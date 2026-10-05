@@ -1,0 +1,43 @@
+{
+  "name": "neo-meme-coins",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "check:extension": "node --check extension/page-tap-v081.js && node --check extension/visual-label-discovery-v09.js && node --check extension/sentinel-v5.js && node --check extension/resolver-v081.js && node --check extension/background-main-v4.js && node --check extension/realtime-bg.js && node --check extension/engine-v2.js && node --check extension/popup.js",
+    "build": "npm run check:strategy && npm run check:extension && vite build && node scripts/package-extension.mjs",
+    "preview": "vite preview --host 0.0.0.0",
+    "lint": "tsc --noEmit",
+    "check:strategy": "node scripts/verify-strategy-lock.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^2.4.0",
+    "@solana/web3.js": "^1.98.4",
+    "@supabase/supabase-js": "^2.110.2",
+    "@tailwindcss/vite": "^4.1.14",
+    "@vitejs/plugin-react": "^5.0.4",
+    "adm-zip": "^0.6.0",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "firebase": "^12.16.0",
+    "lucide-react": "^0.546.0",
+    "motion": "^12.23.24",
+    "react": "^19.0.1",
+    "react-dom": "^19.0.1",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.9.2",
+    "vite": "^6.2.3"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.14.0",
+    "autoprefixer": "^10.4.21",
+    "esbuild": "^0.25.0",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.21.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

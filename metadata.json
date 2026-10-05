@@ -1,0 +1,6 @@
+{
+  "name": "NEO Meme Coins",
+  "description": "Device-first Solana meme coin risk intelligence with holder concentration, fresh-wallet, common-funder, synchronized-funding, liquidity and market-flow analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["DEVICE_SIDE_SOLANA_RPC", "DEXSCREENER_PUBLIC_DATA", "BROWSER_EXTENSION"]
+}

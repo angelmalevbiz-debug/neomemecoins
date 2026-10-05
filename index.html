@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#08090c" />
+    <meta name="description" content="NEO Meme Coins — 24/7 Solana meme coin monitoring, scoring and paper trading." />
+    <title>NEO Meme Coins — Live Solana Monitor</title>
+    <script>
+      (() => {
+        const timeZone = 'Europe/Sofia';
+        const localeMethods = ['toLocaleString', 'toLocaleTimeString', 'toLocaleDateString'];
+
+        for (const method of localeMethods) {
+          const original = Date.prototype[method];
+          Date.prototype[method] = function (locales, options) {
+            return original.call(this, locales || 'bg-BG', {
+              ...(options || {}),
+              timeZone: options && options.timeZone ? options.timeZone : timeZone,
+            });
+          };
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

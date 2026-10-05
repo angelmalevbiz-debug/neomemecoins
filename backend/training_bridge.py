@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from engine_runtime import atomic_json
 from paper_training import USDC, digest, number, raw_int
@@ -20,6 +21,7 @@ from paper_training import USDC, digest, number, raw_int
 _BRIDGE = None
 ROUTE_EVIDENCE_TTL_MS = 30_000
 SOL = 'So11111111111111111111111111111111111111112'
+RECENT_OBSERVATION_IDS = 8192
 
 
 class TrainingBridge:
@@ -29,12 +31,18 @@ class TrainingBridge:
         self.queue = queue.Queue(maxsize=4096)
         self.cache = {}
         self.lock = threading.Lock()
+        self.pending_ids = set()
+        self.recent_ids = OrderedDict()
+        self.coalesced = 0
         self.dropped = 0
         try:
             previous = json.loads((self.root / 'training.json').read_text(encoding='utf-8'))
             # Keep the producer count monotonic across parent-process restarts;
             # the worker stores a reset baseline for the current PAPER epoch.
             self.dropped = int(number(previous.get('recording_drops_baseline'))) + int(number(previous.get('recording_drops_total')))
+            for row_id in previous.get('seen_ids', [])[-RECENT_OBSERVATION_IDS:]:
+                if isinstance(row_id, str):
+                    self.recent_ids[row_id] = None
         except (OSError, ValueError, TypeError):
             pass
         self.error = None
@@ -50,13 +58,49 @@ class TrainingBridge:
     def submit(self, observation):
         if self.closed:
             return False
+        payload = copy.deepcopy(observation)
+        row_id = payload.get('id') if isinstance(payload, dict) and not payload.get('_reset') else None
+        if row_id:
+            # Monitor paths can report the same exact coin/flow/proof several
+            # times in one millisecond. Coalesce only identical content hashes;
+            # new evidence and distinct proof updates retain their own rows.
+            # Queue insertion and pending registration share the lock so the
+            # writer cannot finish before the ID becomes visible to producers.
+            with self.lock:
+                if row_id in self.pending_ids or row_id in self.recent_ids:
+                    self.coalesced += 1
+                    return True
+                self.pending_ids.add(row_id)
+                try:
+                    self.queue.put_nowait(payload)
+                except queue.Full:
+                    self.pending_ids.discard(row_id)
+                    self.dropped += 1
+                    self.error = 'Training queue full; missing observations invalidate evidence coverage'
+                    return False
+            return True
         try:
-            self.queue.put_nowait(copy.deepcopy(observation))
+            self.queue.put_nowait(payload)
             return True
         except queue.Full:
             self.dropped += 1
             self.error = 'Training queue full; missing observations invalidate evidence coverage'
             return False
+
+    def _record_persisted(self, row_id):
+        if not row_id:
+            return
+        with self.lock:
+            self.pending_ids.discard(row_id)
+            self.recent_ids[row_id] = None
+            self.recent_ids.move_to_end(row_id)
+            while len(self.recent_ids) > RECENT_OBSERVATION_IDS:
+                self.recent_ids.popitem(last=False)
+
+    def _forget_pending(self, row_id):
+        if row_id:
+            with self.lock:
+                self.pending_ids.discard(row_id)
 
     def run(self):
         try:
@@ -74,6 +118,7 @@ class TrainingBridge:
                 except queue.Empty:
                     self.read_snapshot()
                     continue
+                row_id = item.get('id') if isinstance(item, dict) and not item.get('_reset') else None
                 try:
                     if item is None:
                         return
@@ -87,6 +132,9 @@ class TrainingBridge:
                             'recording_drops_total': self.dropped})
                         with self.lock:
                             self.cache.clear()
+                            self.pending_ids.clear()
+                            self.recent_ids.clear()
+                            self.coalesced = 0
                         self.error = None
                     else:
                         # Persist provenance before evaluating. Accepted observations are
@@ -96,8 +144,10 @@ class TrainingBridge:
                             handle.flush()
                             os.fsync(handle.fileno())
                         self.processed += 1
+                        self._record_persisted(row_id)
                     self.read_snapshot()
                 except Exception as exc:
+                    self._forget_pending(row_id)
                     self.error = f'{type(exc).__name__}: {exc}'
                     self.latest = dict(self.latest, recorder={
                         'processed': self.processed, 'backlog': self.queue.qsize(),
@@ -386,7 +436,8 @@ def snapshot():
     if _BRIDGE:
         result = copy.deepcopy(_BRIDGE.latest)
         result['recorder'] = {'processed': _BRIDGE.processed, 'backlog': _BRIDGE.queue.qsize(),
-                              'dropped': _BRIDGE.dropped, 'error': _BRIDGE.error}
+                              'dropped': _BRIDGE.dropped, 'coalesced': _BRIDGE.coalesced,
+                              'error': _BRIDGE.error}
         if _BRIDGE.error:
             result['status'] = 'degraded'
         return result

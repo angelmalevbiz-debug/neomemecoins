@@ -88,6 +88,9 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         at = int(time.time()*1000)
         self.observe(at, proof=False)
         snap = self.wait_for(lambda s:s["unique_observations"] == 1)
+        journal_size = (self.root/"observations.jsonl").stat().st_size
+        checkpoint = json.loads((self.root/"training.json").read_text(encoding="utf-8"))["recording_start_offset"]
+        self.assertEqual(checkpoint, journal_size)
         self.assertEqual(self.control(snap)["open_positions"], 0)
         self.assertEqual(self.control(snap)["pending_orders"], 0)
         self.observe(at+1000)
@@ -160,6 +163,8 @@ class TrainingBridgeProcessTests(unittest.TestCase):
     def test_queue_drop_visible_and_submit_never_waits_for_learner(self):
         bridge = TrainingBridge.__new__(TrainingBridge)
         bridge.queue = queue.Queue(maxsize=1)
+        bridge.lock = threading.Lock(); bridge.pending_ids = set(); bridge.recent_ids = training_bridge.OrderedDict()
+        bridge.coalesced = 0
         bridge.closed = False; bridge.dropped = 0; bridge.error = None
         bridge.processed = 0; bridge.latest = {"paper_only": True}
         self.assertTrue(bridge.submit({"id": "one"}))
@@ -171,6 +176,34 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertIn("queue full", bridge.error.lower())
         bridge.closed = True
         self.assertFalse(bridge.submit({"id": "three"}))
+
+    def test_duplicate_observation_ids_are_coalesced_without_queue_pressure(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.queue = queue.Queue(maxsize=1)
+        bridge.lock = threading.Lock(); bridge.pending_ids = set(); bridge.recent_ids = training_bridge.OrderedDict()
+        bridge.coalesced = 0; bridge.closed = False; bridge.dropped = 0; bridge.error = None
+        self.assertTrue(bridge.submit({"id": "same-evidence"}))
+        self.assertTrue(bridge.submit({"id": "same-evidence"}))
+        self.assertEqual(bridge.queue.qsize(), 1)
+        self.assertEqual(bridge.coalesced, 1)
+        self.assertEqual(bridge.dropped, 0)
+        self.assertIsNone(bridge.error)
+        self.assertEqual(bridge.queue.get_nowait(), {"id": "same-evidence"})
+        bridge.queue.task_done()
+        bridge._record_persisted("same-evidence")
+        self.assertTrue(bridge.submit({"id": "same-evidence"}))
+        self.assertEqual(bridge.queue.qsize(), 0)
+        self.assertEqual(bridge.coalesced, 2)
+
+    def test_recent_duplicate_ids_are_restored_from_durable_training_state(self):
+        engine = PaperTrainingEngine(self.root / "training.json")
+        engine.state["seen_ids"] = ["persisted-evidence"]
+        engine.save()
+        self.start()
+        self.assertTrue(self.bridge.submit({"id": "persisted-evidence"}))
+        self.assertEqual(self.bridge.queue.qsize(), 0)
+        self.assertEqual(self.bridge.coalesced, 1)
+        self.assertEqual(self.bridge.dropped, 0)
 
     def test_submit_stays_nonblocking_when_child_process_is_not_progressing(self):
         self.start()

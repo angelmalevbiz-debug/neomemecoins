@@ -67,11 +67,11 @@ Run `backend/market_monitor.py` in another terminal with the same environment. S
 
 Primary repository defaults retain a disabled daily cap (`0`), disabled drawdown cap (`0`), maximum full-loss capital $250 and exposure 100%; these are explicitly visible and are **not** the conservative runbook settings. New training default risk limits remain active. Do not silently change an existing account's limits.
 
-`GET /state` includes `paper_training`: portfolio capitals/returns, open/completed trades, raw simulation versus unique observations/episodes, refusals, failure fees, queue drops/lag, last training, active version, history and control comparison. The UI displays those fields. The public deployed old code will not display this panel until repaired code is deployed.
+`GET /state` includes `paper_training`: portfolio capitals/returns, open/completed trades, raw simulation versus unique observations/episodes, refusals, failure fees, queue drops/lag, last training, active version, history and control comparison. The live Pages build displays those fields.
 
 ## Recording and causal replay
 
-The bridge writes `<account directory>/training/observations.jsonl`. It stores availability/source times, exact mint/pool, flow, safety/price provenance, main quote evidence and explicit model assumptions. It makes no per-experiment API request. Copy recordings after flushing/stopping the producer, or use complete newline-terminated records only.
+The bridge coalesces only identical observation IDs in a bounded recent-ID cache, then writes accepted rows to `<account directory>/training/observations.jsonl`. It stores availability/source times, exact mint/pool, flow, safety/price provenance, main quote evidence and explicit model assumptions. It makes no per-experiment API request. The independent worker evaluates up to 100 complete rows per batch, atomically saves learner state with its byte-offset checkpoint, and resumes there after restart; the main bot never waits for this work. Queue drops remain explicit evidence gaps and block promotion. Copy recordings after flushing/stopping the producer, or use complete newline-terminated records only.
 
 ```powershell
 .venv/Scripts/python.exe scripts/paper_training.py import --input .runtime/demo/training/observations.jsonl --output .runtime/datasets/market.jsonl

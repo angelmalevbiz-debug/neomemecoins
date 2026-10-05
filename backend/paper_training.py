@@ -903,7 +903,7 @@ class PaperTrainingEngine:
                                            "to": previous["id"], "params": previous["params"], "comparison": comparison})
             self.state["monitor"] = None
 
-    def ingest(self, observation):
+    def ingest(self, observation, *, persist=True):
         row = copy.deepcopy(observation)
         # Keep recorder facts and counters deterministic across duplicate replay,
         # including duplicates older than the current time cursor.
@@ -914,11 +914,13 @@ class PaperTrainingEngine:
             row_id = None
         if row_id and row_id in self.state["seen_ids"]:
             self.state["duplicate_observations"] += 1
-            self.save()
+            if persist:
+                self.save()
             return False
         if not row_id or not self._row_valid(row):
             self.state["invalid_observations"] += 1
-            self.save()
+            if persist:
+                self.save()
             return False
         row["available_at"], row["observed_at"] = int(row["available_at"]), int(row["observed_at"])
         row["id"] = row_id
@@ -959,7 +961,8 @@ class PaperTrainingEngine:
             self._train(now)
         self.state.update(last_available_at=now, updated_at=now,
                           status="ACTIVE" if any(b["positions"] or b["pending"] for b in self.state["books"].values()) else "WAIT")
-        self.save()
+        if persist:
+            self.save()
         return True
 
     def replay(self, observations):

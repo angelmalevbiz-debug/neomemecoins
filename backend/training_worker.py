@@ -9,6 +9,8 @@ from engine_runtime import atomic_json as _atomic_json
 from paper_training import PaperTrainingEngine
 from paper_state_reset import archive_files
 
+MAX_BATCH_ROWS = 512
+
 
 def atomic_json(path, data):
     # Snapshot readers can briefly prevent replacement on Windows. Retry only
@@ -56,18 +58,24 @@ def follow(root, config):
                     if handle.seek(0, 2) < offset:
                         offset = 0
                     handle.seek(offset)
-                    for _ in range(100):
+                    for _ in range(MAX_BATCH_ROWS):
                         line = handle.readline()
                         if not line or not line.endswith(b'\n'):
                             break
                         offset += len(line)
+                        changed = True
                         row = json.loads(line)
                         if int(row.get('available_at', 0)) < minimum_time:
                             continue
                         if row.get('id') in engine.state['seen_ids']:
                             continue
-                        engine.ingest(row)
-                        changed = True
+                        engine.ingest(row, persist=False)
+            if changed:
+                # The append-only source is durable before it enters this worker.
+                # Commit the whole batch and its byte offset atomically so the
+                # next restart resumes here instead of re-reading a huge journal.
+                engine.state['recording_start_offset'] = offset
+                engine.save()
             if changed or not source.exists() or minimum_time:
                 atomic_json(root / 'training_snapshot.json', engine.snapshot())
             time.sleep(.05)

@@ -22,7 +22,7 @@ jobs:
           python-version: '3.12'
       - name: Verify and restore the source archive
         env:
-          EXPECTED_SHA256: 2cb6c93df2afe4bf9f68d2fb8103abd0cd7589f24a6d244df05c23cda8b0b528
+          EXPECTED_SHA256: 7659886d737e07a246f6f8e2f839253171b128508dd5debda42087391306a338
           BASE_SHA: f3aa701fe1fde5d2b2bdf578ec92606488b406c6
         run: |
           git cat-file -e "$BASE_SHA^{commit}"
@@ -30,7 +30,7 @@ jobs:
           python - <<'PY'
           import hashlib, os, pathlib, stat, zipfile
           root = pathlib.Path.cwd().resolve()
-          archive = root / "neomemecoins-ready-v2.zip"
+          archive = root / "neomemecoins-ready-v3.zip"
           digest = hashlib.sha256(archive.read_bytes()).hexdigest()
           if digest != os.environ["EXPECTED_SHA256"]:
               raise SystemExit(f"Source archive SHA mismatch: {digest}")
@@ -60,7 +60,7 @@ jobs:
               raise SystemExit(f"Unexpectedly small source archive: {len(seen)} files")
           print(f"Restored {len(seen)} verified files ({digest})")
           PY
-          git rm -f neomemecoins-ready.zip neomemecoins-ready-v2.zip .github/workflows/bootstrap-pages.yml
+          git rm -f neomemecoins-ready.zip neomemecoins-ready-v2.zip neomemecoins-ready-v3.zip .github/workflows/bootstrap-pages.yml
       - name: Set up Node
         uses: actions/setup-node@v4
         with:

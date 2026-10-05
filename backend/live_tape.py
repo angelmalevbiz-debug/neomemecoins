@@ -20,16 +20,16 @@ import requests
 import honest_quote_transport as quote_transport
 
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
-RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://rpc.solanatracker.io/public')
+RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
-MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '20'))
+MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','4'))))
+PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','6'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 WINDOW_MS = 300_000
-POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','1.0'))
+POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -102,9 +102,14 @@ def feed_snapshot():
     coins.sort(key=priority,reverse=True)
     pinned = [dict(p.get('coin_snapshot') or {},address=p.get('address'),pairAddress=p.get('pairAddress'))
               for p in state.get('positions',[])]
+    # The strict transaction decoder below only verifies the PumpSwap AMM.
+    # Other DEX pools stay outside this flow tape rather than being mislabeled
+    # as zero-flow or making verified PumpSwap coverage permanently degraded.
+    pinned_supported = [coin for coin in pinned if str(coin.get('dexId') or '').lower() == 'pumpswap']
+    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap']
     rows,observed = {},now_ms()
     shared_reference=shared_quote_reference()
-    for coin in pinned+coins[:MAX_TRACKED]:
+    for coin in (pinned_supported+supported_coins)[:MAX_TRACKED]:
         pair,mint = coin.get('pairAddress'),coin.get('address')
         if not pair or not mint or pair in rows:
             continue
@@ -387,7 +392,9 @@ class TapeRecorder:
             active = next_active
 
     def process(self,rpc):
-        pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed,slot LIMIT ?",(self.clock(),self.tx_budget)))
+        # Drain the freshest actionable signatures first. Historical retries can
+        # remain durable without starving the current five-minute decision window.
+        pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed DESC,slot DESC LIMIT ?",(self.clock(),self.tx_budget)))
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
@@ -430,8 +437,15 @@ class TapeRecorder:
             state = self.db.execute('SELECT * FROM pairs WHERE pair=?',(pair,)).fetchone()
             if not state:
                 continue
-            counters = {r['state']:r['n'] for r in self.db.execute('SELECT state,count(*) n FROM signatures WHERE pair=? AND (event_time>=? OR event_time IS NULL) GROUP BY state',(pair,cutoff))}
-            pending = self.db.execute("SELECT count(*) n,min(observed) oldest FROM signatures WHERE pair=? AND state='pending'",(pair,)).fetchone()
+            # Unknown event times only affect decisions for the five-minute
+            # window in which we actually observed the signature.
+            recent_filter = '(event_time>=? OR (event_time IS NULL AND observed>=?))'
+            counters = {r['state']:r['n'] for r in self.db.execute(
+                f'SELECT state,count(*) n FROM signatures WHERE pair=? AND {recent_filter} GROUP BY state',
+                (pair,cutoff,cutoff))}
+            pending = self.db.execute(
+                f"SELECT count(*) n,min(observed) oldest FROM signatures WHERE pair=? AND state='pending' AND {recent_filter}",
+                (pair,cutoff,cutoff)).fetchone()
             latest = self.db.execute('SELECT max(event_time) t FROM events WHERE pair=?',(pair,)).fetchone()['t']
             reason = state['reason']
             if pending['n']:
@@ -452,10 +466,14 @@ class TapeRecorder:
             for record in coverage.values():
                 record.update(status='DEGRADED',reason='UI_WINDOW_TRUNCATED')
         counts = {r['state']:r['n'] for r in self.db.execute('SELECT state,count(*) n FROM signatures GROUP BY state')}
+        current_backlog = sum(record['backlog'] for record in coverage.values())
+        total_backlog = counts.get('pending',0)
         return {**STATUS,'status':'online' if coverage and all(r['status']=='COMPLETE' for r in coverage.values()) else 'degraded',
                 'updated_at':current,'tracked_pairs':len(feed),'events':events,'pair_coverage':coverage,
                 'coverage':sum(r['status']=='COMPLETE' for r in coverage.values())/max(1,len(feed)),
-                'backlog':counts.get('pending',0),'classifications':counts,'events_total':self.db.execute('SELECT count(*) n FROM events').fetchone()['n'],
+                'backlog':total_backlog,'current_backlog':current_backlog,
+                'stale_pending':max(0,total_backlog-current_backlog),
+                'classifications':counts,'events_total':self.db.execute('SELECT count(*) n FROM events').fetchone()['n'],
                 'window_ms':WINDOW_MS,'projection_truncated':truncated,
                 'lag_ms':max((max(0,current-r['oldest_pending_at']) for r in coverage.values() if r['oldest_pending_at']),default=0)}
 

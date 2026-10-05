@@ -47,6 +47,38 @@ def non_swap():
 
 
 class ParserTests(unittest.TestCase):
+    def test_feed_snapshot_limits_order_flow_to_supported_pumpswap_pools(self):
+        class Response:
+            def raise_for_status(self):
+                return None
+            def json(self):
+                return {
+                    'feed': [
+                        {'address':pubkey(20),'pairAddress':pubkey(21),'dexId':'raydium',
+                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':100,'sells':100}}},
+                        {'address':pubkey(22),'pairAddress':pubkey(23),'dexId':'pumpfun',
+                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':90,'sells':90}}},
+                        {'address':pubkey(24),'pairAddress':pubkey(25),'dexId':'pumpswap',
+                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':10,'sells':10}}},
+                        {'address':pubkey(26),'pairAddress':pubkey(27),'dexId':'pumpswap',
+                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':9,'sells':9}}},
+                    ],
+                    'positions': [
+                        {'address':pubkey(28),'pairAddress':pubkey(29),
+                         'coin_snapshot':{'dexId':'pumpswap','symbol':'PIN','priceUsd':1}},
+                        {'address':pubkey(30),'pairAddress':pubkey(31),
+                         'coin_snapshot':{'dexId':'raydium','symbol':'UNSUPPORTED','priceUsd':1}},
+                    ],
+                }
+
+        with patch.object(tape.SESSION,'get',return_value=Response()), \
+             patch.object(tape,'shared_quote_reference',return_value=None), \
+             patch.object(tape,'MAX_TRACKED',1):
+            feed=tape.feed_snapshot()
+        self.assertEqual({row['pair'] for row in feed},{pubkey(29)})
+        self.assertLessEqual(len(feed),1)
+        self.assertTrue(all(row['dexId']=='pumpswap' for row in feed))
+
     def test_projection_atomic_replace_retries_transient_windows_lock(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -183,6 +215,44 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s081')
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
+
+    def test_current_pending_signatures_are_processed_before_old_retries(self):
+        self.rec.tx_budget=1
+        with self.rec.db:
+            for signature,observed,slot in (('old',NOW-600_000,1),('current',NOW,2)):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,metadata,state,attempts,next_retry)
+                    VALUES(?,?,?,?,?,?,'pending',0,0)''',
+                    (signature,PAIR,slot,observed,observed,json.dumps(META)))
+        requested=[]
+
+        def rpc(calls):
+            requested.extend(params[0] for method,params in calls if method=='getTransaction')
+            return [{'result':non_swap()} for _ in calls]
+
+        self.rec.process(rpc)
+        self.assertEqual(requested,['current'])
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='old'").fetchone()[0],'pending')
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='current'").fetchone()[0],'non_swap')
+
+    def test_old_unknown_history_does_not_block_complete_current_coverage(self):
+        def rpc(calls):
+            return [{'result':[]} for _ in calls]
+
+        self.rec.poll([META],rpc)
+        old=self.clock[0]-tape.WINDOW_MS-10
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,metadata,state,attempts,next_retry)
+                VALUES('stale-pending',?,?, ?,?,?, 'pending',0,0)''',
+                (PAIR,1,old,old,json.dumps(META)))
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,metadata,state,attempts,next_retry)
+                VALUES('stale-unknown',?,?,NULL,?,?,'unclassified',1,0)''',
+                (PAIR,2,old,json.dumps(META)))
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['status'],'online')
+        self.assertEqual(snapshot['backlog'],1)
+        self.assertEqual(snapshot['current_backlog'],0)
+        self.assertEqual(snapshot['stale_pending'],1)
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],0)
 
     def test_transaction_null_is_pending_then_success_after_restart(self):
         available=[False]

@@ -300,6 +300,12 @@ export default function App() {
   const connectionStatus = dashboardConnectionStatus(connection, now);
   const connected = connectionStatus === 'ONLINE';
   const connectionLabel = connected ? 'BACKEND ONLINE' : connectionStatus;
+  const tapeOnline = connected && state?.live_tape_status?.status === 'online';
+  const selectedFlowSupported = selectedCoin?.dexId?.toLowerCase() === 'pumpswap';
+  const flowStatusLabel = !connected ? connectionLabel
+    : !selectedFlowSupported ? `FLOW NOT VERIFIED · ${selectedCoin?.dexId?.toUpperCase() || 'UNKNOWN DEX'}`
+      : tapeOnline ? `VERIFIED ON-CHAIN · ${state?.live_tape_status?.tracked_pairs ?? 0} PUMPSWAP POOLS`
+        : 'ON-CHAIN COVERAGE INCOMPLETE · NEW ENTRIES STAY BLOCKED';
   const snapshotHint = connection.receivedAt ? `Последен получен отговор: ${fullTimeLabel(connection.receivedAt)}.` : 'PAPER сметката още не е заредена.';
   const emptyStateMessage = state ? 'Няма записи в получения отговор.' : 'Данните още не са заредени от backend.';
 
@@ -372,10 +378,10 @@ export default function App() {
             <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0b0e11]">
               <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" /> LIVE ORDER FLOW</div>
-                  <div className="mt-1 text-sm font-black text-white">${selectedCoin.symbol} · реални Solana сделки</div>
+                  <div className={`flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] ${tapeOnline && selectedFlowSupported ? 'text-emerald-300' : 'text-amber-200'}`}><span className={`h-2 w-2 rounded-full ${tapeOnline && selectedFlowSupported ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />{tapeOnline && selectedFlowSupported ? 'VERIFIED ON-CHAIN ORDER FLOW' : 'ORDER-FLOW COVERAGE'}</div>
+                  <div className="mt-1 text-sm font-black text-white">${selectedCoin.symbol} · {selectedFlowSupported ? 'проверени PumpSwap транзакции' : 'за този DEX няма проверен поток'}</div>
                 </div>
-                <div className="text-[9px] text-slate-500">{connected && state?.live_tape_status?.status === 'online' ? `ON-CHAIN LIVE · ${state.live_tape_status.tracked_pairs ?? 0} pairs` : connectionLabel} · guard {state?.config.position_scan_seconds ?? 2}s</div>
+                <div className={`text-[9px] ${tapeOnline && selectedFlowSupported ? 'text-slate-500' : 'text-amber-200/80'}`}>{flowStatusLabel} · guard {state?.config.position_scan_seconds ?? 2}s</div>
               </div>
               <div className="grid grid-cols-2 gap-px bg-white/[0.05] sm:grid-cols-4">
                 <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">BUY 60s</div><div className="mt-1 text-sm font-black text-emerald-300">{detail?.flow ? fmtMoney(detail.flow.buy_usd) : '—'}</div></div>

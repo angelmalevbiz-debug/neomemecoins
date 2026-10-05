@@ -71,7 +71,7 @@
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "660b991ba342dc34a2d5cf3a58c05a05621c7290babf893ffb6cc1919eacbc50",
     "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
-    "backend/live_tape.py": "e0490cc58c25fb95d35a2b7d02e89601d6b90215f6c7b2d46b188e52b00e2dee",
+    "backend/live_tape.py": "94cb90e4742807933030df153db76b25dd3067e5cd1e04ba9315dad67be706ac",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -150,6 +150,6 @@
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"
   },
   "support_file_changes": {
-    "backend/live_tape.py": "Bounded shared tape ingestion aligned with transaction processing capacity; verified signatures and safety gates remain mandatory"
+    "backend/live_tape.py": "Decoder-supported PumpSwap-only tape; lower RPC poll rate, freshest-first processing, and current-window-only backlog gating; complete safety gates remain mandatory"
   }
 }

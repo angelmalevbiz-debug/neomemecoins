@@ -98,10 +98,10 @@ $settings = @{
     NEO_MARKET_UPSTREAM="http://127.0.0.1:$MainPort"; NEO_LOCAL_API="http://127.0.0.1:$MainPort/state";
     NEO_MARKET_STATE_PATH=(Join-Path $runtime 'state.json'); NEO_MARKET_AUDIT_PATH=(Join-Path $runtime 'audit.jsonl');
     NEO_LIVE_TAPE_PATH=(Join-Path $runtime 'live_tape.json'); NEO_TAPE_DB_PATH=(Join-Path $runtime 'live_tape.sqlite3');
-    # Keep signature discovery near the recorder's 120-transaction processing
-    # budget: at most 20 pools × 4 signatures per one-second poll.
-    NEO_TAPE_MAX_PAIRS='20'; NEO_TAPE_PAGE_SIZE='4'; NEO_TAPE_PAGES_PER_POLL='1';
-    NEO_TAPE_TX_PER_POLL='120'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_POLL_SECONDS='1.0';
+    # Share one free mainnet RPC tape; cap total supported pools, including pins,
+    # and process only a bounded batch each two-second poll.
+    NEO_TAPE_MAX_PAIRS='12'; NEO_TAPE_PAGE_SIZE='6'; NEO_TAPE_PAGES_PER_POLL='1';
+    NEO_TAPE_TX_PER_POLL='120'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
     NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');
     NEO_STRATEGY_LAB_COMPACT_PATH=(Join-Path $runtime 'strategy_lab_compact.json');

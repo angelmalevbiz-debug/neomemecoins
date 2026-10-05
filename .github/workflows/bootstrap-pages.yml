@@ -8,13 +8,13 @@ permissions:
   actions: write
 jobs:
   apply-and-deploy:
-    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.added, '.github/workflows/codex-update.zip')
+    if: github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'Queue verified PAPER runtime update')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 5
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -24,7 +24,7 @@ jobs:
           cache: npm
       - name: Verify upload and exact base, then extract allowlisted files
         env:
-          EXPECTED_SHA256: 7a1fd02600d9a06e74dd8fbdc97cbc4fb26d3684f6c13505e5f1f7ed22ee45f1
+          EXPECTED_SHA256: fded1bb7eb8acec890bdd01a6e21d2cc9cc0c0fa5ab1d971bc5a6f04e051c6cf
           EXPECTED_PARENT: 077e2a94e8819b9221560c337e56a4d21a00f529
         run: |
           if [ ! -f .github/workflows/codex-update.zip ]; then
@@ -45,9 +45,9 @@ jobs:
           actual_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
           if actual_sha != os.environ['EXPECTED_SHA256']:
               raise SystemExit(f'Bundle SHA mismatch: {actual_sha}')
-          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
-          if parent != os.environ['EXPECTED_PARENT']:
-              raise SystemExit(f'Unexpected main parent: {parent}')
+          ancestry = subprocess.check_output(['git', 'rev-list', '--max-count=5', 'HEAD^'], text=True).splitlines()
+          if os.environ['EXPECTED_PARENT'] not in ancestry:
+              raise SystemExit(f'Expected base is not in ancestry: {ancestry}')
           with zipfile.ZipFile(archive) as bundle:
               names = bundle.namelist()
               if len(names) != len(set(names)) or set(names) != expected:

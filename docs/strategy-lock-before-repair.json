@@ -1,0 +1,92 @@
+{
+  "name": "NEO Meme Coins EARLY Order Flow paper strategy",
+  "locked_at_utc": "2026-10-05T16:35:00Z",
+  "source_commit": "USER_UNLOCKED_EARLY_ORDER_FLOW_20261005",
+  "strategy_file": "backend/market_monitor.py",
+  "sha256": "b5e1289036992080ee099fd9d7a03cb4ecae4310cc9d8bc6369046d5bb75887d",
+  "production_strategy_id": "ORDER_FLOW_EARLY_ADAPTIVE",
+  "rules": {
+    "entry_score": 58,
+    "max_positions": 8,
+    "stop_loss_pct": 5,
+    "take_profit_pct": 10,
+    "trailing_pct": 4,
+    "max_hold_minutes": 60,
+    "starting_balance_usd": 1000,
+    "trade_notional_usd_max": 200,
+    "early_trade_notional_usd_range": [
+      25,
+      200
+    ],
+    "max_daily_loss_usd": 0,
+    "min_liquidity_usd": 4000
+  },
+  "policy": "User explicitly unlocked the strategy on 2026-10-05 to favor many early PAPER entries and learning from outcomes. Do not switch this PAPER strategy to real-money execution without a separate explicit request.",
+  "integrity_note": "High-frequency PAPER mode with direct early discovery: GeckoTerminal new PumpSwap pools are sampled on a 15s cache and merged before DexScreener profile/boost indexing, preserving the exact new pool for its first 15 minutes. Sub-minute ULTRA_EARLY entries can trigger from score 58 / conviction 30 after the first real buy-flow impulse. Up to 8 positions, $25-$200 liquidity-aware scout sizing, history-based size reduction after repeated losing setups, 30-second order flow, faster tape polling, prewarmed safety checks, exact-pool Jupiter confirmation, mandatory rug vetoes, and absolute -5% PAPER stop accounting. No state/history reset.",
+  "execution_mode": "JUPITER_QUOTE_V2_EXPECTED",
+  "entry_policy_version": "ORDER_FLOW_EARLY_LEARNER_V8",
+  "entry_policy_limits": {
+    "ultra_early": {
+      "max_age_minutes": 45,
+      "min_score": 58,
+      "min_liquidity_usd": 4000,
+      "min_flow_trades": 1,
+      "min_flow_ratio": 1.05,
+      "min_conviction": 30
+    },
+    "early": {
+      "max_age_minutes": 180,
+      "min_score": 70,
+      "min_liquidity_usd": 5000,
+      "min_flow_trades": 2,
+      "min_flow_ratio": 1.1,
+      "min_conviction": 45
+    },
+    "momentum": {
+      "min_score": 78,
+      "min_liquidity_usd": 7500,
+      "min_flow_trades": 3,
+      "min_flow_ratio": 1.2,
+      "min_conviction": 55
+    },
+    "max_entry_impact_pct": 1.75,
+    "max_roundtrip_cost_pct": 2.75,
+    "max_worst_case_cost_pct": 4,
+    "reentry_cooldown_seconds": 1200,
+    "risk_overlay": "USER_NET_5_HARD_CAP"
+  },
+  "support_files_sha256": {
+    "backend/engine_entry_policy.py": "ef9bcecd56b08944cf51f8175e06fbb62940d19e7836f1df866423c57b8c711d",
+    "backend/paper_execution_quotes.py": "93fd07ba67904f6cdbf5497cc7c0587f6240e49c4de2d2276c9b68178790958b",
+    "backend/engine_rug_guard.py": "871d62ea0769d3d6d34eb0f4d1032dc822bae0134c5fb5506ceec60591e9cc0e",
+    "backend/engine_execution.py": "e7f7f2dc403c6bfd6d99b0935b29cc76c8ca8f8b9dcc5f25a7f2cee5a58b0ae7",
+    "backend/gold_order_flow.py": "00fabcefe73e4c30b70ec53cf9d9051c45a35f3189cd080626f2a3c62f9d87ff",
+    "backend/honest_quote_transport.py": "bd5868c186bdc64f708012df31f18f505fa55dc6ecc48478468728bd59b9eabd",
+    "backend/pair_price_integrity.py": "a92e8fffb95949982321dc1f67d77484415cc037cadd9e1d318a6f0ed444463b",
+    "backend/engine_runtime.py": "7aaf03b854d032a4a6b5e840c95d1a7eaae9239007d03e15e90f1d59d55e2c66",
+    "backend/pumpswap_stop_quote.py": "0b782ffc6e2984e1d86127c16ed09539f66dc3ef9644a0d2304d291643311d8b",
+    "backend/live_tape.py": "2884d509b8aad870d8a382b58b7ea43c55d6f5e55fec7533d8d97e75fd913c18"
+  },
+  "runtime_version": "RUNTIME_REPAIR_V1",
+  "runtime_note": "Up to 8 concurrent PAPER positions. $200 is a maximum, not a fixed size: thin/very-new pools use $25-$150 scouts so high-frequency learning is not blocked by $200 price impact. Daily loss cap remains disabled for this ongoing PAPER experiment; history/state are preserved.",
+  "stop_execution_mode": "PUMPSWAP_RPC_RESERVES_V2_WITH_PAPER_5_PCT_CAP",
+  "stop_execution_note": "Execution-only change: PumpSwap exits use batched direct Solana reserve marks with Jupiter fallback; -4% net pre-arm and an absolute -5% PAPER accounting cap preserve observed gap quotes for audit. Entry, ORDER FLOW signal, adaptive hold and history are unchanged.",
+  "entry_data_fallbacks": {
+    "missing_or_pending_reference_price": "EXACT_POOL_JUPITER_CONFIRMATION_REQUIRED",
+    "sol_usd_for_costs": "DEXSCREENER_SOL_MARKET_60S_CACHE",
+    "prewarm_safety_checks": true,
+    "strategy_changed": true
+  },
+  "learning": {
+    "mode": "SIZE_NOT_ENTRY_VETO",
+    "window_trades": 60,
+    "behavior": "Repeated losing comparable setups continue trading at smaller size instead of being disabled."
+  },
+  "discovery": {
+    "primary_early": "GECKOTERMINAL_SOLANA_NEW_POOLS_PUMPSWAP",
+    "cache_seconds": 15,
+    "dexscreener_profiles_and_boosts": true,
+    "exact_new_pool_pinned_minutes": 15,
+    "safety_checks_unchanged": true
+  }
+}

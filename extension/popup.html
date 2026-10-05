@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="bg">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEO Meme Coins</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="brand-row">
+        <div class="brand-mark">N</div>
+        <div>
+          <div class="brand">NEO Meme Coins</div>
+          <div class="sub">Terminal + Visual Realtime Sentinel</div>
+        </div>
+        <span class="alpha">v0.9</span>
+      </header>
+
+      <section class="auto-card">
+        <div class="live-row"><span class="dot"></span><span>SENTINEL ACTIVE</span></div>
+        <h1>NEO следи терминала постоянно.</h1>
+        <p id="statusText">Стартирам network/WebSocket + visual DOM discovery.</p>
+        <div class="terminal-row"><span>Терминал</span><strong id="terminalName">—</strong></div>
+        <div class="terminal-row"><span>Radar</span><strong id="currentCoin">Чакам данни…</strong></div>
+        <button id="rescanBtn">ОБНОВИ SENTINEL</button>
+        <div id="error" class="error hidden"></div>
+      </section>
+
+      <section id="result" class="result-card hidden">
+        <div class="eyebrow">НАЙ-СИЛЕН ПОСЛЕДЕН DEEP CHECK</div>
+        <div class="result-main">
+          <div><div id="posture" class="posture">WATCH</div><div id="tokenName" class="token-name">—</div></div>
+          <div class="score-box"><span>RISK</span><strong id="risk">-</strong></div>
+        </div>
+        <div class="confidence">Confidence: <strong id="confidence">-</strong></div>
+      </section>
+
+      <section class="how-card">
+        <div class="eyebrow">КАК РАБОТИ v0.9</div>
+        <p>NEO комбинира terminal network/WebSocket feed с втори visual DOM слой, който чете видимите имена, тикери и близкия market context. Така може да resolve-ва coin дори когато Fomo не показва contract address в HTML.</p>
+      </section>
+
+      <details class="settings">
+        <summary>RPC настройки</summary>
+        <label for="rpcInput">Custom Solana RPC URL</label>
+        <input id="rpcInput" type="url" placeholder="https://..." />
+        <button id="saveRpcBtn" class="secondary">ЗАПАЗИ ЛОКАЛНО</button>
+        <p>Не е задължително. Custom RPC се използва само за Solana holder/funding deep checks.</p>
+      </details>
+
+      <footer>NEO не чете seed/private keys и не изпълнява сделки. Risk/Outlook са анализ на налични данни, не гаранция.</footer>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

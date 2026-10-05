@@ -1,0 +1,4 @@
+            if exit_reason == 'STOP_LOSS' and pnl_pct < -STOP_LOSS_PCT:
+                price = entry * (1 - STOP_LOSS_PCT / 100)
+                pnl_pct = -STOP_LOSS_PCT
+                pnl_usd = quantity * (price - entry)

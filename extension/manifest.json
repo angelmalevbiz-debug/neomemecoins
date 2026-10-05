@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "NEO Meme Coins",
+  "version": "0.9.0",
+  "description": "Autonomous realtime crypto Sentinel for Fomo, Axiom and Photon with network/WebSocket feed extraction, visual DOM token discovery, multichain token resolution, market radar, automatic deep analysis, social observation and local validation.",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "https://api.dexscreener.com/*",
+    "https://api.mainnet.solana.com/*",
+    "https://api.mainnet-beta.solana.com/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "background-main-v4.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://fomo.family/*",
+        "https://*.fomo.family/*",
+        "https://photon-sol.tinyastro.io/*",
+        "https://photon.tinyastro.io/*",
+        "https://axiom.trade/*",
+        "https://backup.axiom.trade/*"
+      ],
+      "js": ["page-tap-v081.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://fomo.family/*",
+        "https://*.fomo.family/*",
+        "https://photon-sol.tinyastro.io/*",
+        "https://photon.tinyastro.io/*",
+        "https://axiom.trade/*",
+        "https://backup.axiom.trade/*"
+      ],
+      "js": ["visual-label-discovery-v09.js", "sentinel-v5.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "NEO Meme Coins Sentinel",
+    "default_popup": "popup.html"
+  }
+}

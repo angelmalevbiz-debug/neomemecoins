@@ -1,0 +1,16 @@
+[Unit]
+Description=NEO Meme Coins Multi Strategy Paper Lab
+After=network-online.target neo-fomo-monitor.service neo-live-tape.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/neo-meme-trade
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/strategy_lab.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

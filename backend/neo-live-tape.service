@@ -1,0 +1,16 @@
+[Unit]
+Description=NEO Meme Coins Solana Live Tape
+After=network-online.target neo-fomo-monitor.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/neo-meme-trade
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/root/neo-meme-trade/.venv-tape/bin/python /root/neo-meme-trade/backend/live_tape.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

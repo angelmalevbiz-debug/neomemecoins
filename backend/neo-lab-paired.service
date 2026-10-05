@@ -1,0 +1,28 @@
+[Unit]
+Description=NEO isolated matched paper-exit experiments
+After=network-online.target neo-strategy-lab.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/neo-meme-trade/backend
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired
+ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/lab_paired_runner.py
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths=/var/lib/neo-market
+ReadWritePaths=/var/lib/neo-lab-paired
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=192M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+[Unit]
+Description=Astra 6 Brain isolated quote-backed paper experiment
+After=network-online.target neo-fomo-monitor.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/neo-meme-trade/backend
+ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/astra6_brain.py
+Environment=PYTHONUNBUFFERED=1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+MemoryMax=180M
+CPUQuota=25%
+
+[Install]
+WantedBy=multi-user.target

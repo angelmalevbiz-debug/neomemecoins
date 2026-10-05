@@ -39,6 +39,8 @@ def run(service):
         import market_monitor as module
     elif service == 'tape':
         import live_tape as module
+    elif service == 'lab':
+        import strategy_lab as module
     else:
         import user_gateway as module
         # Per-user engines inherit the same isolated environment and stop marker.
@@ -80,6 +82,8 @@ def run(service):
         elif service == 'tape' and module._RECORDER is not None:
             module._RECORDER.db.commit()
             module._RECORDER.close()
+        elif service == 'lab':
+            module.persist('stopped')
         elif service == 'gateway':
             for process in list(module.ENGINE_PROCESSES.values()):
                 try:
@@ -92,6 +96,6 @@ def run(service):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--service', choices=('main', 'tape', 'gateway'), default='main')
+    parser.add_argument('--service', choices=('main', 'tape', 'lab', 'gateway'), default='main')
     args = parser.parse_args()
     run(args.service)

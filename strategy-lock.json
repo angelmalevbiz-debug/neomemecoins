@@ -1,6 +1,6 @@
 {
   "name": "NEO verified PAPER execution and isolated learning",
-  "locked_at_utc": "2026-10-05",
+  "locked_at_utc": "2026-10-06",
   "source_commit": "USER_AUTHORIZED_PAPER_AUDIT_REPAIR_20261005",
   "strategy_file": "backend/market_monitor.py",
   "sha256": "2cf961b8349afaebcc31074d7146fc3e5c105f1d357ff030f72d34c157c916df",
@@ -78,7 +78,7 @@
     "backend/paper_state_reset.py": "72a270787ca7af6af6b7d3883aae3e09cba3e5a7bc73359f56ec33e14b7b828b",
     "backend/paper_training.py": "18f9b836d6bcf8260a2e58fadbf41863a56b1e071a1274fb59f5b7f92c095a54",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "627d8c592d64082362a23c6ee729dd945a1be1cf63d0d0645da34a3f29416e17",
+    "backend/strategy_lab.py": "53b5876a6b5d9447b53f3482be3bfddf136f0b8d3acbdf2abe32af3b10c45d12",
     "backend/training_bridge.py": "be12a2904711f25932f375d5faa23ffa6eda3fdf5911aaf3dfbd408afccd50a2",
     "backend/training_worker.py": "ad806420804950da3547a7ae380ce7ff61860df70c2eb566921d1a4c2dc24918",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006"
@@ -144,7 +144,7 @@
     "backend/training_worker.py": "Independent process, durable reset boundary and restart",
     "backend/paper_state_reset.py": "User-authorized checksum archives and all PAPER reset/restore",
     "backend/user_gateway.py": "Independent private accounts without inherited central trades and atomic registry",
-    "backend/strategy_lab.py": "Inert import, complete histories and truthful profit factor",
+    "backend/strategy_lab.py": "Use the configured shared live tape and market snapshot for local PAPER portfolios; avoid an extra price API request per open position.",
     "backend/astra6_brain.py": "Shared exit-priority quote transport, cache/backoff, UTF-8 persistence and truthful profit factor",
     "backend/lab_paired_runner.py": "Cross-platform file locking and UTF-8 persistence",
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"

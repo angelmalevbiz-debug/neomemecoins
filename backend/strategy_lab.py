@@ -14,6 +14,7 @@ DEX='https://api.dexscreener.com'
 STATE_PATH=Path(os.getenv('NEO_STRATEGY_LAB_PATH','/var/lib/neo-market/strategy_lab.json'))
 COMPACT_PATH=Path(os.getenv('NEO_STRATEGY_LAB_COMPACT_PATH',str(STATE_PATH.parent/'strategy_lab_compact.json')))
 RESET_FLAG_PATH=Path(os.getenv('NEO_STRATEGY_LAB_RESET_FLAG','/var/lib/neo-market/strategy_lab.reset'))
+LIVE_TAPE_PATH=Path(os.getenv('NEO_LIVE_TAPE_PATH','/var/lib/neo-market/live_tape.json'))
 START_BALANCE=float(os.getenv('NEO_LAB_START_BALANCE','500'))
 STRATEGY_START_BALANCES={'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100'))}
 TRADE_NOTIONAL=float(os.getenv('NEO_LAB_TRADE_NOTIONAL','150'))
@@ -112,7 +113,7 @@ def atomic_write(data):
     atomic_write_path(STATE_PATH,data)
 
 def flow_map():
-    tape=load_json(Path('/var/lib/neo-market/live_tape.json'),{})
+    tape=load_json(LIVE_TAPE_PATH,{})
     cutoff=now_ms()-60_000
     out={}
     for e in tape.get('events',[]):
@@ -207,26 +208,6 @@ if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_started_at']=now_ms()
 assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'All 33 entries need a policy'
 
-def dex_position_prices(positions):
-    if not positions: return {}
-    addresses=list(dict.fromkeys(p.get('address') for p in positions if p.get('address')))
-    wanted={(p.get('address'),p.get('pairAddress')) for p in positions if p.get('address') and p.get('pairAddress')}
-    out={}
-    for i in range(0,len(addresses),30):
-        batch=addresses[i:i+30]
-        try:
-            r=SESSION.get(DEX+'/tokens/v1/solana/'+','.join(batch),timeout=(1,3))
-            r.raise_for_status();payload=r.json()
-            rows=payload if isinstance(payload,list) else []
-        except (requests.RequestException,ValueError):continue
-        for p in rows:
-            a=(p.get('baseToken') or {}).get('address')
-            pair=p.get('pairAddress')
-            if (a,pair) in wanted:
-                price=num(p.get('priceUsd'))
-                if price>0: out[(a,pair)]=p
-    return out
-
 def close_position(book,pos,coin,reason):
     market_price=num(coin.get('priceUsd')); qty=num(pos.get('quantity'))
     quote=exit_execution(coin,qty)
@@ -268,9 +249,14 @@ def realize_partial(book,pos,coin,fraction,label):
                   'move_pct':round((market_price-num(pos.get('entry_price')))/max(num(pos.get('entry_price')),1e-18)*100,3)})
     return pnl
 
-def update_positions(flows):
-    positions=[b['position'] for b in STATE['books'].values() if b.get('position')]
-    prices=dex_position_prices(positions) if positions else {}
+def update_positions(flows,feed):
+    # Mark open positions from the same recent market snapshot used for entries.
+    # This avoids one extra DEX request per position-management cycle.
+    prices={}
+    for coin in feed or []:
+        address=coin.get('address'); pair=coin.get('pairAddress')
+        if address and pair and num(coin.get('priceUsd'))>0:
+            prices[(address,pair)]=coin
     for book in STATE['books'].values():
         pos=book.get('position')
         if not pos: continue
@@ -423,14 +409,19 @@ def main():
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()
     last_entry=0
+    feed=[]
     while True:
         started=time.time()
         try:
             flows=flow_map()
-            update_positions(flows)
-            if time.time()-last_entry>=ENTRY_REFRESH_SECONDS:
+            refresh_due=time.time()-last_entry>=ENTRY_REFRESH_SECONDS
+            if refresh_due:
                 r=SESSION.get(API_URL,timeout=5); r.raise_for_status()
-                maybe_open(r.json().get('feed') or [],flows); last_entry=time.time()
+                feed=r.json().get('feed') or []
+                last_entry=time.time()
+            update_positions(flows,feed)
+            if refresh_due:
+                maybe_open(feed,flows)
             persist('online')
         except Exception as e:
             persist('degraded',e)

@@ -1,40 +1,31 @@
-# Measured Pages/backend status
+# Current PAPER deployment status
 
-The maintained repository is [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins). The browser address is [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/). The legacy repository remains a historical baseline.
+The maintained repository is [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins). The public app is [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/).
 
-## Published baseline and current local replacement
+## Verified public site baseline
 
-At source commit `9634414e2ea109afd83b5f78e0277a6bc530f2d0`, Pages deployment [37359080106](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37359080106) and regression [37359080111](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37359080111) passed. Served HTML, JS and CSS matched the exact Pages CI artifact. That publication did not deploy the Python services.
+The frontend baseline at source commit `d983b1de48958d0a9dabc4ae37d210d6c175c83e` was published by [Pages run #17](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376396987), which succeeded. The preceding verified-source restore [run #11](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376320288) also succeeded. The served JavaScript bundle contains the current `NEO_API_URL` Quick Tunnel host. The local Lab runtime fix in this document changes backend source and does not add a frontend feature.
 
-On 2026-10-05 at 19:28 UTC, a new local PAPER runtime behind the free Quick Tunnel passed read-only probes. The authenticated gateway preflight returned 204 with the exact Pages origin and allowed the `authorization` header; `/user/health` returned 200 and the unauthenticated private-state request returned the expected 401. The loopback shared monitor returned policy `ORDER_FLOW_VALIDATED_THRESHOLDS_V9`, `paper_only=true`, and the `paper_training` object. This probe confirmed backend readiness before the subsequent Pages publication; verify the final publication separately against its Actions run. The GitHub `NEO_API_URL` repository variable is set to the current tunnel hostname.
+Read-only checks on 2026-10-06: Pages returned HTTP 200; the local gateway's `/user/health` returned HTTP 200; `OPTIONS /user/state` returned 204 with the exact `https://angelmalevbiz-debug.github.io` origin and the `Authorization` header allowed. An unauthenticated `/user/state` returns the expected 401. The Codex browser is currently at the sign-in form, so the authenticated private dashboard has not been verified here.
 
-The live PAPER learner currently reports 1,600 unique observations across 65 market episodes, zero simulations, zero open/completed trades, and active version `v0-control`. All candidate books have separate $500 balances. The current market feed fails required safety/flow/route evidence checks, so signals are recorded as rejected observations and the engine correctly remains in WAIT. These observations are not trades and do not establish profitable edge. An earlier short Windows read/replace contention has been repaired and its status check now retries before declaring the worker degraded.
+## Live local PAPER runtime snapshot
 
-Read-only backend measurements on 2026-10-05 at 19:07 UTC:
+The local machine is running the main monitor, shared live-tape recorder, 33-strategy Lab, and per-user gateway in PAPER mode. All state is isolated under ignored `.runtime/accounts`. The machine, these services, network connection, and `cloudflared` Quick Tunnel must remain available; Quick Tunnels can change hostname and have no uptime guarantee. No live executor or wallet signing is enabled.
 
-| Probe from the new Pages origin | HTTP result | Actual allowed origin |
-| --- | --- | --- |
-| `OPTIONS /user/state` with authorization preflight | 204 | `https://angelmalev9-creator.github.io` |
-| `GET /user/health` | 200 | `https://angelmalev9-creator.github.io` |
-| Unauthenticated `GET /user/state` | 401, correctly protected | `https://angelmalev9-creator.github.io` |
-| Shared diagnostic `GET /state` | 200 | `*` |
+At the measured `/state` snapshot on 2026-10-06, the main account scanned 68 market-feed entries; 0 passed its early order-flow signal, 0 were quoted, and 0 opened. The diagnostics report incomplete or delayed verified order flow and no qualifying early buy-flow impulse. This main account therefore had 0 open and 0 closed trades at that snapshot.
 
-The requested origin is `https://angelmalevbiz-debug.github.io`. The old private gateway's mismatched response explains the reported browser `Failed to fetch` after successful Supabase login. A 204 preflight alone does not establish browser access. The source gateway includes an exact allowlist for both Pages origins and local development; its authenticated success, unauthorized and upstream-error responses are covered by HTTP integration tests. The local replacement's expected unauthenticated 401 has been confirmed, but an authenticated Pages browser session has not been checked in this runtime.
+The Lab reported `online` for 33 separate books, with 3 open and 13 completed positions at the measured snapshot. Each book retains its own balance and risk; the Fast Scalper starts at $100 and the other Lab books at $500. The raw open entries passed exact-pool price cross-checks and record DEX fees, network fees, modeled price impact, slippage/latency, and `REALISTIC_COSTS_V1`. Results are measured per book; balances and returns are not summed.
 
-The shared remote state still reports `ORDER_FLOW_GOLD_SIGNAL_VERIFIED_V7`, `paper_only=true`, and no `paper_training`. Therefore the repaired learning engine is not proven running on that server. A correct frontend message cannot repair this backend deployment.
+The separate candidate learner remains `WAIT`: 0 learner simulations, 69 unique market episodes, 41,470 unique observations, active version `v0-control`, and no completed training attempt or approved candidate. The 33 Lab books are experimental PAPER portfolios, not evidence that a candidate model has been trained or promoted. The tape currently reports `degraded`, tracks 60 pairs, and had no recent trade events; order-flow-dependent entries stay blocked until valid events arrive. No profitability conclusion is supported by the current sample.
 
-## PAPER reset boundary
+## Reset boundary
 
-The shared primary account on the legacy server was reset to $1,000 with empty history and positions. Local reset archives and independent training accounts were verified. The new local per-user registry is fresh and begins accounts at $1,000; its nine training books begin independently at $500. Remote legacy Lab, Astra and paired experiments still contain prior results; private per-user accounts have not been audited or reset through administrative host access. The all-account request remains incomplete on that legacy server. Preserve every account's independent capital; never aggregate legacy simulation counts as independent market evidence.
+The new local runtime was reset before starting, with archives retained. The 33 Lab books began from fresh state. The previous remote/legacy backend's shared account was reset, but Lab/Astra/paired and private accounts there were not audited or reset because administrative host access was unavailable. That legacy backend is not the endpoint used by the current Pages build; its old history does not appear in the local runtime.
 
-## Remaining host operation
-
-The free local path avoids the legacy server and is documented in [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md). If the legacy server is brought back into scope, use an authorized admin session to install reviewed source into its actual checkout, inspect effective service environment/path overrides, stop every primary/private/training/Lab/Astra/paired writer, then execute the documented offline `reset-all`. Retain checksum archives, verify empty accounts/new sessions, and restart the original service configuration in PAPER mode. Do not reset files while writers remain active. The repository's example locations must be checked against the running host.
-
-Verify the private gateway CORS origin after restarting it and its reverse proxy, and verify the revised shared policy plus `paper_training`. Finally use a real authenticated browser session on Pages to verify the private dashboard. No unauthenticated fallback, public token relay, LIVE execution, signing or wallet funding is part of this repair.
+See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for start/stop commands, recovery, replay, reset, and verification details. The read-only probe command is:
 
 ```sh
 python scripts/check_pages_backend.py --output .runtime/pages-backend-check.json
 ```
 
-This command performs only public read-only diagnostic requests. Exit 0 establishes the listed gateway/schema checks; it does not establish private dashboard access, all-account reset, live learning progress, or profitable market edge. Those need separate evidence. Runtime and account evidence stays ignored locally.
+It checks only public gateway/schema responses; it does not authenticate, establish private-dashboard access, certify completed learning, or prove profitability.

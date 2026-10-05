@@ -58,14 +58,18 @@ if ($Action -eq 'StartMissing') {
             throw "The existing owned $requiredService service is not running; no existing process was stopped."
         }
     }
-    $oldTape = @($previous.processes | Where-Object service -eq 'tape')
-    if ($oldTape.Count -and $null -ne (Get-OwnedProcess $oldTape[0])) {
-        throw 'The owned tape process is already running.'
-    }
     $records = @($previous.processes | Where-Object {
-        $_.service -ne 'tape' -and $null -ne (Get-OwnedProcess $_)
+        $_.service -in @('main', 'gateway') -and $null -ne (Get-OwnedProcess $_)
     })
-    $servicesToStart = @('tape')
+    $servicesToStart = @()
+    foreach ($candidate in @('tape', 'lab')) {
+        $instances = @($previous.processes | Where-Object service -eq $candidate)
+        $owned = @($instances | Where-Object { $null -ne (Get-OwnedProcess $_) })
+        if ($owned.Count -gt 1) { throw "Multiple owned $candidate processes are running; no process was stopped." }
+        if ($owned.Count -eq 1) { $records += $owned[0] }
+        else { $servicesToStart += $candidate }
+    }
+    if ($servicesToStart.Count -eq 0) { Write-Output 'All local PAPER services are already running.'; exit 0 }
 } else {
     foreach ($port in @($MainPort, $GatewayPort)) {
         if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port is already occupied; no existing process will be stopped." }
@@ -75,7 +79,7 @@ if ($Action -eq 'StartMissing') {
         if (@($previous.processes | Where-Object { $null -ne (Get-OwnedProcess $_) }).Count -gt 0) { throw 'An owned PAPER service is already running.' }
     }
     $records = @()
-    $servicesToStart = @('main', 'tape', 'gateway')
+    $servicesToStart = @('main', 'tape', 'lab', 'gateway')
 }
 # This is the public Auth verification key already distributed to browsers.
 if (!$SupabasePublishableKey) {
@@ -99,6 +103,7 @@ $settings = @{
     NEO_STRATEGY_LAB_COMPACT_PATH=(Join-Path $runtime 'strategy_lab_compact.json');
     NEO_RISK_CACHE_DIR=(Join-Path $runtime 'risk'); NEO_PRICE_CHECK_DIR=(Join-Path $runtime 'price-check');
     NEO_ENGINE_BLOCKLIST_PATH=(Join-Path $runtime 'token_blocklist.json');
+    NEO_STRATEGY_LAB_RESET_FLAG=(Join-Path $runtime 'strategy_lab.reset');
     NEO_JUPITER_LOCK_PATH=(Join-Path $runtime 'quote.lock'); NEO_JUPITER_STAMP_PATH=(Join-Path $runtime 'quote-stamp.txt');
     NEO_TRAINING_ROOT=(Join-Path $runtime 'training');
     SUPABASE_URL='https://qziuovwcauaklgqscqys.supabase.co'; SUPABASE_PUBLISHABLE_KEY=$SupabasePublishableKey

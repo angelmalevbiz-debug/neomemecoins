@@ -18,14 +18,14 @@ Both Python suites use temporary state/audit/cache directories through the runne
 
 ## Local PAPER dashboard and free HTTPS tunnel
 
-The maintained Pages frontend can use the local PAPER services without Contabo. The local runtime is isolated under the ignored `.runtime/accounts` directory. It starts a $1,000 main PAPER account, nine separate $500 learning books, a shared market recorder, and a per-user gateway on loopback ports 8878/8879. It does not modify remote/server accounts.
+The maintained Pages frontend can use the local PAPER services without Contabo. The local runtime is isolated under the ignored `.runtime/accounts` directory. It starts a $1,000 main PAPER account, nine separate $500 learning books, 33 independent strategy Lab books (Fast Scalper starts at $100), one shared market recorder, and a per-user gateway on loopback ports 8878/8879. It does not modify remote/server accounts.
 
 ```powershell
 .\scripts\start_local_paper.ps1 -Action Start
 .\scripts\start_local_paper.ps1 -Action Status
 ```
 
-To repair only a missing tape process while verified main and gateway processes continue running, use `-Action StartMissing`. Stop all three gracefully and flush their state with `-Action Stop`; the command does not force-kill a service that is still stopping.
+To repair only missing tape or Lab processes while verified main and gateway processes continue running, use `-Action StartMissing`. Stop all owned services gracefully and flush their state with `-Action Stop`; the command does not force-kill a service that is still stopping.
 
 In a separate PowerShell window, expose only the loopback gateway and keep that window open:
 
@@ -63,7 +63,7 @@ $env:NEO_MAX_DRAWDOWN_PCT='10'
 .venv/Scripts/python.exe backend/live_tape.py
 ```
 
-Run `backend/market_monitor.py` in another terminal with the same environment. Set `NEO_STRATEGY_LAB_PATH` and `NEO_STRATEGY_LAB_COMPACT_PATH` to isolated paths if running legacy Lab too. The main process launches its independent training worker and bounded writer. The worker has no provider client. Price/safety checks and tape must become valid before entries; UNKNOWN/DEGRADED data correctly stays WAIT. Start with an API budget appropriate to the actual authenticated provider plan.
+The main monitor and the 33-strategy Lab consume the same live tape and recent market snapshot. Position marks reuse that shared market snapshot; the Lab does not issue a separate price request for each open position. The main process launches its independent training worker and bounded writer. The worker has no provider client. Price/safety checks and tape must become valid before entries; UNKNOWN/DEGRADED data correctly stays WAIT. Start with an API budget appropriate to the actual authenticated provider plan.
 
 Primary repository defaults retain a disabled daily cap (`0`), disabled drawdown cap (`0`), maximum full-loss capital $250 and exposure 100%; these are explicitly visible and are **not** the conservative runbook settings. New training default risk limits remain active. Do not silently change an existing account's limits.
 

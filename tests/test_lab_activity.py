@@ -98,6 +98,32 @@ class ActivityTests(unittest.TestCase):
             self.assertLess(b['position']['open_pnl_usd'],0)
             self.assertGreaterEqual(b['position']['entry_roundtrip_pnl_pct'],-2.75)
 
+    def test_flow_map_reads_the_configured_shared_tape(self):
+        with tempfile.TemporaryDirectory() as folder:
+            tape_path=Path(folder)/'live_tape.json'
+            stamp=lab.now_ms()
+            tape_path.write_text(__import__('json').dumps({'events':[
+                {'ts':stamp,'address':ADDRESS,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
+                {'ts':stamp,'address':ADDRESS,'direction':'SELL','usd_amount':40,'wallet':'seller'},
+            ]}),encoding='utf-8')
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path):observed=lab.flow_map()
+        self.assertEqual(observed[ADDRESS]['trades'],2)
+        self.assertEqual(observed[ADDRESS]['ratio'],6)
+        self.assertEqual(observed[ADDRESS]['unique_wallets'],2)
+
+    def test_position_management_uses_the_shared_feed_without_extra_price_api(self):
+        book=lab.STATE['books']['PRECISION']
+        book['position']={'trade_no':1,'address':ADDRESS,'pairAddress':PAIR,'entry_price':.01,
+                          'current_price':.01,'quantity':10000,'original_quantity':10000,
+                          'notional_usd':100,'remaining_cost_basis_usd':100,
+                          'opened_at':NOW,'partial_realized_pnl':0,'entry_network_fee_usd':0}
+        quote={'fill_price':.0101,'net_proceeds_usd':100,'dex_fee_usd':0,'network_fee_usd':0,
+               'impact_pct':0,'slippage_pct':0,'latency_pct':0}
+        with patch.object(lab,'exit_execution',return_value=quote), patch.object(lab.SESSION,'get',side_effect=AssertionError('must reuse shared feed')) as request, patch.object(lab,'now_ms',return_value=NOW):
+            lab.update_positions({},[coin()])
+        request.assert_not_called()
+        self.assertEqual(book['position']['current_price'],coin()['priceUsd'])
+
     def test_net_stop_all_33_no_loss_clamping(self):
         c=coin()
         for b in lab.STATE['books'].values():
@@ -107,8 +133,8 @@ class ActivityTests(unittest.TestCase):
                            'opened_at':NOW-1000,'partial_realized_pnl':0,'entry_network_fee_usd':0}
         quote={'fill_price':.94,'net_proceeds_usd':94,'dex_fee_usd':0,'network_fee_usd':0,
                'impact_pct':0,'slippage_pct':0,'latency_pct':0}
-        with patch.object(lab,'dex_position_prices',return_value={(ADDRESS,PAIR):{**c,'priceUsd':1}}),patch.object(lab,'exit_execution',return_value=quote),patch.object(lab,'now_ms',return_value=NOW):
-            lab.update_positions({})
+        with patch.object(lab,'exit_execution',return_value=quote),patch.object(lab,'now_ms',return_value=NOW):
+            lab.update_positions({},[c])
         for b in lab.STATE['books'].values():
             self.assertIsNone(b['position'])
             self.assertEqual(b['history'][0]['exit_reason'],'STOP_LOSS_3_NET')

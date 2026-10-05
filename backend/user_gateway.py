@@ -341,13 +341,14 @@ class Handler(BaseHTTPRequestHandler):
     def cors(self):
         origin = self.headers.get("Origin", "")
         allowed = {
+            "https://angelmalevbiz-debug.github.io",
             "https://angelmalev9-creator.github.io",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
         }
         self.send_header(
             "Access-Control-Allow-Origin",
-            origin if origin in allowed else "https://angelmalev9-creator.github.io",
+            origin if origin in allowed else "https://angelmalevbiz-debug.github.io",
         )
         self.send_header("Vary", "Origin")
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")

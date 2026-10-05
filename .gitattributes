@@ -1,0 +1,3 @@
+# Preserve exact audit evidence bytes across Windows/Linux checkouts.
+docs/strategy-lock-before-repair.json -text
+tests/fixtures/paper_gap_v9.jsonl -text

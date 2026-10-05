@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+.runtime/
+artifacts/
+
+.venv-tape/
+*.bak-*
+*.pre-research

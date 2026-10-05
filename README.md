@@ -2,6 +2,10 @@
 
 **Device-first Solana meme coin risk intelligence.**
 
+GitHub repository: [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins).
+Web app: [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/).
+Publishing and backend setup: [GitHub Pages deployment](docs/GITHUB_PAGES.md).
+
 NEO Meme Coins is being built as a browser-based scanner + Chrome/Chromium extension that turns raw market/on-chain data into understandable risk signals before a user considers a trade.
 
 The architecture intentionally avoids owner-paid runtime APIs for the core scanner. Market data is fetched directly from public endpoints and Solana RPC calls run from the user's device. A user may optionally provide their own RPC endpoint, stored locally in the browser.
@@ -28,7 +32,7 @@ The current `neo-meme-coins-v1` branch includes:
 - device-local RPC settings
 - Chrome Manifest V3 extension with a compact scanner popup
 - DexScreener URL auto-detection in the extension
-- static Vite web build suitable for Vercel
+- static Vite web build published through GitHub Pages
 
 ## Important product rule
 

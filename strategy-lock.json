@@ -81,7 +81,7 @@
     "backend/strategy_lab.py": "627d8c592d64082362a23c6ee729dd945a1be1cf63d0d0645da34a3f29416e17",
     "backend/training_bridge.py": "f25d6bc763c801bbaa4c65c05869921b471885b46ca6187ed81ad2a39ac0c08d",
     "backend/training_worker.py": "75a48c03cbdf7274a74d6701f8e2f45ce618337caf135fde9dfe05bc3bbeba81",
-    "backend/user_gateway.py": "85b0c359ef4e9ce38039872ae11c91256e5a93ff027cca239e66ca76f032feb6"
+    "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary engine remains a fixed control with main defaults explicitly disclosed; learner runs in a separate process and separate independently funded books.",

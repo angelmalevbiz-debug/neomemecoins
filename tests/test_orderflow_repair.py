@@ -1,5 +1,5 @@
 """Offline evidence tests: original signal parity, price poisoning, timing, no lookahead."""
-import ast,copy,hashlib,random,time,unittest
+import ast,copy,hashlib,random,sys,time,unittest
 from pathlib import Path
 from unittest.mock import patch
 import gold_order_flow as gold
@@ -12,7 +12,11 @@ class GoldParityTests(unittest.TestCase):
  def test_frozen_baseline_ast_hash_and_20000_inputs(self):
   text=(Path(__file__).parent/'fixtures/gold_entry_expression.txt').read_text()
   node=ast.parse(text,mode='eval').body
-  self.assertEqual(hashlib.sha256(ast.dump(node).encode()).hexdigest(),'ef252e00380c264b2f0d389c48d53c102d2b3219946cc60cbdf8b9b7efdf222a')
+  # Python 3.13 added show_empty, and 3.14 omits empty fields by default.
+  # Preserve the explicit empty-field representation used by Python 3.12.
+  dump_options={'show_empty':True} if sys.version_info>=(3,13) else {}
+  baseline_dump=ast.dump(node,**dump_options)
+  self.assertEqual(hashlib.sha256(baseline_dump.encode()).hexdigest(),'e71bf5406c0a7b31396dd8d1e51bd73d79b46fd96cc9540b7e2ad9b58ea9e906')
   fn=compile(ast.Expression(node),'<original-GOLD>','eval');rnd=random.Random(21)
   for _ in range(20000):
    score=rnd.choice([0,78,84.99,85,90,100]);liquidity=rnd.choice([1000,9999,10000,14999,15000,50000])

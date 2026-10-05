@@ -20,7 +20,7 @@ jobs:
           python-version: '3.12'
       - name: Verify and restore the source archive
         env:
-          EXPECTED_SHA256: 481e3478b0dff72f743bb17a286bb11c607e24165b7da5828c911022e7e4b02f
+          EXPECTED_SHA256: 2cb6c93df2afe4bf9f68d2fb8103abd0cd7589f24a6d244df05c23cda8b0b528
           BASE_SHA: f3aa701fe1fde5d2b2bdf578ec92606488b406c6
         run: |
           git cat-file -e "$BASE_SHA^{commit}"
@@ -28,7 +28,7 @@ jobs:
           python - <<'PY'
           import hashlib, os, pathlib, stat, zipfile
           root = pathlib.Path.cwd().resolve()
-          archive = root / "neomemecoins-ready.zip"
+          archive = root / "neomemecoins-ready-v2.zip"
           digest = hashlib.sha256(archive.read_bytes()).hexdigest()
           if digest != os.environ["EXPECTED_SHA256"]:
               raise SystemExit(f"Source archive SHA mismatch: {digest}")
@@ -58,24 +58,4 @@ jobs:
               raise SystemExit(f"Unexpectedly small source archive: {len(seen)} files")
           print(f"Restored {len(seen)} verified files ({digest})")
           PY
-          git rm -f neomemecoins-ready.zip .github/workflows/bootstrap-pages.yml
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install and verify
-        run: |
-          npm ci
-          python -m pip install -r requirements.txt
-          python scripts/run_python_checks.py
-          npm run lint
-          npm run build
-          git diff --check
-      - name: Commit verified source and remove the one-time restore workflow
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "Restore verified PAPER training and dashboard fixes"
-          git push origin HEAD:main
+          git rm -f neomemecoins-ready.zip neomemecoins-ready-v2.zip .github/workflows/bootstrap-pages.yml

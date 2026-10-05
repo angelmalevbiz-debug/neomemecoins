@@ -113,10 +113,19 @@ class TrainingBridge:
             self.error = f'Training worker exited with code {self.process.returncode}'
         path = self.root / 'training_snapshot.json'
         if path.exists():
-            try:
-                self.latest = json.loads(path.read_text(encoding='utf-8'))
-            except (OSError, ValueError):
-                self.error = 'Unreadable training worker snapshot'
+            for attempt in range(5):
+                try:
+                    self.latest = json.loads(path.read_text(encoding='utf-8'))
+                    if self.error == 'Unreadable training worker snapshot':
+                        self.error = None
+                    return
+                except (OSError, ValueError):
+                    if attempt == 4:
+                        self.error = 'Unreadable training worker snapshot'
+                    else:
+                        # Atomic replace can briefly contend with a Windows
+                        # reader. Retry before degrading the primary dashboard.
+                        time.sleep(.01)
 
     def close(self):
         self.closed = True

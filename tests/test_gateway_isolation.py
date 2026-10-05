@@ -75,6 +75,34 @@ class GatewayIsolation(unittest.TestCase):
                                          'https://angelmalevbiz-debug.github.io')
                         self.assertNotEqual(headers['Access-Control-Allow-Origin'], origin)
 
+    def test_private_state_cors_includes_authentication_and_upstream_errors(self):
+        origin = 'https://angelmalevbiz-debug.github.io'
+        with self.gateway_server() as address:
+            def request_state():
+                connection = http.client.HTTPConnection(*address, timeout=2)
+                try:
+                    connection.request('GET', '/user/state', headers={'Origin': origin})
+                    response = connection.getresponse()
+                    body = json.loads(response.read())
+                    self.assertEqual(response.getheader('Access-Control-Allow-Origin'), origin)
+                    self.assertEqual(response.getheader('Vary'), 'Origin')
+                    return response.status, body
+                finally:
+                    connection.close()
+
+            status, body = request_state()
+            self.assertEqual(status, 401)
+            self.assertEqual(body['error'], 'unauthorized')
+            with patch.object(self.gateway, 'verify_user', return_value={'id': 'test-user'}):
+                with patch.object(self.gateway, 'proxy_user_engine', return_value={'history': []}):
+                    status, body = request_state()
+                    self.assertEqual(status, 200)
+                    self.assertEqual(body['history'], [])
+                with patch.object(self.gateway, 'proxy_user_engine', side_effect=RuntimeError('engine unavailable')):
+                    status, body = request_state()
+                    self.assertEqual(status, 502)
+                    self.assertEqual(body['error'], 'gateway_error')
+
     def test_new_personal_book_does_not_copy_shared_trades_or_capital(self):
         raw = {'history': [{'opened_at': 9999999999999, 'pnl_usd': 90}],
                'positions': [{'opened_at': 9999999999999, 'quantity': 10}]}

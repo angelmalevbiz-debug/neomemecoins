@@ -30,6 +30,7 @@ TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 WINDOW_MS = 300_000
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','1.0'))
+ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 WSOL = 'So11111111111111111111111111111111111111112'
@@ -471,7 +472,19 @@ def atomic_write(payload):
         json.dump(payload,handle,ensure_ascii=False,allow_nan=False)
         handle.flush()
         os.fsync(handle.fileno())
-    os.replace(temporary,OUT)
+    # Windows antivirus/indexers can briefly hold a just-written target open.
+    # Retry only transient replacement permission errors; preserve atomicity and
+    # report a genuine persistent failure to the recorder's backoff loop.
+    for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
+        try:
+            os.replace(temporary,OUT)
+            break
+        except PermissionError:
+            if attempt + 1 >= ATOMIC_REPLACE_ATTEMPTS:
+                raise
+            time.sleep(min(.4, .025 * (2 ** attempt)))
+    else:  # pragma: no cover - the loop either replaces or raises
+        raise PermissionError('Unable to replace the live-tape projection')
 
 
 def poll_once():

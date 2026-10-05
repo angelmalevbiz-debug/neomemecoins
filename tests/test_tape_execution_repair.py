@@ -47,6 +47,29 @@ def non_swap():
 
 
 class ParserTests(unittest.TestCase):
+    def test_projection_atomic_replace_retries_transient_windows_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            destination = root / 'live_tape.json'
+            destination.write_text('{"old": true}', encoding='utf-8')
+            replace = tape.os.replace
+            attempts = []
+
+            def transient_lock(source, target):
+                attempts.append((source, target))
+                if len(attempts) < 3:
+                    raise PermissionError('temporary Windows sharing violation')
+                replace(source, target)
+
+            with patch.object(tape, 'OUT', destination), patch.object(tape.os, 'replace', side_effect=transient_lock), \
+                 patch.object(tape.time, 'sleep') as delay:
+                tape.atomic_write({'status': 'ok', 'events': []})
+            self.assertEqual(len(attempts), 3)
+            self.assertEqual(delay.call_count, 2)
+            self.assertEqual(json.loads(destination.read_text(encoding='utf-8')),
+                             {'status': 'ok', 'events': []})
+            self.assertFalse(list(root.glob('*.tmp')))
+
     def test_transfer_is_not_trade_even_with_signer_token_delta(self):
         tx=transaction();tx['transaction']['message']['instructions']=[{'programId':'11111111111111111111111111111111','accounts':[PAIR],'data':'1'}]
         state,events,_=tape.classify_transaction(tx,META,ingested_at=NOW)

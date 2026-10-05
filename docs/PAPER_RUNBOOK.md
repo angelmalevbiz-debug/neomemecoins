@@ -11,9 +11,34 @@ npm run lint
 npm run check:strategy
 npm run build
 .venv/Scripts/python.exe scripts/check_quote_contract.py
+.venv/Scripts/python.exe scripts/check_pages_backend.py --output .runtime/pages-backend-check.json
 ```
 
 Both Python suites use temporary state/audit/cache directories through the runner. Test imports do not load or overwrite the working account. No live execution path is enabled; `NEO_ENGINE_MODE=LIVE` fails at startup.
+
+## Local PAPER dashboard and free HTTPS tunnel
+
+The maintained Pages frontend can use the local PAPER services without Contabo. The local runtime is isolated under the ignored `.runtime/accounts` directory. It starts a $1,000 main PAPER account, nine separate $500 learning books, a shared market recorder, and a per-user gateway on loopback ports 8878/8879. It does not modify remote/server accounts.
+
+```powershell
+.\scripts\start_local_paper.ps1 -Action Start
+.\scripts\start_local_paper.ps1 -Action Status
+```
+
+To repair only a missing tape process while verified main and gateway processes continue running, use `-Action StartMissing`. Stop all three gracefully and flush their state with `-Action Stop`; the command does not force-kill a service that is still stopping.
+
+In a separate PowerShell window, expose only the loopback gateway and keep that window open:
+
+```powershell
+$neoPaperUrl = 'http://127.0.0.1:8879'
+& 'C:\Program Files (x86)\cloudflared\cloudflared.exe' tunnel --no-autoupdate --protocol http2 --url=$neoPaperUrl
+```
+
+Copy the `https://….trycloudflare.com` hostname into the GitHub repository variable `NEO_API_URL`, then rerun the Pages deployment workflow. The checked-in workflow reads that variable at build time. A Quick Tunnel is temporary and has no uptime guarantee; the computer, local PAPER processes, network, and `cloudflared` window must remain available. If the tunnel restarts with a different hostname, update `NEO_API_URL` and rerun Pages deployment. See Cloudflare's [Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+
+The browser gateway uses exact Pages-origin CORS and requires the normal Supabase bearer token for private state. `/user/health` and the shared `/state` diagnostic do not prove that the logged-in private dashboard works. Use the authenticated site to validate the account after deployment. PAPER actions only; no LIVE executor is exposed by this local service.
+
+The read-only Pages/backend check deliberately returns a nonzero exit code if the public gateway's CORS origin or shared backend schema is still old. It does not log in, bypass private account authentication, reset accounts, or certify financial results. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for the latest measured deployment boundary.
 
 ## Start a separate PAPER account
 
@@ -92,7 +117,7 @@ Main and nested training archives are separate: restore each to its matching dir
 
 ## Executed result register
 
-Final verification on 2026-10-05:
+Initial verification on 2026-10-05, before migration to the maintained GitHub account:
 
 | Executed command | Result |
 | --- | --- |
@@ -112,4 +137,6 @@ Final verification on 2026-10-05:
 
 A first frontend build correctly failed the old strategy hash guard before manifest update; it was an expected authorized-change guard failure. The final guard passed without deleting verification. The synthetic comparison dataset SHA256 is `5c1609a5768aff2bf4c06e7a9cdd5df529be67e5bd18407915c6d6f8095db363`. Raw archives and private runtime data remain local and excluded from Git.
 
-The reviewed repair is published on `codex/repair-paper-learning` in PR #2. The remote tree hash was verified equal to the locally tested source. Production backend installation has not happened because no host login is available; merging a web build alone cannot restart or update its Python services.
+The original repair was reviewed in PR #2 of the legacy repository. The maintained source was subsequently published to `angelmalevbiz-debug/neomemecoins` at `9634414e2ea109afd83b5f78e0277a6bc530f2d0`; its Pages run `37359080106` and PAPER regression run `37359080111` succeeded. The served HTML, JavaScript and CSS were checked against that run's exact artifact. The migrated regression result was 259 root tests plus 59 backend tests. These successful checks supersede the old account-lock/quota failures above for the maintained Pages site.
+
+Production backend installation has not happened because no administrative host session is available. At 2026-10-05 19:07 UTC its gateway still allowed only the legacy Pages origin; the shared backend still reported `ORDER_FLOW_GOLD_SIGNAL_VERIFIED_V7` and had no `paper_training` object. Updating a web build cannot restart or update its Python services. The shared primary reset does not satisfy the requested all-account reset.

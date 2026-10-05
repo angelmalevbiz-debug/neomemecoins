@@ -1,6 +1,7 @@
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
+import { FormEvent, Fragment, ReactNode, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, LockKeyhole, LogIn, LogOut, ShieldCheck, UserPlus } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
+import { clearAccountStateCache } from '../lib/paperDashboardState';
 import {
   getAuthRedirectUrl,
   isSupabaseConfigured,
@@ -65,12 +66,14 @@ export default function SaaSAuthGate({ children }: { children: ReactNode }) {
 
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return;
+      if (!data.session) clearAccountStateCache(sessionStorage);
       setAuthUser(data.session?.user || null);
       setReady(true);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
+      if (!session) clearAccountStateCache(sessionStorage);
       setAuthUser(session?.user || null);
       setReady(true);
     });
@@ -85,6 +88,7 @@ export default function SaaSAuthGate({ children }: { children: ReactNode }) {
     if (!authUser || !supabase) {
       setActiveSession(null);
       sessionStorage.removeItem('saas_active_session');
+      if (ready) clearAccountStateCache(sessionStorage);
       return;
     }
 
@@ -118,7 +122,7 @@ export default function SaaSAuthGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [authUser]);
+  }, [authUser?.id, ready]);
 
   useEffect(() => {
     setErrorMessage('');
@@ -213,13 +217,19 @@ export default function SaaSAuthGate({ children }: { children: ReactNode }) {
   const handleLogout = async () => {
     if (!supabase) return;
     setBusy(true);
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    clearAccountStateCache(sessionStorage);
+    if (error) {
+      setErrorMessage(authMessage(error.message));
+      setBusy(false);
+      return;
+    }
     sessionStorage.removeItem('saas_active_session');
     setActiveSession(null);
     setBusy(false);
   };
 
-  if (!ready || (authUser && profileLoading)) {
+  if (!ready || (authUser && (profileLoading || activeSession?.userId !== authUser.id))) {
     return (
       <div className="min-h-screen bg-[#08090c] text-white flex items-center justify-center">
         <div className="flex items-center gap-3 text-sm text-white/60">
@@ -252,7 +262,7 @@ export default function SaaSAuthGate({ children }: { children: ReactNode }) {
             <LogOut className="h-4 w-4" />
           </button>
         </div>
-        {children}
+        <Fragment key={authUser.id}>{children}</Fragment>
       </>
     );
   }

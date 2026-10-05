@@ -92,7 +92,7 @@ DEFAULT_CONFIG = {
     "max_roundtrip_cost_pct": 2.75, "adverse_slippage_bps": 20.0,
     "failed_attempt_fee_usd": .02, "min_flow_trades": 3,
     "min_flow_wallets": 2, "min_flow_buy_usd": 25.0,
-    "episode_ms": 3600000, "embargo_ms": 60000,
+    "episode_ms": 3600000, "embargo_ms": 60000, "post_exit_window_ms": 3600000,
     "train_every_episodes": 30, "min_train_episodes": 30,
     "min_validation_episodes": 30, "min_validation_trades": 20, "min_validation_days": 5,
     "min_validation_net_usd": 0.0, "min_improvement_usd": 1.0,
@@ -197,6 +197,15 @@ class PaperTrainingEngine:
             self.config = _config(config)
             self.state = self._fresh()
             self.save()
+        self._index_post_exit_assessments()
+
+    def _index_post_exit_assessments(self):
+        """Rebuild once per load/reset; each row then visits active windows only."""
+        self._post_exit_pending = {
+            name: {index for index, trade in enumerate(book["trades"])
+                   if (trade.get("exit_analysis") or {}).get("post_exit")
+                   and not trade["exit_analysis"]["post_exit"]["status"].startswith("window_complete")}
+            for name, book in self.state["books"].items()}
 
     def _fresh(self):
         cash = self.config["initial_cash"]
@@ -222,6 +231,7 @@ class PaperTrainingEngine:
         if initial_cash is not None:
             self.config = _config({**self.config, "initial_cash": initial_cash})
         self.state = self._fresh()
+        self._index_post_exit_assessments()
         self.save()
         return self.snapshot()
 
@@ -304,12 +314,18 @@ class PaperTrainingEngine:
                 or self._guards(row, entry=False)):
             return None
         decimals = evidence.get("decimals")
-        fee_bps = number(evidence.get("entry_dex_fee_bps" if side == "buy" else "exit_dex_fee_bps",
-                                      evidence.get("dex_fee_bps")), math.nan)
-        network = number(evidence.get("entry_network_fee_usd" if side == "buy" else "exit_network_fee_usd",
-                                      evidence.get("network_fee_usd")), math.nan)
-        reserve = number(evidence.get("entry_account_reserve_usd", 0.0), math.nan) if side == "buy" else 0.0
+        fee_value = evidence.get("entry_dex_fee_bps" if side == "buy" else "exit_dex_fee_bps",
+                                 evidence.get("dex_fee_bps"))
+        network_value = evidence.get("entry_network_fee_usd" if side == "buy" else "exit_network_fee_usd",
+                                     evidence.get("network_fee_usd"))
+        reserve_value = evidence.get("entry_account_reserve_usd") if side == "buy" else 0.0
+        # Imported model assumptions follow the same fail-closed cost contract
+        # as recorded quotes. An omitted reserve or False is not proof of a
+        # pre-existing token account, and a boolean is never a fee amount.
+        fee_bps, network, reserve = (number(value, math.nan)
+                                     for value in (fee_value, network_value, reserve_value))
         if (not isinstance(decimals, int) or isinstance(decimals, bool) or not 0 <= decimals <= 18
+                or any(isinstance(value, bool) for value in (fee_value, network_value, reserve_value))
                 or not 0 <= fee_bps <= 500 or not 0 <= network <= 5 or not 0 <= reserve <= 5):
             return None
         price = number(coin["priceUsd"])
@@ -482,11 +498,81 @@ class PaperTrainingEngine:
                  "exit": q, "exit_reason": pending["reason"], "pnl_usd": pnl,
                  "pnl_pct": pnl / position["committed_usd"] * 100,
                  "exit_analysis": {"mfe_minus_realized_pct": position["mfe_pct"] - pnl / position["committed_usd"] * 100,
-                                   "late_or_early": "path comparison only; future optimum unknown",
-                                   "stop_gap_pct": max(0.0, -pnl / position["committed_usd"] * 100 - position["planned_stop_pct"])}}
+                                   "late_or_early": "awaiting_retrospective_post_exit_evidence",
+                                   "stop_gap_pct": max(0.0, -pnl / position["committed_usd"] * 100 - position["planned_stop_pct"]),
+                                   "post_exit": {
+                                       "kind": "RETROSPECTIVE_EXECUTABLE_MARK_COMPARISON",
+                                       "not_executed": True, "decision_input": False,
+                                       "window_ends_at": row["available_at"] + self.config["post_exit_window_ms"],
+                                       "status": "awaiting_subsequent_observation",
+                                       "valid_observations": 0, "unavailable_observations": 0,
+                                       "latest": None, "best": None, "worst": None,
+                                       "limitations": "same raw inventory, recorded market and modeled costs only; holding capital, market impact from our own trade and future optimum are unknown"}}}
         book["trades"].append(trade)
+        self._post_exit_pending.setdefault(book["id"], set()).add(len(book["trades"]) - 1)
         del book["positions"][position["address"]]
         book["cooldowns"][position["address"]] = row["available_at"] + self.config["cooldown_ms"]
+
+    def _assess_post_exit(self, book, row):
+        """Append available retrospective evidence without changing trade returns.
+
+        A later executable mark is a sensitivity comparison for the original
+        raw inventory, not a counterfactual executed portfolio. This module's
+        decisions, candidate scoring and approval use actual simulated ledgers,
+        never these later marks. Unknown liquidation stays unknown, not zero.
+        """
+        now, coin = row["available_at"], row["coin"]
+        pending = self._post_exit_pending.get(book["id"], set())
+        for index in list(pending):
+            trade = book["trades"][index]
+            analysis = trade.get("exit_analysis") or {}
+            assessment = analysis.get("post_exit")
+            if not assessment:
+                # Existing saved trade histories remain readable. Historical
+                # analysis is not reconstructed from unobserved later prices.
+                pending.discard(index)
+                continue
+            if now > assessment["window_ends_at"]:
+                if not assessment["status"].startswith("window_complete"):
+                    assessment["status"] = ("window_complete" if assessment["valid_observations"]
+                                             else "window_complete_without_executable_evidence")
+                    assessment["completed_at"] = now
+                pending.discard(index)
+                continue
+            if (now <= trade["closed_at"] or row["observed_at"] <= trade["closed_at"]
+                    or coin["address"] != trade["address"] or coin["pairAddress"] != trade["pair"]):
+                continue
+            reasons = self._guards(row, entry=False)
+            q = None if reasons else self._execution(row, "sell", trade["token_raw"], trade["closed_at"] + 1)
+            if q and q["decimals"] != trade["decimals"]:
+                reasons.append("token_decimals_changed")
+                q = None
+            assessment["last_observed_at"] = now
+            if not q:
+                assessment["unavailable_observations"] += 1
+                assessment["status"] = "subsequent_liquidation_unavailable"
+                assessment["latest"] = {"observation_id": row["id"], "available_at": now,
+                                         "valuation": "unknown", "delta_to_executed_exit_usd": None,
+                                         "reasons": reasons or ["no_fresh_matching_sell_evidence_after_exit"]}
+                continue
+            proceeds = max(0.0, q["output_raw"] / 1e6 - q["network_fee_usd"])
+            alternative_pnl = proceeds - trade["committed_usd"] - trade["failed_exit_fees_usd"]
+            sample = {"observation_id": row["id"], "available_at": now,
+                      "observed_at": row["observed_at"], "market_updated_at": coin.get("updatedAt"),
+                      "valuation": "executable_estimate" if q["model"] == MODEL else "recorded_quote_bound",
+                      "hypothetical_net_proceeds_usd": proceeds,
+                      "hypothetical_pnl_usd": alternative_pnl,
+                      "delta_to_executed_exit_usd": alternative_pnl - trade["pnl_usd"],
+                      "execution": copy.deepcopy(q), "not_executed": True}
+            assessment["valid_observations"] += 1
+            assessment["status"], assessment["latest"] = "observing_retrospective_window", sample
+            if assessment["best"] is None or sample["delta_to_executed_exit_usd"] > assessment["best"]["delta_to_executed_exit_usd"]:
+                assessment["best"] = copy.deepcopy(sample)
+            if assessment["worst"] is None or sample["delta_to_executed_exit_usd"] < assessment["worst"]["delta_to_executed_exit_usd"]:
+                assessment["worst"] = copy.deepcopy(sample)
+            analysis["late_or_early"] = ("later_better_liquidation_observed_retrospectively"
+                                         if assessment["best"]["delta_to_executed_exit_usd"] > 0
+                                         else "executed_exit_not_improved_by_observed_later_marks")
 
     def _step_book(self, book, row, episode):
         now = row["available_at"]
@@ -689,6 +775,8 @@ class PaperTrainingEngine:
             candidate = selected["id"]
             self.state["books"]["VALIDATE_CANDIDATE"] = empty_book("VALIDATE_CANDIDATE", HYPOTHESES[candidate], cash)
             self.state["books"]["VALIDATE_CONTROL"] = empty_book("VALIDATE_CONTROL", BASELINE, cash)
+            self._post_exit_pending["VALIDATE_CANDIDATE"] = set()
+            self._post_exit_pending["VALIDATE_CONTROL"] = set()
             self.state["training"] = {"candidate": candidate, "params": copy.deepcopy(HYPOTHESES[candidate]),
                                        "selected_at": now, "start_after": now + self.config["embargo_ms"],
                                        "train_episode_ids": sorted(self.state["episodes"]),
@@ -742,14 +830,21 @@ class PaperTrainingEngine:
         enough = (result["paired_episode_count"] >= self.config["min_validation_episodes"]
                   and len(candidate["trades"]) >= self.config["min_validation_trades"]
                   and result["calendar_day_cluster_count"] >= self.config["min_validation_days"])
-        if not enough:
-            if now - trial["selected_at"] > self.config["validation_max_ms"]:
+        unresolved = bool(candidate["positions"] or candidate["pending"] or control["positions"] or control["pending"])
+        # A stranded holding must neither be called successful nor freeze the
+        # periodic learner forever after the closed-evidence threshold is met.
+        # Retain its conservative valuation and the full trial in history.
+        if now - trial["selected_at"] > self.config["validation_max_ms"]:
+            trial["status"] = "expired_unresolved_positions" if unresolved else "expired_validation_window"
+            if not enough and not unresolved:
                 trial["status"] = "expired_insufficient_evidence"
-                self.state["last_training"].update(status=trial["status"], validation=result)
-                self.state["training_history"][-1] = copy.deepcopy(self.state["last_training"])
-                self.state["training"] = None
+            self.state["last_training"].update(status=trial["status"], validation=result,
+                                               validation_start=trial["start_after"], validation_end=now,
+                                               rejected_checks=["validation_window_expired"])
+            self.state["training_history"][-1] = copy.deepcopy(self.state["last_training"])
+            self.state["training"] = None
             return
-        if candidate["positions"] or candidate["pending"] or control["positions"] or control["pending"]:
+        if not enough or unresolved:
             return
         ci = result["approximate_cluster_mean_95_ci"]
         reasons = []
@@ -786,6 +881,8 @@ class PaperTrainingEngine:
             cash = self.config["initial_cash"]
             self.state["books"]["MONITOR_CANDIDATE"] = empty_book("MONITOR_CANDIDATE", trial["params"], cash)
             self.state["books"]["MONITOR_CONTROL"] = empty_book("MONITOR_CONTROL", BASELINE, cash)
+            self._post_exit_pending["MONITOR_CANDIDATE"] = set()
+            self._post_exit_pending["MONITOR_CONTROL"] = set()
             self.state["monitor"] = {"version": version, "previous": previous, "started_at": now}
         self.state["training"] = None
 
@@ -846,6 +943,7 @@ class PaperTrainingEngine:
         # Rejected signal path observations are evaluated separately, never
         # added to execution pnl/win rate or promoted as hypothetical wins.
         for book in self.state["books"].values():
+            self._assess_post_exit(book, row)
             for rejected in reversed(book["rejected"]):
                 if rejected["at"] >= now:
                     continue

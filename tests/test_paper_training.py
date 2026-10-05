@@ -6,8 +6,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from paper_training import AsyncTrainingRecorder, BASELINE, MODEL, PaperTrainingEngine, normalize_quote
+from training_bridge import TrainingBridge
 
 NOW = 1_800_000_000_000
 MINT = "So11111111111111111111111111111111111111112"
@@ -24,7 +26,9 @@ def row(at, price=1.0, score=90.0, mint=MINT, sell=True, identifier=None):
             "safety": {"allowed": True, "mint": mint, "pair": PAIR, "checked_at": at},
             "execution": {"mode": MODEL, "mint": mint, "pair": PAIR,
                           "decimals": 6, "dex_fee_bps": 30,
-                          "network_fee_usd": .01, "buy_route": True, "sell_route": sell,
+                          "network_fee_usd": .01, "entry_account_reserve_usd": 0.0,
+                          "account_reserve_basis": "SYNTHETIC_EXISTING_PAPER_ACCOUNT",
+                          "buy_route": True, "sell_route": sell,
                           "verified_at": at, "price_verified": True}}
 
 
@@ -124,6 +128,36 @@ class PaperTrainingTests(unittest.TestCase):
         x["observed_at"] = NOW + 2001
         self.assertFalse(e.ingest(x))
 
+    def test_imported_model_requires_explicit_reserve_and_numeric_costs(self):
+        e = self.engine()
+        invalid = [
+            ("entry_account_reserve_usd", None),
+            ("entry_account_reserve_usd", False),
+            ("entry_account_reserve_usd", True),
+            ("dex_fee_bps", False),
+            ("entry_dex_fee_bps", False),
+            ("network_fee_usd", False),
+            ("entry_network_fee_usd", True),
+        ]
+        for index, (field, value) in enumerate(invalid):
+            with self.subTest(field=field, value=value):
+                x = row(NOW + index * 1000)
+                if value is None:
+                    x["execution"].pop(field, None)
+                else:
+                    x["execution"][field] = value
+                self.assertIsNone(e._execution(x, "buy", 10_000_000))
+                e.ingest(x)
+                self.assertFalse(book(e)["pending"])
+                self.assertFalse(book(e)["positions"])
+        self.assertEqual(e.snapshot()["simulation_count"], 0)
+        # Explicit zero remains legitimate for a supplied existing PAPER-account
+        # assumption; omission and booleans cannot produce this result.
+        valid = row(NOW + 10_000)
+        self.assertEqual(e._execution(valid, "buy", 10_000_000)["entry_account_reserve_usd"], 0.0)
+        e.ingest(valid)
+        self.assertTrue(book(e)["pending"])
+
     def test_malformed_nonfinite_recording_is_rejected_without_corrupting_state(self):
         e = self.engine()
         x = row(NOW)
@@ -204,6 +238,135 @@ class PaperTrainingTests(unittest.TestCase):
         self.assertAlmostEqual(book(e)["cash"] - 500, t["pnl_usd"])
         self.assertEqual(book(e)["positions"], {})
 
+    def test_post_exit_assessment_waits_for_available_matching_observations(self):
+        e = self.engine()
+        e.replay(episode(NOW, MINT))
+        trade = book(e)["trades"][0]
+        actual = {k: copy.deepcopy(v) for k, v in trade.items() if k != "exit_analysis"}
+        analysis = trade["exit_analysis"]["post_exit"]
+        self.assertEqual(analysis["status"], "awaiting_subsequent_observation")
+        self.assertEqual(analysis["valid_observations"], 0)
+        self.assertIsNone(analysis["best"])
+        cash = book(e)["cash"]
+        e.ingest(row(NOW + 4000, mint="A" * 32, score=40))
+        self.assertEqual(analysis["valid_observations"], 0)
+        e.ingest(row(NOW + 5000, price=1.3, score=40))
+        self.assertEqual(analysis["valid_observations"], 1)
+        self.assertTrue(analysis["not_executed"])
+        self.assertFalse(analysis["decision_input"])
+        self.assertGreater(analysis["best"]["delta_to_executed_exit_usd"], 0)
+        self.assertEqual(trade["exit_analysis"]["late_or_early"], "later_better_liquidation_observed_retrospectively")
+        self.assertEqual({k: v for k, v in trade.items() if k != "exit_analysis"}, actual)
+        self.assertEqual(book(e)["cash"], cash)
+        self.assertEqual(len(book(e)["trades"]), 1)
+
+    def test_post_exit_unknown_stale_future_sell_and_costs_are_not_free_profit(self):
+        e = self.engine()
+        e.replay(episode(NOW, MINT))
+        trade = book(e)["trades"][0]
+        analysis = trade["exit_analysis"]["post_exit"]
+        pnl = trade["pnl_usd"]
+        e.ingest(row(NOW + 4000, price=2, score=40, sell=False))
+        stale = row(NOW + 5000, price=2, score=40)
+        stale["coin"]["updatedAt"] = trade["closed_at"]
+        e.ingest(stale)
+        future = row(NOW + 6000, price=2, score=40)
+        future["execution"]["verified_at"] = NOW + 7000
+        e.ingest(future)
+        self.assertEqual(analysis["valid_observations"], 0)
+        self.assertEqual(analysis["unavailable_observations"], 3)
+        self.assertIsNone(analysis["best"])
+        self.assertEqual(analysis["latest"]["valuation"], "unknown")
+        self.assertIsNone(analysis["latest"]["delta_to_executed_exit_usd"])
+        expensive = row(NOW + 7000, price=1.3, score=40)
+        expensive["execution"]["exit_network_fee_usd"] = 2.0
+        e.ingest(expensive)
+        self.assertEqual(analysis["valid_observations"], 1)
+        self.assertEqual(analysis["latest"]["execution"]["network_fee_usd"], 2.0)
+        self.assertLess(analysis["latest"]["delta_to_executed_exit_usd"], 0)
+        self.assertEqual(trade["pnl_usd"], pnl)
+        self.assertEqual(book(e)["failed"], [])
+
+    def test_post_exit_future_path_changes_assessment_not_past_decisions_or_ledger(self):
+        left = self.engine(post_exit_window_ms=5000)
+        right = PaperTrainingEngine(Path(self.tmp.name) / "other.json",
+                                    {"notional": 10, "post_exit_window_ms": 5000})
+        prefix = episode(NOW, MINT)
+        left.replay(prefix); right.replay(prefix)
+        self.assertEqual(book(left)["trades"], book(right)["trades"])
+        left.ingest(row(NOW + 5000, price=2, score=40))
+        right.ingest(row(NOW + 5000, price=.2, score=40))
+        lt, rt = book(left)["trades"][0], book(right)["trades"][0]
+        self.assertEqual({k:v for k,v in lt.items() if k != "exit_analysis"},
+                         {k:v for k,v in rt.items() if k != "exit_analysis"})
+        self.assertEqual(book(left)["cash"], book(right)["cash"])
+        self.assertEqual(left.state["active_version"], right.state["active_version"])
+        self.assertGreater(lt["exit_analysis"]["post_exit"]["best"]["delta_to_executed_exit_usd"], 0)
+        self.assertLess(rt["exit_analysis"]["post_exit"]["best"]["delta_to_executed_exit_usd"], 0)
+        saved = copy.deepcopy(lt["exit_analysis"]["post_exit"])
+        left = PaperTrainingEngine(self.path)
+        left.ingest(row(NOW + 9000, price=5, score=40))
+        restored_analysis = book(left)["trades"][0]["exit_analysis"]["post_exit"]
+        self.assertEqual(restored_analysis["status"], "window_complete")
+        self.assertEqual(restored_analysis["valid_observations"], 1)
+        self.assertEqual(restored_analysis["best"], saved["best"])
+
+    def test_post_exit_work_visits_active_window_only_after_restart(self):
+        e = self.engine(post_exit_window_ms=5000)
+        e.replay(episode(NOW, MINT))
+        active = book(e)["trades"][0]
+        expired = copy.deepcopy(active)
+        expired["closed_at"] = NOW - 10000
+        expired["exit_analysis"]["post_exit"].update(
+            status="window_complete_without_executable_evidence", window_ends_at=NOW - 5000)
+        book(e)["trades"] = [copy.deepcopy(expired) for _ in range(1000)] + [active]
+        e.save()
+        e = PaperTrainingEngine(self.path)
+
+        class IndexedHistory(list):
+            """Fail if an observation scans the historical ledger again."""
+            reads = 0
+
+            def __iter__(self):
+                raise AssertionError("post-exit assessment scanned all historical trades")
+
+            def __reversed__(self):
+                raise AssertionError("post-exit assessment scanned all historical trades")
+
+            def __getitem__(self, index):
+                self.reads += 1
+                return super().__getitem__(index)
+
+        history = IndexedHistory(book(e)["trades"])
+        book(e)["trades"] = history
+        e._assess_post_exit(book(e), row(NOW + 5000, price=1.3, score=40))
+        self.assertEqual(history.reads, 1)
+        self.assertEqual(history[-1]["exit_analysis"]["post_exit"]["valid_observations"], 1)
+        history.reads = 0
+        e._assess_post_exit(book(e), row(NOW + 9000, price=2, score=40))
+        self.assertEqual(history.reads, 1)
+        history.reads = 0
+        for at in range(NOW + 10000, NOW + 15000, 1000):
+            e._assess_post_exit(book(e), row(at, price=3, score=40))
+        self.assertEqual(history.reads, 0)
+
+    def test_active_validation_books_receive_retrospective_assessment(self):
+        e = self.learning_engine()
+        cutoff = self.train(e)
+        mint = "D" * 32
+        e.replay(episode(cutoff + 10000, mint))
+        self.assertIsNotNone(e.state["training"])
+        for name in ("VALIDATE_CANDIDATE", "VALIDATE_CONTROL"):
+            self.assertEqual(book(e, name)["trades"][0]["exit_analysis"]["post_exit"]["valid_observations"], 0)
+        e = PaperTrainingEngine(self.path)
+        e.ingest(row(cutoff + 14000, mint=mint, price=1.3, score=40))
+        for name in ("VALIDATE_CANDIDATE", "VALIDATE_CONTROL"):
+            assessment = book(e, name)["trades"][0]["exit_analysis"]["post_exit"]
+            self.assertEqual(assessment["valid_observations"], 1)
+            self.assertFalse(assessment["decision_input"])
+        self.assertEqual(e.state["active_version"], "v0-control")
+        self.assertIsNotNone(e.state["training"])
+
     def test_unknown_sell_route_retains_open_loser_failed_retries_and_restart(self):
         e = self.engine(order_timeout_ms=1000)
         e.ingest(row(NOW)); e.ingest(row(NOW + 1000))
@@ -259,13 +422,13 @@ class PaperTrainingTests(unittest.TestCase):
                 right.replay(rows[boundary:])
                 self.assertEqual(left.snapshot(), right.snapshot())
 
-    def learning_engine(self):
+    def learning_engine(self, **config):
         return self.engine(min_train_episodes=2, train_every_episodes=1,
                            min_validation_episodes=2, min_validation_trades=2,
                            min_validation_days=1,
                            min_improvement_usd=.5, embargo_ms=1000,
                            require_positive_ci=False, rollback_min_episodes=2,
-                           rollback_underperformance_usd=.5)
+                           rollback_underperformance_usd=.5, **config)
 
     def train(self, e):
         rows = []
@@ -326,6 +489,31 @@ class PaperTrainingTests(unittest.TestCase):
         self.assertIn("incomplete_recording_coverage", e.state["last_training"]["rejected_checks"])
         self.assertEqual(e.snapshot()["recording_drops_total"], 1)
 
+    def test_sufficient_validation_with_stranded_loss_expires_without_promotion(self):
+        e = self.learning_engine(validation_max_ms=100_000)
+        cutoff = self.train(e)
+        stranded = "Z" * 32
+        e.ingest(row(cutoff + 2000, mint=stranded))
+        e.ingest(row(cutoff + 3000, mint=stranded))
+        self.validate(e, cutoff)
+        candidate = book(e, "VALIDATE_CANDIDATE")
+        self.assertGreaterEqual(len(candidate["trades"]), 2)
+        self.assertIn(stranded, candidate["positions"])
+        e.ingest(row(cutoff + 200_000, score=40, mint="Y" * 32))
+        self.assertIsNone(e.state["training"])
+        self.assertEqual(e.state["active_version"], "v0-control")
+        last = e.state["last_training"]
+        self.assertEqual(last["status"], "expired_unresolved_positions")
+        self.assertIn("validation_window_expired", last["rejected_checks"])
+        retained = last["validation"]["candidate"]
+        self.assertEqual(retained["open_positions"], 1)
+        self.assertEqual(retained["positions"][0]["mark_usd"], 0)
+        self.assertEqual(retained["positions"][0]["valuation"], "stale_unliquidatable_conservative_zero")
+        restored = PaperTrainingEngine(self.path)
+        self.assertIsNone(restored.state["training"])
+        self.assertEqual(restored.state["training_history"][-1]["status"], "expired_unresolved_positions")
+        self.assertEqual(book(restored, "LEARNER")["params"], BASELINE)
+
     def test_automatic_rollback_requires_new_episode_evidence(self):
         e = self.learning_engine()
         cutoff = self.train(e)
@@ -377,6 +565,21 @@ class PaperTrainingTests(unittest.TestCase):
         e.ingest(x)
         self.assertFalse(book(e, "GOLD_ADAPTIVE")["pending"])
         self.assertTrue(book(e)["pending"])
+        for at in (NOW + 1000, NOW + 2000):
+            fresh = row(at)
+            fresh["context"] = {"conviction": 80, "available_at": at}
+            e.ingest(fresh)
+        self.assertIn(MINT, book(e, "GOLD_ADAPTIVE")["positions"])
+        future = row(NOW + 3000, price=.99)
+        future["context"] = {"conviction": 20, "available_at": NOW + 5000}
+        e.ingest(future)
+        self.assertNotIn(MINT, book(e, "GOLD_ADAPTIVE")["pending"])
+        # Identical adverse market with actually available conviction can now
+        # trigger an exit; the future-valued feature did not trigger it early.
+        available = row(NOW + 4000, price=.99)
+        available["context"] = {"conviction": 20, "available_at": NOW + 4000}
+        e.ingest(available)
+        self.assertEqual(book(e, "GOLD_ADAPTIVE")["pending"][MINT]["reason"], "CONVICTION_EXIT")
 
     def test_conservative_zero_mark_enforces_daily_loss_and_entries_stop(self):
         e = self.engine(daily_loss_fraction=.01)
@@ -433,6 +636,31 @@ class PaperTrainingTests(unittest.TestCase):
         self.assertEqual(json.loads(path.read_text())["coin"]["priceUsd"], 1)
         self.assertEqual(recorder.snapshot()["written"], 1)
         self.assertFalse(recorder.submit(x))
+
+    def test_training_bridge_retries_transient_snapshot_read_lock(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.root = Path(self.tmp.name)
+        bridge.process = None
+        bridge.error = "Unreadable training worker snapshot"
+        bridge.latest = {"status": "degraded"}
+        path = bridge.root / "training_snapshot.json"
+        payload = '{"status":"WAIT","paper_only":true}'
+        path.write_text(payload, encoding="utf-8")
+        attempts = []
+
+        def transient_lock(target, *args, **kwargs):
+            attempts.append(target)
+            if len(attempts) < 3:
+                raise PermissionError("temporary Windows sharing violation")
+            return payload
+
+        with patch.object(Path, "read_text", autospec=True, side_effect=transient_lock), \
+             patch("training_bridge.time.sleep") as delay:
+            bridge.read_snapshot()
+        self.assertEqual(bridge.latest, {"status": "WAIT", "paper_only": True})
+        self.assertIsNone(bridge.error)
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual(delay.call_count, 2)
 
     def test_quote_mode_requires_exact_quantity_and_fresh_next_quote(self):
         e = self.engine()

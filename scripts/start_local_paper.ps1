@@ -1,0 +1,127 @@
+param(
+    [ValidateSet('Start', 'StartMissing', 'Stop', 'Status')][string]$Action = 'Start',
+    [int]$MainPort = 8878,
+    [int]$GatewayPort = 8879,
+    [string]$SupabasePublishableKey = ''
+)
+$ErrorActionPreference = 'Stop'
+$repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$runtime = Join-Path $repository '.runtime/accounts'
+$services = Join-Path $runtime 'services'
+$manifestPath = Join-Path $services 'processes.json'
+$stopMarker = Join-Path $services 'stop.request'
+$runner = Join-Path $PSScriptRoot 'local_paper_service.py'
+$python = Join-Path $repository '.venv/Scripts/python.exe'
+
+function Get-OwnedProcess($record) {
+    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($record.pid)" -ErrorAction SilentlyContinue
+    if ($null -ne $process -and $process.CommandLine -like "*$runner*") {
+        # ConvertFrom-Json may parse an ISO timestamp with a trailing Z into a
+        # DateTime object, whose string form is local time. Compare instants,
+        # with a small tolerance for CIM timestamp precision, rather than text.
+        $expectedCreated = ([DateTime]$record.created_at).ToUniversalTime()
+        $actualCreated = $process.CreationDate.ToUniversalTime()
+        if ([Math]::Abs(($actualCreated - $expectedCreated).TotalSeconds) -lt 2) { return $process }
+    }
+    return $null
+}
+
+if ($Action -eq 'Status') {
+    if (Test-Path -LiteralPath $manifestPath) {
+        $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        foreach ($record in $manifest.processes) {
+            [pscustomobject]@{ service=$record.service; pid=$record.pid; running=($null -ne (Get-OwnedProcess $record)); stdout=$record.stdout; stderr=$record.stderr }
+        }
+    } else { Write-Output 'No local PAPER process manifest exists.' }
+    exit 0
+}
+if ($Action -eq 'Stop') {
+    if (!(Test-Path -LiteralPath $manifestPath)) { throw 'No owned local PAPER process manifest exists.' }
+    $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    [IO.File]::WriteAllText($stopMarker, [DateTime]::UtcNow.ToString('o'))
+    $deadline = [DateTime]::UtcNow.AddSeconds(60)
+    do {
+        $remaining = @($manifest.processes | Where-Object { $null -ne (Get-OwnedProcess $_) })
+        if ($remaining.Count -eq 0) { Write-Output 'All owned PAPER services stopped and flushed.'; exit 0 }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw 'Owned services are still flushing; no forced termination performed. Review service logs.'
+}
+
+if (!(Test-Path -LiteralPath $python)) { throw 'Install the isolated .venv dependencies before starting PAPER services.' }
+if ($Action -eq 'StartMissing') {
+    if (!(Test-Path -LiteralPath $manifestPath)) { throw 'StartMissing requires a verified existing local PAPER manifest.' }
+    $previous = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    foreach ($requiredService in @('main', 'gateway')) {
+        $required = @($previous.processes | Where-Object service -eq $requiredService)
+        if ($required.Count -ne 1 -or $null -eq (Get-OwnedProcess $required[0])) {
+            throw "The existing owned $requiredService service is not running; no existing process was stopped."
+        }
+    }
+    $oldTape = @($previous.processes | Where-Object service -eq 'tape')
+    if ($oldTape.Count -and $null -ne (Get-OwnedProcess $oldTape[0])) {
+        throw 'The owned tape process is already running.'
+    }
+    $records = @($previous.processes | Where-Object {
+        $_.service -ne 'tape' -and $null -ne (Get-OwnedProcess $_)
+    })
+    $servicesToStart = @('tape')
+} else {
+    foreach ($port in @($MainPort, $GatewayPort)) {
+        if (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue) { throw "Port $port is already occupied; no existing process will be stopped." }
+    }
+    if (Test-Path -LiteralPath $manifestPath) {
+        $previous = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+        if (@($previous.processes | Where-Object { $null -ne (Get-OwnedProcess $_) }).Count -gt 0) { throw 'An owned PAPER service is already running.' }
+    }
+    $records = @()
+    $servicesToStart = @('main', 'tape', 'gateway')
+}
+# This is the public Auth verification key already distributed to browsers.
+if (!$SupabasePublishableKey) {
+    $serviceConfig = Get-Content -LiteralPath (Join-Path $repository 'backend/neo-user-gateway.service')
+    $setting = $serviceConfig | Where-Object { $_ -match '^Environment=SUPABASE_PUBLISHABLE_KEY=' } | Select-Object -First 1
+    if ($setting) { $SupabasePublishableKey = $setting.Substring('Environment=SUPABASE_PUBLISHABLE_KEY='.Length) }
+}
+if (!$SupabasePublishableKey.StartsWith('sb_publishable_')) { throw 'A Supabase public publishable key is required.' }
+[IO.Directory]::CreateDirectory($services) | Out-Null
+if (Test-Path -LiteralPath $stopMarker) { Remove-Item -LiteralPath $stopMarker }
+$settings = @{
+    PYTHONUTF8='1'; PYTHONUNBUFFERED='1'; NEO_ENGINE_MODE='PAPER'; NEO_EXECUTION_MODE='PAPER';
+    NEO_LOCAL_RUNTIME_ROOT=$runtime; NEO_LOCAL_STOP_FILE=$stopMarker; NEO_MARKET_ROOT=$repository;
+    NEO_MONITOR_HOST='127.0.0.1'; NEO_MONITOR_PORT="$MainPort";
+    NEO_USER_GATEWAY_HOST='127.0.0.1'; NEO_USER_GATEWAY_PORT="$GatewayPort";
+    NEO_MARKET_UPSTREAM="http://127.0.0.1:$MainPort"; NEO_LOCAL_API="http://127.0.0.1:$MainPort/state";
+    NEO_MARKET_STATE_PATH=(Join-Path $runtime 'state.json'); NEO_MARKET_AUDIT_PATH=(Join-Path $runtime 'audit.jsonl');
+    NEO_LIVE_TAPE_PATH=(Join-Path $runtime 'live_tape.json'); NEO_TAPE_DB_PATH=(Join-Path $runtime 'live_tape.sqlite3');
+    NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
+    NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');
+    NEO_STRATEGY_LAB_COMPACT_PATH=(Join-Path $runtime 'strategy_lab_compact.json');
+    NEO_RISK_CACHE_DIR=(Join-Path $runtime 'risk'); NEO_PRICE_CHECK_DIR=(Join-Path $runtime 'price-check');
+    NEO_ENGINE_BLOCKLIST_PATH=(Join-Path $runtime 'token_blocklist.json');
+    NEO_JUPITER_LOCK_PATH=(Join-Path $runtime 'quote.lock'); NEO_JUPITER_STAMP_PATH=(Join-Path $runtime 'quote-stamp.txt');
+    NEO_TRAINING_ROOT=(Join-Path $runtime 'training');
+    SUPABASE_URL='https://qziuovwcauaklgqscqys.supabase.co'; SUPABASE_PUBLISHABLE_KEY=$SupabasePublishableKey
+}
+$original = @{}
+try {
+    foreach ($name in $settings.Keys) {
+        $original[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
+        [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process')
+    }
+    $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff')
+    foreach ($service in $servicesToStart) {
+        $stdout = Join-Path $services "$service-$stamp.stdout.log"
+        $stderr = Join-Path $services "$service-$stamp.stderr.log"
+        $process = Start-Process -FilePath $python -ArgumentList @('"'+$runner+'"', '--service', $service) -WorkingDirectory $repository -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
+        $metadata = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
+        $records += [pscustomobject]@{service=$service;pid=$process.Id;created_at=$metadata.CreationDate.ToUniversalTime().ToString('o');stdout=$stdout;stderr=$stderr}
+        @{mode='PAPER';runtime_root=$runtime;main_port=$MainPort;gateway_port=$GatewayPort;processes=$records} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+    }
+} catch {
+    if ($Action -eq 'Start') { [IO.File]::WriteAllText($stopMarker, [DateTime]::UtcNow.ToString('o')) }
+    throw
+} finally {
+    foreach ($name in $original.Keys) { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }
+}
+$records | Select-Object service,pid,stdout,stderr

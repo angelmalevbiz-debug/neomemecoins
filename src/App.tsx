@@ -1,7 +1,7 @@
 import LabPairedPanel, { type LabPairedSnapshot } from './components/LabPairedPanel';
 import PaperTrainingPanel, { type PaperTrainingSnapshot } from './components/PaperTrainingPanel';
 import AstraBrainPanel, { type AstraSnapshot } from './components/AstraBrainPanel';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Bot, ChevronRight, CircleDollarSign, Clock3, ExternalLink,
   Flame, Gauge, Pause, Play, RefreshCw, Search, ShieldCheck, Sparkles,
@@ -11,8 +11,13 @@ import {
   Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { supabase } from './lib/supabase';
+import {
+  backendErrorMessage, dashboardConnectionStatus, initialDashboardConnection,
+  moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, readAccountStateCache, writeAccountStateCache,
+} from './lib/paperDashboardState';
 
-const API = 'https://neo-meme-api.169-58-211-177.sslip.io';
+const apiConfiguration = paperApiConfiguration((import.meta as any).env.VITE_NEO_API_URL, (import.meta as any).env.DEV);
+const API = apiConfiguration.url;
 
 type Signal = { kind: 'positive' | 'neutral' | 'risk'; title: string; detail: string };
 type TxWindow = { buys: number; sells: number };
@@ -61,6 +66,16 @@ type MonitorState = {
 };
 type TokenDetail = { coin: Coin; history: PricePoint[]; position: Position | null; trades: Position[]; live_tape?: LiveTrade[]; flow?: FlowStats };
 type Filter = 'ALL' | 'SETUP' | 'WATCH' | 'NEW' | 'BOOSTED';
+function isMonitorState(value: unknown): value is MonitorState {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as MonitorState;
+  return Array.isArray(candidate.feed) && Array.isArray(candidate.positions) && Array.isArray(candidate.history)
+    && Array.isArray(candidate.events) && typeof candidate.running === 'boolean' && typeof candidate.status === 'string'
+    && !!candidate.stats && !!candidate.config
+    && ['demo_balance_usd', 'demo_equity_usd', 'demo_available_usd', 'demo_reserved_usd', 'return_pct',
+      'demo_starting_balance_usd', 'realized_today_usd', 'unrealized_pnl_usd', 'closed_trades', 'win_rate',
+      'open_positions', 'feed_count'].every(key => typeof candidate.stats[key] === 'number' && Number.isFinite(candidate.stats[key]));
+}
 const fmtMoney = (value = 0) => value >= 1_000_000 ? `$${(value / 1_000_000).toFixed(2)}M` : value >= 1_000 ? `$${(value / 1_000).toFixed(1)}K` : `$${value.toFixed(0)}`;
 const fmtPrice = (value = 0) => value >= 1 ? `$${value.toFixed(4)}` : value >= 0.01 ? `$${value.toFixed(6)}` : value >= 0.0001 ? `$${value.toFixed(8)}` : `$${value.toPrecision(5)}`;
 const ageLabel = (minutes: number | null) => minutes == null ? '—' : minutes < 60 ? `${Math.round(minutes)}m` : minutes < 1440 ? `${(minutes / 60).toFixed(1)}h` : `${(minutes / 1440).toFixed(1)}d`;
@@ -102,6 +117,15 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [connection, setConnection] = useState(initialDashboardConnection);
+  const [now, setNow] = useState(Date.now);
+  const cacheChecked = useRef(false);
+  const stateGeneration = useRef(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
 
   useEffect(() => {
@@ -109,19 +133,8 @@ export default function App() {
     let retryTimer: number | undefined;
     let pollTimer: number | undefined;
     let inFlight = false;
-    let hasValidState = false;
-
-    try {
-      const cached = sessionStorage.getItem('neo-live-state-v1');
-      if (cached) {
-        const parsed = JSON.parse(cached) as { savedAt: number; state: MonitorState };
-        if (Date.now() - parsed.savedAt < 15_000) {
-          hasValidState = true;
-          setState(parsed.state);
-          setError('');
-        }
-      }
-    } catch { /* cache is optional */ }
+    let activeController: AbortController | undefined;
+    const generation = ++stateGeneration.current;
 
     const schedulePoll = () => {
       if (cancelled) return;
@@ -133,12 +146,25 @@ export default function App() {
       inFlight = true;
       let retryScheduled = false;
       try {
+        if (apiConfiguration.error) throw new Error(apiConfiguration.error);
         if (!supabase) throw new Error('Supabase unavailable');
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: authError } = await supabase.auth.getSession();
+        if (authError) throw authError;
         const token = session?.access_token;
-        if (!token) throw new Error('Session expired');
+        const userId = session?.user.id;
+        if (!token || !userId) throw new Error('Session expired');
+        if (cancelled || generation !== stateGeneration.current) return;
+        if (!cacheChecked.current) {
+          cacheChecked.current = true;
+          const cached = readAccountStateCache(sessionStorage, userId, Date.now(), isMonitorState);
+          if (cached) {
+            setState(cached.state);
+            setConnection({ source: 'cache', receivedAt: cached.savedAt, failure: '' });
+          }
+        }
 
         const controller = new AbortController();
+        activeController = controller;
         const timeout = window.setTimeout(() => controller.abort(), 4000);
         const response = await fetch(`${API}/user/state`, {
           cache: 'no-store',
@@ -146,24 +172,25 @@ export default function App() {
           headers: { Authorization: `Bearer ${token}` },
         }).finally(() => window.clearTimeout(timeout));
         if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
-        const next = await response.json() as MonitorState;
-        if (cancelled) return;
-        hasValidState = true;
+        const next: unknown = await response.json();
+        if (!isMonitorState(next)) throw new Error('Backend върна невалидни данни за PAPER сметката.');
+        if (cancelled || generation !== stateGeneration.current) return;
+        const receivedAt = Date.now();
         setState(next);
+        setConnection({ source: 'network', receivedAt, failure: '' });
+        setNow(receivedAt);
         setError('');
-        try {
-          sessionStorage.setItem('neo-live-state-v1', JSON.stringify({ savedAt: Date.now(), state: next }));
-        } catch { /* cache is optional */ }
+        writeAccountStateCache(sessionStorage, userId, next, receivedAt);
         setSelectedAddress(current => current || next.feed[0]?.address || '');
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || generation !== stateGeneration.current) return;
+        const message = backendErrorMessage(err);
+        setError(message);
+        setConnection(current => ({ ...current, failure: message }));
         if (attempt < 3) {
           const delays = [100, 250, 500];
           retryScheduled = true;
           retryTimer = window.setTimeout(() => void load(attempt + 1), delays[attempt]);
-        } else if (!hasValidState) {
-          const message = err instanceof Error ? err.message : 'Backend unavailable';
-          setError(message.includes('aborted') ? 'Backend unavailable' : message);
         }
       } finally {
         inFlight = false;
@@ -174,6 +201,7 @@ export default function App() {
     void load();
     return () => {
       cancelled = true;
+      activeController?.abort();
       if (retryTimer) window.clearTimeout(retryTimer);
       if (pollTimer) window.clearTimeout(pollTimer);
     };
@@ -183,8 +211,9 @@ export default function App() {
     if (!selectedAddress) return;
     let cancelled = false;
     const loadToken = async () => {
+      const generation = stateGeneration.current;
       try {
-        if (!supabase) return;
+        if (!supabase || apiConfiguration.error) return;
         const { data: { session } } = await supabase.auth.getSession();
         const token = session?.access_token;
         if (!token) return;
@@ -194,7 +223,7 @@ export default function App() {
         });
         if (!response.ok) return;
         const next = await response.json() as TokenDetail;
-        if (!cancelled) setDetail(next);
+        if (!cancelled && generation === stateGeneration.current) setDetail(next);
       } catch { /* feed still works without token history */ }
     };
     void loadToken();
@@ -224,9 +253,11 @@ export default function App() {
   const resetMyDemo = async () => {
     if (!supabase) return;
     try {
+      if (apiConfiguration.error) throw new Error(apiConfiguration.error);
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) throw new Error('Session expired');
+      const userId = session?.user.id;
+      if (!token || !userId) throw new Error('Session expired');
 
       const response = await fetch(`${API}/user/reset`, {
         method: 'POST',
@@ -234,44 +265,58 @@ export default function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!response.ok) throw new Error(`Backend HTTP ${response.status}`);
-      const next = await response.json() as MonitorState;
+      const next: unknown = await response.json();
+      if (!isMonitorState(next)) throw new Error('Backend върна невалидни данни след reset.');
+      // A state request started before reset must never resurrect the old account snapshot.
+      stateGeneration.current += 1;
+      const receivedAt = Date.now();
+      writeAccountStateCache(sessionStorage, userId, next, receivedAt);
       setState(next);
+      setConnection({ source: 'network', receivedAt, failure: '' });
+      setNow(receivedAt);
+      setDetail(null);
       setError('');
       setRefreshTick(value => value + 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset failed');
+      setError(backendErrorMessage(err));
     }
   };
 
   const dexEmbed = selectedCoin?.pairAddress ? `https://dexscreener.com/solana/${selectedCoin.pairAddress}?embed=1&theme=dark&trades=0&info=0` : '';
+  const connectionStatus = dashboardConnectionStatus(connection, now);
+  const connected = connectionStatus === 'ONLINE';
+  const connectionLabel = connected ? 'BACKEND ONLINE' : connectionStatus;
+  const snapshotHint = connection.receivedAt ? `Последен получен отговор: ${fullTimeLabel(connection.receivedAt)}.` : 'PAPER сметката още не е заредена.';
+  const emptyStateMessage = state ? 'Няма записи в получения отговор.' : 'Данните още не са заредени от backend.';
 
   return <div className="min-h-screen bg-[#07090b] text-slate-200">
     <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#07090b]/95 backdrop-blur-xl">
       <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">        <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10"><Zap className="h-5 w-5 text-emerald-300" /></div>
           <div>
-            <div className="flex items-center gap-2"><span className="text-base font-black text-white">NEO Meme Coins</span><span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black tracking-[0.14em] text-emerald-300">LIVE</span></div>
+            <div className="flex items-center gap-2"><span className="text-base font-black text-white">NEO Meme Coins</span><span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black tracking-[0.14em] text-emerald-300">PAPER</span></div>
             <div className="text-[10px] text-slate-600">24/7 Solana market intelligence</div>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`hidden items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-black sm:flex ${state?.status === 'monitoring' ? 'border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-300' : 'border-amber-400/20 bg-amber-400/[0.06] text-amber-200'}`}><span className={`h-2 w-2 rounded-full ${state?.status === 'monitoring' ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />{state?.status === 'monitoring' ? 'BACKEND ONLINE' : (state?.status || 'CONNECTING').toUpperCase()}</div>
+          <div data-testid="backend-connection" className={`hidden items-center gap-2 rounded-xl border px-3 py-2 text-[10px] font-black sm:flex ${connected ? 'border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-300' : 'border-amber-400/20 bg-amber-400/[0.06] text-amber-200'}`}><span className={`h-2 w-2 rounded-full ${connected ? 'animate-pulse bg-emerald-300' : 'bg-amber-300'}`} />{connectionLabel}</div>
           <button onClick={refreshDashboard} disabled={busy} className="flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 text-[10px] font-black text-white hover:bg-white/[0.06] disabled:opacity-40"><RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} /> ОБНОВИ</button>
         </div>
       </div>
     </header>
 
     <main className="mx-auto max-w-[1800px] px-4 py-5 sm:px-6 lg:px-8">
-      {error && <div className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-xs text-red-200">{error}</div>}
+      {error && <div role="alert" className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-xs text-red-200">{error} {state && 'Показаните данни са от последния отговор и не потвърждават текущото състояние.'} {snapshotHint}</div>}
+      {!connected && !error && <div role="status" className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-xs text-amber-100">{state ? 'Показани са последно получени данни. Текущите баланси, позиции и работата на бота още не са потвърдени.' : 'Свързване с backend. Балансите и сделките ще се покажат след получаване на данни.'} {snapshotHint}</div>}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Metric label="Demo balance" value={`$${(state?.stats.demo_balance_usd ?? 1000).toFixed(2)}`} hint={`start $${(state?.stats.demo_starting_balance_usd ?? 1000).toFixed(0)}`} />
-        <Metric label="Equity" value={`$${(state?.stats.demo_equity_usd ?? 1000).toFixed(2)}`} hint={`${(state?.stats.return_pct ?? 0) >= 0 ? '+' : ''}${(state?.stats.return_pct ?? 0).toFixed(2)}% session`} />
-        <Metric label="Available" value={`$${(state?.stats.demo_available_usd ?? 1000).toFixed(2)}`} hint={`reserved $${(state?.stats.demo_reserved_usd ?? 0).toFixed(0)}`} />
-        <Metric label="Днес PnL" value={`${(state?.stats.realized_today_usd ?? 0) >= 0 ? '+' : ''}$${(state?.stats.realized_today_usd ?? 0).toFixed(2)}`} hint={`unrealized ${(state?.stats.unrealized_pnl_usd ?? 0) >= 0 ? '+' : ''}$${(state?.stats.unrealized_pnl_usd ?? 0).toFixed(2)}`} />
-        <Metric label="Open paper" value={`${state?.stats.open_positions ?? 0}/${state?.config.max_positions ?? 2}`} hint={`$${state?.config.trade_notional_usd ?? 100} на позиция`} />
-        <Metric label="Win rate" value={state?.stats.closed_trades ? `${state.stats.win_rate.toFixed(0)}%` : '—'} hint={`${state?.stats.closed_trades ?? 0} затворени`} />
-        <Metric label="Live coins" value={String(state?.stats.feed_count ?? 0)} hint={`scan на ${state?.config.scan_seconds ?? 15}s`} />
-        <Metric label="SETUP" value={String(setupCount)} hint={`${watchCount} WATCH`} />
+        <Metric label="Demo balance" value={moneyOrUnavailable(state?.stats.demo_balance_usd)} hint={state ? `start ${moneyOrUnavailable(state.stats.demo_starting_balance_usd, false, 0)}` : 'Очакват се данни'} />
+        <Metric label="Equity" value={moneyOrUnavailable(state?.stats.demo_equity_usd)} hint={state ? `${percentageOrUnavailable(state.stats.return_pct)} session` : 'Очакват се данни'} />
+        <Metric label="Available" value={moneyOrUnavailable(state?.stats.demo_available_usd)} hint={state ? `reserved ${moneyOrUnavailable(state.stats.demo_reserved_usd, false, 0)}` : 'Очакват се данни'} />
+        <Metric label="Днес PnL" value={moneyOrUnavailable(state?.stats.realized_today_usd, true)} hint={state ? `unrealized ${moneyOrUnavailable(state.stats.unrealized_pnl_usd, true)}` : 'Очакват се данни'} />
+        <Metric label="Open paper" value={state ? `${state.stats.open_positions}/${state.config.max_positions}` : '—'} hint={state ? `${moneyOrUnavailable(state.config.trade_notional_usd, false, 0)} на позиция` : 'Очакват се данни'} />
+        <Metric label="Win rate" value={state?.stats.closed_trades ? `${state.stats.win_rate.toFixed(0)}%` : '—'} hint={state ? `${state.stats.closed_trades} затворени` : 'Очакват се данни'} />
+        <Metric label="Live coins" value={state ? String(state.stats.feed_count) : '—'} hint={state ? `scan на ${state.config.scan_seconds}s` : 'Очакват се данни'} />
+        <Metric label="SETUP" value={state ? String(setupCount) : '—'} hint={state ? `${watchCount} WATCH` : 'Очакват се данни'} />
       </section>
       <section className="mt-4 grid gap-4 xl:grid-cols-[390px_minmax(0,1fr)_340px]">
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#0b0e11]">
@@ -286,7 +331,7 @@ export default function App() {
             </div>
           </div>
           <div className="max-h-[760px] overflow-y-auto p-2">
-            {filtered.length === 0 && <div className="p-6 text-center text-xs text-slate-600">Няма coins за този филтър.</div>}
+            {filtered.length === 0 && <div className="p-6 text-center text-xs text-slate-600">{state ? 'Няма coins за този филтър.' : emptyStateMessage}</div>}
             {filtered.map((coin, index) => {
               const active = selectedCoin?.address === coin.address;
               return <button key={coin.address} onClick={() => setSelectedAddress(coin.address)} className={`mb-1.5 w-full rounded-2xl border p-3 text-left transition ${active ? 'border-emerald-400/25 bg-emerald-400/[0.055]' : 'border-white/[0.06] bg-white/[0.015] hover:border-white/10 hover:bg-white/[0.03]'}`}>
@@ -316,13 +361,13 @@ export default function App() {
                   <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300"><span className="h-2 w-2 animate-pulse rounded-full bg-emerald-300" /> LIVE ORDER FLOW</div>
                   <div className="mt-1 text-sm font-black text-white">${selectedCoin.symbol} · реални Solana сделки</div>
                 </div>
-                <div className="text-[9px] text-slate-500">{state?.live_tape_status?.status === 'online' ? `ON-CHAIN LIVE · ${state.live_tape_status.tracked_pairs ?? 0} pairs` : 'CONNECTING…'} · guard {state?.config.position_scan_seconds ?? 2}s</div>
+                <div className="text-[9px] text-slate-500">{connected && state?.live_tape_status?.status === 'online' ? `ON-CHAIN LIVE · ${state.live_tape_status.tracked_pairs ?? 0} pairs` : connectionLabel} · guard {state?.config.position_scan_seconds ?? 2}s</div>
               </div>
               <div className="grid grid-cols-2 gap-px bg-white/[0.05] sm:grid-cols-4">
-                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">BUY 60s</div><div className="mt-1 text-sm font-black text-emerald-300">{fmtMoney(detail?.flow?.buy_usd ?? 0)}</div></div>
-                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">SELL 60s</div><div className="mt-1 text-sm font-black text-red-300">{fmtMoney(detail?.flow?.sell_usd ?? 0)}</div></div>
-                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">BUY/SELL</div><div className="mt-1 text-sm font-black text-white">{(detail?.flow?.buy_sell_usd_ratio ?? 0).toFixed(2)}x</div></div>
-                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">WALLETS 60s</div><div className="mt-1 text-sm font-black text-white">{detail?.flow?.unique_wallets ?? 0}</div></div>
+                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">BUY 60s</div><div className="mt-1 text-sm font-black text-emerald-300">{detail?.flow ? fmtMoney(detail.flow.buy_usd) : '—'}</div></div>
+                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">SELL 60s</div><div className="mt-1 text-sm font-black text-red-300">{detail?.flow ? fmtMoney(detail.flow.sell_usd) : '—'}</div></div>
+                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">BUY/SELL</div><div className="mt-1 text-sm font-black text-white">{detail?.flow ? `${detail.flow.buy_sell_usd_ratio.toFixed(2)}x` : '—'}</div></div>
+                <div className="bg-[#0b0e11] p-3"><div className="text-[8px] font-black uppercase text-slate-700">WALLETS 60s</div><div className="mt-1 text-sm font-black text-white">{detail?.flow?.unique_wallets ?? '—'}</div></div>
               </div>
               <div className="max-h-[280px] overflow-y-auto">
                 {(detail?.live_tape || []).length ? (detail?.live_tape || []).slice(0, 40).map(tx => <a key={tx.signature} href={`https://solscan.io/tx/${tx.signature}`} target="_blank" rel="noreferrer" className="grid grid-cols-[62px_48px_minmax(70px,1fr)_92px_86px] items-center gap-2 border-b border-white/[0.05] px-4 py-2.5 text-[9px] hover:bg-white/[0.025]">
@@ -331,7 +376,7 @@ export default function App() {
                   <span className="truncate font-black text-white">{fmtMoney(tx.usd_amount)}</span>
                   <span className="truncate font-mono text-slate-500">{shortAddress(tx.wallet)}</span>
                   <span className={`truncate text-right font-black ${tx.note.includes('WHALE') ? 'text-amber-300' : tx.direction === 'BUY' ? 'text-emerald-300/70' : 'text-red-300/70'}`}>{tx.note}</span>
-                </a>) : <div className="p-8 text-center text-[10px] leading-5 text-slate-600">NEO слуша Solana Mainnet в реално време.<br/>Чака следващата on-chain покупка или продажба за този pair.</div>}
+                </a>) : <div className="p-8 text-center text-[10px] leading-5 text-slate-600">{detail ? 'Няма on-chain сделки в последния отговор за този pair.' : 'Данните за on-chain сделки още не са заредени.'}</div>}
               </div>
             </div>
 
@@ -352,25 +397,25 @@ export default function App() {
                 <div className="mt-4 space-y-2">{selectedCoin.signals.length ? selectedCoin.signals.map((item, i) => <div key={`${item.title}-${i}`} className={`rounded-xl border p-3 ${item.kind === 'positive' ? 'border-emerald-400/15 bg-emerald-400/[0.05]' : item.kind === 'risk' ? 'border-red-400/15 bg-red-400/[0.05]' : 'border-white/[0.07] bg-white/[0.02]'}`}><div className={`text-[10px] font-black ${item.kind === 'positive' ? 'text-emerald-300' : item.kind === 'risk' ? 'text-red-300' : 'text-slate-300'}`}>{item.title}</div><div className="mt-1 text-[9px] leading-4 text-slate-600">{item.detail}</div></div>) : <div className="text-xs text-slate-600">Няма сигнали.</div>}</div>
               </div>
             </div>
-          </> : <div className="flex min-h-[500px] items-center justify-center rounded-3xl border border-white/10 bg-[#0b0e11] text-xs text-slate-600">Чакам първия market scan…</div>}
+          </> : <div className="flex min-h-[500px] items-center justify-center rounded-3xl border border-white/10 bg-[#0b0e11] text-xs text-slate-600">{state ? 'В получения отговор още няма market scan.' : emptyStateMessage}</div>}
         </div>
         <aside className="space-y-4">
           <div className="rounded-3xl border border-emerald-400/20 bg-[#09100d] p-4">
-            <div className="flex items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">NEO AUTO BOT</div><h2 className="mt-1 text-lg font-black text-white">Paper engine</h2></div><div className={`rounded-lg border px-2 py-1 text-[9px] font-black ${state?.running ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/[0.03] text-slate-500'}`}>{state?.running ? 'RUNNING' : 'PAUSED'}</div></div>
+            <div className="flex items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">NEO AUTO BOT</div><h2 className="mt-1 text-lg font-black text-white">Paper engine</h2></div><div className={`rounded-lg border px-2 py-1 text-[9px] font-black ${connected && state?.running ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/[0.03] text-slate-500'}`}>{connected ? state?.running ? 'RUNNING' : 'PAUSED' : connectionStatus}</div></div>
             <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.045] p-3">
-              <div className="flex items-end justify-between gap-3"><div><div className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-300/70">Demo account</div><div className="mt-1 text-2xl font-black text-white">${(state?.stats.demo_balance_usd ?? 1000).toFixed(2)}</div></div><div className="text-right"><div className={`text-sm font-black ${(state?.stats.return_pct ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{(state?.stats.return_pct ?? 0) >= 0 ? '+' : ''}{(state?.stats.return_pct ?? 0).toFixed(2)}%</div><div className="mt-1 text-[8px] text-slate-600">session return</div></div></div>
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3 text-[9px]"><div><div className="text-slate-700">EQUITY</div><div className="mt-0.5 font-black text-white">${(state?.stats.demo_equity_usd ?? 1000).toFixed(2)}</div></div><div><div className="text-slate-700">AVAILABLE</div><div className="mt-0.5 font-black text-white">${(state?.stats.demo_available_usd ?? 1000).toFixed(2)}</div></div><div><div className="text-slate-700">RESERVED</div><div className="mt-0.5 font-black text-white">${(state?.stats.demo_reserved_usd ?? 0).toFixed(2)}</div></div></div>
+              <div className="flex items-end justify-between gap-3"><div><div className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-300/70">Demo account</div><div className="mt-1 text-2xl font-black text-white">{moneyOrUnavailable(state?.stats.demo_balance_usd)}</div></div><div className="text-right"><div className={`text-sm font-black ${state && state.stats.return_pct >= 0 ? 'text-emerald-300' : state ? 'text-red-300' : 'text-slate-500'}`}>{percentageOrUnavailable(state?.stats.return_pct)}</div><div className="mt-1 text-[8px] text-slate-600">session return</div></div></div>
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3 text-[9px]"><div><div className="text-slate-700">EQUITY</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_equity_usd)}</div></div><div><div className="text-slate-700">AVAILABLE</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_available_usd)}</div></div><div><div className="text-slate-700">RESERVED</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_reserved_usd)}</div></div></div>
               <div className="mt-2 text-[8px] text-slate-600">Session {state?.stats.demo_session_id || '—'} · от {fullTimeLabel(state?.stats.demo_started_at || 0)}</div>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Entry score</div><div className="mt-1 text-lg font-black text-white">{state?.config.entry_score ?? 75}+</div></div><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Trade size</div><div className="mt-1 text-lg font-black text-white">${state?.config.trade_notional_usd ?? 100}</div></div></div>
-            <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[9px] leading-4 text-slate-500">Планиран стоп {state?.config.stop_loss_pct ?? 5}% · TP {state?.config.take_profit_pct ?? 10}% · trailing {state?.config.trailing_pct ?? 4}% · max hold {state?.config.max_hold_minutes ?? 60}m · дневен лимит {state?.config.max_daily_loss_usd === 0 ? 'ИЗКЛЮЧЕН' : `-$${state?.config.max_daily_loss_usd ?? 0}`}. Gap или липсващ sell route могат да увеличат загубата отвъд стопа.</div>
+            <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Entry score</div><div className="mt-1 text-lg font-black text-white">{state ? `${state.config.entry_score}+` : '—'}</div></div><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Trade size</div><div className="mt-1 text-lg font-black text-white">{moneyOrUnavailable(state?.config.trade_notional_usd, false, 0)}</div></div></div>
+            <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[9px] leading-4 text-slate-500">{state ? <>Планиран стоп {state.config.stop_loss_pct}% · TP {state.config.take_profit_pct}% · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m · дневен лимит {state.config.max_daily_loss_usd === 0 ? 'ИЗКЛЮЧЕН' : `-$${state.config.max_daily_loss_usd}`}. Gap или липсващ sell route могат да увеличат загубата отвъд стопа.</> : 'Настройките на PAPER сметката още не са заредени.'}</div>
             <div className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-3 text-center text-[10px] font-black text-emerald-200"><ShieldCheck className="h-4 w-4" /> GOLD ENGINE СЕ УПРАВЛЯВА ЦЕНТРАЛНО</div>
-            <div className="mt-3 text-[9px] leading-4 text-slate-600">{state?.message || 'Свързване с backend…'}</div>
+            <div className="mt-3 text-[9px] leading-4 text-slate-600">{connected ? state?.message : `${connectionLabel} · ${snapshotHint}`}</div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#0b0e11] p-4">
             <div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Open positions</div><h3 className="mt-1 text-base font-black text-white">Автоматични входове</h3></div><WalletCards className="h-4 w-4 text-emerald-300" /></div>
-            <div className="mt-4 space-y-2">{(state?.positions || []).length === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">NEO чака coin, който покрива всички entry условия.</div>}{state?.positions.map(position => <button key={position.id} onClick={() => setSelectedAddress(position.address)} className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3 text-left hover:border-emerald-400/20"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol}</div><div className="mt-0.5 text-[9px] text-slate-600">#{position.trade_no ?? '—'} · entry {fmtPrice(position.entry_price)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{position.pnl_pct >= 0 ? '+' : ''}{position.pnl_pct.toFixed(2)}%</div></div><div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.pnl_usd >= 0 ? '+' : ''}${position.pnl_usd.toFixed(2)} · Score {position.current_score?.toFixed(0) ?? position.score.toFixed(0)}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div></button>)}</div>
+            <div className="mt-4 space-y-2">{(state?.positions || []).length === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">{state ? 'В последния отговор няма отворени позиции.' : 'Данните за позициите още не са заредени.'}</div>}{state?.positions.map(position => <button key={position.id} onClick={() => setSelectedAddress(position.address)} className="w-full rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3 text-left hover:border-emerald-400/20"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol}</div><div className="mt-0.5 text-[9px] text-slate-600">#{position.trade_no ?? '—'} · entry {fmtPrice(position.entry_price)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{position.pnl_pct >= 0 ? '+' : ''}{position.pnl_pct.toFixed(2)}%</div></div><div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.pnl_usd >= 0 ? '+' : ''}${position.pnl_usd.toFixed(2)} · Score {position.current_score?.toFixed(0) ?? position.score.toFixed(0)}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div></button>)}</div>
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#0b0e11] p-4">
             <div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Activity</div><h3 className="mt-1 text-base font-black text-white">Какво прави NEO</h3></div><Bot className="h-4 w-4 text-emerald-300" /></div>
@@ -383,10 +428,10 @@ export default function App() {
       <section className="mt-4 overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#0b0e11]">
         <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">MULTI-STRATEGY LAB</div><h2 className="mt-1 text-lg font-black text-white">33 стратегии + Astra 6 Brain · Fast Scalper $100 · останалите $500</h2><div className="mt-1 text-[9px] text-slate-600">Старите 33 теста: −3% / +10% с разходен модел. Astra 6 Brain: −2% / +10–20% с Jupiter котировки и отделен капитал.</div></div>
-          <div className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-black ${state?.strategy_lab?.status === 'online' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>{(state?.strategy_lab?.status || 'CONNECTING').toUpperCase()}</div>
+          <div className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-black ${connected && state?.strategy_lab?.status === 'online' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>{connected ? (state?.strategy_lab?.status || 'UNKNOWN').toUpperCase() : connectionLabel}</div>
         </div>
         <div data-testid="lab-integrity-warning" className="mx-4 mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-4 py-3 text-xs leading-5 text-amber-100">В историята на Lab има несъответстващи цени, включително XFUN. Сумите не са пренаписани. Новите входове изискват проверка на точния pool от втори източник.</div>
-        <AstraBrainPanel data={state?.strategy_lab?.astra} />
+        {state?.strategy_lab?.astra && <AstraBrainPanel data={state.strategy_lab.astra} />}
         <LabPairedPanel data={state?.strategy_lab?.paired} />
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1050px] text-left">
@@ -413,17 +458,17 @@ export default function App() {
 
       <section data-testid="execution-integrity" className="mt-4 rounded-2xl border border-sky-400/20 bg-sky-400/[0.04] p-4 text-xs leading-6 text-slate-300">
         <div className="font-bold text-white">Order Flow · стратегията и изпълнението се проверяват отделно</div>
-        <p>Сигнал: {state?.config.signal_strategy ?? 'Зареждане…'} · Стоп −{state?.config.stop_loss_pct ?? 3}% нето · Цел +{state?.config.take_profit_pct ?? 10}% нето.</p>
+        <p>{state ? <>Сигнал: {state.config.signal_strategy ?? 'Не е посочен'} · Стоп −{state.config.stop_loss_pct}% нето · Цел +{state.config.take_profit_pct}% нето.</> : 'Настройките на изпълнението още не са заредени от backend.'}</p>
         <p>Цените по-долу са от симулираното изпълнение, когато са налични, а не от графиката. Котировката не е изпълнена транзакция. Мрежовите разходи и допълнителният буфер остават оценки.</p>
         <p className="mt-1 text-amber-200">При reset старата PAPER история се архивира и започва нова сесия. Архивните и симулираните резултати не доказват бъдеща доходност.</p>
       </section>
 
       <section className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-[#0b0e11]">
-        <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Paper history</div><h2 className="mt-1 text-lg font-black text-white">История на симулираните сделки</h2></div><div className="flex items-center gap-2 text-[9px] text-slate-600"><CircleDollarSign className="h-4 w-4 text-emerald-300" /> {state?.stats.closed_trades ?? 0} затворени · balance ${(state?.stats.demo_balance_usd ?? 1000).toFixed(2)}</div></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[1450px] text-left"><thead><tr className="border-b border-white/[0.06] text-[8px] font-black uppercase tracking-[0.14em] text-slate-700"><th className="px-4 py-3"># / Coin</th><th className="px-4 py-3">Вход време</th><th className="px-4 py-3">Симулиран вход</th><th className="px-4 py-3">Изход време</th><th className="px-4 py-3">Симулиран изход</th><th className="px-4 py-3">Размер</th><th className="px-4 py-3">PnL</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Изход</th><th className="px-4 py-3">Hold</th><th className="px-4 py-3">Проверка</th></tr></thead><tbody>{(state?.history || []).length === 0 ? <tr><td colSpan={12} className="px-4 py-8 text-center text-xs text-slate-600">Историята ще се появи след първите автоматично затворени demo позиции.</td></tr> : state?.history.slice(0, 100).map(trade => <tr key={trade.id} onClick={() => setSelectedAddress(trade.address)} className="cursor-pointer border-b border-white/[0.04] text-xs hover:bg-white/[0.02]"><td className="px-4 py-3"><div className="font-black text-white">#{trade.trade_no ?? '—'} · ${trade.symbol}</div><div className="mt-1 text-[9px] text-slate-700">{shortAddress(trade.address)}</div></td><td className="px-4 py-3 text-[10px] text-slate-500">{fullTimeLabel(trade.opened_at)}</td><td className="px-4 py-3 text-slate-300">{fmtPrice(trade.execution_entry_price ?? trade.entry_price)}</td><td className="px-4 py-3 text-[10px] text-slate-500">{fullTimeLabel(trade.closed_at || trade.updated_at)}</td><td className="px-4 py-3 text-slate-300">{fmtPrice(trade.execution_exit_price ?? trade.exit_price ?? trade.current_price)}</td><td className="px-4 py-3 text-slate-400">${trade.notional_usd.toFixed(2)}</td><td className={`px-4 py-3 font-black ${(trade.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}><div>{(trade.pnl_usd || 0) >= 0 ? '+' : ''}${(trade.pnl_usd || 0).toFixed(2)}</div><div className="mt-1 text-[9px]">{(trade.pnl_pct || 0) >= 0 ? '+' : ''}{(trade.pnl_pct || 0).toFixed(2)}%</div></td><td className="px-4 py-3"><div className="text-slate-500">${(trade.balance_before ?? 0).toFixed(2)}</div><div className="mt-1 font-black text-white">→ ${(trade.balance_after ?? 0).toFixed(2)}</div></td><td className="px-4 py-3 text-slate-400">{trade.score?.toFixed(0)}</td><td className="px-4 py-3 text-slate-400">{trade.exit_reason || '—'}</td><td className="px-4 py-3 text-slate-500">{durationLabel(trade.opened_at, trade.closed_at)}</td><td className="px-4 py-3">{trade.dex_url ? <a onClick={e => e.stopPropagation()} href={trade.dex_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1.5 text-[9px] font-black text-slate-400 hover:text-white">CHART <ExternalLink className="h-3 w-3" /></a> : '—'}</td></tr>)}</tbody></table></div>
+        <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Paper history</div><h2 className="mt-1 text-lg font-black text-white">История на симулираните сделки</h2></div><div className="flex items-center gap-2 text-[9px] text-slate-600"><CircleDollarSign className="h-4 w-4 text-emerald-300" /> {state ? state.stats.closed_trades : '—'} затворени · balance {moneyOrUnavailable(state?.stats.demo_balance_usd)}</div></div>
+        <div className="overflow-x-auto"><table className="w-full min-w-[1450px] text-left"><thead><tr className="border-b border-white/[0.06] text-[8px] font-black uppercase tracking-[0.14em] text-slate-700"><th className="px-4 py-3"># / Coin</th><th className="px-4 py-3">Вход време</th><th className="px-4 py-3">Симулиран вход</th><th className="px-4 py-3">Изход време</th><th className="px-4 py-3">Симулиран изход</th><th className="px-4 py-3">Размер</th><th className="px-4 py-3">PnL</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Score</th><th className="px-4 py-3">Изход</th><th className="px-4 py-3">Hold</th><th className="px-4 py-3">Проверка</th></tr></thead><tbody>{(state?.history || []).length === 0 ? <tr><td colSpan={12} className="px-4 py-8 text-center text-xs text-slate-600">{state ? 'В последния отговор няма затворени PAPER сделки.' : 'Историята още не е заредена от backend.'}</td></tr> : state?.history.slice(0, 100).map(trade => <tr key={trade.id} onClick={() => setSelectedAddress(trade.address)} className="cursor-pointer border-b border-white/[0.04] text-xs hover:bg-white/[0.02]"><td className="px-4 py-3"><div className="font-black text-white">#{trade.trade_no ?? '—'} · ${trade.symbol}</div><div className="mt-1 text-[9px] text-slate-700">{shortAddress(trade.address)}</div></td><td className="px-4 py-3 text-[10px] text-slate-500">{fullTimeLabel(trade.opened_at)}</td><td className="px-4 py-3 text-slate-300">{fmtPrice(trade.execution_entry_price ?? trade.entry_price)}</td><td className="px-4 py-3 text-[10px] text-slate-500">{fullTimeLabel(trade.closed_at || trade.updated_at)}</td><td className="px-4 py-3 text-slate-300">{fmtPrice(trade.execution_exit_price ?? trade.exit_price ?? trade.current_price)}</td><td className="px-4 py-3 text-slate-400">${trade.notional_usd.toFixed(2)}</td><td className={`px-4 py-3 font-black ${(trade.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}><div>{(trade.pnl_usd || 0) >= 0 ? '+' : ''}${(trade.pnl_usd || 0).toFixed(2)}</div><div className="mt-1 text-[9px]">{(trade.pnl_pct || 0) >= 0 ? '+' : ''}{(trade.pnl_pct || 0).toFixed(2)}%</div></td><td className="px-4 py-3"><div className="text-slate-500">${(trade.balance_before ?? 0).toFixed(2)}</div><div className="mt-1 font-black text-white">→ ${(trade.balance_after ?? 0).toFixed(2)}</div></td><td className="px-4 py-3 text-slate-400">{trade.score?.toFixed(0)}</td><td className="px-4 py-3 text-slate-400">{trade.exit_reason || '—'}</td><td className="px-4 py-3 text-slate-500">{durationLabel(trade.opened_at, trade.closed_at)}</td><td className="px-4 py-3">{trade.dex_url ? <a onClick={e => e.stopPropagation()} href={trade.dex_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1.5 text-[9px] font-black text-slate-400 hover:text-white">CHART <ExternalLink className="h-3 w-3" /></a> : '—'}</td></tr>)}</tbody></table></div>
       </section>
 
-      <PaperTrainingPanel data={state?.paper_training} />
+      {state?.paper_training ? <PaperTrainingPanel data={state.paper_training} /> : <section className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/[0.04] p-4 text-xs text-amber-100">{state ? 'Backend не е предоставил данни за обучителния PAPER режим. Активната версия и резултатите още не са потвърдени.' : 'Данните за обучителния PAPER режим още не са заредени от backend.'}</section>}
       <footer className="mt-5 flex flex-col justify-between gap-2 border-t border-white/[0.06] py-5 text-[9px] leading-4 text-slate-700 sm:flex-row"><div>NEO Meme Coins · live Solana market monitoring · isolated account engine</div><div className="max-w-2xl sm:text-right">Paper режимът е симулация. Meme coins са високорискови; score-ът е филтър за наблюдение, не обещание за печалба.</div></footer>
     </main>
   </div>;

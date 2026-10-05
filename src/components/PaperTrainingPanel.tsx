@@ -1,3 +1,9 @@
+type PostExitMark = { delta_to_executed_exit_usd: number | null; valuation: string };
+type ExitAnalysis = {
+  mfe_minus_realized_pct?: number; stop_gap_pct?: number;
+  post_exit?: { status: string; window_ends_at: number; valid_observations: number;
+    unavailable_observations: number; best: PostExitMark | null; worst: PostExitMark | null };
+};
 export type TrainingBook = {
   id: string; starting_balance: number; cash: number; equity: number; net_pnl_usd: number;
   return_pct: number; completed_trades: number; open_positions: number; pending_orders: number;
@@ -5,7 +11,7 @@ export type TrainingBook = {
   failed_executions: number; feasibility: number | null; rejected_signals?: number;
   rejection_reasons: Record<string, number>; risk_halt: string | null;
   positions: { symbol: string; address: string; opened_at: number; valuation: string; committed_usd: number }[];
-  recent_trades: { symbol: string; closed_at: number; pnl_usd: number; exit_reason: string }[];
+  recent_trades: { symbol: string; closed_at: number; pnl_usd: number; exit_reason: string; exit_analysis?: ExitAnalysis }[];
 };
 type Comparison = { net_improvement_usd: number; paired_episode_count: number;
   approximate_cluster_mean_95_ci: number[] | null; stress_net_pnl_usd: number };
@@ -54,7 +60,17 @@ export default function PaperTrainingPanel({ data }: { data?: PaperTrainingSnaps
     <div className="mt-3 grid gap-3 md:grid-cols-2">{(data?.books || []).filter(b => b.positions.length || b.recent_trades.length).map(book => <details key={book.id} className="rounded-xl border border-white/[0.06] p-3 text-[10px] text-slate-400">
       <summary className="cursor-pointer font-bold text-white">{book.id} · позиции и последни сделки</summary>
       {book.positions.map(p => <div key={p.address} className="mt-2">{p.symbol} · {money(p.committed_usd)} · {stamp(p.opened_at)} · {p.valuation}</div>)}
-      {book.recent_trades.map((t, i) => <div key={`${t.closed_at}-${i}`} className="mt-2">{t.symbol} · {money(t.pnl_usd)} · {t.exit_reason} · {stamp(t.closed_at)}</div>)}
+      {book.recent_trades.map((t, i) => <details key={`${t.closed_at}-${i}`} className="mt-2 rounded-lg bg-white/[0.02] p-2">
+        <summary className="cursor-pointer">{t.symbol} · {money(t.pnl_usd)} · {t.exit_reason} · {stamp(t.closed_at)}</summary>
+        {t.exit_analysis ? <div className="mt-2 space-y-1 leading-5">
+          <div>Разлика между най-добра наблюдавана оценка през позицията и реализирания резултат: {t.exit_analysis.mfe_minus_realized_pct?.toFixed(2) ?? '—'} процентни пункта. Превишение на планирания стоп: {t.exit_analysis.stop_gap_pct?.toFixed(2) ?? '—'} процентни пункта.</div>
+          {t.exit_analysis.post_exit && <>
+            <div>След затварянето: {t.exit_analysis.post_exit.valid_observations} валидни оценки · {t.exit_analysis.post_exit.unavailable_observations} наблюдения без изпълнима оценка · до {stamp(t.exit_analysis.post_exit.window_ends_at)} · {t.exit_analysis.post_exit.status}.</div>
+            <div>Разлика на по-късните оценки спрямо изпълнения изход: най-добра {t.exit_analysis.post_exit.best?.delta_to_executed_exit_usd != null ? money(t.exit_analysis.post_exit.best.delta_to_executed_exit_usd) : '—'} · най-лоша {t.exit_analysis.post_exit.worst?.delta_to_executed_exit_usd != null ? money(t.exit_analysis.post_exit.worst.delta_to_executed_exit_usd) : '—'}.</div>
+            <div className="text-amber-200/80">Това са последващи хипотетични оценки за същото количество с отчетени разходи. Те не са изпълнени сделки, не променят PnL и не са били налични при решението.</div>
+          </>}
+        </div> : <div className="mt-2">Липсва подробна оценка в този запис.</div>}
+      </details>)}
     </details>)}</div>
     <details className="mt-3 text-[10px] text-slate-500"><summary className="cursor-pointer">История на версиите и връщанията</summary>
       {(data?.versions || []).map(v => <div key={v.id} className="mt-1">{v.id} · {v.status} · {stamp(v.at)}</div>)}

@@ -26,7 +26,7 @@ jobs:
           import zipfile
           from pathlib import PurePosixPath
 
-          expected_base = "d983b1de48958d0a9dabc4ae37d210d6c175c83e"
+          expected_base = "f2c6897302bb1efb3b634e5f0bbecdeab11cc0e4"
           parent = subprocess.check_output(["git", "rev-parse", "HEAD^"], text=True).strip()
           if parent != expected_base:
               raise SystemExit(f"Unexpected base commit: {parent}")

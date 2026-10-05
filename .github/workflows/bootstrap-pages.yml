@@ -1,0 +1,175 @@
+name: Verified one-time source restore and Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - neomemecoins-ready.zip
+      - .github/workflows/bootstrap-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  restore-and-deploy:
+    if: github.repository == 'angelmalevbiz-debug/neomemecoins' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PYTHONUTF8: '1'
+      NEO_ENGINE_MODE: PAPER
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify history and restore the pinned source archive
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, stat, subprocess, zipfile
+          from pathlib import Path, PurePosixPath
+
+          BASE = 'f7e08116585683a6352eedbe4803161314c62f20'
+          ARCHIVE = 'neomemecoins-ready.zip'
+          SHA256 = 'cb511a814436839afb88163cffe401b6f92b6d7767e5eb3a66a8924f90713bb0'
+          ALLOWED = {ARCHIVE, '.github/workflows/bootstrap-pages.yml'}
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          subprocess.run(['git', 'merge-base', '--is-ancestor', BASE, 'HEAD'], check=True)
+          if git('status', '--porcelain'):
+              raise SystemExit('Checkout must be clean before restoring source')
+          for commit in git('rev-list', BASE + '..HEAD').decode('ascii').splitlines():
+              changed = git('diff-tree', '--root', '-m', '--no-commit-id', '--name-only', '-r', '-z', commit)
+              if any(p.decode('utf-8') not in ALLOWED for p in changed.split(b'\0') if p):
+                  raise SystemExit('Unexpected source mutation since the fixed base')
+          root = Path.cwd().resolve()
+          archive = root / ARCHIVE
+          if not archive.is_file() or archive.is_symlink():
+              raise SystemExit('Pinned archive is missing or is a symbolic link')
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != SHA256:
+              raise SystemExit('Archive SHA256 does not match the approved source')
+
+          manifest = {}
+          seen = set()
+          with zipfile.ZipFile(archive) as source:
+              entries = source.infolist()
+              if len(entries) > 1000 or sum(e.file_size for e in entries) > 32 * 1024 * 1024:
+                  raise SystemExit('Archive exceeds the fixed extraction bounds')
+              safe = []
+              for entry in entries:
+                  name = entry.filename
+                  parts = PurePosixPath(name).parts
+                  if (not parts or name.startswith('/') or '\\' in name or ':' in name
+                          or '\0' in name or '..' in parts or '.' in parts
+                          or '.git' in [p.casefold() for p in parts]):
+                      raise SystemExit('Unsafe archive path')
+                  if parts[0].casefold() == '.github':
+                      continue
+                  if name == ARCHIVE or entry.flag_bits & 1:
+                      raise SystemExit('Unexpected archive payload')
+                  canonical = '/'.join(parts)
+                  if canonical.casefold() in seen:
+                      raise SystemExit('Duplicate archive path')
+                  seen.add(canonical.casefold())
+                  mode = entry.external_attr >> 16
+                  kind = stat.S_IFMT(mode)
+                  if kind not in (0, stat.S_IFREG, stat.S_IFDIR):
+                      raise SystemExit('Archive links and special files are forbidden')
+                  dest = root.joinpath(*parts)
+                  if not dest.resolve().is_relative_to(root):
+                      raise SystemExit('Archive path escapes checkout')
+                  if any(p.is_symlink() for p in (dest, *dest.parents) if p != root):
+                      raise SystemExit('Archive path traverses a symbolic link')
+                  safe.append((entry, canonical, dest, mode))
+              archive_files = {name for entry, name, _, _ in safe if not entry.is_dir()}
+              tracked = {p.decode('utf-8') for p in git('ls-files', '-z').split(b'\0') if p}
+              if any(p not in archive_files and p != ARCHIVE and not p.startswith('.github/') for p in tracked):
+                  raise SystemExit('Checkout has source files absent from the approved archive')
+              required = {'package.json', 'package-lock.json', 'requirements.txt', 'scripts/run_python_checks.py'}
+              if not required.issubset(archive_files):
+                  raise SystemExit('Archive lacks required build/check inputs')
+              for entry, name, dest, mode in safe:
+                  if entry.is_dir():
+                      dest.mkdir(parents=True, exist_ok=True)
+                  else:
+                      dest.parent.mkdir(parents=True, exist_ok=True)
+                      payload = source.read(entry)
+                      dest.write_bytes(payload)
+                      dest.chmod(0o755 if mode & 0o111 else 0o644)
+                      manifest[name] = hashlib.sha256(payload).hexdigest()
+          data = {'checkout_sha': git('rev-parse', 'HEAD').decode().strip(), 'files': manifest}
+          (Path(os.environ['RUNNER_TEMP']) / 'bootstrap-source-manifest.json').write_text(json.dumps(data))
+          print('Verified and restored', len(manifest), 'source files; .github was excluded')
+          PY
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          npm ci
+          python -m pip install -r requirements.txt
+      - name: Run isolated PAPER regression suites
+        run: python scripts/run_python_checks.py
+      - name: Type-check and build the static frontend
+        run: |
+          npm run lint
+          npm run build
+          touch dist/.nojekyll
+
+      - name: Verify exact source bytes and restore main by fast-forward commit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+          data = json.loads((Path(os.environ['RUNNER_TEMP']) / 'bootstrap-source-manifest.json').read_text())
+          files = data['files']
+          for name, expected in files.items():
+              path = Path(name)
+              if path.is_symlink() or not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                  raise SystemExit('A check modified the approved source bytes')
+          if git('rev-parse', 'HEAD').decode().strip() != data['checkout_sha']:
+              raise SystemExit('HEAD changed during validation')
+          remote = git('ls-remote', '--exit-code', 'origin', 'refs/heads/main').decode().split()[0]
+          if remote != data['checkout_sha']:
+              raise SystemExit('Main advanced during validation; refusing to overwrite it')
+          Path('neomemecoins-ready.zip').unlink()
+          subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
+          subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
+          subprocess.run(['git', '-c', 'core.autocrlf=false', 'add', '--force', '--all', '--', *sorted(files), 'neomemecoins-ready.zip'], check=True)
+          staged = {p.decode('utf-8') for p in git('diff', '--cached', '--name-only', '-z').split(b'\0') if p}
+          if not staged.issubset(set(files) | {'neomemecoins-ready.zip'}):
+              raise SystemExit('Unexpected staged path, including a possible workflow mutation')
+          for name, expected in files.items():
+              if hashlib.sha256(git('show', ':' + name)).hexdigest() != expected:
+                  raise SystemExit('Git would change the approved source bytes')
+          subprocess.run(['git', 'commit', '-m', 'Restore verified NEO PAPER source and publish frontend'], check=True)
+          subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/main'], check=True)
+          PY
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - name: Deploy static frontend to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

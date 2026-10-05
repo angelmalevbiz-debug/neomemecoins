@@ -42,7 +42,7 @@ jobs:
 
           BASE = 'f7e08116585683a6352eedbe4803161314c62f20'
           ARCHIVE = 'neomemecoins-ready.zip'
-          SHA256 = 'cb511a814436839afb88163cffe401b6f92b6d7767e5eb3a66a8924f90713bb0'
+          SHA256 = '3f6a96d3a6f06799527dd580e7dbdc6f9e11525366c66576ddfd1b52ad8b429a'
           ALLOWED = {ARCHIVE, '.github/workflows/bootstrap-pages.yml'}
           def git(*args):
               return subprocess.check_output(['git', *args])

@@ -1,0 +1,112 @@
+name: Apply verified PAPER runtime update
+on:
+  push:
+    paths:
+      - .github/workflows/codex-update.zip
+permissions:
+  contents: write
+  actions: write
+jobs:
+  apply-and-deploy:
+    if: github.ref == 'refs/heads/main' && contains(github.event.head_commit.added, '.github/workflows/codex-update.zip')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify upload and exact base, then extract allowlisted files
+        env:
+          EXPECTED_SHA256: 7a1fd02600d9a06e74dd8fbdc97cbc4fb26d3684f6c13505e5f1f7ed22ee45f1
+          EXPECTED_PARENT: 077e2a94e8819b9221560c337e56a4d21a00f529
+        run: |
+          if [ ! -f .github/workflows/codex-update.zip ]; then
+            echo 'No update bundle in this commit; cleanup event skipped.'
+            exit 0
+          fi
+          python - <<'PY'
+          import hashlib, os, subprocess, zipfile
+          from pathlib import Path, PurePosixPath
+          archive = Path('.github/workflows/codex-update.zip')
+          expected = {
+              'backend/live_tape.py',
+              'scripts/start_local_paper.ps1',
+              'src/App.tsx',
+              'strategy-lock.json',
+              'tests/test_tape_execution_repair.py',
+          }
+          actual_sha = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if actual_sha != os.environ['EXPECTED_SHA256']:
+              raise SystemExit(f'Bundle SHA mismatch: {actual_sha}')
+          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
+          if parent != os.environ['EXPECTED_PARENT']:
+              raise SystemExit(f'Unexpected main parent: {parent}')
+          with zipfile.ZipFile(archive) as bundle:
+              names = bundle.namelist()
+              if len(names) != len(set(names)) or set(names) != expected:
+                  raise SystemExit(f'Bundle member allowlist mismatch: {names}')
+              for name in names:
+                  path = PurePosixPath(name)
+                  if path.is_absolute() or '..' in path.parts or '\\' in name:
+                      raise SystemExit(f'Unsafe bundle path: {name}')
+                  data = bundle.read(name)
+                  if len(data) > 5_000_000:
+                      raise SystemExit(f'Unexpectedly large file: {name}')
+                  target = Path(name)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(data)
+          print(f'Verified {len(expected)} files from {actual_sha}')
+          PY
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify backend tests, frontend types, strategy lock, and production build
+        run: |
+          python scripts/run_python_checks.py
+          npm ci
+          npm run lint
+          npm run build
+      - name: Commit source and remove temporary upload artifacts
+        id: source
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add backend/live_tape.py scripts/start_local_paper.ps1 src/App.tsx strategy-lock.json tests/test_tape_execution_repair.py
+          git rm --force .github/workflows/bootstrap-pages.yml .github/workflows/codex-update.zip
+          git commit -m 'Bound verified PAPER flow and preserve strategy trade details'
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git push origin HEAD:main
+      - name: Dispatch and verify GitHub Pages deployment
+        uses: actions/github-script@v7
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const sourceSha = process.env.SOURCE_SHA;
+            const started = Date.now() - 5000;
+            await github.rest.actions.createWorkflowDispatch({
+              owner, repo, workflow_id: 'deploy-pages.yml', ref: 'main'
+            });
+            for (let attempt = 0; attempt < 90; attempt++) {
+              const response = await github.rest.actions.listWorkflowRuns({
+                owner, repo, workflow_id: 'deploy-pages.yml', branch: 'main', per_page: 20
+              });
+              const run = response.data.workflow_runs.find(item =>
+                item.event === 'workflow_dispatch' && item.head_sha === sourceSha &&
+                Date.parse(item.created_at) >= started
+              );
+              if (run?.status === 'completed') {
+                if (run.conclusion !== 'success') throw new Error(`Pages deployment failed: ${run.html_url}`);
+                core.info(`Pages deployed successfully: ${run.html_url}`);
+                return;
+              }
+              await new Promise(resolve => setTimeout(resolve, 10000));
+            }
+            throw new Error('Timed out waiting for the Pages deployment run.');

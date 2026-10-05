@@ -1,7 +1,7 @@
 import LabPairedPanel, { type LabPairedSnapshot } from './components/LabPairedPanel';
 import PaperTrainingPanel, { type PaperTrainingSnapshot } from './components/PaperTrainingPanel';
 import AstraBrainPanel, { type AstraSnapshot } from './components/AstraBrainPanel';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Activity, Bot, ChevronRight, CircleDollarSign, Clock3, ExternalLink,
   Flame, Gauge, Pause, Play, RefreshCw, Search, ShieldCheck, Sparkles,
@@ -46,8 +46,21 @@ type Position = {
   exit_liquidity_usd?: number; exit_volume_h1?: number; exit_market_cap?: number; exit_change_m5?: number;
 };
 type PricePoint = { ts: number; price: number; liquidity: number; volumeH1: number; score: number };
-type LabPosition = { symbol: string; address: string; strategy_id: string; opened_at: number; pnl_pct: number; notional_usd: number };
-type LabBook = { id: string; name: string; starting_balance: number; balance: number; position: LabPosition | null; history: Position[] };
+type LabTrade = {
+  trade_no?: number; strategy_id?: string; symbol: string; name?: string; address: string; pairAddress?: string;
+  entry_price?: number; execution_entry_price?: number; exit_price?: number; execution_exit_price?: number;
+  notional_usd: number; opened_at: number; closed_at?: number; score?: number; pnl_pct?: number; pnl_usd?: number;
+  balance_before?: number; balance_after?: number; exit_reason?: string; execution_mode?: string;
+  entry_dex_fee_usd?: number; exit_dex_fee_usd?: number; entry_network_fee_usd?: number; exit_network_fee_usd?: number;
+  entry_price_impact_pct?: number; exit_price_impact_pct?: number; entry_slippage_pct?: number; exit_slippage_pct?: number;
+};
+type LabPosition = {
+  symbol: string; address: string; pairAddress?: string; strategy_id: string; opened_at: number; pnl_pct: number;
+  open_pnl_usd?: number; notional_usd: number; entry_price?: number; execution_entry_price?: number;
+  current_price?: number; entry_dex_fee_usd?: number; entry_network_fee_usd?: number;
+  estimated_exit_fee_usd?: number; estimated_exit_impact_pct?: number; execution_mode?: string;
+};
+type LabBook = { id: string; name: string; starting_balance: number; balance: number; position: LabPosition | null; history: LabTrade[] };
 type LabStats = { trades: number; wins: number; losses: number; win_rate: number; profit_factor: number | null; realized_pnl: number; equity: number; return_pct: number; open: boolean };
 type StrategyLab = { paired?: LabPairedSnapshot; astra?: AstraSnapshot; status: string; updated_at: number; started_at: number; books: Record<string, LabBook>; stats: Record<string, LabStats>; error?: string };
 type LiveTrade = { ts: number; direction: 'BUY' | 'SELL'; token_amount: number; usd_amount: number; wallet: string; note: string; address: string; pairAddress: string; symbol: string; signature: string; slot: number };
@@ -112,6 +125,7 @@ export default function App() {
   const [state, setState] = useState<MonitorState | null>(null);
   const [error, setError] = useState('');
   const [selectedAddress, setSelectedAddress] = useState('');
+  const [selectedLabStrategyId, setSelectedLabStrategyId] = useState('');
   const [detail, setDetail] = useState<TokenDetail | null>(null);
   const [filter, setFilter] = useState<Filter>('ALL');
   const [search, setSearch] = useState('');
@@ -427,29 +441,43 @@ export default function App() {
 
       <section className="mt-4 overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#0b0e11]">
         <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">MULTI-STRATEGY LAB</div><h2 className="mt-1 text-lg font-black text-white">33 стратегии + Astra 6 Brain · Fast Scalper $100 · останалите $500</h2><div className="mt-1 text-[9px] text-slate-600">Старите 33 теста: −3% / +10% с разходен модел. Astra 6 Brain: −2% / +10–20% с Jupiter котировки и отделен капитал.</div></div>
+          <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">MULTI-STRATEGY LAB</div><h2 className="mt-1 text-lg font-black text-white">33 отделни PAPER портфейла · Fast Scalper $100 · останалите $500</h2><div className="mt-1 text-[9px] text-slate-600">Текущи пазарни цени · моделирани DEX такси, impact, slippage и мрежов разход · всяка сметка се отчита отделно.</div></div>
           <div className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-black ${connected && state?.strategy_lab?.status === 'online' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>{connected ? (state?.strategy_lab?.status || 'UNKNOWN').toUpperCase() : connectionLabel}</div>
         </div>
         <div data-testid="lab-integrity-warning" className="mx-4 mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-4 py-3 text-xs leading-5 text-amber-100">В историята на Lab има несъответстващи цени, включително XFUN. Сумите не са пренаписани. Новите входове изискват проверка на точния pool от втори източник.</div>
+        <div className="mx-4 mt-3 rounded-xl border border-sky-400/15 bg-sky-400/[0.035] px-4 py-3 text-[10px] leading-5 text-sky-100"><b>Какво означава „реалистичен“ тук:</b> цените са от живия пазар, а симулаторът приспада моделирани DEX такси, ценово въздействие, slippage, забавяне и мрежов разход. Това не е истинска Solana транзакция и не може да съвпадне точно с реално изпълнение — пулът, priority fee, congestion, route и движението на цената могат да променят резултата. Jupiter котировката в Astra също не е изпратен swap.</div>
         {state?.strategy_lab?.astra && <AstraBrainPanel data={state.strategy_lab.astra} />}
         <LabPairedPanel data={state?.strategy_lab?.paired} />
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1050px] text-left">
+          <table className="w-full min-w-[1100px] text-left">
             <thead><tr className="border-b border-white/[0.06] text-[8px] font-black uppercase tracking-[0.14em] text-slate-700"><th className="px-4 py-3">Стратегия</th><th className="px-4 py-3">Balance</th><th className="px-4 py-3">Equity</th><th className="px-4 py-3">PnL</th><th className="px-4 py-3">Сделки</th><th className="px-4 py-3">Win rate</th><th className="px-4 py-3">PF</th><th className="px-4 py-3">Отворена позиция</th></tr></thead>
             <tbody>
               {Object.values(state?.strategy_lab?.books || {}).filter(book => book.id !== 'ASTRA_6_BRAIN').sort((a,b) => (state?.strategy_lab?.stats?.[b.id]?.equity ?? b.balance) - (state?.strategy_lab?.stats?.[a.id]?.equity ?? a.balance)).map(book => {
                 const st = state?.strategy_lab?.stats?.[book.id];
                 const pnl = st?.realized_pnl ?? (book.balance - book.starting_balance);
-                return <tr key={book.id} className="border-b border-white/[0.04] text-xs hover:bg-white/[0.02]">
-                  <td className="px-4 py-3"><div className="font-black text-white">{book.name}</div>{book.id === 'FLOW_MOMENTUM_SCALE_OUT' && <div className="mt-1 text-[9px] text-amber-200/80">Общ изход −3/+10; близките входове могат да дадат еднакви сделки.</div>}<div className="mt-1 text-[8px] font-mono text-slate-700">{book.id}</div></td>
+                const expanded = selectedLabStrategyId === book.id;
+                const trades = book.history || [];
+                const referencePair = book.position?.pairAddress || trades[0]?.pairAddress;
+                const dexUrl = referencePair ? `https://dexscreener.com/solana/${encodeURIComponent(referencePair)}` : '';
+                const bookDexButton = dexUrl
+                  ? <a href={dexUrl} target="_blank" rel="noopener noreferrer" onClick={event => event.stopPropagation()} aria-label={`Отвори ${book.name} в DexScreener`} className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1.5 text-[8px] font-black text-slate-400 hover:border-cyan-300/25 hover:text-cyan-200">DEX <ExternalLink className="h-3 w-3" /></a>
+                  : <span title="Ще има адрес след първа изпълнена PAPER позиция" className="inline-flex items-center gap-1 rounded-lg border border-white/[0.05] px-2 py-1.5 text-[8px] font-black text-slate-700">DEX · няма pool</span>;
+                return <Fragment key={book.id}>
+                <tr className={`border-b border-white/[0.04] text-xs hover:bg-white/[0.02] ${expanded ? 'bg-cyan-400/[0.025]' : ''}`}>
+                  <td className="px-4 py-3"><button type="button" aria-expanded={expanded} onClick={() => setSelectedLabStrategyId(expanded ? '' : book.id)} className="text-left"><div className="font-black text-white">{book.name}<span className="ml-2 text-[9px] font-medium text-cyan-200/70">{expanded ? 'сгъни' : 'сделки'} · {st?.trades ?? trades.length}</span></div><div className="mt-1 text-[8px] font-mono text-slate-700">{book.id}</div></button>{book.id === 'FLOW_MOMENTUM_SCALE_OUT' && <div className="mt-1 text-[9px] text-amber-200/80">Общ изход −3/+10; близките входове могат да дадат еднакви сделки.</div>}</td>
                   <td className="px-4 py-3 font-black text-white">${book.balance.toFixed(2)}</td>
                   <td className="px-4 py-3 text-slate-300">${(st?.equity ?? book.balance).toFixed(2)}</td>
                   <td className={`px-4 py-3 font-black ${pnl >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}<div className="mt-1 text-[9px]">{(st?.return_pct ?? 0) >= 0 ? '+' : ''}{(st?.return_pct ?? 0).toFixed(2)}%</div></td>
                   <td className="px-4 py-3 text-slate-400">{st?.trades ?? 0}<div className="mt-1 text-[9px] text-slate-700">{st?.wins ?? 0}W / {st?.losses ?? 0}L</div></td>
                   <td className="px-4 py-3 font-black text-white">{st?.trades ? `${st.win_rate.toFixed(1)}%` : '—'}</td>
                   <td className="px-4 py-3 text-slate-300">{st?.profit_factor != null ? st.profit_factor.toFixed(2) : st?.wins && !st.losses ? '∞ (няма загуби)' : '—'}</td>
-                  <td className="px-4 py-3">{book.position ? <button onClick={() => setSelectedAddress(book.position!.address)} className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] px-3 py-2 text-left"><div className="font-black text-cyan-200">${book.position.symbol}</div><div className={`mt-1 text-[9px] font-black ${(book.position.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{(book.position.pnl_pct || 0) >= 0 ? '+' : ''}{(book.position.pnl_pct || 0).toFixed(2)}% · ${book.position.notional_usd.toFixed(0)}</div></button> : <span className="text-[9px] text-slate-700">чака setup</span>}</td>
+                  <td className="px-4 py-3"><div className="flex items-center gap-2">{book.position ? <button onClick={() => setSelectedAddress(book.position!.address)} className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] px-3 py-2 text-left"><div className="font-black text-cyan-200">${book.position.symbol}</div><div className={`mt-1 text-[9px] font-black ${(book.position.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{(book.position.pnl_pct || 0) >= 0 ? '+' : ''}{(book.position.pnl_pct || 0).toFixed(2)}% · ${book.position.notional_usd.toFixed(0)}</div></button> : <span className="text-[9px] text-slate-700">чака setup</span>}{bookDexButton}</div></td>
                 </tr>
+                {expanded && <tr className="border-b border-cyan-400/10 bg-black/20"><td colSpan={8} className="px-4 py-4">
+                  {book.position && <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-cyan-300/20 bg-cyan-400/[0.045] p-3"><div><div className="text-[9px] font-black uppercase tracking-wide text-cyan-200">Отворена PAPER позиция · {book.position.execution_mode || 'моделирано изпълнение'}</div><div className="mt-1 text-xs font-black text-white">${book.position.symbol} · вход {fmtPrice(book.position.execution_entry_price ?? book.position.entry_price ?? 0)} · текуща оценка {fmtPrice(book.position.current_price ?? 0)} · размер ${book.position.notional_usd.toFixed(2)}</div><div className="mt-1 text-[9px] text-slate-400">Нереализиран PnL {book.position.open_pnl_usd != null ? `${book.position.open_pnl_usd >= 0 ? '+' : ''}$${book.position.open_pnl_usd.toFixed(2)}` : '—'} · вход DEX такса ${book.position.entry_dex_fee_usd?.toFixed(3) ?? '—'} · мрежа ${book.position.entry_network_fee_usd?.toFixed(3) ?? '—'} · оценка изходна такса ${book.position.estimated_exit_fee_usd?.toFixed(3) ?? '—'}</div></div><div className="flex items-center gap-2"><button onClick={() => setSelectedAddress(book.position!.address)} className="rounded-lg border border-white/10 px-2.5 py-2 text-[9px] font-black text-slate-300 hover:text-white">Токен</button>{book.position.pairAddress && <a href={`https://dexscreener.com/solana/${encodeURIComponent(book.position.pairAddress)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-cyan-300/20 px-2.5 py-2 text-[9px] font-black text-cyan-100">DEX <ExternalLink className="h-3 w-3" /></a>}</div></div>}
+                  {trades.length ? <div className="space-y-2">{trades.map((trade, index) => <article key={`${book.id}-${trade.trade_no ?? trade.opened_at}-${index}`} className="grid gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[10px] md:grid-cols-[1fr_auto] md:items-center"><div><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><b className="text-xs text-white">#{trade.trade_no ?? '—'} · ${trade.symbol}</b><span className="text-slate-500">Score {trade.score?.toFixed(0) ?? '—'} · {trade.execution_mode || 'моделиран PAPER'}</span><span className="text-slate-500">{fullTimeLabel(trade.opened_at)} → {fullTimeLabel(trade.closed_at || 0)}</span></div><div className="mt-1 text-slate-400">Вход {fmtPrice(trade.execution_entry_price ?? trade.entry_price ?? 0)} → изход {fmtPrice(trade.execution_exit_price ?? trade.exit_price ?? 0)} · размер ${trade.notional_usd.toFixed(2)} · {trade.exit_reason || 'изходът още не е записан'}</div><div className="mt-1 text-slate-500">DEX такси ${(trade.entry_dex_fee_usd ?? 0).toFixed(3)} + ${(trade.exit_dex_fee_usd ?? 0).toFixed(3)} · мрежа ${(trade.entry_network_fee_usd ?? 0).toFixed(3)} + ${(trade.exit_network_fee_usd ?? 0).toFixed(3)} · impact {trade.entry_price_impact_pct?.toFixed(2) ?? '—'}% / {trade.exit_price_impact_pct?.toFixed(2) ?? '—'}% · slippage {trade.entry_slippage_pct?.toFixed(2) ?? '—'}% / {trade.exit_slippage_pct?.toFixed(2) ?? '—'}%</div></div><div className="flex items-center justify-between gap-3 md:justify-end"><b className={(trade.pnl_usd ?? 0) >= 0 ? 'text-emerald-300' : 'text-red-300'}>{(trade.pnl_usd ?? 0) >= 0 ? '+' : ''}${(trade.pnl_usd ?? 0).toFixed(2)} · {(trade.pnl_pct ?? 0) >= 0 ? '+' : ''}{(trade.pnl_pct ?? 0).toFixed(2)}%</b>{trade.pairAddress && <a href={`https://dexscreener.com/solana/${encodeURIComponent(trade.pairAddress)}`} target="_blank" rel="noopener noreferrer" aria-label={`Свери ${trade.symbol} в DexScreener`} className="inline-flex items-center gap-1 rounded-lg border border-cyan-300/20 px-2.5 py-2 font-black text-cyan-100">DEX <ExternalLink className="h-3 w-3" /></a>}</div></article>)}</div> : !book.position ? <div className="rounded-lg border border-dashed border-white/[0.07] p-4 text-[10px] text-slate-500">Тази стратегия още няма приключила или отворена PAPER сделка. DEX pool ще се покаже при първа валидна позиция; не се измисля адрес за графика.</div> : <div className="text-[10px] text-slate-500">Няма приключили PAPER сделки за тази стратегия.</div>}
+                </td></tr>}
+                </Fragment>
               })}
             </tbody>
           </table>

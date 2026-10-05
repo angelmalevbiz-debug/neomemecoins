@@ -71,7 +71,7 @@
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "660b991ba342dc34a2d5cf3a58c05a05621c7290babf893ffb6cc1919eacbc50",
     "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
-    "backend/live_tape.py": "7dd6ffb7fbe52b6c390c32520850d50785fe399218e6cf8f98539eb1eaeb8c53",
+    "backend/live_tape.py": "e0490cc58c25fb95d35a2b7d02e89601d6b90215f6c7b2d46b188e52b00e2dee",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -148,5 +148,8 @@
     "backend/astra6_brain.py": "Shared exit-priority quote transport, cache/backoff, UTF-8 persistence and truthful profit factor",
     "backend/lab_paired_runner.py": "Cross-platform file locking and UTF-8 persistence",
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"
+  },
+  "support_file_changes": {
+    "backend/live_tape.py": "Bounded shared tape ingestion aligned with transaction processing capacity; verified signatures and safety gates remain mandatory"
   }
 }

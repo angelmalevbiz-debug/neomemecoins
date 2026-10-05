@@ -22,10 +22,10 @@ import honest_quote_transport as quote_transport
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
 RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://rpc.solanatracker.io/public')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
-MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '60'))
+MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '20'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','100'))))
-PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','2')))
+PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','4'))))
+PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 WINDOW_MS = 300_000

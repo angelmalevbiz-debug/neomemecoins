@@ -7,6 +7,7 @@ and events. Unknown programs/ambiguous bodies degrade coverage, never imply
 that there were no sellers. A signature is terminal only after classification.
 """
 import base64
+import concurrent.futures
 import json
 import hashlib
 import math
@@ -28,6 +29,7 @@ PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','6'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
+GET_TRANSACTION_WORKERS = max(1,min(4,int(os.getenv('NEO_TAPE_GET_TRANSACTION_WORKERS','4'))))
 WINDOW_MS = 300_000
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
@@ -42,9 +44,16 @@ EVENT_DISCRIMINATORS = {bytes([103,244,82,31,44,245,119,119]):'BUY',
                         bytes([62,47,55,10,165,3,220,42]):'SELL'}
 ANCHOR_EVENT_CPI = bytes([228,69,165,46,81,203,154,29])
 _B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
-NON_SWAP_DISCRIMINATORS = {hashlib.sha256(('global:'+name).encode()).digest()[:8]
-                          for name in ('create_pool','deposit','withdraw','collect_coin_creator_fee','extend_account',
-                                       'claim_token_incentives','sync_user_volume_accumulator','close_user_volume_accumulator')}
+NON_SWAP_INSTRUCTIONS = (
+    'admin_cto_pool','admin_update_token_incentives','boost_buy_and_burn','claim_cashback',
+    'claim_token_incentives','close_user_volume_accumulator','collect_coin_creator_fee','create_config',
+    'create_pool','deposit','disable','extend_account','init_boost','init_user_volume_accumulator',
+    'migrate_pool_coin_creator','set_boost_authority','set_coin_creator','set_reserved_fee_recipients',
+    'sync_user_volume_accumulator','toggle_boost','toggle_cashback_enabled','toggle_mayhem_mode',
+    'transfer_creator_fees_to_pump','transfer_creator_fees_to_pump_v2','update_admin',
+    'update_buyback_config','update_creator_fee_config','update_fee_config','withdraw',
+)
+NON_SWAP_DISCRIMINATORS = {hashlib.sha256(('global:'+name).encode()).digest()[:8] for name in NON_SWAP_INSTRUCTIONS}
 INFRA_PROGRAMS = {'11111111111111111111111111111111','TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
                   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb','ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'}
 SESSION = requests.Session()
@@ -105,8 +114,9 @@ def feed_snapshot():
     # The strict transaction decoder below only verifies the PumpSwap AMM.
     # Other DEX pools stay outside this flow tape rather than being mislabeled
     # as zero-flow or making verified PumpSwap coverage permanently degraded.
-    pinned_supported = [coin for coin in pinned if str(coin.get('dexId') or '').lower() == 'pumpswap']
-    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap']
+    supported_quote = lambda coin: coin.get('quoteTokenAddress') in (WSOL,USDC)
+    pinned_supported = [coin for coin in pinned if str(coin.get('dexId') or '').lower() == 'pumpswap' and supported_quote(coin)]
+    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap' and supported_quote(coin)]
     rows,observed = {},now_ms()
     shared_reference=shared_quote_reference()
     for coin in (pinned_supported+supported_coins)[:MAX_TRACKED]:
@@ -143,7 +153,14 @@ def rpc_batch(calls):
     # PublicNode permits only one getTransaction per JSON-RPC request.
     # Respect that provider contract while retaining normal batching for
     # cheaper methods such as getSignaturesForAddress.
-    batch_limit=1 if any(method=='getTransaction' for method,_ in calls) else RPC_BATCH_SIZE
+    methods={method for method,_ in calls}
+    if methods=={'getTransaction'} and len(calls)>1:
+        # Keep every provider request single-call, but drain independent
+        # transaction bodies concurrently so one slow response cannot age
+        # the entire five-minute flow window.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(GET_TRANSACTION_WORKERS,len(calls))) as pool:
+            return list(pool.map(lambda call: rpc_batch([call])[0],calls))
+    batch_limit=1 if 'getTransaction' in methods else min(RPC_BATCH_SIZE,4) if 'getSignaturesForAddress' in methods else RPC_BATCH_SIZE
     if len(calls)>batch_limit:
         answers=[]
         for start in range(0,len(calls),batch_limit):

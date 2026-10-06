@@ -60,13 +60,15 @@ class ParserTests(unittest.TestCase):
                         {'address':pubkey(22),'pairAddress':pubkey(23),'dexId':'pumpfun',
                          'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':90,'sells':90}}},
                         {'address':pubkey(24),'pairAddress':pubkey(25),'dexId':'pumpswap',
-                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':10,'sells':10}}},
+                         'priceUsd':1,'priceNative':1,'quoteTokenAddress':tape.WSOL,'txns':{'m5':{'buys':10,'sells':10}}},
                         {'address':pubkey(26),'pairAddress':pubkey(27),'dexId':'pumpswap',
-                         'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':9,'sells':9}}},
+                         'priceUsd':1,'priceNative':1,'quoteTokenAddress':tape.WSOL,'txns':{'m5':{'buys':9,'sells':9}}},
+                        {'address':pubkey(32),'pairAddress':pubkey(33),'dexId':'pumpswap',
+                         'priceUsd':1,'priceNative':1,'quoteTokenAddress':pubkey(34),'txns':{'m5':{'buys':500,'sells':500}}},
                     ],
                     'positions': [
                         {'address':pubkey(28),'pairAddress':pubkey(29),
-                         'coin_snapshot':{'dexId':'pumpswap','symbol':'PIN','priceUsd':1}},
+                         'coin_snapshot':{'dexId':'pumpswap','symbol':'PIN','priceUsd':1,'quoteTokenAddress':tape.WSOL}},
                         {'address':pubkey(30),'pairAddress':pubkey(31),
                          'coin_snapshot':{'dexId':'raydium','symbol':'UNSUPPORTED','priceUsd':1}},
                     ],
@@ -79,6 +81,13 @@ class ParserTests(unittest.TestCase):
         self.assertEqual({row['pair'] for row in feed},{pubkey(29)})
         self.assertLessEqual(len(feed),1)
         self.assertTrue(all(row['dexId']=='pumpswap' for row in feed))
+
+    def test_known_current_pumpswap_non_swap_instruction_does_not_degrade_flow(self):
+        discriminator=tape.hashlib.sha256(b'global:boost_buy_and_burn').digest()[:8]
+        self.assertIn(discriminator,tape.NON_SWAP_DISCRIMINATORS)
+        tx=non_swap()
+        tx['transaction']['message']['instructions'][0]={'programId':tape.PUMP_AMM,'accounts':[PAIR],'data':tape._b58encode(discriminator)}
+        self.assertEqual(tape.classify_transaction(tx,META,observed_at=NOW,ingested_at=NOW)[0],'non_swap')
 
     def test_projection_atomic_replace_retries_transient_windows_lock(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -195,6 +204,18 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(answers[0]['result'],'one');self.assertIn('error',answers[1]);self.assertEqual(answers[2]['result'],'three')
         self.assertIn('error',tape.align_rpc_answers(calls,[{'id':1,'result':1},{'id':1,'result':2}])[0])
 
+    def test_signature_discovery_batches_are_bounded_for_public_rpc(self):
+        posted=[]
+        class Response:
+            def __init__(self,payload): self.payload=payload
+            def raise_for_status(self): return None
+            def json(self): return [{'id':row['id'],'result':[]} for row in self.payload]
+        def post(_url,*,json,timeout): posted.append(json);return Response(json)
+        calls=[('getSignaturesForAddress',[f'p{i}',{}]) for i in range(10)]
+        with patch.object(tape.SESSION,'post',side_effect=post): answers=tape.rpc_batch(calls)
+        self.assertEqual(len(answers),10)
+        self.assertEqual([len(payload) for payload in posted],[4,4,2])
+
     def test_get_transaction_respects_single_call_public_rpc_contract(self):
         posted=[]
         class Response:
@@ -213,10 +234,17 @@ class RpcAndDurability(unittest.TestCase):
         class Response:
             def raise_for_status(self): return None
             def json(self): return [{'id':1,'result':None}]
-        with patch.object(tape.SESSION,'post',side_effect=[requests.ConnectionError('reset'),Response()]):
+        def post(_url,*,json,timeout):
+            if json[0]['params'][0]=='a': raise requests.ConnectionError('reset')
+            return Response()
+        with patch.object(tape.SESSION,'post',side_effect=post):
             answers=tape.rpc_batch([('getTransaction',['a',{}]),('getTransaction',['b',{}])])
         self.assertEqual(answers[0]['error']['code'],'TRANSACTION_RPC_UNAVAILABLE')
         self.assertIsNone(answers[1]['result'])
+
+    def test_get_transaction_concurrency_is_bounded(self):
+        self.assertGreaterEqual(tape.GET_TRANSACTION_WORKERS,1)
+        self.assertLessEqual(tape.GET_TRANSACTION_WORKERS,4)
 
     def test_get_transaction_requests_support_version_one(self):
         with self.rec.db:

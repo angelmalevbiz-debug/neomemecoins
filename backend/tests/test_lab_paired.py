@@ -29,9 +29,12 @@ def coin(now=NOW,price=.001):
 
 
 def tape(now=NOW):
-    return {'status':'online','updated_at':now,'events':[{'ts':now-i*1000,'address':MINT,'pairAddress':PAIR,
+    return {'status':'online','updated_at':now,
+        'pair_coverage':{PAIR:{'status':'COMPLETE','complete_since_ms':now-300_000}},
+        'events':[{'ts':now-i*1000,'event_time':now-i*1000,'available_at':now-i*1000,
+        'confirmed_swap':True,'quality_flags':[],'address':MINT,'pairAddress':PAIR,
         'direction':'BUY' if i<6 else 'SELL','usd_amount':100.,'token_amount':100000.,
-        'signature':'sig'+str(i),'wallet':'wallet'+str(i)} for i in range(8)]}
+        'event_id':'event'+str(i),'signature':'sig'+str(i),'wallet':'wallet'+str(i)} for i in range(8)]}
 
 
 def weak(now=NOW,key='one'):
@@ -49,11 +52,23 @@ class PolicyTests(unittest.TestCase):
     def test_dedup(self):
         t=tape();t['events']+=copy.deepcopy(t['events']);self.assertEqual(p.flow_window(t,MINT,PAIR,30,NOW)['trades'],8)
     def test_future_event_rejected(self):
-        t=tape();t['events'][0]['ts']=NOW+1;self.assertEqual(p.flow_window(t,MINT,PAIR,30,NOW)['trades'],7)
+        t=tape();t['events'][0]['ts']=NOW+1;t['events'][0]['event_time']=NOW+1;self.assertEqual(p.flow_window(t,MINT,PAIR,30,NOW)['trades'],7)
     def test_future_provider_rejected(self):
         t=tape();t['updated_at']=NOW+1;self.assertFalse(p.flow_window(t,MINT,PAIR,30,NOW)['fresh'])
     def test_stale_provider(self):
         t=tape();t['updated_at']=NOW-16000;self.assertFalse(p.flow_window(t,MINT,PAIR,30,NOW)['fresh'])
+    def test_global_degraded_does_not_block_complete_exact_pool(self):
+        t=tape();t['status']='degraded'
+        self.assertTrue(p.flow_window(t,MINT,PAIR,30,NOW)['fresh'])
+    def test_incomplete_exact_pool_stays_fail_closed(self):
+        t=tape();t['pair_coverage'][PAIR]['status']='DEGRADED'
+        self.assertFalse(p.flow_window(t,MINT,PAIR,30,NOW)['fresh'])
+    def test_coverage_must_span_requested_window(self):
+        t=tape();t['pair_coverage'][PAIR]['complete_since_ms']=NOW-10_000
+        self.assertFalse(p.flow_window(t,MINT,PAIR,30,NOW)['fresh'])
+    def test_unverified_or_flagged_events_are_not_flow(self):
+        t=tape();t['events'][0]['confirmed_swap']=False;t['events'][1]['quality_flags']=['UNKNOWN']
+        self.assertEqual(p.flow_window(t,MINT,PAIR,30,NOW)['trades'],6)
     def test_invalid_direction_and_amount(self):
         t=tape();t['events'][0]['direction']='UNKNOWN';t['events'][1]['usd_amount']=-1
         self.assertEqual(p.flow_window(t,MINT,PAIR,30,NOW)['trades'],6)

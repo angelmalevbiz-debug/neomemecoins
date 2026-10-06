@@ -39,24 +39,32 @@ def number(value: Any, default=0.0):
 
 
 def flow_window(tape, mint, pair, seconds, now):
-    """Exact pool identity, deduplicated events, no future timestamps."""
+    """Exact-pool flow with fail-closed coverage local to this pool."""
+    cutoff=now-seconds*1000
+    coverage=(tape.get('pair_coverage') or {}).get(pair,{})
+    complete=(str(coverage.get('status') or '').upper()=='COMPLETE'
+              and 0<number(coverage.get('complete_since_ms'),now+1)<=cutoff)
+    tape_fresh=0<=now-number(tape.get('updated_at'),now+1)<=15_000
     seen=set(); rows=[]
     for e in tape.get('events', []):
-        ts=number(e.get('ts'))
-        if e.get('address')!=mint or e.get('pairAddress')!=pair or not now-seconds*1000 <= ts <= now: continue
+        ts=number(e.get('event_time'),number(e.get('ts')))
+        available=number(e.get('available_at'),number(e.get('ingested_at')))
+        if e.get('address')!=mint or e.get('pairAddress')!=pair or not cutoff <= ts <= now: continue
+        if e.get('confirmed_swap') is not True or e.get('quality_flags') or not 0<available<=now: continue
         if e.get('direction') not in ('BUY','SELL') or number(e.get('usd_amount'))<=0: continue
-        identity=(e.get('signature'),mint,pair,e.get('direction'),ts,e.get('wallet'),e.get('usd_amount'),e.get('token_amount'))
+        identity=(e.get('event_id') or e.get('signature'),mint,pair,e.get('direction'),ts,e.get('wallet'),e.get('usd_amount'),e.get('token_amount'))
         if identity in seen: continue
         seen.add(identity); rows.append(e)
     buys=[e for e in rows if e['direction']=='BUY']; sells=[e for e in rows if e['direction']=='SELL']
     b=sum(number(e['usd_amount']) for e in buys); s=sum(number(e['usd_amount']) for e in sells)
-    latest=max((int(e['ts']) for e in rows), default=0)
+    latest=max((int(number(e.get('available_at'),number(e.get('ingested_at')))) for e in rows), default=0)
     wallets=len({e['wallet'] for e in rows if e.get('wallet')})
     return {'seconds':seconds,'trades':len(rows),'buys':len(buys),'sells':len(sells),
             'buy_usd':b,'sell_usd':s,'net_buy_usd':b-s,'ratio':b/max(s,1),
             'unique_wallets':wallets,'max_sell':max((number(e['usd_amount']) for e in sells),default=0),
             'latest_at':latest,'evidence_key':str(latest)+':'+str(len(rows))+':'+str(round(b+s,4)),
-            'fresh':tape.get('status')=='online' and 0<=now-number(tape.get('updated_at'))<=15_000 and latest>0 and 0<=now-latest<=15_000}
+            'coverage_status':str(coverage.get('status') or 'UNKNOWN').upper(),
+            'fresh':bool(complete and tape_fresh)}
 
 
 def features(coin, flow):

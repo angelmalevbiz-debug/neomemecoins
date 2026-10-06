@@ -9,6 +9,7 @@ export type TrainingBook = {
   return_pct: number; completed_trades: number; open_positions: number; pending_orders: number;
   unique_completed_episodes: number; wins: number; losses: number; max_drawdown_pct: number;
   failed_executions: number; feasibility: number | null; rejected_signals?: number;
+  rejected_market_episodes?: number; evaluated_rejected_paths?: number;
   rejection_reasons: Record<string, number>; risk_halt: string | null;
   positions: { symbol: string; address: string; opened_at: number; valuation: string; committed_usd: number }[];
   recent_trades: { symbol: string; closed_at: number; pnl_usd: number; exit_reason: string; exit_analysis?: ExitAnalysis }[];
@@ -54,7 +55,7 @@ export default function PaperTrainingPanel({ data }: { data?: PaperTrainingSnaps
         <td className={`px-2 ${book.net_pnl_usd >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{money(book.net_pnl_usd)} · {book.return_pct.toFixed(2)}%</td>
         <td className="px-2">{book.open_positions} / {book.completed_trades} · чакащи {book.pending_orders}</td>
         <td className="px-2">{book.unique_completed_episodes}</td><td className="px-2">{book.max_drawdown_pct.toFixed(2)}%</td>
-        <td className="px-2">{book.failed_executions} / {book.rejected_signals ?? 0}</td>
+        <td className="px-2">{book.failed_executions} / {book.rejected_signals ?? 0}<div className="text-[9px] text-slate-500">{book.rejected_market_episodes ?? 0} епизода · {book.evaluated_rejected_paths ?? 0} оценени</div></td>
       </tr>)}</tbody>
     </table></div>
     <div className="mt-3 grid gap-3 md:grid-cols-2">{(data?.books || []).filter(b => b.positions.length || b.recent_trades.length).map(book => <details key={book.id} className="rounded-xl border border-white/[0.06] p-3 text-[10px] text-slate-400">

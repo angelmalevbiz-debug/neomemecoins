@@ -404,10 +404,54 @@ class PaperTrainingTests(unittest.TestCase):
         self.assertEqual(s["completed_trades"], 0)
         self.assertEqual(s["net_pnl_usd"], 0)
         self.assertEqual(s["rejected_signals"], 2)
+        self.assertEqual(s["rejected_market_episodes"], 1)
+        self.assertEqual(len(book(e)["rejected"]), 1)
         rejected = book(e)["rejected"][0]
         self.assertEqual(rejected["outcome"], "not_executed")
+        self.assertEqual(rejected["signal_count"], 2)
         self.assertEqual(rejected["subsequent_market_return_pct"], 100)
         self.assertIn("not_executable", rejected["missed_opportunity"])
+
+    def test_repeated_rejections_coalesce_without_losing_signal_counts_after_restart(self):
+        e = self.engine()
+        for index in range(300):
+            e.ingest(row(NOW + index * 1000, score=40, identifier="rejected-%d" % index))
+        s = e.stats(book(e))
+        self.assertEqual(s["rejected_signals"], 300)
+        self.assertEqual(s["rejected_market_episodes"], 1)
+        self.assertEqual(len(book(e)["rejected"]), 1)
+        self.assertEqual(book(e)["rejected"][0]["signal_count"], 300)
+        restored = PaperTrainingEngine(self.path)
+        self.assertEqual(restored.stats(book(restored))["rejected_signals"], 300)
+        self.assertEqual(len(book(restored)["rejected"]), 1)
+
+    def test_legacy_rejection_history_compacts_by_episode_and_preserves_totals(self):
+        e = self.engine()
+        for index in range(4):
+            e.ingest(row(NOW + index * 1000, score=40, identifier="old-%d" % index))
+        control = book(e)
+        original = control["rejected"][0]
+        legacy = []
+        for index in range(4):
+            item = copy.deepcopy(original)
+            item["id"] = "legacy-%d" % index
+            item["at"] = NOW + index * 1000
+            item.pop("signal_count", None)
+            legacy.append(item)
+        control["rejected"] = legacy
+        for key in ("rejected_total", "rejected_market_episodes_total",
+                    "evaluated_rejected_paths_total", "rejection_reason_counts"):
+            control.pop(key, None)
+        e.save()
+
+        restored = PaperTrainingEngine(self.path)
+        compacted = book(restored)
+        stats = restored.stats(compacted)
+        self.assertEqual(len(compacted["rejected"]), 1)
+        self.assertEqual(compacted["rejected"][0]["signal_count"], 4)
+        self.assertEqual(stats["rejected_signals"], 4)
+        self.assertEqual(stats["rejected_market_episodes"], 1)
+        self.assertEqual(stats["rejection_reasons"]["score"], 4)
 
     def test_restart_pending_and_open_exit_steps_equivalent(self):
         for boundary in (1, 2, 3):

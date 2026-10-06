@@ -31,6 +31,7 @@ VERSION = "PAPER_TRAINING_V1"
 USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 MODEL = "RECORDED_LIQUIDITY_MODEL"
 ADDRESS = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+MAX_REJECTED_EPISODE_HISTORY = 2000
 
 
 def number(value, default=0.0):
@@ -146,7 +147,9 @@ def _config(supplied):
 def empty_book(name, params, cash):
     return {"id": name, "params": copy.deepcopy(params), "initial_cash": cash,
             "cash": cash, "positions": {}, "pending": {}, "trades": [],
-            "rejected": [], "failed": [], "cooldowns": {}, "peak_equity": cash,
+            "rejected": [], "rejected_total": 0, "rejected_market_episodes_total": 0,
+            "evaluated_rejected_paths_total": 0, "rejection_reason_counts": {},
+            "failed": [], "cooldowns": {}, "peak_equity": cash,
             "max_drawdown": 0.0, "day": None, "day_start_equity": cash,
             "halt_reason": None, "observations": 0}
 
@@ -193,11 +196,16 @@ class PaperTrainingEngine:
             for book in self.state["books"].values():
                 if not math.isfinite(number(book["cash"], math.nan)) or book["cash"] < 0:
                     raise ValueError("invalid paper cash ledger")
+            if self._compact_rejections():
+                # The append-only observation journal retains individual
+                # decisions; state keeps one path per episode plus totals.
+                self.save()
         else:
             self.config = _config(config)
             self.state = self._fresh()
             self.save()
         self._index_post_exit_assessments()
+        self._index_rejected_signals()
 
     def _index_post_exit_assessments(self):
         """Rebuild once per load/reset; each row then visits active windows only."""
@@ -206,6 +214,72 @@ class PaperTrainingEngine:
                    if (trade.get("exit_analysis") or {}).get("post_exit")
                    and not trade["exit_analysis"]["post_exit"]["status"].startswith("window_complete")}
             for name, book in self.state["books"].items()}
+
+    def _compact_rejections(self):
+        changed = False
+        for book in self.state["books"].values():
+            records = book.get("rejected") if isinstance(book.get("rejected"), list) else []
+            reasons = Counter(book.get("rejection_reason_counts") or {})
+            if not reasons:
+                for item in records:
+                    reasons.update(item.get("reasons") or [])
+            grouped = {}
+            signal_total = sum(max(1, int(number(item.get("signal_count"), 1))) for item in records)
+            for item in records:
+                episode = str(item.get("episode") or item.get("id") or "legacy:%s" % item.get("at", 0))
+                current = grouped.get(episode)
+                if current is None:
+                    current = copy.deepcopy(item)
+                    current["episode"] = episode
+                    current["first_signal_at"] = int(number(item.get("first_signal_at"), item.get("at", 0)))
+                    current["last_signal_at"] = int(number(item.get("last_signal_at"), item.get("at", 0)))
+                    current["signal_count"] = max(1, int(number(item.get("signal_count"), 1)))
+                    grouped[episode] = current
+                else:
+                    current["signal_count"] += max(1, int(number(item.get("signal_count"), 1)))
+                    current["last_signal_at"] = max(current["last_signal_at"], int(number(item.get("last_signal_at"), item.get("at", 0))))
+                    current["reasons"] = list(dict.fromkeys((current.get("reasons") or []) + (item.get("reasons") or [])))
+                    if item.get("evaluation_at", 0) > current.get("evaluation_at", 0):
+                        for key in ("evaluation_at", "subsequent_market_return_pct", "missed_opportunity"):
+                            if key in item:
+                                current[key] = copy.deepcopy(item[key])
+            episodes = list(grouped.values())
+            episodes.sort(key=lambda item: (number(item.get("at")), str(item.get("episode"))))
+            evaluated = sum(bool(item.get("evaluation_at")) for item in episodes)
+            old_total = int(number(book.get("rejected_total"), signal_total))
+            old_episode_total = int(number(book.get("rejected_market_episodes_total"), len(grouped)))
+            old_evaluated = int(number(book.get("evaluated_rejected_paths_total"), evaluated))
+            capped = episodes[-MAX_REJECTED_EPISODE_HISTORY:]
+            if (len(records) != len(capped) or old_total != book.get("rejected_total")
+                    or old_episode_total != book.get("rejected_market_episodes_total")
+                    or old_evaluated != book.get("evaluated_rejected_paths_total")
+                    or reasons != Counter(book.get("rejection_reason_counts") or {})):
+                changed = True
+            book["rejected"] = capped
+            book["rejected_total"] = old_total
+            book["rejected_market_episodes_total"] = old_episode_total
+            book["evaluated_rejected_paths_total"] = old_evaluated
+            book["rejection_reason_counts"] = dict(reasons)
+        return changed
+
+    def _index_rejected_signals(self):
+        now = int(self.state.get("last_available_at", 0))
+        self._rejected_episode_index = {}
+        self._rejected_market_index = {}
+        for name, book in self.state["books"].items():
+            episode_index = {}
+            market_index = {}
+            for item in book.get("rejected", []):
+                episode_index[item.get("episode")] = item
+                if now and now - int(number(item.get("at"))) > self.config["episode_ms"]:
+                    if not item.get("evaluation_at"):
+                        item["missed_opportunity"] = "window_complete_no_matching_observation"
+                        item["window_complete_at"] = now
+                    continue
+                market = (item.get("address"), item.get("pair"))
+                market_index.setdefault(market, []).append(item)
+            self._rejected_episode_index[name] = episode_index
+            self._rejected_market_index[name] = market_index
 
     def _fresh(self):
         cash = self.config["initial_cash"]
@@ -232,6 +306,7 @@ class PaperTrainingEngine:
             self.config = _config({**self.config, "initial_cash": initial_cash})
         self.state = self._fresh()
         self._index_post_exit_assessments()
+        self._index_rejected_signals()
         self.save()
         return self.snapshot()
 
@@ -432,15 +507,74 @@ class PaperTrainingEngine:
         book["halt_reason"] = reason
 
     def _reject(self, book, row, episode, reasons):
-        # A rejected signal is distinct from a failed execution or completed trade.
-        book["rejected"].append({"id": row["id"], "at": row["available_at"], "episode": episode,
-                                 "address": row["coin"]["address"], "pair": row["coin"]["pairAddress"],
-                                 "reasons": reasons, "params": copy.deepcopy(book["params"]),
-                                 "decision_features": copy.deepcopy(row.get("flow") or {}),
-                                 "execution_evidence": copy.deepcopy(row.get("execution") or {}),
-                                 "price": number(row["coin"].get("priceUsd")),
-                                 "score": number(row["coin"].get("score")),
-                                 "outcome": "not_executed", "missed_opportunity": "unknown_until_future_observation"})
+        # Count every rejected signal, but store one path per market episode.
+        # Full individual decisions remain in the append-only observation journal.
+        book["rejected_total"] = int(book.get("rejected_total", 0)) + 1
+        counts = Counter(book.get("rejection_reason_counts") or {})
+        counts.update(reasons)
+        book["rejection_reason_counts"] = dict(counts)
+        episode_index = self._rejected_episode_index.setdefault(book["id"], {})
+        existing = episode_index.get(episode)
+        stamp = int(row["available_at"])
+        price = number(row["coin"].get("priceUsd"))
+        if existing is not None:
+            existing["signal_count"] = int(existing.get("signal_count", 1)) + 1
+            existing["last_signal_at"] = stamp
+            existing["last_signal_price"] = price
+            existing["reasons"] = list(dict.fromkeys((existing.get("reasons") or []) + reasons))
+            return
+        book["rejected_market_episodes_total"] = int(book.get("rejected_market_episodes_total", 0)) + 1
+        rejected = {"id": row["id"], "at": stamp, "episode": episode,
+                    "first_signal_at": stamp, "last_signal_at": stamp, "signal_count": 1,
+                    "address": row["coin"]["address"], "pair": row["coin"]["pairAddress"],
+                    "reasons": reasons, "params": copy.deepcopy(book["params"]),
+                    "decision_features": copy.deepcopy(row.get("flow") or {}),
+                    "execution_evidence": copy.deepcopy(row.get("execution") or {}),
+                    "price": price, "score": number(row["coin"].get("score")),
+                    "outcome": "not_executed", "missed_opportunity": "unknown_until_future_observation"}
+        book["rejected"].append(rejected)
+        episode_index[episode] = rejected
+        market_index = self._rejected_market_index.setdefault(book["id"], {}).setdefault(
+            (rejected["address"], rejected["pair"]), [])
+        market_index.append(rejected)
+        if len(book["rejected"]) > MAX_REJECTED_EPISODE_HISTORY:
+            expired = book["rejected"].pop(0)
+            episode_index.pop(expired.get("episode"), None)
+            market = (expired.get("address"), expired.get("pair"))
+            active = self._rejected_market_index[book["id"]].get(market, [])
+            self._rejected_market_index[book["id"]][market] = [item for item in active if item is not expired]
+
+    def _assess_rejected_paths(self, book, row):
+        now = int(row["available_at"])
+        market = (row["coin"]["address"], row["coin"]["pairAddress"])
+        indexed = self._rejected_market_index.get(book["id"], {})
+        records = indexed.get(market, [])
+        if not records:
+            return
+        active = []
+        price = number(row["coin"].get("priceUsd"))
+        for rejected in records:
+            if rejected["at"] >= now:
+                active.append(rejected)
+                continue
+            if now - rejected["at"] > self.config["episode_ms"]:
+                if not rejected.get("evaluation_at"):
+                    rejected["missed_opportunity"] = "window_complete_no_matching_observation"
+                    rejected["window_complete_at"] = now
+                continue
+            if price > 0:
+                rejected["subsequent_market_return_pct"] = (price / rejected["price"] - 1) * 100
+                rejected["evaluation_at"] = now
+                rejected["latest_observed_price"] = price
+                rejected["missed_opportunity"] = "market_path_only_not_executable_profit"
+                if not rejected.get("path_evaluated"):
+                    rejected["path_evaluated"] = True
+                    book["evaluated_rejected_paths_total"] = int(book.get("evaluated_rejected_paths_total", 0)) + 1
+            active.append(rejected)
+        if active:
+            indexed[market] = active
+        else:
+            indexed.pop(market, None)
 
     def _failure(self, book, pending, now, reason, position=None):
         # Explicit assumed retry overhead, never represented as a known paid fee.
@@ -736,9 +870,12 @@ class PaperTrainingEngine:
                 "failed_executions": len(book["failed"]),
                 "estimated_failed_fees_usd": sum(t["estimated_fee_usd"] for t in book["failed"]),
                 "feasibility": len(trades) / (len(trades) + len(book["failed"])) if trades or book["failed"] else None,
-                "rejection_reasons": dict(Counter(r for item in book["rejected"] for r in item["reasons"])),
-                "rejected_signals": len(book["rejected"]),
-                "evaluated_rejected_paths": sum("evaluation_at" in r for r in book["rejected"]),
+                "rejection_reasons": dict(book.get("rejection_reason_counts") or Counter(
+                    r for item in book["rejected"] for r in item["reasons"])),
+                "rejected_signals": int(book.get("rejected_total", len(book["rejected"]))),
+                "rejected_market_episodes": int(book.get("rejected_market_episodes_total", len(book["rejected"]))),
+                "evaluated_rejected_paths": int(book.get("evaluated_rejected_paths_total",
+                    sum(bool(r.get("evaluation_at")) for r in book["rejected"]))),
                 "recent_rejected_signals": copy.deepcopy(book["rejected"][-10:]),
                 "recent_failed_executions": copy.deepcopy(book["failed"][-10:]),
                 "valuation_unknown_positions": sum(p["valuation"] != "fresh" for p in book["positions"].values()),
@@ -942,19 +1079,11 @@ class PaperTrainingEngine:
             if name.startswith("MONITOR_") and (not monitor_before or now <= monitor_before["started_at"]):
                 continue
             self._step_book(book, row, episode)
-        # Rejected signal path observations are evaluated separately, never
-        # added to execution pnl/win rate or promoted as hypothetical wins.
+        # Evaluate skipped paths on their own market only. They never become
+        # executed trades or enter realized PnL.
         for book in self.state["books"].values():
             self._assess_post_exit(book, row)
-            for rejected in reversed(book["rejected"]):
-                if rejected["at"] >= now:
-                    continue
-                if now - rejected["at"] > self.config["episode_ms"]:
-                    break
-                if rejected["address"] == row["coin"]["address"] and rejected["pair"] == row["coin"]["pairAddress"] and rejected["price"] > 0:
-                    rejected["subsequent_market_return_pct"] = (number(row["coin"].get("priceUsd")) / rejected["price"] - 1) * 100
-                    rejected["evaluation_at"] = now
-                    rejected["missed_opportunity"] = "market_path_only_not_executable_profit"
+            self._assess_rejected_paths(book, row)
         self._validate(now)
         self._rollback(now)
         if not trial_before and not self.state["training"]:

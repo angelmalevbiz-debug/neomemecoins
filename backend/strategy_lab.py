@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, math, os, time
+import json, math, os, threading, time
 from pathlib import Path
 from typing import Any, Callable
 import requests
@@ -7,7 +7,9 @@ from astra_lab_bridge import merge_astra_snapshot
 from lab_paired_bridge import merge_paired_snapshot
 from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
+import engine_rug_guard as rug_guard
 from lab_position_marks import POSITION_MARK_FEED
+import paper_execution_quotes as paper_quotes
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
 
@@ -44,6 +46,13 @@ NETWORK_FEE_SOL=float(os.getenv('NEO_LAB_NETWORK_FEE_SOL','0.0001'))
 MAX_PRICE_IMPACT_PCT=float(os.getenv('NEO_LAB_MAX_PRICE_IMPACT_PCT','20'))
 EXECUTION_MODEL_VERSION='DEX_SPOT_MODELED_COSTS_V2'
 POSITION_STALE_AFTER_MS=12_000
+LAB_PRICE_PROBE_NOTIONAL_USD=float(os.getenv('NEO_LAB_PRICE_PROBE_NOTIONAL_USD','10'))
+LAB_PRICE_PROBE_TTL_MS=10_000
+LAB_PRICE_PROBE_RETRY_MS=15_000
+LAB_PRICE_PROBE_LOCK=threading.Lock()
+LAB_PRICE_PROBE_CACHE={}
+LAB_PRICE_PROBE_RETRY_AFTER={}
+LAB_PRICE_PROBE_INFLIGHT=False
 
 SESSION=requests.Session()
 SESSION.headers.update({'user-agent':'NEO-Strategy-Lab/1.0','accept':'application/json'})
@@ -159,6 +168,127 @@ def flow_map():
     return out
 def enrich(c,flows):
     return activity.market_features(c, flows.get(c.get('address')))
+
+def cached_jupiter_tiebreak(validation,coin,*,now=None):
+    """Use a fresh, same-token PAPER route quote to finish a price review.
+
+    GeckoTerminal remains the first reference. When it is pending/unavailable,
+    the shared, rate-limited Jupiter quote path can confirm the signal price.
+    The risk check remains bound to the exact signal mint/pair; the independent
+    quote may use any valid route for that mint. It does not place an order.
+    """
+    now=now_ms() if now is None else int(now)
+    mint=str(coin.get('address') or ''); pair=str(coin.get('pairAddress') or '')
+    key=(mint,pair)
+    with LAB_PRICE_PROBE_LOCK:
+        probe=LAB_PRICE_PROBE_CACHE.get(key)
+    if not probe:
+        return validation
+    quote=probe.get('quote') or {}
+    quoted_at=int(num(quote.get('quoted_at')))
+    signal_at=int(num(coin.get('updatedAt')))
+    decimals=probe.get('decimals')
+    if (probe.get('mint')!=mint or probe.get('pair')!=pair
+            or quote.get('input_mint')!=paper_quotes.USDC_MINT
+            or quote.get('output_mint')!=mint
+            or type(decimals) is not int or not 0<=decimals<=18
+            or not 0<=now-quoted_at<=LAB_PRICE_PROBE_TTL_MS
+            or signal_at<=0 or signal_at>quoted_at
+            or not 0<=now-signal_at<=activity.MAX_FEED_AGE_MS):
+        return validation
+    try:
+        raw=int(quote.get('token_raw_amount'))
+        notional=float(quote.get('input_usdc_raw'))/1_000_000
+        quantity=raw/(10**decimals)
+        if raw<=0 or notional<=0 or quantity<=0:
+            return validation
+        quoted_price=notional/quantity
+    except (TypeError,ValueError,OverflowError,ZeroDivisionError):
+        return validation
+    return price_integrity.jupiter_tiebreak(validation,quoted_price)
+
+def schedule_jupiter_price_probe(coin):
+    """Schedule one shared, non-blocking same-token cross-check at a time."""
+    global LAB_PRICE_PROBE_INFLIGHT
+    mint=str(coin.get('address') or ''); pair=str(coin.get('pairAddress') or '')
+    if not mint or not pair:
+        return False
+    key=(mint,pair); stamp=now_ms()
+    with LAB_PRICE_PROBE_LOCK:
+        cached=LAB_PRICE_PROBE_CACHE.get(key)
+        if cached and 0<=stamp-int(num((cached.get('quote') or {}).get('quoted_at')))<=LAB_PRICE_PROBE_TTL_MS:
+            return False
+        if LAB_PRICE_PROBE_INFLIGHT or LAB_PRICE_PROBE_RETRY_AFTER.get(key,0)>stamp:
+            return False
+        LAB_PRICE_PROBE_INFLIGHT=True
+
+    def run():
+        global LAB_PRICE_PROBE_INFLIGHT
+        retry_ms=LAB_PRICE_PROBE_RETRY_MS
+        try:
+            # Reuse the main engine's cached full safety check for mint decimals.
+            # Do not start an independent risk scan or bypass a missing result.
+            guard=rug_guard.check(coin)
+            decimals=(guard.get('metrics') or {}).get('decimals')
+            if (guard.get('status')!='pass' or guard.get('mint')!=mint
+                    or guard.get('pair')!=pair or type(decimals) is not int
+                    or not 0<=decimals<=18):
+                retry_ms=3_000
+                return
+            input_raw=int(round(LAB_PRICE_PROBE_NOTIONAL_USD*1_000_000))
+            if input_raw<=0:
+                return
+            # This is a read-only quote for the same token mint, not a simulated
+            # fill. The strategy's modeled execution still uses the signal pool.
+            raw_quote=paper_quotes.quote(
+                paper_quotes.USDC_MINT,mint,input_raw,purpose='background')
+            if not raw_quote:
+                return
+            route_plan=raw_quote.get('routePlan') or []
+            token_legs=[(leg.get('swapInfo') or {}) for leg in route_plan
+                        if mint in ((leg.get('swapInfo') or {}).get('inputMint'),
+                                    (leg.get('swapInfo') or {}).get('outputMint'))]
+            quoted_at=int(num(raw_quote.get('_received_at')))
+            if (raw_quote.get('inputMint')!=paper_quotes.USDC_MINT
+                    or raw_quote.get('outputMint')!=mint
+                    or int(num(raw_quote.get('inAmount'))) != input_raw
+                    or int(num(raw_quote.get('outAmount')))<=0
+                    or not token_legs or quoted_at<=0):
+                return
+            quote={
+                'input_mint':raw_quote['inputMint'],'output_mint':raw_quote['outputMint'],
+                'quoted_at':quoted_at,'input_usdc_raw':raw_quote['inAmount'],
+                'token_raw_amount':raw_quote['outAmount'],
+                'route_amm_keys':[leg.get('ammKey') for leg in token_legs],
+            }
+            with LAB_PRICE_PROBE_LOCK:
+                LAB_PRICE_PROBE_CACHE[key]={
+                    'mint':mint,'pair':pair,'decimals':decimals,'quote':quote,
+                    'signal_observed_at':int(num(coin.get('updatedAt'))),
+                }
+                retry_ms=LAB_PRICE_PROBE_TTL_MS
+                if len(LAB_PRICE_PROBE_CACHE)>128:
+                    oldest=sorted(LAB_PRICE_PROBE_CACHE.items(),key=lambda item:int(num((item[1].get('quote') or {}).get('quoted_at'))))
+                    for old_key,_ in oldest[:len(LAB_PRICE_PROBE_CACHE)-96]:
+                        LAB_PRICE_PROBE_CACHE.pop(old_key,None)
+        except Exception:
+            # Quote/risk provider outages remain visible as a blocked signal;
+            # the next bounded retry can recover without interrupting exits.
+            pass
+        finally:
+            with LAB_PRICE_PROBE_LOCK:
+                LAB_PRICE_PROBE_INFLIGHT=False
+                LAB_PRICE_PROBE_RETRY_AFTER[key]=max(
+                    LAB_PRICE_PROBE_RETRY_AFTER.get(key,0),now_ms()+retry_ms)
+
+    try:
+        threading.Thread(target=run,name='neo-lab-jupiter-price-check',daemon=True).start()
+        return True
+    except RuntimeError:
+        with LAB_PRICE_PROBE_LOCK:
+            LAB_PRICE_PROBE_INFLIGHT=False
+            LAB_PRICE_PROBE_RETRY_AFTER[key]=stamp+LAB_PRICE_PROBE_RETRY_MS
+        return False
 
 STRATEGIES=[
  {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':lambda f: f['score']>=98 and f['liq']>=25000 and 3<=f['m5']<=18 and 1.1<=f['bs']<=3.0 and f['lmc']>=.15 and 8<=f['age']<=180},
@@ -387,17 +517,29 @@ def maybe_open(feed,flows):
             continue
         eligible=[]
         checked=0
+        signal_candidates=0
         blocked_cost=0
         blocked_price=0
+        price_crosscheck_pending=0
         blocked_cooldown=0
         flow_rejected=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
             if not rule.matches(features):
-                if strategy['id']=='SCALPER' and rule.matches(features,require_flow=False):
+                if rule.matches(features,require_flow=False):
                     flow_rejected+=1
                 continue
+            signal_candidates+=1
             validation=price_integrity.check(coin)
+            if validation.get('status')=='review':
+                validation=cached_jupiter_tiebreak(validation,coin,now=now)
+                if validation.get('status')!='pass':
+                    if validation.get('status')=='review':
+                        price_crosscheck_pending+=1
+                        schedule_jupiter_price_probe(coin)
+                    else:
+                        blocked_price+=1
+                    continue
             if validation.get('status')!='pass':
                 blocked_price+=1; continue
             address=coin['address']
@@ -413,11 +555,14 @@ def maybe_open(feed,flows):
                 blocked_cost+=1
                 continue
             eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
-                             coin,features,proposed))
+                             coin,features,proposed,validation))
         book['entry_diagnostics']={
-            'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
+            'at':now,'signal_candidates':signal_candidates,
+            'matched_candidates':checked,'cost_rejected':blocked_cost,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':len(eligible),
             'price_verification_rejected':blocked_price,
+            'price_crosscheck_pending':price_crosscheck_pending,
+            'flow_missing_candidates':flow_rejected,
             'risk_limited_notional_usd':round(entry_limit,4),
         }
         if strategy['id']=='SCALPER':
@@ -432,7 +577,7 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']='verified_flow_unavailable'
         if not eligible:
             continue
-        _,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1]))
+        _,_,coin,features,proposed,validation=max(eligible,key=lambda item:(item[0],item[1]))
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
         qty=num(opening['quantity'])
@@ -458,7 +603,7 @@ def maybe_open(feed,flows):
             'execution_source':'DEX_SPOT_WITH_MODELED_FRICTION',
             'quote_status':'fresh','mark_received_at':stamp,
             'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','quote_age_ms':0,
-            'price_crosscheck':price_integrity.check(coin),
+            'price_crosscheck':validation,
             'entry_policy_version':activity.POLICY_VERSION,
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
             'entry_size_reduced':notional+0.02<entry_limit,
@@ -488,6 +633,7 @@ def stats(book):
             'profit_factor':round(gp/gl,2) if gl>0 else None,
             'profit_factor_status':'finite' if gl>0 else ('infinite_no_losses' if gp>0 else 'undefined_no_results'),
             'realized_pnl':round(num(book.get('balance'))-start,2),
+            'unrealized_pnl':round(unreal,2),'total_pnl':round(equity-start,2),
             'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(p),
             'valuation_stale':valuation_stale,'mark_age_ms':mark_age_ms,
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),

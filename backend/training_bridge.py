@@ -201,6 +201,10 @@ class TrainingBridge:
             diagnostic.close()
 
     def _ensure_worker(self, config_path):
+        # Shutdown sets closed before queuing its sentinel. A worker exit racing
+        # with the final recorder batch must not start a fresh child behind it.
+        if self.closed or self.stop_event.is_set():
+            return
         if self.process is not None:
             returncode = self.process.poll()
             if returncode is None:

@@ -1,7 +1,7 @@
 {
   "name": "NEO verified PAPER execution and isolated learning",
   "locked_at_utc": "2026-10-06",
-  "source_commit": "USER_AUTHORIZED_PAPER_QUOTE_SIZE_BACKOFF_20261006",
+  "source_commit": "USER_AUTHORIZED_LAB_PRICE_CROSSCHECK_20261006",
   "strategy_file": "backend/market_monitor.py",
   "sha256": "1447d4f855721f1f18e5e01d2ccd56d6ab49a092a1e93f576de38bd1603b5852",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
@@ -80,12 +80,12 @@
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "ce20fd2372eb307b4e4cdeeaf468f22f993781a3fc5754d1b9f070c2dca6e42c",
-    "backend/training_bridge.py": "deaaf5dcf6ca779cd7494ad5db43194c6ae560ec19dbb60f01eb54a9716fbe61",
+    "backend/strategy_lab.py": "a74bc750ab6c816b3ed9cd8e0e75464bd1e3a0b8be9e8d36bd327e3c0ceeebd3",
+    "backend/training_bridge.py": "5e40add75882c7bbee73d010148ea425c42475d9b03b792b1bda22a5249fc14d",
     "backend/training_worker.py": "9390cc7cc78afb2dc791d03e8c51fb85374a5edf5330d22ddd614048fba65ae2",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
     "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
-    "backend/lab_dashboard_projection.py": "6714791cc22c0330843c902c76cfd058062a6fc4f9afd2c7cfa41d8a0cc28da0",
+    "backend/lab_dashboard_projection.py": "cf36d79a6400fd89cb495100abdc47044fa951c93894f08bb52a74e474fa5e6c",
     "backend/lab_activity.py": "6f39bd931024205cbd08644652fee9ddad5a14d5438c315310cb8620155e17ab",
     "backend/winner_ensemble.py": "96d40a7d1e7623af693dce792e7ccbf0414702a18ab41a9b6e727d9cfcd9fa77",
     "backend/market_monitor.py": "1447d4f855721f1f18e5e01d2ccd56d6ab49a092a1e93f576de38bd1603b5852",
@@ -100,7 +100,8 @@
     "missing_or_pending_reference_price": "EXACT_POOL_JUPITER_CONFIRMATION_REQUIRED",
     "sol_usd_for_tape": "SHARED_TIMESTAMPED_JUPITER_REFERENCE",
     "prewarm_safety_checks": true,
-    "strategy_changed": true
+    "strategy_changed": true,
+    "strategy_lab_missing_reference_price": "FRESH_SAME_TOKEN_JUPITER_ROUTE_REQUIRED"
   },
   "learning": {
     "mode": "ISOLATED_VALIDATED_PAPER_PARAMETERS",
@@ -134,18 +135,18 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Bound live tape RPC requests to supported singleton transaction reads with v1 support while preserving strict incomplete-coverage gates. Reset recorder sidecars with each session and coalesce duplicate learner polls to prevent false degraded status from queue saturation. Restrict live flow completeness checks to the exact 30-second decision window while preserving older unknown signatures in durable history.",
+  "hash_change_reasons": "Bound live tape RPC requests to supported singleton transaction reads with v1 support while preserving strict incomplete-coverage gates. Reset recorder sidecars with each session and coalesce duplicate learner polls to prevent false degraded status from queue saturation. Restrict live flow completeness checks to the exact 30-second decision window while preserving older unknown signatures in durable history. Add bounded same-token Jupiter price cross-checks for Strategy Lab after independent signal matches, accept any valid same-token Jupiter route for price checks while binding the signal to the exact safety-checked pair, expose per-strategy entry blockers, and report marked PAPER PnL beside realized PnL. Prevent a shutting-down recorder from respawning its child learner; keep all process cleanup isolated from trading decisions.",
   "support_file_changes": {
     "backend/live_tape.py": "Keep bounded batched signature discovery and singleton transaction reads. Restart after tracking gaps or stale pagination, replay only the 30-second decision window for flow validation, and keep older raw tape history for replay.",
-    "backend/strategy_lab.py": "Fresh exact-pool spot refresh for held positions, stale valuation labels, and explicit modeled-cost execution basis",
+    "backend/strategy_lab.py": "Keep Strategy Lab checks active when GeckoTerminal has no reference by scheduling one non-blocking, full-risk-approved same-token Jupiter route quote at a time; use only fresh, post-signal price confirmation and preserve cost and flow gates. PAPER execution remains modeled on the signal pool; report realized, unrealized, and marked net PnL per independent book.",
     "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
-    "backend/lab_dashboard_projection.py": "Expose position mark age/source and paper-only modeled execution basis",
+    "backend/lab_dashboard_projection.py": "Expose compact per-strategy entry diagnostics and clearly separated realized, unrealized, and marked PAPER PnL for the dashboard.",
     "backend/market_monitor.py": "Keep main PAPER entries and exits unchanged; perform separate bounded learner quote preflights after entry evaluation",
     "backend/engine_entry_policy.py": "Shared fresh pair/mint and market snapshot validation, explicit ensemble signal rejection and execution cost limits",
     "backend/lab_activity.py": "Single canonical feature builder and unchanged four promoted entry rules shared by Lab and main PAPER ensemble",
     "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account",
     "backend/paper_training.py": "Require fresh complete exact-pool flow before allocating quote capacity to learner route evidence",
-    "backend/training_bridge.py": "Coalesce repeated same-pair learner snapshots within a bounded interval while preserving material price, flow, safety, validation, and quote evidence; this reduces queue overload without slowing execution exits.",
+    "backend/training_bridge.py": "Coalesce identical snapshots and keep training off the exit path; prevent worker restart after bridge shutdown so PAPER services stop without leaving orphan learners.",
     "backend/training_quote_probe.py": "Bounded read-only two-way exact-pool Jupiter quote evidence for isolated PAPER learning",
     "backend/paper_state_reset.py": "Archive and reset recorder/quote-probe diagnostics together with PAPER history so each authorized clean session starts with truthful zeroed counters."
   }

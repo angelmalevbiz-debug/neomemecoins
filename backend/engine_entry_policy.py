@@ -17,7 +17,7 @@ _ADDRESS = re.compile(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$')
 LABELS = {
     'risk_budget_unavailable': 'недостатъчен оставащ дневен бюджет за минималната позиция',
     'gold_signal': 'няма достатъчно ранен buy-flow импулс',
-    'winner_signal': 'няма сигнал от четирите PAPER стратегии',
+    'winner_signal': 'няма сигнал от активните PAPER стратегии',
     'flow_quality': 'непълен или забавен проверен order flow',
     'audit_pending': 'непотвърден траен audit запис; изчаква повторен запис',
     'liquidation_unavailable': 'неизвестна ликвидационна оценка на отворена позиция',

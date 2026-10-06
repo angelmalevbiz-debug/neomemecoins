@@ -5,14 +5,15 @@ win rate. Fees and fill assumptions remain in strategy_lab.py unchanged.
 """
 from dataclasses import dataclass
 import math
+import os
 import re
 from typing import Any, Callable
 
 POLICY_VERSION = 'LAB_ACTIVE_V3_VERIFIED_SCALPER'
-REENTRY_SECONDS = 60
-LOSS_REENTRY_SECONDS = 180
-SCALPER_REENTRY_SECONDS = 600
-SCALPER_LOSS_REENTRY_SECONDS = 3600
+REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_REENTRY_SECONDS', '60')))
+LOSS_REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_LOSS_REENTRY_SECONDS', '180')))
+SCALPER_REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_SCALPER_REENTRY_SECONDS', '600')))
+SCALPER_LOSS_REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_SCALPER_LOSS_REENTRY_SECONDS', '3600')))
 SCALPER_MAX_BALANCE_FRACTION = 0.25
 SCALPER_MIN_NOTIONAL_USD = 2.0
 MAX_FEED_AGE_MS = 20_000

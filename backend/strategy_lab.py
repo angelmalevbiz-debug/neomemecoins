@@ -29,8 +29,10 @@ STRATEGY_START_BALANCES={
 TRADE_NOTIONAL=float(os.getenv('NEO_LAB_TRADE_NOTIONAL','150'))
 POLL_SECONDS=float(os.getenv('NEO_LAB_POLL_SECONDS','2'))
 ENTRY_REFRESH_SECONDS=float(os.getenv('NEO_LAB_ENTRY_REFRESH_SECONDS','2'))
-STOP_LOSS=3.0
-TAKE_PROFIT=10.0
+STOP_LOSS=float(os.getenv('NEO_LAB_STOP_LOSS_PCT','3'))
+TAKE_PROFIT=float(os.getenv('NEO_LAB_TAKE_PROFIT_PCT','10'))
+if not math.isfinite(STOP_LOSS) or not math.isfinite(TAKE_PROFIT) or STOP_LOSS <= 0 or TAKE_PROFIT <= 0:
+    raise ValueError('invalid PAPER lab exit configuration')
 TRAILING=4.0
 MAX_HOLD_MIN=60.0
 REENTRY_COOLDOWN_MIN=activity.REENTRY_SECONDS/60.0

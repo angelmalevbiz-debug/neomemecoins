@@ -32,12 +32,15 @@ POSITION_SCAN_SECONDS = float(os.getenv('NEO_POSITION_SCAN_SECONDS', '0.5'))
 DEX_API = 'https://api.dexscreener.com'
 MAX_FEED = 90
 ENTRY_SCORE = 60.0
-MAX_POSITIONS = 8
-STOP_LOSS_PCT = 5.0
+MAX_POSITIONS = max(1, int(os.getenv('NEO_MAX_POSITIONS', '8')))
+STOP_LOSS_PCT = float(os.getenv('NEO_STOP_LOSS_PCT', '5'))
 STOP_EXECUTION_BUFFER_PCT = 0.5  # Planned risk allowance, never a fill clamp.
-STOP_EXECUTION_ARM_NET_PCT = 5.0
+STOP_EXECUTION_ARM_NET_PCT = STOP_LOSS_PCT
 EXIT_IMPACT_EMERGENCY_PCT = 0.75
-TAKE_PROFIT_PCT = 10.0
+TAKE_PROFIT_PCT = float(os.getenv('NEO_TAKE_PROFIT_PCT', '10'))
+ENTRY_COOLDOWN_SECONDS = max(0, int(os.getenv('NEO_ENTRY_COOLDOWN_SECONDS', '1200')))
+PUBLIC_HISTORY_LIMIT = int(os.getenv('NEO_PUBLIC_HISTORY_LIMIT', '100'))
+TARGET_TRADES_PER_HOUR = max(0, int(os.getenv('NEO_TARGET_TRADES_PER_HOUR', '0')))
 TRAILING_PCT = 4.0
 MAX_HOLD_MINUTES = 60
 WEAK_CHECK_MINUTES = 5
@@ -63,9 +66,10 @@ STRICT_MAX_WORST_CASE_COST_PCT = float(os.getenv('NEO_STRICT_MAX_WORST_CASE_COST
 EFFECTIVE_ENTRY_THRESHOLDS = order_flow.EntryThresholds(STRICT_ENTRY_SCORE, STRICT_MIN_LIQUIDITY_USD, STRICT_MIN_CONVICTION)
 for _threshold in (STRICT_MAX_ENTRY_IMPACT_PCT, STRICT_MAX_ROUNDTRIP_COST_PCT, STRICT_MAX_WORST_CASE_COST_PCT,
                    TRADE_NOTIONAL_USD, MAX_DAILY_LOSS_USD, POSITION_SCAN_SECONDS, MAX_POSITION_RISK_USD,
-                   MAX_TOTAL_EXPOSURE_PCT, MAX_DRAWDOWN_PCT):
+                   MAX_TOTAL_EXPOSURE_PCT, MAX_DRAWDOWN_PCT, STOP_LOSS_PCT, TAKE_PROFIT_PCT):
     if not math.isfinite(_threshold) or _threshold < 0: raise ValueError('invalid PAPER configuration')
-if TRADE_NOTIONAL_USD <= 0 or POSITION_SCAN_SECONDS <= 0: raise ValueError('invalid PAPER configuration')
+if TRADE_NOTIONAL_USD <= 0 or POSITION_SCAN_SECONDS <= 0 or STOP_LOSS_PCT <= 0 or TAKE_PROFIT_PCT <= 0: raise ValueError('invalid PAPER configuration')
+if PUBLIC_HISTORY_LIMIT < 0: raise ValueError('invalid PAPER history limit')
 if MAX_POSITION_RISK_USD <= 0 or not 0 < MAX_TOTAL_EXPOSURE_PCT <= 100 or not 0 <= MAX_DRAWDOWN_PCT <= 100:
     raise ValueError('invalid PAPER risk limits')
 
@@ -547,6 +551,9 @@ class State:
             lifetime = trade_metrics(self.history)
             wins, closed = lifetime['wins'], lifetime['closed_trades']
             closed_total = closed
+            cutoff_hour = now_ms() - 60 * 60 * 1000
+            closed_last_hour = sum(1 for t in self.history if int(t.get('closed_at') or 0) >= cutoff_hour)
+            public_history = self.history if PUBLIC_HISTORY_LIMIT == 0 else self.history[:PUBLIC_HISTORY_LIMIT]
             tape = read_live_tape()
             return {
                 'running': self.running,
@@ -556,7 +563,7 @@ class State:
                 'scan_count': self.scan_count,
                 'feed': self.feed,
                 'positions': self.positions,
-                'history': [compact_public_trade(t) for t in self.history[:100]],
+                'history': [compact_public_trade(t) for t in public_history],
                 'events': self.events[:30],
                 'source_status': self.source_status,
                 'entry_diagnostics': self.entry_diagnostics,
@@ -568,6 +575,9 @@ class State:
                     'feed_count': len(self.feed),
                     'open_positions': len(self.positions),
                     'closed_trades': closed_total,
+                    'closed_trades_last_hour': closed_last_hour,
+                    'target_trades_per_hour': TARGET_TRADES_PER_HOUR or None,
+                    'hourly_target_met': bool(TARGET_TRADES_PER_HOUR and closed_last_hour >= TARGET_TRADES_PER_HOUR),
                     'wins': wins,
                     'win_rate': round((wins / closed) * 100, 1) if closed else 0,
                     'metrics': {'lifetime': lifetime,
@@ -605,7 +615,9 @@ class State:
                     'stop_loss_basis': 'EXECUTABLE_NET_PNL',
                     'stop_trigger_net_pct': -STOP_LOSS_PCT,
                     'take_profit_basis': 'EXECUTABLE_NET_PNL',
-                    'reentry_seconds': 1200, 'loss_reentry_seconds': 1200,
+                    'reentry_seconds': ENTRY_COOLDOWN_SECONDS, 'loss_reentry_seconds': ENTRY_COOLDOWN_SECONDS,
+                    'history_limit': PUBLIC_HISTORY_LIMIT or None,
+                    'target_trades_per_hour': TARGET_TRADES_PER_HOUR or None,
                     'signal_strategy': winner_ensemble.VERSION,
                     'ensemble_strategies': list(winner_ensemble.STRATEGIES),
                     'signal_source_commit': winner_ensemble.VERSION,
@@ -1492,7 +1504,7 @@ class Monitor:
         open_addresses = {p.get('address') for p in STATE.positions}
         now = now_ms()
         # Keep per-token cooldown so high frequency does not become revenge re-entry.
-        recent = {t.get('address') for t in STATE.history if now-int(t.get('closed_at',0))<20*60*1000}
+        recent = {t.get('address') for t in STATE.history if now-int(t.get('closed_at',0)) < ENTRY_COOLDOWN_SECONDS * 1000}
         for coin in feed:
             if len(STATE.positions) >= MAX_POSITIONS:
                 break

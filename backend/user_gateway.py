@@ -28,6 +28,21 @@ MAX_USER_PORT = int(os.getenv("NEO_USER_ENGINE_PORT_END", "19800"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qziuovwcauaklgqscqys.supabase.co").rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
+TARGET_PAPER_EMAIL = os.getenv("NEO_TARGET_PAPER_EMAIL", "").strip().lower()
+TARGET_PAPER_PROFILE = "HF_300_SL4_TP10_COSTS_V1"
+TARGET_HISTORY_RESTORE_VERSION = "BACKUP_UNION_V1"
+BACKUP_ROOT = Path(os.getenv("NEO_MARKET_BACKUP_ROOT", "/var/lib/neo-market/backups"))
+TARGET_PAPER_ENV = {
+    "NEO_STOP_LOSS_PCT": "4",
+    "NEO_TAKE_PROFIT_PCT": "10",
+    "NEO_ENTRY_COOLDOWN_SECONDS": "60",
+    "NEO_MAX_POSITIONS": "20",
+    "NEO_TRADE_NOTIONAL_USD": "50",
+    "NEO_PUBLIC_HISTORY_LIMIT": "0",
+    "NEO_TARGET_TRADES_PER_HOUR": "300",
+    "NEO_STRATEGY_LAB_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json",
+    "NEO_STRATEGY_LAB_COMPACT_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json",
+}
 
 LOCK = threading.RLock()
 ENGINE_PROCESSES = {}
@@ -124,6 +139,77 @@ def engine_audit_path(user_id):
     return engine_dir(user_id) / "audit.jsonl"
 
 
+def is_target_user(user):
+    return bool(TARGET_PAPER_EMAIL and str(user.get("email") or "").strip().lower() == TARGET_PAPER_EMAIL)
+
+
+def apply_target_profile(user, account):
+    if not is_target_user(user):
+        return False
+    changed = account.get("paper_profile") != TARGET_PAPER_PROFILE
+    if changed:
+        account["paper_profile"] = TARGET_PAPER_PROFILE
+        account["updated_at"] = now_ms()
+        save_store()
+    return changed
+
+
+def trade_identity(trade):
+    stable = trade.get("id") or trade.get("event_id")
+    if stable:
+        return str(stable)
+    return "|".join(str(trade.get(k) or "") for k in
+                    ("session_id", "trade_no", "address", "opened_at", "closed_at"))
+
+
+def restore_target_history(user_id, account):
+    if account.get("history_restore_version") == TARGET_HISTORY_RESTORE_VERSION:
+        return False
+    state_path = engine_state_path(user_id)
+    if not state_path.exists():
+        return False
+    safe_id = safe_user_id(user_id)
+    sources = []
+    if BACKUP_ROOT.exists():
+        sources.extend(BACKUP_ROOT.glob(f"**/{safe_id}.json"))
+        sources.extend(BACKUP_ROOT.glob(f"**/states/users/{safe_id}/state.json"))
+    sources = sorted({p.resolve() for p in sources if p.is_file()}, key=lambda p: p.stat().st_mtime)
+    sources.append(state_path.resolve())
+    merged = {}
+    source_count = 0
+    for source in sources:
+        try:
+            payload = json.loads(source.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        history = payload.get("history") if isinstance(payload, dict) else None
+        if not isinstance(history, list):
+            continue
+        source_count += 1
+        for trade in history:
+            if isinstance(trade, dict):
+                merged[trade_identity(trade)] = copy.deepcopy(trade)
+    for trade in account.get("history") or []:
+        if isinstance(trade, dict):
+            merged.setdefault(trade_identity(trade), copy.deepcopy(trade))
+    current = json.loads(state_path.read_text(encoding="utf-8"))
+    before = len(current.get("history") or [])
+    restored = list(merged.values())
+    restored.sort(key=lambda t: int(t.get("closed_at") or t.get("opened_at") or 0), reverse=True)
+    backup = state_path.with_name(f"state.pre-history-restore-{now_ms()}.json")
+    backup.write_bytes(state_path.read_bytes())
+    current["history"] = restored
+    atomic_json(state_path, current)
+    account["history_restore_version"] = TARGET_HISTORY_RESTORE_VERSION
+    account["history_restore_before"] = before
+    account["history_restore_after"] = len(restored)
+    account["history_restore_sources"] = source_count
+    account["history_restore_at"] = now_ms()
+    account["updated_at"] = now_ms()
+    save_store()
+    return len(restored) != before
+
+
 def port_open(port):
     try:
         with socket.create_connection(("127.0.0.1", int(port)), timeout=0.25):
@@ -138,6 +224,26 @@ def engine_health(port):
         return response.status_code == 200 and bool(response.json().get("ok"))
     except Exception:
         return False
+
+
+def stop_engine_for_reconfigure(user_id, account):
+    process = ENGINE_PROCESSES.pop(str(user_id), None)
+    if process is not None and process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+    port = int(account.get("engine_port") or 0)
+    if port and engine_health(port):
+        subprocess.run(["/usr/bin/fuser", "-k", f"{port}/tcp"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, check=False, timeout=5)
+        deadline = time.time() + 5
+        while time.time() < deadline and port_open(port):
+            time.sleep(0.1)
+        if port_open(port):
+            raise RuntimeError("User PAPER engine could not be safely reconfigured")
 
 
 def allocate_port(user_id):
@@ -266,6 +372,8 @@ def start_engine(user, account):
         "NEO_ENGINE_MODE": "PAPER",
         "NEO_TRAINING_ROOT": str(engine_dir(user_id) / 'training'),
     })
+    if account.get("paper_profile") == TARGET_PAPER_PROFILE:
+        env.update(TARGET_PAPER_ENV)
 
     engine_dir(user_id).mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen(
@@ -290,6 +398,12 @@ def start_engine(user, account):
 def ensure_engine(user):
     with LOCK:
         account = ensure_account_record(user)
+        profile_changed = apply_target_profile(user, account)
+        needs_restore = is_target_user(user) and account.get("history_restore_version") != TARGET_HISTORY_RESTORE_VERSION
+        if profile_changed or needs_restore:
+            stop_engine_for_reconfigure(user["id"], account)
+            bootstrap_if_needed(user, account)
+            restore_target_history(user["id"], account)
         return start_engine(user, account)
 
 

@@ -6,13 +6,25 @@ the exact pool, safety, executable quotes, costs and available account capital.
 """
 from dataclasses import asdict
 import math
+import os
 from typing import Any
 
 import lab_activity
 
 VERSION = 'WINNER_ENSEMBLE_PAPER_V1'
 ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_ENTRY_V1'
-STRATEGIES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
+DEFAULT_STRATEGIES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
+_strategy_env = os.getenv('NEO_WINNER_STRATEGIES', '').strip()
+if _strategy_env.upper() == 'ALL':
+    STRATEGIES = tuple(lab_activity.RULES.keys())
+elif _strategy_env:
+    requested = tuple(part.strip().upper() for part in _strategy_env.split(',') if part.strip())
+    unknown = [name for name in requested if name not in lab_activity.RULES]
+    if unknown:
+        raise ValueError(f'unknown PAPER strategies: {unknown}')
+    STRATEGIES = requested or DEFAULT_STRATEGIES
+else:
+    STRATEGIES = DEFAULT_STRATEGIES
 MIN_SCORE = min(lab_activity.RULES[name].score for name in STRATEGIES)
 MIN_LIQUIDITY_USD = min(lab_activity.RULES[name].liquidity for name in STRATEGIES)
 

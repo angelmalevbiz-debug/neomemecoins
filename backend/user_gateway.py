@@ -30,17 +30,18 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qziuovwcauaklgqscqys.supabase.
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
 TARGET_PAPER_EMAIL = os.getenv("NEO_TARGET_PAPER_EMAIL", "").strip().lower()
-TARGET_PAPER_PROFILE = "HF_50H_SL4_TP10_COSTS_V2"
+TARGET_PAPER_PROFILE = "HF_100H_SL4_TP10_COSTS_V3"
 TARGET_HISTORY_RESTORE_VERSION = "FULL_ACCOUNT_ARCHIVE_UNION_V2"
 BACKUP_ROOT = Path(os.getenv("NEO_MARKET_BACKUP_ROOT", "/var/lib/neo-market/backups"))
 TARGET_PAPER_ENV = {
     "NEO_STOP_LOSS_PCT": "4",
     "NEO_TAKE_PROFIT_PCT": "10",
-    "NEO_ENTRY_COOLDOWN_SECONDS": "60",
+    "NEO_ENTRY_COOLDOWN_SECONDS": "30",
     "NEO_MAX_POSITIONS": "20",
     "NEO_TRADE_NOTIONAL_USD": "50",
     "NEO_PUBLIC_HISTORY_LIMIT": "0",
-    "NEO_TARGET_TRADES_PER_HOUR": "50",
+    "NEO_TARGET_TRADES_PER_HOUR": "100",
+    "NEO_WINNER_STRATEGIES": "ALL",
     "NEO_STRATEGY_LAB_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json",
     "NEO_STRATEGY_LAB_COMPACT_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json",
 }

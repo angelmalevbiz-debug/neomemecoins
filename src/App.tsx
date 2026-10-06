@@ -315,6 +315,49 @@ export default function App() {
         : 'ON-CHAIN COVERAGE INCOMPLETE · NEW ENTRIES STAY BLOCKED';
   const snapshotHint = connection.receivedAt ? `Последен получен отговор: ${fullTimeLabel(connection.receivedAt)}.` : 'PAPER сметката още не е заредена.';
   const emptyStateMessage = state ? 'Няма записи в получения отговор.' : 'Данните още не са заредени от backend.';
+  const promotedPortfolio = useMemo(() => {
+    const lab = state?.strategy_lab;
+    const setup = lab?.portfolio_setup;
+    if (!lab || setup?.status !== 'ACTIVE') return null;
+    const ids = (setup.strategies || []).filter(id => lab.books[id]?.portfolio_group === 'PROMOTED_PAPER');
+    if (!ids.length) return null;
+    const books = ids.map(id => ({ id, book: lab.books[id], stats: lab.stats[id] }));
+    const startingBalance = books.reduce((sum, { book }) => sum + book.starting_balance, 0);
+    const balance = books.reduce((sum, { book }) => sum + book.balance, 0);
+    const equity = books.reduce((sum, { book, stats }) => sum + (stats?.equity ?? (book.balance + (book.position?.open_pnl_usd ?? 0))), 0);
+    const reserved = books.reduce((sum, { book }) => sum + (book.position?.notional_usd ?? 0), 0);
+    const trades = books.reduce((sum, { book, stats }) => sum + (stats?.trades ?? book.history.length), 0);
+    const wins = books.reduce((sum, { book, stats }) => sum + (stats?.wins ?? book.history.filter(trade => (trade.pnl_usd ?? 0) > 0).length), 0);
+    return {
+      books,
+      startingBalance,
+      balance,
+      equity,
+      available: Math.max(0, balance - reserved),
+      reserved,
+      realizedPnl: balance - startingBalance,
+      unrealizedPnl: equity - balance,
+      returnPct: startingBalance > 0 ? ((equity - startingBalance) / startingBalance) * 100 : 0,
+      openPositions: books.filter(({ book }) => Boolean(book.position)).length,
+      trades,
+      wins,
+      winRate: trades ? (wins / trades) * 100 : 0,
+      valuationStale: books.some(({ stats }) => Boolean(stats?.valuation_stale)),
+    };
+  }, [state]);
+  const portfolioBalance = promotedPortfolio?.balance ?? state?.stats.demo_balance_usd;
+  const portfolioEquity = promotedPortfolio?.equity ?? state?.stats.demo_equity_usd;
+  const portfolioStartingBalance = promotedPortfolio?.startingBalance ?? state?.stats.demo_starting_balance_usd;
+  const portfolioAvailable = promotedPortfolio?.available ?? state?.stats.demo_available_usd;
+  const portfolioReserved = promotedPortfolio?.reserved ?? state?.stats.demo_reserved_usd;
+  const portfolioReturnPct = promotedPortfolio?.returnPct ?? state?.stats.return_pct;
+  const portfolioRealizedPnl = promotedPortfolio?.realizedPnl ?? state?.stats.realized_today_usd;
+  const portfolioUnrealizedPnl = promotedPortfolio?.unrealizedPnl ?? state?.stats.unrealized_pnl_usd;
+  const portfolioOpenPositions = promotedPortfolio?.openPositions ?? state?.stats.open_positions;
+  const portfolioMaxPositions = promotedPortfolio?.books.length ?? state?.config.max_positions;
+  const portfolioClosedTrades = promotedPortfolio?.trades ?? state?.stats.closed_trades;
+  const portfolioWinRate = promotedPortfolio?.winRate ?? state?.stats.win_rate;
+  const portfolioRunning = promotedPortfolio ? state?.strategy_lab?.status === 'online' : state?.running;
   const selectedPaperTrades = selectedPaperStrategy && state ? [
     ...state.positions.filter(trade => trade.strategy_matches?.includes(selectedPaperStrategy)).map(trade => ({ trade, closed: false })),
     ...state.history.filter(trade => trade.strategy_matches?.includes(selectedPaperStrategy)).map(trade => ({ trade, closed: true })),
@@ -340,12 +383,12 @@ export default function App() {
       {error && <div role="alert" className="mb-4 rounded-2xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-xs text-red-200">{error} {state && 'Показаните данни са от последния отговор и не потвърждават текущото състояние.'} {snapshotHint}</div>}
       {!connected && !error && <div role="status" className="mb-4 rounded-2xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-xs text-amber-100">{state ? 'Показани са последно получени данни. Текущите баланси, позиции и работата на бота още не са потвърдени.' : 'Свързване с backend. Балансите и сделките ще се покажат след получаване на данни.'} {snapshotHint}</div>}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <Metric label="Demo balance" value={moneyOrUnavailable(state?.stats.demo_balance_usd)} hint={state ? `start ${moneyOrUnavailable(state.stats.demo_starting_balance_usd, false, 0)}` : 'Очакват се данни'} />
-        <Metric label="Equity" value={moneyOrUnavailable(state?.stats.demo_equity_usd)} hint={state ? `${percentageOrUnavailable(state.stats.return_pct)} session` : 'Очакват се данни'} />
-        <Metric label="Available" value={moneyOrUnavailable(state?.stats.demo_available_usd)} hint={state ? `reserved ${moneyOrUnavailable(state.stats.demo_reserved_usd, false, 0)}` : 'Очакват се данни'} />
-        <Metric label="Днес PnL" value={moneyOrUnavailable(state?.stats.realized_today_usd, true)} hint={state ? `unrealized ${moneyOrUnavailable(state.stats.unrealized_pnl_usd, true)}` : 'Очакват се данни'} />
-        <Metric label="Open paper" value={state ? `${state.stats.open_positions}/${state.config.max_positions}` : '—'} hint={state ? `${moneyOrUnavailable(state.config.trade_notional_usd, false, 0)} на позиция` : 'Очакват се данни'} />
-        <Metric label="Win rate" value={state?.stats.closed_trades ? `${state.stats.win_rate.toFixed(0)}%` : '—'} hint={state ? `${state.stats.closed_trades} затворени` : 'Очакват се данни'} />
+        <Metric label={promotedPortfolio ? 'Promoted balance' : 'Demo balance'} value={moneyOrUnavailable(portfolioBalance)} hint={state ? `start ${moneyOrUnavailable(portfolioStartingBalance, false, 0)}` : 'Очакват се данни'} />
+        <Metric label="Equity" value={moneyOrUnavailable(portfolioEquity)} hint={state ? `${percentageOrUnavailable(portfolioReturnPct)} ${promotedPortfolio ? 'promoted' : 'session'}${promotedPortfolio?.valuationStale ? ' · stale mark' : ''}` : 'Очакват се данни'} />
+        <Metric label="Available" value={moneyOrUnavailable(portfolioAvailable)} hint={state ? `reserved ${moneyOrUnavailable(portfolioReserved, false, 0)}` : 'Очакват се данни'} />
+        <Metric label={promotedPortfolio ? 'Promoted PnL' : 'Днес PnL'} value={moneyOrUnavailable(portfolioRealizedPnl, true)} hint={state ? `unrealized ${moneyOrUnavailable(portfolioUnrealizedPnl, true)}` : 'Очакват се данни'} />
+        <Metric label="Open paper" value={state ? `${portfolioOpenPositions ?? 0}/${portfolioMaxPositions ?? 0}` : '—'} hint={state ? (promotedPortfolio ? `${promotedPortfolio.books.length} promoted стратегии` : `${moneyOrUnavailable(state.config.trade_notional_usd, false, 0)} на позиция`) : 'Очакват се данни'} />
+        <Metric label="Win rate" value={portfolioClosedTrades ? `${(portfolioWinRate ?? 0).toFixed(0)}%` : '—'} hint={state ? `${portfolioClosedTrades ?? 0} затворени` : 'Очакват се данни'} />
         <Metric label="Live coins" value={state ? String(state.stats.feed_count) : '—'} hint={state ? `scan на ${state.config.scan_seconds}s` : 'Очакват се данни'} />
         <Metric label="SETUP" value={state ? String(setupCount) : '—'} hint={state ? `${watchCount} WATCH` : 'Очакват се данни'} />
       </section>
@@ -432,19 +475,24 @@ export default function App() {
         </div>
         <aside className="space-y-4">
           <div className="rounded-3xl border border-emerald-400/20 bg-[#09100d] p-4">
-            <div className="flex items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">NEO AUTO BOT</div><h2 className="mt-1 text-lg font-black text-white">Paper engine</h2></div><div className={`rounded-lg border px-2 py-1 text-[9px] font-black ${connected && state?.running ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/[0.03] text-slate-500'}`}>{connected ? state?.running ? 'RUNNING' : 'PAUSED' : connectionStatus}</div></div>
+            <div className="flex items-start justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">NEO AUTO BOT</div><h2 className="mt-1 text-lg font-black text-white">{promotedPortfolio ? 'Promoted PAPER Portfolio' : 'Paper engine'}</h2></div><div className={`rounded-lg border px-2 py-1 text-[9px] font-black ${connected && portfolioRunning ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-white/10 bg-white/[0.03] text-slate-500'}`}>{connected ? portfolioRunning ? 'RUNNING' : 'PAUSED' : connectionStatus}</div></div>
             <div className="mt-4 rounded-2xl border border-emerald-400/15 bg-emerald-400/[0.045] p-3">
-              <div className="flex items-end justify-between gap-3"><div><div className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-300/70">Обща PAPER сметка</div><div className="mt-1 text-2xl font-black text-white">{moneyOrUnavailable(state?.stats.demo_balance_usd)}</div></div><div className="text-right"><div className={`text-sm font-black ${state && state.stats.return_pct >= 0 ? 'text-emerald-300' : state ? 'text-red-300' : 'text-slate-500'}`}>{percentageOrUnavailable(state?.stats.return_pct)}</div><div className="mt-1 text-[8px] text-slate-600">session return</div></div></div>
-              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3 text-[9px]"><div><div className="text-slate-700">EQUITY</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_equity_usd)}</div></div><div><div className="text-slate-700">AVAILABLE</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_available_usd)}</div></div><div><div className="text-slate-700">RESERVED</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(state?.stats.demo_reserved_usd)}</div></div></div>
-              <div className="mt-2 text-[8px] text-slate-600">Session {state?.stats.demo_session_id || '—'} · от {fullTimeLabel(state?.stats.demo_started_at || 0)}</div>
+              <div className="flex items-end justify-between gap-3"><div><div className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-300/70">{promotedPortfolio ? 'Главен promoted PAPER портфейл' : 'Обща PAPER сметка'}</div><div className="mt-1 text-2xl font-black text-white">{moneyOrUnavailable(portfolioBalance)}</div></div><div className="text-right"><div className={`text-sm font-black ${(portfolioReturnPct ?? 0) >= 0 ? 'text-emerald-300' : state ? 'text-red-300' : 'text-slate-500'}`}>{percentageOrUnavailable(portfolioReturnPct)}</div><div className="mt-1 text-[8px] text-slate-600">{promotedPortfolio ? 'promoted return' : 'session return'}</div></div></div>
+              <div className="mt-3 grid grid-cols-3 gap-2 border-t border-white/[0.06] pt-3 text-[9px]"><div><div className="text-slate-700">EQUITY</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(portfolioEquity)}</div></div><div><div className="text-slate-700">AVAILABLE</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(portfolioAvailable)}</div></div><div><div className="text-slate-700">RESERVED</div><div className="mt-0.5 font-black text-white">{moneyOrUnavailable(portfolioReserved)}</div></div></div>
+              <div className="mt-2 text-[8px] text-slate-600">{promotedPortfolio ? `PROMOTED_PAPER · ${promotedPortfolio.books.length} стратегии · start ${moneyOrUnavailable(promotedPortfolio.startingBalance, false, 0)}` : `Session ${state?.stats.demo_session_id || '—'} · от ${fullTimeLabel(state?.stats.demo_started_at || 0)}`}</div>
             </div>
-            {!!state?.config.ensemble_strategies?.length && <div data-testid="paper-ensemble" className="mt-2 rounded-xl border border-cyan-300/15 bg-cyan-400/[0.04] p-3 text-[9px] leading-4 text-cyan-100">
+            {promotedPortfolio && <div data-testid="promoted-paper-summary" className="mt-2 rounded-xl border border-emerald-300/15 bg-emerald-400/[0.04] p-3 text-[9px] leading-4 text-emerald-100">
+              <div className="font-black">Най-добрият promoted cohort управлява горния $1,000 PAPER портфейл</div>
+              <div className="mt-1 text-slate-500">Само стратегиите, минали promotion критериите, участват в balance/equity/PnL. TEST портфейлите отдолу не влияят на тези числа.</div>
+              <div className="mt-2 grid grid-cols-2 gap-1">{promotedPortfolio.books.map(({ id, book, stats }) => <button key={id} type="button" onClick={() => setSelectedLabStrategyId(current => current === id ? '' : id)} className="rounded-lg border border-white/10 px-2 py-1.5 text-left text-emerald-100/80 hover:text-white"><b>{book.name}</b><div className="mt-0.5 text-[8px] text-slate-500">${book.balance.toFixed(2)} · equity ${(stats?.equity ?? book.balance).toFixed(2)} · {stats?.trades ?? book.history.length} сделки</div></button>)}</div>
+            </div>}
+            {!promotedPortfolio && !!state?.config.ensemble_strategies?.length && <div data-testid="paper-ensemble" className="mt-2 rounded-xl border border-cyan-300/15 bg-cyan-400/[0.04] p-3 text-[9px] leading-4 text-cyan-100">
               <div className="font-black">Една PAPER сметка · {state.config.ensemble_strategies.length} паралелни стратегии</div>
               <div className="mt-1 text-slate-500">Съвпадналите сигнали водят до една позиция за токен и използват общия наличен капитал. Отворени: {state.stats.open_positions}/{state.config.max_positions}.</div>
               <div className="mt-2 grid grid-cols-2 gap-1">{state.config.ensemble_strategies.map(id => <button key={id} type="button" aria-expanded={selectedPaperStrategy === id} onClick={() => setSelectedPaperStrategy(current => current === id ? '' : id)} className={`rounded-lg border px-2 py-1.5 text-left font-bold ${selectedPaperStrategy === id ? 'border-cyan-300/35 bg-cyan-300/10 text-white' : 'border-white/10 text-cyan-100/75 hover:text-white'}`}>{strategyName[id] || id}</button>)}</div>
               <div className="mt-2 text-slate-500">Пазарен сигнал; входът и изходът са моделирани PAPER изпълнения.</div>
             </div>}
-            {selectedPaperStrategy && state?.config.ensemble_strategies?.includes(selectedPaperStrategy) && <div className="mt-2 rounded-xl border border-cyan-300/15 bg-black/20 p-3 text-[9px] leading-4">
+            {!promotedPortfolio && selectedPaperStrategy && state?.config.ensemble_strategies?.includes(selectedPaperStrategy) && <div className="mt-2 rounded-xl border border-cyan-300/15 bg-black/20 p-3 text-[9px] leading-4">
               <div className="font-black text-cyan-100">{strategyName[selectedPaperStrategy] || selectedPaperStrategy} · сделки в общата сметка</div>
               <div className="mt-1 text-slate-500">Сделка с повече от един сигнал се вижда при всяко съвпаднало правило, но PnL се отчита само веднъж в общия баланс.</div>
               {selectedPaperTrades.length ? <div className="mt-2 max-h-64 space-y-1 overflow-y-auto">{selectedPaperTrades.map(({ trade, closed }) => <div key={`${closed ? 'closed' : 'open'}-${trade.id}`} className="rounded-lg border border-white/[0.06] p-2">
@@ -453,41 +501,58 @@ export default function App() {
                 {(trade.dex_url || trade.pairAddress) && <a href={trade.dex_url || `https://dexscreener.com/solana/${encodeURIComponent(trade.pairAddress)}`} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-cyan-200 hover:text-white">DEX Screener <ExternalLink className="h-3 w-3" /></a>}
               </div>)}</div> : <div className="mt-2 rounded-lg border border-dashed border-white/10 p-2 text-slate-500">Още няма изпълнени PAPER сделки по този сигнал.</div>}
             </div>}
-            <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Entry score</div><div className="mt-1 text-lg font-black text-white">{state ? `${state.config.entry_score}+` : '—'}</div></div><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Trade size</div><div className="mt-1 text-lg font-black text-white">{moneyOrUnavailable(state?.config.trade_notional_usd, false, 0)}</div></div></div>
-            <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[9px] leading-4 text-slate-500">{state ? <>Планиран стоп {state.config.stop_loss_pct}% · TP {state.config.take_profit_pct}% · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m · дневен лимит {state.config.max_daily_loss_usd === 0 ? 'ИЗКЛЮЧЕН' : `-$${state.config.max_daily_loss_usd}`}. Gap или липсващ sell route могат да увеличат загубата отвъд стопа.</> : 'Настройките на PAPER сметката още не са заредени.'}</div>
-            <div className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-3 text-center text-[10px] font-black text-emerald-200"><ShieldCheck className="h-4 w-4" /> {connected && state?.running ? 'PAPER ПРАВИЛАТА СЛЕДЯТ ЗА ВАЛИДНИ ВХОДОВЕ' : 'АКТИВНОСТТА НА PAPER ENGINE НЕ Е ПОТВЪРДЕНА'}</div>
-            <div className="mt-3 text-[9px] leading-4 text-slate-600">{connected ? state?.message : `${connectionLabel} · ${snapshotHint}`}</div>
+            {promotedPortfolio ? <>
+              <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Strategies</div><div className="mt-1 text-lg font-black text-white">{promotedPortfolio.books.length}</div></div><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Max / strategy position</div><div className="mt-1 text-lg font-black text-white">{state?.strategy_lab?.portfolio_setup?.max_position_fraction != null ? `${(state.strategy_lab.portfolio_setup.max_position_fraction * 100).toFixed(0)}%` : '—'}</div></div></div>
+              <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[9px] leading-4 text-slate-500">Promoted стратегиите пазят отделни PAPER книги, но техните balance/equity/PnL се сумират тук като един $1,000 портфейл. TEST стратегиите остават извън него.</div>
+            </> : <>
+              <div className="mt-2 grid grid-cols-2 gap-2"><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Entry score</div><div className="mt-1 text-lg font-black text-white">{state ? `${state.config.entry_score}+` : '—'}</div></div><div className="rounded-xl border border-white/[0.07] bg-black/20 p-3"><div className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-700">Trade size</div><div className="mt-1 text-lg font-black text-white">{moneyOrUnavailable(state?.config.trade_notional_usd, false, 0)}</div></div></div>
+              <div className="mt-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-[9px] leading-4 text-slate-500">{state ? <>Планиран стоп {state.config.stop_loss_pct}% · TP {state.config.take_profit_pct}% · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m · дневен лимит {state.config.max_daily_loss_usd === 0 ? 'ИЗКЛЮЧЕН' : `-$${state.config.max_daily_loss_usd}`}. Gap или липсващ sell route могат да увеличат загубата отвъд стопа.</> : 'Настройките на PAPER сметката още не са заредени.'}</div>
+            </>}
+            <div className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.05] px-3 text-center text-[10px] font-black text-emerald-200"><ShieldCheck className="h-4 w-4" /> {connected && portfolioRunning ? 'PAPER ПРАВИЛАТА СЛЕДЯТ ЗА ВАЛИДНИ ВХОДОВЕ' : 'АКТИВНОСТТА НА PAPER ENGINE НЕ Е ПОТВЪРДЕНА'}</div>
+            <div className="mt-3 text-[9px] leading-4 text-slate-600">{connected ? (promotedPortfolio ? 'Promoted PAPER cohort е активен; балансът горе се движи от неговите стратегии.' : state?.message) : `${connectionLabel} · ${snapshotHint}`}</div>
           </div>
 
           <div className="rounded-3xl border border-white/10 bg-[#0b0e11] p-4">
             <div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Open positions</div><h3 className="mt-1 text-base font-black text-white">Автоматични входове</h3></div><WalletCards className="h-4 w-4 text-emerald-300" /></div>
             <div className="mt-4 space-y-2">
-              {(state?.positions || []).length === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">{state ? 'В последния отговор няма отворени позиции. Нов вход изисква валиден сигнал, котировка и свободен капитал.' : 'Данните за позициите още не са заредени.'}</div>}
-              {state?.positions.map(position => <div key={position.id} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
-                <button onClick={() => setSelectedAddress(position.address)} className="w-full text-left hover:opacity-80"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol}</div><div className="mt-0.5 text-[9px] text-slate-600">#{position.trade_no ?? '—'} · вход {fmtPrice(position.execution_entry_price ?? position.entry_price)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{position.pnl_pct >= 0 ? '+' : ''}{position.pnl_pct.toFixed(2)}%</div></div></button>
-                {!!position.strategy_matches?.length && <div className="mt-2 text-[9px] text-cyan-200/80">Сигнали: {strategyLabels(position.strategy_matches)}</div>}
-                <div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.pnl_usd >= 0 ? '+' : ''}${position.pnl_usd.toFixed(2)} · Score {position.current_score?.toFixed(0) ?? position.score.toFixed(0)}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div>
-                {(position.dex_url || position.pairAddress) && <a href={position.dex_url || `https://dexscreener.com/solana/${encodeURIComponent(position.pairAddress)}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 rounded-lg border border-cyan-300/20 px-2 py-1 text-[9px] font-black text-cyan-200">DEX Screener <ExternalLink className="h-3 w-3" /></a>}
-              </div>)}
+              {promotedPortfolio ? <>
+                {promotedPortfolio.openPositions === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">Няма отворени promoted позиции. Нов вход изисква валиден setup и моделирано изпълнение.</div>}
+                {promotedPortfolio.books.filter(({ book }) => Boolean(book.position)).map(({ id, book }) => {
+                  const position = book.position!;
+                  return <div key={`${id}-${position.opened_at}`} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
+                    <button onClick={() => setSelectedAddress(position.address)} className="w-full text-left hover:opacity-80"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol} · {book.name}</div><div className="mt-0.5 text-[9px] text-slate-600">вход {fmtPrice(position.execution_entry_price ?? position.entry_price ?? 0)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.quote_status === 'fresh' ? (position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300') : 'text-amber-200'}`}>{position.quote_status === 'fresh' ? `${position.pnl_pct >= 0 ? '+' : ''}${position.pnl_pct.toFixed(2)}%` : 'STALE'}</div></div></button>
+                    <div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.open_pnl_usd != null ? `${position.open_pnl_usd >= 0 ? '+' : ''}$${position.open_pnl_usd.toFixed(2)}` : 'PnL —'}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div>
+                    {position.pairAddress && <a href={`https://dexscreener.com/solana/${encodeURIComponent(position.pairAddress)}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 rounded-lg border border-cyan-300/20 px-2 py-1 text-[9px] font-black text-cyan-200">DEX Screener <ExternalLink className="h-3 w-3" /></a>}
+                  </div>;
+                })}
+              </> : <>
+                {(state?.positions || []).length === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">{state ? 'В последния отговор няма отворени позиции. Нов вход изисква валиден сигнал, котировка и свободен капитал.' : 'Данните за позициите още не са заредени.'}</div>}
+                {state?.positions.map(position => <div key={position.id} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
+                  <button onClick={() => setSelectedAddress(position.address)} className="w-full text-left hover:opacity-80"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol}</div><div className="mt-0.5 text-[9px] text-slate-600">#{position.trade_no ?? '—'} · вход {fmtPrice(position.execution_entry_price ?? position.entry_price)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{position.pnl_pct >= 0 ? '+' : ''}{position.pnl_pct.toFixed(2)}%</div></div></button>
+                  {!!position.strategy_matches?.length && <div className="mt-2 text-[9px] text-cyan-200/80">Сигнали: {strategyLabels(position.strategy_matches)}</div>}
+                  <div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.pnl_usd >= 0 ? '+' : ''}${position.pnl_usd.toFixed(2)} · Score {position.current_score?.toFixed(0) ?? position.score.toFixed(0)}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div>
+                  {(position.dex_url || position.pairAddress) && <a href={position.dex_url || `https://dexscreener.com/solana/${encodeURIComponent(position.pairAddress)}`} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 rounded-lg border border-cyan-300/20 px-2 py-1 text-[9px] font-black text-cyan-200">DEX Screener <ExternalLink className="h-3 w-3" /></a>}
+                </div>)}
+              </>}
             </div>
           </div>
           <div className="rounded-3xl border border-white/10 bg-[#0b0e11] p-4">
             <div className="flex items-center justify-between"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600">Activity</div><h3 className="mt-1 text-base font-black text-white">Какво прави NEO</h3></div><Bot className="h-4 w-4 text-emerald-300" /></div>
             <div className="mt-4 space-y-3">{(state?.events || []).slice(0, 8).map(event => <div key={`${event.ts}-${event.text}`} className="flex gap-2.5"><div className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300" /><div><div className="text-[10px] leading-4 text-slate-400">{event.text}</div><div className="mt-0.5 text-[8px] text-slate-700">{timeLabel(event.ts)}</div></div></div>)}</div>
-            <div className="mt-4 border-t border-white/[0.06] pt-3"><button onClick={() => { if (window.confirm('Да започна ли НОВА ЛИЧНА demo сесия с $1,000? Това засяга само твоя dashboard и не пипа GOLD engine-а.')) resetMyDemo(); }} className="h-8 w-full rounded-lg border border-white/[0.07] bg-transparent text-[9px] font-black text-slate-600 hover:bg-white/[0.03] hover:text-white">RESET МОЯТА DEMO → $1,000</button></div>
+            <div className="mt-4 border-t border-white/[0.06] pt-3">{promotedPortfolio ? <div className="rounded-lg border border-emerald-300/10 px-3 py-2 text-center text-[9px] text-emerald-100/60">Главният $1,000 баланс е promoted cohort; отделният legacy demo reset не го променя.</div> : <button onClick={() => { if (window.confirm('Да започна ли НОВА ЛИЧНА demo сесия с $1,000? Това засяга само твоя dashboard и не пипа GOLD engine-а.')) resetMyDemo(); }} className="h-8 w-full rounded-lg border border-white/[0.07] bg-transparent text-[9px] font-black text-slate-600 hover:bg-white/[0.03] hover:text-white">RESET МОЯТА DEMO → $1,000</button>}</div>
           </div>
         </aside>
       </section>
 
       <section className="mt-4 overflow-hidden rounded-3xl border border-cyan-400/15 bg-[#0b0e11]">
         <div className="flex flex-col gap-3 border-b border-white/[0.07] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">MULTI-STRATEGY LAB</div><h2 className="mt-1 text-lg font-black text-white">Отделни обучителни PAPER портфейли · извън горната сметка</h2><div className="mt-1 text-[9px] text-slate-600">Четирите избрани стратегии имат по $250 тестов капитал и до 25% на позиция. Балансите и резултатите им не се сумират с общата PAPER сметка.</div></div>
+          <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-300">MULTI-STRATEGY LAB</div><h2 className="mt-1 text-lg font-black text-white">Promoted + обучителни PAPER портфейли</h2><div className="mt-1 text-[9px] text-slate-600">PROMOTED_PAPER стратегиите формират горния $1,000 баланс. TEST стратегиите остават отделни и не влияят на главния портфейл.</div></div>
           <div className={`rounded-lg border px-2.5 py-1.5 text-[9px] font-black ${connected && state?.strategy_lab?.status === 'online' ? 'border-emerald-400/20 bg-emerald-400/10 text-emerald-300' : 'border-amber-400/20 bg-amber-400/10 text-amber-200'}`}>{connected ? (state?.strategy_lab?.status || 'UNKNOWN').toUpperCase() : connectionLabel}</div>
         </div>
         <div data-testid="lab-integrity-warning" className="mx-4 mt-3 rounded-xl border border-amber-400/20 bg-amber-400/[0.04] px-4 py-3 text-xs leading-5 text-amber-100">В историята на Lab има несъответстващи цени, включително XFUN. Сумите не са пренаписани. Новите входове изискват проверка на точния pool от втори източник.</div>
         {state?.strategy_lab?.portfolio_setup?.version && state.strategy_lab.portfolio_setup.status !== 'UNCONFIGURED' && <div data-testid="lab-promoted-paper-cohort" className="mx-4 mt-3 rounded-xl border border-emerald-400/20 bg-emerald-400/[0.035] px-4 py-3 text-[10px] leading-5 text-emerald-50">
-          <div className="font-black">{state.strategy_lab.portfolio_setup.status === 'DRAINING' ? 'Подготовка на избрания обучителен набор · текущите позиции се управляват до затваряне' : `Обучителен набор · $${state.strategy_lab.portfolio_setup.total_allocated_capital_usd?.toFixed(0) ?? '1,000'} разпределени в независими сметки`}</div>
-          <div className="text-emerald-100/70">{state.strategy_lab.portfolio_setup.status === 'DRAINING' ? 'Преходът е в ход: няма нови входове; текущите позиции се прехвърлят в отделни exit-only PAPER книги.' : 'Началните резултати са архивирани; новото сравнение започва от нула.'} Исторически: {state.strategy_lab.portfolio_setup.historical_simulations ?? 0} симулации върху {state.strategy_lab.portfolio_setup.unique_market_episodes_30m ?? 0} приблизителни токен епизода (30 мин.). Епизодите се припокриват между стратегиите, а данните имат известни несъответствия.</div>
+          <div className="font-black">{state.strategy_lab.portfolio_setup.status === 'DRAINING' ? 'Подготовка на promoted PAPER cohort · текущите позиции се управляват до затваряне' : `Главен promoted PAPER портфейл · $${state.strategy_lab.portfolio_setup.total_allocated_capital_usd?.toFixed(0) ?? '1,000'} разпределени в независими стратегии`}</div>
+          <div className="text-emerald-100/70">{state.strategy_lab.portfolio_setup.status === 'DRAINING' ? 'Преходът е в ход: няма нови входове; текущите позиции се прехвърлят в отделни exit-only PAPER книги.' : 'Този cohort формира горните balance/equity/PnL карти; TEST книгите са изключени.'} Исторически: {state.strategy_lab.portfolio_setup.historical_simulations ?? 0} симулации върху {state.strategy_lab.portfolio_setup.unique_market_episodes_30m ?? 0} приблизителни токен епизода (30 мин.). Епизодите се припокриват между стратегиите, а данните имат известни несъответствия.</div>
           {state.strategy_lab.portfolio_setup.promotion_error && <div className="mt-1 text-amber-200">Промоцията още не е завършена: {state.strategy_lab.portfolio_setup.promotion_error}</div>}
           <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-4">{(state.strategy_lab.portfolio_setup.strategies || []).map(id => {
             const book = state.strategy_lab.books[id];

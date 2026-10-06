@@ -18,6 +18,8 @@ LABELS = {
     'risk_budget_unavailable': 'недостатъчен оставащ дневен бюджет за минималната позиция',
     'gold_signal': 'няма достатъчно ранен buy-flow импулс',
     'winner_signal': 'няма сигнал от активните PAPER стратегии',
+    'brainstorm_confidence': 'BRAINSTORM мета-анализът не достига минималната увереност',
+    'brainstorm_execution': 'BRAINSTORM мета-анализът отхвърли качеството на симулираното изпълнение',
     'flow_quality': 'непълен или забавен проверен order flow',
     'audit_pending': 'непотвърден траен audit запис; изчаква повторен запис',
     'liquidation_unavailable': 'неизвестна ликвидационна оценка на отворена позиция',

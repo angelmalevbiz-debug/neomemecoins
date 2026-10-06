@@ -16,6 +16,7 @@ import engine_runtime as runtime
 import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
+import brainstorm_engine
 import entry_size_backoff
 from lab_dashboard_projection import compact_strategy_lab
 
@@ -247,6 +248,7 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
         'opened_at', 'updated_at', 'closed_at', 'exit_price', 'exit_reason',
         'trade_no', 'session_id', 'pnl_usd', 'pnl_pct', 'balance_before',
         'balance_after', 'dex_url', 'strategy_id', 'strategy_matches',
+        'brainstorm_version', 'brainstorm_confidence', 'brainstorm_match_count', 'brainstorm_family_count',
         'signal_evidence', 'entry_policy_version',
         'exit_policy_version', 'signal_pnl_pct', 'entry_roundtrip_pnl_pct',
         'observed_exit_pnl_pct', 'observed_exit_pnl_usd', 'paper_stop_capped',
@@ -554,6 +556,8 @@ class State:
             cutoff_hour = now_ms() - 60 * 60 * 1000
             closed_last_hour = sum(1 for t in self.history if int(t.get('closed_at') or 0) >= cutoff_hour)
             public_history = self.history if PUBLIC_HISTORY_LIMIT == 0 else self.history[:PUBLIC_HISTORY_LIMIT]
+            brainstorm_history = [t for t in self.history if t.get('brainstorm_version') == brainstorm_engine.VERSION or isinstance(t.get('brainstorm'), dict)]
+            brainstorm_metrics = trade_metrics(brainstorm_history)
             tape = read_live_tape()
             return {
                 'running': self.running,
@@ -580,6 +584,11 @@ class State:
                     'hourly_target_met': bool(TARGET_TRADES_PER_HOUR and closed_last_hour >= TARGET_TRADES_PER_HOUR),
                     'wins': wins,
                     'win_rate': round((wins / closed) * 100, 1) if closed else 0,
+                    'brainstorm_trades': brainstorm_metrics['closed_trades'],
+                    'brainstorm_wins': brainstorm_metrics['wins'],
+                    'brainstorm_win_rate': brainstorm_metrics['win_rate'],
+                    'brainstorm_target_win_rate_pct': round(brainstorm_engine.TARGET_WIN_RATE * 100, 1),
+                    'brainstorm_target_met': bool(brainstorm_metrics['closed_trades'] and brainstorm_metrics['win_rate'] is not None and brainstorm_metrics['win_rate'] >= brainstorm_engine.TARGET_WIN_RATE * 100),
                     'metrics': {'lifetime': lifetime,
                         'session': trade_metrics([t for t in self.history if t.get('session_id') == self.demo_session_id]),
                         'rolling_100': trade_metrics(self.history[:100]),
@@ -620,6 +629,12 @@ class State:
                     'target_trades_per_hour': TARGET_TRADES_PER_HOUR or None,
                     'signal_strategy': winner_ensemble.VERSION,
                     'ensemble_strategies': list(winner_ensemble.STRATEGIES),
+                    'brainstorm_enabled': brainstorm_engine.ENABLED,
+                    'brainstorm_version': brainstorm_engine.VERSION,
+                    'brainstorm_target_win_rate': brainstorm_engine.TARGET_WIN_RATE,
+                    'brainstorm_min_confidence': brainstorm_engine.MIN_CONFIDENCE,
+                    'brainstorm_min_matches': brainstorm_engine.MIN_MATCHES,
+                    'brainstorm_min_families': brainstorm_engine.MIN_FAMILIES,
                     'signal_source_commit': winner_ensemble.VERSION,
                     'risk_overlay': 'PLANNED_NET_STOP_NO_FILL_GUARANTEE',
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
@@ -642,7 +657,7 @@ class State:
                     'daily_loss_cap_enabled': MAX_DAILY_LOSS_USD > 0,
                     'starting_balance_usd': STARTING_BALANCE_USD,
                     'execution_mode': 'PAPER_QUOTE_OR_OBSERVED_POOL_MODEL',
-                    'execution_note': 'PAPER only; four market-signal rules share one account. Exact-pool quotes and fees are modeled, not executed fills; gaps and unsellable losses remain possible.',
+                    'execution_note': 'PAPER only; the active strategy ensemble is filtered by an auditable BRAINSTORM meta-layer. Exact-pool quotes and fees are modeled, not executed fills; gaps and unsellable losses remain possible.',
                     'entry_policy_version': winner_ensemble.ENTRY_POLICY_VERSION,
                     'exit_policy': 'fixed', 'exit_policy_version': exit_policy.VERSION,
                     'effective_config_hash': effective_config_hash(),
@@ -723,6 +738,11 @@ def trade_metrics(trades):
 def effective_config_hash():
     config = {'entry_version': winner_ensemble.ENTRY_POLICY_VERSION,
               'ensemble_version': winner_ensemble.VERSION, 'ensemble_rules': winner_ensemble.rule_config(),
+              'brainstorm_version': brainstorm_engine.VERSION, 'brainstorm_enabled': brainstorm_engine.ENABLED,
+              'brainstorm_target_win_rate': brainstorm_engine.TARGET_WIN_RATE,
+              'brainstorm_min_confidence': brainstorm_engine.MIN_CONFIDENCE,
+              'brainstorm_min_matches': brainstorm_engine.MIN_MATCHES,
+              'brainstorm_min_families': brainstorm_engine.MIN_FAMILIES,
               'exit_version': exit_policy.VERSION, 'stop_pct': STOP_LOSS_PCT, 'take_profit_pct': TAKE_PROFIT_PCT,
               'risk_buffer_pct': STOP_EXECUTION_BUFFER_PCT, 'daily_loss_usd': MAX_DAILY_LOSS_USD,
               'max_positions': MAX_POSITIONS, 'notional_usd': TRADE_NOTIONAL_USD,
@@ -1562,6 +1582,21 @@ class Monitor:
             if safety.get('status') != 'pass' or safety.get('provisional_early'):
                 reject(report, safety.get('reasons') or ['risk_check_pending'], coin)
                 continue
+            brainstorm_pre = None
+            if not price_review:
+                brainstorm_pre = brainstorm_engine.evaluate_pre(
+                    coin, strategy_matches, list(STATE.history), safety=safety,
+                    validation=validation, flow=flow, context=context, now_ms=now_ms(),
+                )
+                if not brainstorm_pre.get('allow', True):
+                    reject(report, ['brainstorm_confidence'], coin, {
+                        'confidence': brainstorm_pre.get('confidence'),
+                        'threshold': brainstorm_pre.get('min_confidence'),
+                        'match_count': brainstorm_pre.get('match_count'),
+                        'family_count': brainstorm_pre.get('family_count'),
+                        'vetoes': brainstorm_pre.get('vetoes'),
+                    })
+                    continue
             strategy_id = winner_ensemble.VERSION
             # These are the Lab market rules in one shared PAPER account. They
             # do not claim verified chain-flow evidence; execution gates below
@@ -1691,6 +1726,34 @@ class Monitor:
                         report,[validation.get('reason') or 'price_tiebreak_failed'],coin,validation
                     )
                     continue
+            if brainstorm_pre is None:
+                brainstorm_pre = brainstorm_engine.evaluate_pre(
+                    coin, strategy_matches, list(STATE.history), safety=safety,
+                    validation=validation, flow=flow, context=context, now_ms=now_ms(),
+                )
+                if not brainstorm_pre.get('allow', True):
+                    reject(report, ['brainstorm_confidence'], coin, {
+                        'confidence': brainstorm_pre.get('confidence'),
+                        'threshold': brainstorm_pre.get('min_confidence'),
+                        'match_count': brainstorm_pre.get('match_count'),
+                        'family_count': brainstorm_pre.get('family_count'),
+                        'vetoes': brainstorm_pre.get('vetoes'),
+                    })
+                    continue
+            brainstorm_decision = brainstorm_engine.evaluate_post(
+                brainstorm_pre,
+                immediate_roundtrip_pct=immediate_roundtrip_pct,
+                worst_case_roundtrip_pct=worst_case_roundtrip_pct,
+                impact_pct=impact_pct,
+            )
+            if not brainstorm_decision.get('allow', True):
+                reject(report, ['brainstorm_execution'], coin, {
+                    'confidence': brainstorm_decision.get('confidence'),
+                    'threshold': brainstorm_decision.get('min_confidence'),
+                    'execution_score': brainstorm_decision.get('execution_score'),
+                    'vetoes': brainstorm_decision.get('vetoes'),
+                })
+                continue
             entry_quote = {
                 'fill_price': quote_fill_price,
                 'quantity': quantity,
@@ -1722,6 +1785,24 @@ class Monitor:
                     continue
                 final_flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
                 final_context = self.market_context(current_coin)
+                final_brainstorm_pre = brainstorm_engine.evaluate_pre(
+                    current_coin, final_strategy_matches, list(STATE.history), safety=safety,
+                    validation=validation, flow=final_flow, context=final_context, now_ms=now_ms(),
+                )
+                final_brainstorm = brainstorm_engine.evaluate_post(
+                    final_brainstorm_pre,
+                    immediate_roundtrip_pct=immediate_roundtrip_pct,
+                    worst_case_roundtrip_pct=worst_case_roundtrip_pct,
+                    impact_pct=impact_pct,
+                )
+                if not final_brainstorm.get('allow', True):
+                    reject(report, ['brainstorm_confidence'], coin, {
+                        'confidence': final_brainstorm.get('confidence'),
+                        'threshold': final_brainstorm.get('min_confidence'),
+                        'execution_score': final_brainstorm.get('execution_score'),
+                        'vetoes': final_brainstorm.get('vetoes'),
+                    })
+                    continue
                 if STATE.available_balance_usd()<entry_quote['capital_committed_usd'] or (MAX_DAILY_LOSS_USD > 0 and STATE.risk_day_pnl()<=-MAX_DAILY_LOSS_USD):
                     reject(report,['balance'],coin); return
                 live_open_risk=sum(num(p.get('planned_risk_usd')) for p in STATE.positions)
@@ -1748,10 +1829,15 @@ class Monitor:
                     'current_price': price, 'peak_price': price,
                     'trade_no': next_trade_no, 'session_id': STATE.demo_session_id, 'strategy_id': strategy_id,
                     'strategy_matches': final_strategy_matches,
+                    'brainstorm': final_brainstorm,
+                    'brainstorm_version': final_brainstorm.get('version'),
+                    'brainstorm_confidence': final_brainstorm.get('confidence'),
+                    'brainstorm_match_count': final_brainstorm.get('match_count'),
+                    'brainstorm_family_count': final_brainstorm.get('family_count'),
                     'signal_evidence': 'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS',
                     'entry_mode': entry_mode,
                     'provisional_early_safety': bool(safety.get('provisional_early')),
-                    'learning_mode': 'FIXED_WINNER_ENSEMBLE_SEPARATE_VALIDATED_TRAINING', 'entry_flow': final_flow,
+                    'learning_mode': 'BRAINSTORM_META_ONLINE_CALIBRATION', 'entry_flow': final_flow,
                     'entry_context': context, 'entry_conviction': context.get('conviction'),
                     'entry_hold_mode': context.get('mode'), 'learning_sample': learning['sample'],
                     'learning_win_rate': learning['win_rate'], 'learning_profit_factor': learning['profit_factor'],

@@ -209,7 +209,8 @@ class ExperimentRunner:
         groups=[]
         for group in self.state['groups'].values():
             completed=group['completed']; comparisons={}
-            for arm in ('EARLY','PROTECT'):
+            for arm in policy.ARMS:
+                if arm=='CONTROL': continue
                 deltas=[e['delta_vs_control_usd'][arm] for e in completed]
                 comparisons[arm]={'paired_episodes':len(deltas),'mean_delta_usd':sum(deltas)/len(deltas) if deltas else None,
                     'total_delta_usd':sum(deltas),'improved':sum(x>0 for x in deltas),'worse':sum(x<0 for x in deltas),

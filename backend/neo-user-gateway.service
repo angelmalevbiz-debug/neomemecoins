@@ -6,15 +6,16 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/neo-meme-trade
+WorkingDirectory=/root/neomemecoins
 Environment=PYTHONUNBUFFERED=1
 Environment=NEO_USER_GATEWAY_HOST=127.0.0.1
 Environment=NEO_USER_GATEWAY_PORT=8789
 Environment=NEO_MARKET_UPSTREAM=http://127.0.0.1:8788
+Environment=NEO_MARKET_ROOT=/root/neomemecoins
 Environment=NEO_USER_STATE_PATH=/var/lib/neo-market/user_accounts.json
 Environment=SUPABASE_URL=https://qziuovwcauaklgqscqys.supabase.co
 Environment=SUPABASE_PUBLISHABLE_KEY=sb_publishable_IVNFzAWi1kb7NjwTBitA_g_gBVnvrie
-ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/user_gateway.py
+ExecStart=/usr/bin/python3 /root/neomemecoins/backend/user_gateway.py
 Restart=always
 RestartSec=3
 

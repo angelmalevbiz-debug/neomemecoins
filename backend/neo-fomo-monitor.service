@@ -1,0 +1,18 @@
+[Unit]
+Description=NEO Meme Coins PAPER Market Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/neomemecoins
+Environment=PYTHONUNBUFFERED=1
+Environment=NEO_MONITOR_HOST=127.0.0.1
+Environment=NEO_MONITOR_PORT=8788
+ExecStart=/usr/bin/python3 /root/neomemecoins/backend/market_monitor.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -6,11 +6,11 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/neo-meme-trade/backend
+WorkingDirectory=/root/neomemecoins/backend
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=1
-Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired
-ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/lab_paired_runner.py
+Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired-v2
+ExecStart=/usr/bin/python3 /root/neomemecoins/backend/lab_paired_runner.py
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=20
@@ -19,7 +19,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
 ReadOnlyPaths=/var/lib/neo-market
-ReadWritePaths=/var/lib/neo-lab-paired
+ReadWritePaths=/var/lib/neo-lab-paired-v2
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 MemoryMax=192M
 CPUQuota=25%

@@ -92,6 +92,17 @@ class PolicyTests(unittest.TestCase):
         self.assertEqual(p.exit_decision(pos(),'PROTECT',-20,{}, {},NOW),'STOP_LOSS_3_NET')
     def test_takeprofit(self):
         self.assertEqual(p.exit_decision(pos(),'CONTROL',15,{}, {},NOW),'TAKE_PROFIT_10_NET')
+    def test_legacy_net_keeps_wider_bracket(self):
+        self.assertIsNone(p.exit_decision(pos(),'LEGACY_NET',-3.5,{}, {},NOW))
+        self.assertEqual(p.exit_decision(pos(),'LEGACY_NET',-4.1,{}, {},NOW),'STOP_LOSS_4_NET')
+        self.assertIsNone(p.exit_decision(pos(),'LEGACY_NET',12,{}, {},NOW))
+        self.assertEqual(p.exit_decision(pos(),'LEGACY_NET',18.1,{}, {},NOW),'TAKE_PROFIT_18_NET')
+    def test_legacy_net_uses_seven_minute_hold(self):
+        x=pos();x['opened_at']=NOW-7*60_000-1
+        self.assertEqual(p.exit_decision(x,'LEGACY_NET',1,{}, {},NOW),'MAX_HOLD_7')
+    def test_legacy_net_profit_protection_is_net_and_observed(self):
+        x=pos();self.assertIsNone(p.exit_decision(x,'LEGACY_NET',11,{}, {},NOW))
+        self.assertEqual(p.exit_decision(x,'LEGACY_NET',3.9,{}, {},NOW+1000),'NET_PROFIT_PROTECT_4')
     def test_maxhold(self):
         x=pos();x['opened_at']=NOW-3600001
         self.assertEqual(p.exit_decision(x,'CONTROL',1,{}, {},NOW),'MAX_HOLD_60')
@@ -137,10 +148,10 @@ class RunnerTests(unittest.TestCase):
     def tearDown(self):self.tmp.cleanup()
     def open(self):self.runner.maybe_open([coin()],tape(),NOW)
     def mark(self,price,now):self.runner.update_positions({(MINT,PAIR):coin(now,price)},tape(now),now)
-    def test_nine_matched_entries(self):
+    def test_all_arms_use_matched_entries(self):
         self.open()
         for g in self.runner.state['groups'].values():
-            positions=[b['position'] for b in g['books'].values()];self.assertEqual(len(positions),3)
+            positions=[b['position'] for b in g['books'].values()];self.assertEqual(len(positions),len(p.ARMS))
             for field in ('opened_at','quantity','notional_usd','entry_evidence_hash','episode_id','execution_entry_price'):
                 self.assertEqual(len({x[field] for x in positions}),1)
     def test_groups_do_not_share_mutable_objects(self):
@@ -152,7 +163,7 @@ class RunnerTests(unittest.TestCase):
             self.assertIsNone(g['books']['PROTECT']['position']);self.assertIsNotNone(g['books']['CONTROL']['position'])
             self.assertEqual(g['completed'],[])
     def test_completed_pairs_and_ledger(self):
-        self.open();self.mark(.00106,NOW+2000);self.mark(.00102,NOW+4000);self.mark(.0012,NOW+6000)
+        self.open();self.mark(.00106,NOW+2000);self.mark(.00102,NOW+4000);self.mark(.0013,NOW+6000)
         for g in self.runner.state['groups'].values():
             self.assertEqual(len(g['completed']),1);self.assertIsNone(g['episode'])
             for b in g['books'].values():

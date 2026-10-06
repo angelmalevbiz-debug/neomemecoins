@@ -17,7 +17,7 @@ from engine_runtime import atomic_json
 HOST = os.getenv("NEO_USER_GATEWAY_HOST", "127.0.0.1")
 PORT = int(os.getenv("NEO_USER_GATEWAY_PORT", "8789"))
 CENTRAL_UPSTREAM = os.getenv("NEO_MARKET_UPSTREAM", "http://127.0.0.1:8788").rstrip("/")
-ROOT = Path(os.getenv("NEO_MARKET_ROOT", "/root/neo-meme-trade"))
+ROOT = Path(os.getenv("NEO_MARKET_ROOT", "/root/neomemecoins"))
 ENGINE_SCRIPT = ROOT / "backend" / "market_monitor.py"
 STORE_PATH = Path(os.getenv("NEO_USER_STATE_PATH", "/var/lib/neo-market/user_accounts.json"))
 USER_ENGINE_ROOT = Path(os.getenv("NEO_USER_ENGINE_ROOT", "/var/lib/neo-market/users"))

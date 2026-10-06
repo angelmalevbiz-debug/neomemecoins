@@ -3,12 +3,17 @@ import math
 from dataclasses import dataclass
 from typing import Any
 
-VERSION = 'LAB_PAIRED_EXITS_V1'
+VERSION = 'LAB_PAIRED_EXITS_V2'
 MODEL = 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'
 COOLDOWN_MS = 20 * 60_000
 MAX_HOLD_MS = 60 * 60_000
-ARMS = ('CONTROL', 'EARLY', 'PROTECT')
-ARM_LABELS = {'CONTROL': 'Контрол −3% / +10%', 'EARLY': 'Ранен изход при слаб поток', 'PROTECT': 'Ранен изход + защита на печалбата'}
+ARMS = ('CONTROL', 'EARLY', 'PROTECT', 'LEGACY_NET')
+ARM_LABELS = {
+    'CONTROL': 'Контрол −3% / +10%',
+    'EARLY': 'Ранен изход при слаб поток',
+    'PROTECT': 'Ранен изход + защита на печалбата',
+    'LEGACY_NET': 'Стар стил cost-aware −4% / +18% + trail / 7m',
+}
 
 @dataclass(frozen=True)
 class Group:
@@ -18,9 +23,12 @@ class Group:
     max_cost: float
 
 GROUPS = (
-    Group('FLOW_EXIT_AB_V1', 'Order Flow · тест на изходите', 'ORDER_FLOW', 2.75),
-    Group('MICRO_BREAKOUT_V3', 'Micro Breakout V3', 'MICRO_BREAKOUT_SAFE', 2.2),
-    Group('ULTRA_PRECISION_V3', 'Ultra Precision V3', 'ULTRA_PRECISION', 2.2),
+    Group('FLOW_EXIT_AB_V1', 'Order Flow · matched exits V2', 'ORDER_FLOW', 2.75),
+    Group('MICRO_BREAKOUT_V3', 'Micro Breakout · matched exits V2', 'MICRO_BREAKOUT_SAFE', 2.2),
+    Group('ULTRA_PRECISION_V3', 'Ultra Precision · matched exits V2', 'ULTRA_PRECISION', 2.2),
+    Group('EARLY_EXIT_AB_V2', 'Early Runner · matched exits V2', 'EARLY', 2.75),
+    Group('MOMENTUM_EXIT_AB_V2', 'Momentum · matched exits V2', 'MOMENTUM', 2.75),
+    Group('PRECISION_EXIT_AB_V2', 'Precision · matched exits V2', 'PRECISION', 2.75),
 )
 
 def number(value: Any, default=0.0):
@@ -90,6 +98,17 @@ def exit_decision(position, arm, net_pct, fast, slow, now):
     if not math.isfinite(net_pct): return None
     peak=max(number(position.get('peak_net_pct'), net_pct),net_pct)
     position['peak_net_pct']=peak
+
+    # Cost-aware reconstruction of the pre-unification exit shape. This is a
+    # research arm only: matched entry, same observed mark, no target-price fill.
+    if arm=='LEGACY_NET':
+        if net_pct<=-4: return 'STOP_LOSS_4_NET'
+        if net_pct>=18: return 'TAKE_PROFIT_18_NET'
+        if now-position['opened_at']>=7*60_000: return 'MAX_HOLD_7'
+        if peak>=10 and net_pct<4: return 'NET_PROFIT_PROTECT_4'
+        if peak>=6 and net_pct<=peak-4: return 'TRAILING_STOP_4_NET'
+        return None
+
     if net_pct<=-3: return 'STOP_LOSS_3_NET'
     if net_pct>=10: return 'TAKE_PROFIT_10_NET'
     if now-position['opened_at']>=MAX_HOLD_MS: return 'MAX_HOLD_60'

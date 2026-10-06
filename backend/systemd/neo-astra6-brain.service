@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/root/neo-meme-trade/backend
-ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/astra6_brain.py
+WorkingDirectory=/root/neomemecoins/backend
+ExecStart=/usr/bin/python3 /root/neomemecoins/backend/astra6_brain.py
 Environment=PYTHONUNBUFFERED=1
 Restart=on-failure
 RestartSec=5

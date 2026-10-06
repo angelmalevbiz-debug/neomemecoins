@@ -1,7 +1,7 @@
 {
   "name": "NEO verified PAPER execution and isolated learning",
   "locked_at_utc": "2026-10-06",
-  "source_commit": "USER_AUTHORIZED_PAPER_QUOTE_SIZE_BACKOFF_20261006",
+  "source_commit": "PAPER_PAIRED_EXIT_RESEARCH_V2_20261006",
   "strategy_file": "backend/market_monitor.py",
   "sha256": "26c07c6cefb5bfcc5333c7c3bfeb5fd98c73679ec92d59b74235e0e482803a21",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
@@ -72,7 +72,9 @@
     "backend/engine_runtime.py": "1a4bfef255d8ffe5de44f1553266683a04a7a55044987c897469c7936516efb9",
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "660b991ba342dc34a2d5cf3a58c05a05621c7290babf893ffb6cc1919eacbc50",
-    "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
+    "backend/lab_paired_runner.py": "bd4f07a65b885075f591fca2cf3c5bd10197716b52d132741e4fd21ca3dea45c",
+    "backend/lab_paired_policy.py": "3b5899787b16c6703430c769e364cb9bf2ad042d7bc7e0045f0b444a19986467",
+    "backend/lab_paired_bridge.py": "b77140102362100a6329159f1a922834d5fdfcc3ecff137af219258c6f5080b4",
     "backend/live_tape.py": "94cb90e4742807933030df153db76b25dd3067e5cd1e04ba9315dad67be706ac",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
@@ -83,7 +85,7 @@
     "backend/strategy_lab.py": "ce20fd2372eb307b4e4cdeeaf468f22f993781a3fc5754d1b9f070c2dca6e42c",
     "backend/training_bridge.py": "0cc7d8cd61fbedde1ce25717fa022c3d03c279f0b24fe42f188ac0ee438553e5",
     "backend/training_worker.py": "9390cc7cc78afb2dc791d03e8c51fb85374a5edf5330d22ddd614048fba65ae2",
-    "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
+    "backend/user_gateway.py": "1758889dd8fd2cfc5930354afc7793b4f8709b3ba281d9b782cda0e5c7d6c910",
     "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
     "backend/lab_dashboard_projection.py": "6714791cc22c0330843c902c76cfd058062a6fc4f9afd2c7cfa41d8a0cc28da0",
     "backend/lab_activity.py": "6f39bd931024205cbd08644652fee9ddad5a14d5438c315310cb8620155e17ab",
@@ -151,10 +153,12 @@
     "backend/training_bridge.py": "Bounded no-API journal bridge with batched durable writes, restart-safe coverage-gap tracking, worker recovery and actual evidence timestamps",
     "backend/training_worker.py": "Independent replay process with batched checkpoints, durable reset boundary, restart and causal journal recovery",
     "backend/paper_state_reset.py": "User-authorized checksum archives, offline PAPER reset/restore and isolated training-only reset that preserves account history",
-    "backend/user_gateway.py": "Independent private accounts without inherited central trades and atomic registry",
+    "backend/user_gateway.py": "Independent private accounts without inherited central trades; per-user engines launch from the maintained /root/neomemecoins source",
     "backend/strategy_lab.py": "Use shared live tape and market snapshots, promote four qualifying independent PAPER books on a new $1,000 cohort, cap each position at 25% of its book, and preserve losers in the test cohort.",
     "backend/astra6_brain.py": "Shared exit-priority quote transport, cache/backoff, UTF-8 persistence and truthful profit factor",
-    "backend/lab_paired_runner.py": "Cross-platform file locking and UTF-8 persistence",
+    "backend/lab_paired_runner.py": "Matched V2 PAPER exit research with four independent arms and six entry groups; no live execution",
+    "backend/lab_paired_policy.py": "Versioned cost-aware legacy-style exit arm plus existing control, early-flow and profit-protection arms",
+    "backend/lab_paired_bridge.py": "Bridge validates the active paired policy version instead of a hard-coded V1 string",
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"
   },
   "support_file_changes": {
@@ -165,6 +169,7 @@
     "backend/market_monitor.py": "One shared $1,000 PAPER account for four entry rules, up to eight concurrent positions, fixed exits, daily loss and drawdown gates, quote and safety checks remain mandatory",
     "backend/engine_entry_policy.py": "Shared fresh pair/mint and market snapshot validation, explicit ensemble signal rejection and execution cost limits",
     "backend/lab_activity.py": "Single canonical feature builder and unchanged four promoted entry rules shared by Lab and main PAPER ensemble",
-    "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account"
+    "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account",
+    "deployment_units": "Systemd units target /root/neomemecoins and isolate paired V2 state from the legacy V1 archive"
   }
 }

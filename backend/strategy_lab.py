@@ -46,6 +46,7 @@ NETWORK_FEE_SOL=float(os.getenv('NEO_LAB_NETWORK_FEE_SOL','0.0001'))
 MAX_PRICE_IMPACT_PCT=float(os.getenv('NEO_LAB_MAX_PRICE_IMPACT_PCT','20'))
 ALLOW_COST_REJECTED_RESEARCH=os.getenv('NEO_LAB_ALLOW_COST_REJECTED_RESEARCH','0').strip().lower() in ('1','true','yes','on')
 RESEARCH_MAX_ENTRY_COST_PCT=float(os.getenv('NEO_LAB_RESEARCH_MAX_ENTRY_COST_PCT','5'))
+RESEARCH_MIN_ENTRY_INTERVAL_MS=max(0,int(float(os.getenv('NEO_LAB_RESEARCH_MIN_ENTRY_INTERVAL_SECONDS','0'))*1000))
 if not math.isfinite(RESEARCH_MAX_ENTRY_COST_PCT) or RESEARCH_MAX_ENTRY_COST_PCT < activity.MAX_ENTRY_COST_PCT:
     raise ValueError('invalid PAPER research cost ceiling')
 EXECUTION_MODEL_VERSION='DEX_SPOT_MODELED_COSTS_V2'
@@ -250,9 +251,10 @@ def load_state():
             'updated_at':now_ms(),'status':'starting','books':books,
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
+            'last_research_entry_at':int(num(raw.get('last_research_entry_at'))),
             'portfolio_setup':raw.get('portfolio_setup')}
 
-STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
+STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting','last_research_entry_at':0,
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
@@ -357,6 +359,11 @@ def update_positions(flows,feed):
                     'quote_status':'fresh' if quote_age<=POSITION_STALE_AFTER_MS else 'stale',
                     'quote_age_ms':quote_age,'quote_unavailable_reason':None})
         if reason: close_position(book,pos,coin,reason)
+def research_entry_allowed(now):
+    last=int(num(STATE.get('last_research_entry_at')))
+    return RESEARCH_MIN_ENTRY_INTERVAL_MS<=0 or not last or now-last>=RESEARCH_MIN_ENTRY_INTERVAL_MS
+
+
 def maybe_open(feed,flows):
     now=now_ms()
     candidates=[]
@@ -398,6 +405,7 @@ def maybe_open(feed,flows):
         blocked_cooldown=0
         flow_rejected=0
         research_only_candidates=0
+        research_rate_limited=0
         executable_candidates=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
@@ -425,7 +433,11 @@ def maybe_open(feed,flows):
                         max_cost_pct=RESEARCH_MAX_ENTRY_COST_PCT,minimum_notional=min_notional
                     )
                     if proposed is not None:
-                        research_only_candidates+=1
+                        if research_entry_allowed(now):
+                            research_only_candidates+=1
+                        else:
+                            research_rate_limited+=1
+                            proposed=None
             else:
                 proposed['cost_qualified']=True
                 executable_candidates+=1
@@ -437,6 +449,7 @@ def maybe_open(feed,flows):
             'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':executable_candidates,
             'research_only_candidates':research_only_candidates,
+            'research_rate_limited':research_rate_limited,
             'price_verification_rejected':blocked_price,
             'risk_limited_notional_usd':round(entry_limit,4),
         }
@@ -491,6 +504,8 @@ def maybe_open(feed,flows):
             'remaining_fraction':1.0,
         }
         book['position']=position
+        if position['research_only']:
+            STATE['last_research_entry_at']=stamp
         book.setdefault('last_entry_by_address',{})[address]=stamp
 
 
@@ -526,7 +541,8 @@ def persist(status='online',error=None):
     STATE['activity_config']={**activity.policy_config(),'stop_loss_net_pct':STOP_LOSS,
                               'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL,
                               'research_cost_rejects_enabled':ALLOW_COST_REJECTED_RESEARCH,
-                              'research_max_entry_cost_pct':RESEARCH_MAX_ENTRY_COST_PCT}
+                              'research_max_entry_cost_pct':RESEARCH_MAX_ENTRY_COST_PCT,
+                              'research_min_entry_interval_seconds':RESEARCH_MIN_ENTRY_INTERVAL_MS/1000}
     previous_setup=STATE.get('portfolio_setup') or {}
     default_setup_status='ACTIVE' if all(
         abs(num(STATE['books'][key].get('starting_balance'))-PROMOTED_ALLOCATION)<1e-8

@@ -21,6 +21,7 @@ Environment=NEO_LAB_SCALPER_REENTRY_SECONDS=480
 Environment=NEO_LAB_SCALPER_LOSS_REENTRY_SECONDS=1200
 Environment=NEO_LAB_ALLOW_COST_REJECTED_RESEARCH=1
 Environment=NEO_LAB_RESEARCH_MAX_ENTRY_COST_PCT=5
+Environment=NEO_LAB_RESEARCH_MIN_ENTRY_INTERVAL_SECONDS=60
 ExecStart=/usr/bin/python3 /root/neomemecoins/backend/strategy_lab.py
 Restart=always
 RestartSec=3

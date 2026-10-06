@@ -128,6 +128,13 @@ class ActivityTests(unittest.TestCase):
         c=coin();c.update(dexId='pumpswap',marketCap=10000,liquidityUsd=10000)
         self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution))
 
+    def test_research_global_cadence_gate(self):
+        lab.STATE['last_research_entry_at']=NOW-59000
+        with patch.object(lab,'RESEARCH_MIN_ENTRY_INTERVAL_MS',60000):
+            self.assertFalse(lab.research_entry_allowed(NOW))
+            lab.STATE['last_research_entry_at']=NOW-60000
+            self.assertTrue(lab.research_entry_allowed(NOW))
+
     def test_research_only_sizing_keeps_costs_and_does_not_relax_executable_gate(self):
         c=coin();c.update(dexId='pumpswap',marketCap=10000,liquidityUsd=10000)
         self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution))

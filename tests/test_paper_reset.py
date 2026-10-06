@@ -72,7 +72,7 @@ class PaperResetTests(unittest.TestCase):
             with self.assertRaises(ValueError):reset_all_offline(root)
             self.assertEqual(state.read_bytes(),before)
 
-    def test_offline_reset_preserves_market_journal_but_skips_entire_old_prefix(self):
+    def test_offline_reset_archives_old_observations_and_starts_fresh_journal(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp); training=root/'training';training.mkdir()
             # Imported/future availability must not resurrect old session results.
@@ -81,9 +81,32 @@ class PaperResetTests(unittest.TestCase):
             journal.write_bytes(old)
             result=reset_offline(root)
             state=json.loads((training/'training.json').read_text(encoding='utf-8'))
-            self.assertEqual(state['recording_start_offset'],len(old))
-            self.assertEqual(journal.read_bytes(),old)
+            self.assertEqual(state['recording_start_offset'],0)
+            self.assertEqual(journal.read_bytes(),b'')
             self.assertEqual((Path(result['training_archive'])/'observations.jsonl').read_bytes(),old)
+            manifest=json.loads((Path(result['training_archive'])/'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(manifest['files']['observations.jsonl']['sha256'],hashlib.sha256(old).hexdigest())
+            restore_archive(result['training_archive'],training)
+            self.assertEqual(journal.read_bytes(),old)
+
+    def test_large_observation_journal_is_archived_without_read_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); training=root/'training';training.mkdir()
+            journal=training/'observations.jsonl'
+            old=b'{"trade":"loss"}\n'*(128*1024)
+            journal.write_bytes(old)
+            original_read_bytes=Path.read_bytes
+            def guarded_read_bytes(path):
+                if path.name=='observations.jsonl':
+                    raise AssertionError('large observation journal must be streamed')
+                return original_read_bytes(path)
+            with patch.object(Path,'read_bytes',guarded_read_bytes):
+                result=reset_offline(root)
+            archive_path=Path(result['training_archive'])/'observations.jsonl'
+            self.assertEqual(archive_path.stat().st_size,len(old))
+            self.assertEqual(journal.stat().st_size,0)
+            manifest=json.loads((Path(result['training_archive'])/'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(manifest['files']['observations.jsonl']['sha256'],hashlib.sha256(old).hexdigest())
 
 
 if __name__=='__main__':unittest.main()

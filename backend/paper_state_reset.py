@@ -14,23 +14,62 @@ from pathlib import Path
 from engine_runtime import atomic_json
 
 
-def archive_files(root, names):
+ARCHIVE_CHUNK_BYTES = 1024 * 1024
+
+
+def _hash_file(path):
+    digest = hashlib.sha256()
+    size = 0
+    with Path(path).open('rb') as handle:
+        while True:
+            chunk = handle.read(ARCHIVE_CHUNK_BYTES)
+            if not chunk:
+                break
+            digest.update(chunk)
+            size += len(chunk)
+    return digest.hexdigest(), size
+
+
+def _copy_file_checked(source, target):
+    digest = hashlib.sha256()
+    size = 0
+    with Path(source).open('rb') as src, Path(target).open('xb') as dst:
+        while True:
+            chunk = src.read(ARCHIVE_CHUNK_BYTES)
+            if not chunk:
+                break
+            dst.write(chunk)
+            digest.update(chunk)
+            size += len(chunk)
+        dst.flush()
+        os.fsync(dst.fileno())
+    return digest.hexdigest(), size
+
+
+def archive_files(root, names, *, move_names=()):
     root = Path(root).resolve()
     destination = root / 'archive' / f'reset-{time.time_ns()}-{uuid.uuid4().hex[:8]}'
     destination.mkdir(parents=True, mode=0o700)
     files = {}
+    move_names = set(move_names)
     for name in names:
         source = root / name
         if source.resolve().parent != root or not source.is_file():
             continue
-        data = source.read_bytes()
         target = destination / source.name
-        target.write_bytes(data)
+        if source.name in move_names:
+            digest, size = _hash_file(source)
+            os.replace(source, target)
+            if target.stat().st_size != size:
+                raise OSError('archive size mismatch; reset refused')
+        else:
+            digest, size = _copy_file_checked(source, target)
+            os.chmod(target, 0o600)
+            archived_digest, archived_size = _hash_file(target)
+            if archived_digest != digest or archived_size != size:
+                raise OSError('archive checksum mismatch; reset refused')
         os.chmod(target, 0o600)
-        digest = hashlib.sha256(data).hexdigest()
-        if hashlib.sha256(target.read_bytes()).hexdigest() != digest:
-            raise OSError('archive checksum mismatch; reset refused')
-        files[source.name] = {'sha256': digest, 'bytes': len(data)}
+        files[source.name] = {'sha256': digest, 'bytes': size}
     atomic_json(destination / 'manifest.json', {
         'schema_version': 1, 'mode': 'PAPER', 'archived_at': int(time.time()*1000),
         'reason': 'User explicitly requested history and capital reset', 'files': files,
@@ -62,12 +101,17 @@ def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
     # Imported only for the explicit training reset, after the archive succeeds.
     from paper_training import PaperTrainingEngine
     training_root = root / 'training'
-    training_archive = archive_files(training_root, ['training.json', 'training_snapshot.json', 'training_events.jsonl', 'observations.jsonl'])
+    training_archive = archive_files(
+        training_root,
+        ['training.json', 'training_snapshot.json', 'training_events.jsonl', 'observations.jsonl'],
+        move_names={'observations.jsonl'},
+    )
     prepared = training_root / f'.reset-training-{uuid.uuid4().hex}.json'
     engine = PaperTrainingEngine(prepared)
     engine.reset(initial_cash=training_balance)
     engine.state['recording_start_at'] = stamp
     journal = training_root / 'observations.jsonl'
+    journal.touch(exist_ok=True)
     engine.state['recording_start_offset'] = journal.stat().st_size if journal.exists() else 0
     engine.save()
     # All serialization/initialization succeeds before the account is changed.
@@ -94,15 +138,18 @@ def restore_archive(archive, root):
     for name, metadata in manifest['files'].items():
         if Path(name).name != name:
             raise ValueError('unsafe manifest filename')
-        data = (archive / name).read_bytes()
-        if hashlib.sha256(data).hexdigest() != metadata['sha256']:
+        source = archive / name
+        digest, size = _hash_file(source)
+        if digest != metadata['sha256'] or size != metadata['bytes']:
             raise ValueError('archive checksum mismatch; restore refused')
-        verified[name] = data
+        verified[name] = source
     # Validate every file before overwriting anything, and preserve current state.
-    preserved = archive_files(root, verified)
-    for name, data in verified.items():
+    preserved = archive_files(root, verified, move_names={'observations.jsonl'})
+    for name, source in verified.items():
         temp = root / (name+'.restore.tmp')
-        temp.write_bytes(data)
+        digest, size = _copy_file_checked(source, temp)
+        if digest != manifest['files'][name]['sha256'] or size != manifest['files'][name]['bytes']:
+            raise OSError('restore checksum mismatch; restore refused')
         os.replace(temp, root / name)
     return {'restored_files': sorted(verified), 'previous_state_archive': str(preserved)}
 

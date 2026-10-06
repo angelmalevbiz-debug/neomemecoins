@@ -132,6 +132,7 @@ class GatewayIsolation(unittest.TestCase):
         self.assertNotIn('NEO_ENGINE_MODE',self.gateway.TARGET_PAPER_ENV)
         self.assertNotIn('NEO_EXECUTION_MODE',self.gateway.TARGET_PAPER_ENV)
         self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_TARGET_TRADES_PER_HOUR'],'50')
+        self.assertIn('/experiments/angel-hf-4-10/',self.gateway.TARGET_PAPER_ENV['NEO_STRATEGY_LAB_PATH'])
 
     def test_target_paper_profile_does_not_match_email_case_or_prefix_by_accident(self):
         with patch.object(self.gateway,'TARGET_PAPER_EMAIL','target@example.com'):

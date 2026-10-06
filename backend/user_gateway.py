@@ -41,6 +41,8 @@ TARGET_PAPER_ENV = {
     "NEO_TRADE_NOTIONAL_USD": "50",
     "NEO_PUBLIC_HISTORY_LIMIT": "0",
     "NEO_TARGET_TRADES_PER_HOUR": "50",
+    "NEO_STRATEGY_LAB_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json",
+    "NEO_STRATEGY_LAB_COMPACT_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json",
 }
 
 LOCK = threading.RLock()

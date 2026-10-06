@@ -1,0 +1,26 @@
+[Unit]
+Description=NEO isolated target-account high-throughput PAPER research lab
+After=network-online.target neo-fomo-monitor.service neo-live-tape.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/neomemecoins
+Environment=PYTHONUNBUFFERED=1
+Environment=NEO_STRATEGY_LAB_PATH=/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json
+Environment=NEO_STRATEGY_LAB_COMPACT_PATH=/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json
+Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired-hf-4-10
+Environment=NEO_LAB_STOP_LOSS_PCT=4
+Environment=NEO_LAB_TAKE_PROFIT_PCT=10
+Environment=NEO_LAB_TRADE_NOTIONAL=50
+Environment=NEO_LAB_REENTRY_SECONDS=30
+Environment=NEO_LAB_LOSS_REENTRY_SECONDS=60
+Environment=NEO_LAB_SCALPER_REENTRY_SECONDS=120
+Environment=NEO_LAB_SCALPER_LOSS_REENTRY_SECONDS=300
+ExecStart=/usr/bin/python3 /root/neomemecoins/backend/strategy_lab.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

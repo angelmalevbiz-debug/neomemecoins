@@ -25,9 +25,11 @@ RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
 MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','6'))))
+PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','30'))))
+MIN_TRACK_ACTIVITY = max(0,int(os.getenv('NEO_TAPE_MIN_TXNS_M5','3')))
+MAX_TRACK_ACTIVITY = max(MIN_TRACK_ACTIVITY,int(os.getenv('NEO_TAPE_MAX_TXNS_M5','120')))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
-TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
+TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','40')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 GET_TRANSACTION_WORKERS = max(1,min(4,int(os.getenv('NEO_TAPE_GET_TRANSACTION_WORKERS','4'))))
 WINDOW_MS = 300_000
@@ -105,9 +107,11 @@ def feed_snapshot():
     response.raise_for_status()
     state = response.json()
     coins = list(state.get('feed',[]) or [])
-    def priority(coin):
+    def activity_of(coin):
         tx = (coin.get('txns') or {}).get('m5') or {}
-        return (float(tx.get('buys') or 0)+float(tx.get('sells') or 0),float(coin.get('score') or 0))
+        return float(tx.get('buys') or 0)+float(tx.get('sells') or 0)
+    def priority(coin):
+        return (float(coin.get('score') or 0),activity_of(coin))
     coins.sort(key=priority,reverse=True)
     pinned = [dict(p.get('coin_snapshot') or {},address=p.get('address'),pairAddress=p.get('pairAddress'))
               for p in state.get('positions',[])]
@@ -116,7 +120,8 @@ def feed_snapshot():
     # as zero-flow or making verified PumpSwap coverage permanently degraded.
     supported_quote = lambda coin: coin.get('quoteTokenAddress') in (WSOL,USDC)
     pinned_supported = [coin for coin in pinned if str(coin.get('dexId') or '').lower() == 'pumpswap' and supported_quote(coin)]
-    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap' and supported_quote(coin)]
+    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap'
+                       and supported_quote(coin) and MIN_TRACK_ACTIVITY <= activity_of(coin) <= MAX_TRACK_ACTIVITY]
     rows,observed = {},now_ms()
     shared_reference=shared_quote_reference()
     for coin in (pinned_supported+supported_coins)[:MAX_TRACKED]:

@@ -89,6 +89,20 @@ class ParserTests(unittest.TestCase):
         tx['transaction']['message']['instructions'][0]={'programId':tape.PUMP_AMM,'accounts':[PAIR],'data':tape._b58encode(discriminator)}
         self.assertEqual(tape.classify_transaction(tx,META,observed_at=NOW,ingested_at=NOW)[0],'non_swap')
 
+    def test_feed_snapshot_prefers_verifiable_activity_over_rpc_saturating_pool(self):
+        class Response:
+            def raise_for_status(self): return None
+            def json(self):
+                return {'feed':[
+                    {'address':pubkey(35),'pairAddress':pubkey(36),'dexId':'pumpswap','score':100,
+                     'quoteTokenAddress':tape.WSOL,'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':400,'sells':300}}},
+                    {'address':pubkey(37),'pairAddress':pubkey(38),'dexId':'pumpswap','score':90,
+                     'quoteTokenAddress':tape.WSOL,'priceUsd':1,'priceNative':1,'txns':{'m5':{'buys':30,'sells':20}}},
+                ],'positions':[]}
+        with patch.object(tape.SESSION,'get',return_value=Response()), patch.object(tape,'shared_quote_reference',return_value=None), patch.object(tape,'MAX_TRACKED',1):
+            feed=tape.feed_snapshot()
+        self.assertEqual(feed[0]['pair'],pubkey(38))
+
     def test_projection_atomic_replace_retries_transient_windows_lock(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

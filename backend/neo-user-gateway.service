@@ -18,7 +18,9 @@ Environment=SUPABASE_URL=https://qziuovwcauaklgqscqys.supabase.co
 Environment=SUPABASE_PUBLISHABLE_KEY=sb_publishable_IVNFzAWi1kb7NjwTBitA_g_gBVnvrie
 ExecStart=/usr/bin/python3 /root/neomemecoins/backend/user_gateway.py
 Restart=always
-RestartSec=3
+RestartSec=1
+TimeoutStopSec=10
+KillMode=mixed
 
 [Install]
 WantedBy=multi-user.target

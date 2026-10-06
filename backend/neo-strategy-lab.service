@@ -9,6 +9,11 @@ User=root
 WorkingDirectory=/root/neomemecoins
 Environment=PYTHONUNBUFFERED=1
 Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired-v2
+Environment=NEO_LAB_TRADE_NOTIONAL=50
+Environment=NEO_LAB_REENTRY_SECONDS=30
+Environment=NEO_LAB_LOSS_REENTRY_SECONDS=60
+Environment=NEO_LAB_SCALPER_REENTRY_SECONDS=120
+Environment=NEO_LAB_SCALPER_LOSS_REENTRY_SECONDS=300
 ExecStart=/usr/bin/python3 /root/neomemecoins/backend/strategy_lab.py
 Restart=always
 RestartSec=3

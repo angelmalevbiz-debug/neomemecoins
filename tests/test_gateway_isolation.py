@@ -131,12 +131,27 @@ class GatewayIsolation(unittest.TestCase):
         self.assertEqual(env['NEO_EXECUTION_MODE'],'PAPER')
         self.assertNotIn('NEO_ENGINE_MODE',self.gateway.TARGET_PAPER_ENV)
         self.assertNotIn('NEO_EXECUTION_MODE',self.gateway.TARGET_PAPER_ENV)
+        self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_TARGET_TRADES_PER_HOUR'],'50')
 
     def test_target_paper_profile_does_not_match_email_case_or_prefix_by_accident(self):
         with patch.object(self.gateway,'TARGET_PAPER_EMAIL','target@example.com'):
             self.assertTrue(self.gateway.is_target_user({'email':'TARGET@example.com'}))
             self.assertFalse(self.gateway.is_target_user({'email':'x-target@example.com'}))
             self.assertFalse(self.gateway.is_target_user({'email':'target@example.com.evil'}))
+
+    def test_gateway_shutdown_terminates_owned_paper_engines(self):
+        class Process:
+            def __init__(self): self.terminated=False; self.waited=False
+            def poll(self): return None
+            def terminate(self): self.terminated=True
+            def wait(self,timeout=None): self.waited=True; return 0
+            def kill(self): raise AssertionError('graceful child should not need kill')
+        child=Process()
+        self.gateway.ENGINE_PROCESSES['target']=child
+        self.gateway.stop_owned_engines()
+        self.assertTrue(child.terminated)
+        self.assertTrue(child.waited)
+        self.assertEqual(self.gateway.ENGINE_PROCESSES,{})
 
     def test_corrupt_registry_refuses_silent_reset(self):
         p=Path(self.gateway.STORE_PATH)

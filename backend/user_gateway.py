@@ -2,6 +2,7 @@
 import copy
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -29,7 +30,7 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qziuovwcauaklgqscqys.supabase.
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
 TARGET_PAPER_EMAIL = os.getenv("NEO_TARGET_PAPER_EMAIL", "").strip().lower()
-TARGET_PAPER_PROFILE = "HF_300_SL4_TP10_COSTS_V1"
+TARGET_PAPER_PROFILE = "HF_50H_SL4_TP10_COSTS_V2"
 TARGET_HISTORY_RESTORE_VERSION = "BACKUP_UNION_V1"
 BACKUP_ROOT = Path(os.getenv("NEO_MARKET_BACKUP_ROOT", "/var/lib/neo-market/backups"))
 TARGET_PAPER_ENV = {
@@ -39,9 +40,7 @@ TARGET_PAPER_ENV = {
     "NEO_MAX_POSITIONS": "20",
     "NEO_TRADE_NOTIONAL_USD": "50",
     "NEO_PUBLIC_HISTORY_LIMIT": "0",
-    "NEO_TARGET_TRADES_PER_HOUR": "300",
-    "NEO_STRATEGY_LAB_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json",
-    "NEO_STRATEGY_LAB_COMPACT_PATH": "/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json",
+    "NEO_TARGET_TRADES_PER_HOUR": "50",
 }
 
 LOCK = threading.RLock()
@@ -246,6 +245,21 @@ def stop_engine_for_reconfigure(user_id, account):
             raise RuntimeError("User PAPER engine could not be safely reconfigured")
 
 
+def stop_owned_engines():
+    with LOCK:
+        processes = list(ENGINE_PROCESSES.values())
+        ENGINE_PROCESSES.clear()
+    for process in processes:
+        if process is None or process.poll() is not None:
+            continue
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+
+
 def allocate_port(user_id):
     accounts = STORE.setdefault("accounts", {})
     reserved = {
@@ -399,11 +413,9 @@ def ensure_engine(user):
     with LOCK:
         account = ensure_account_record(user)
         profile_changed = apply_target_profile(user, account)
-        needs_restore = is_target_user(user) and account.get("history_restore_version") != TARGET_HISTORY_RESTORE_VERSION
-        if profile_changed or needs_restore:
+        if profile_changed:
             stop_engine_for_reconfigure(user["id"], account)
             bootstrap_if_needed(user, account)
-            restore_target_history(user["id"], account)
         return start_engine(user, account)
 
 
@@ -538,8 +550,16 @@ def main():
     USER_ENGINE_ROOT.mkdir(parents=True, exist_ok=True)
     threading.Thread(target=revive_known_engines, name="neo-user-engine-revive", daemon=True).start()
     server = ThreadingHTTPServer((HOST, PORT), Handler)
+    def stop(*_args):
+        threading.Thread(target=server.shutdown, name="neo-user-gateway-shutdown", daemon=True).start()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, stop)
     print(f"NEO user gateway listening on http://{HOST}:{PORT}", flush=True)
-    server.serve_forever(poll_interval=0.5)
+    try:
+        server.serve_forever(poll_interval=0.5)
+    finally:
+        server.server_close()
+        stop_owned_engines()
 
 
 if __name__ == "__main__":

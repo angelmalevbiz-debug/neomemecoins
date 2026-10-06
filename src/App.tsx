@@ -326,7 +326,7 @@ export default function App() {
           <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/20 bg-emerald-400/10"><Zap className="h-5 w-5 text-emerald-300" /></div>
           <div>
             <div className="flex items-center gap-2"><span className="text-base font-black text-white">NEO Meme Coins</span><span className="rounded-md border border-emerald-400/20 bg-emerald-400/10 px-1.5 py-0.5 text-[8px] font-black tracking-[0.14em] text-emerald-300">PAPER</span></div>
-            <div className="text-[10px] text-slate-600">24/7 Solana market intelligence</div>
+            <div className="text-[10px] text-slate-600">Live Solana market intelligence</div>
           </div>
         </div>
         <div className="flex items-center gap-2">

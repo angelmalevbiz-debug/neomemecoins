@@ -75,7 +75,7 @@
     "backend/lab_paired_runner.py": "bd4f07a65b885075f591fca2cf3c5bd10197716b52d132741e4fd21ca3dea45c",
     "backend/lab_paired_policy.py": "5be715c02dfe99407c8d6a164a2e1fccd9b189332a094240df11278b19602155",
     "backend/lab_paired_bridge.py": "b77140102362100a6329159f1a922834d5fdfcc3ecff137af219258c6f5080b4",
-    "backend/live_tape.py": "015d0e60fbe3ce4db8cb89dc400710599d65b32741259f033333414846b142e2",
+    "backend/live_tape.py": "badd35fc447b209ac8edecd8545c57a3fdc5416cba6b068de61cbd2df1868073",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",

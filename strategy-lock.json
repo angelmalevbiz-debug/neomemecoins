@@ -65,7 +65,7 @@
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
-    "backend/paper_state_reset.py": "72a270787ca7af6af6b7d3883aae3e09cba3e5a7bc73359f56ec33e14b7b828b",
+    "backend/paper_state_reset.py": "7eb7ae1e46f23be4f9b9aac49df99acc3a215392c34e62f09b5ebb9496a78f19",
     "backend/paper_training.py": "1da09922c3a6c6a8096577f879224275e579995f172c03dbaff50c852fdc5c14",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
     "backend/strategy_lab.py": "ce20fd2372eb307b4e4cdeeaf468f22f993781a3fc5754d1b9f070c2dca6e42c",

@@ -7,6 +7,7 @@ from astra_lab_bridge import merge_astra_snapshot
 from lab_paired_bridge import merge_paired_snapshot
 from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
+from lab_position_marks import POSITION_MARK_FEED
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
 
@@ -41,6 +42,8 @@ BASE_SLIPPAGE_BPS=float(os.getenv('NEO_LAB_BASE_SLIPPAGE_BPS','10'))
 LATENCY_BUFFER_BPS=float(os.getenv('NEO_LAB_LATENCY_BUFFER_BPS','10'))
 NETWORK_FEE_SOL=float(os.getenv('NEO_LAB_NETWORK_FEE_SOL','0.0001'))
 MAX_PRICE_IMPACT_PCT=float(os.getenv('NEO_LAB_MAX_PRICE_IMPACT_PCT','20'))
+EXECUTION_MODEL_VERSION='DEX_SPOT_MODELED_COSTS_V2'
+POSITION_STALE_AFTER_MS=12_000
 
 SESSION=requests.Session()
 SESSION.headers.update({'user-agent':'NEO-Strategy-Lab/1.0','accept':'application/json'})
@@ -155,17 +158,7 @@ def flow_map():
     }
     return out
 def enrich(c,flows):
-    tx=(c.get('txns') or {}).get('m5') or {}
-    b=num(tx.get('buys')); s=num(tx.get('sells'))
-    liq=num(c.get('liquidityUsd')); mc=num(c.get('marketCap') or c.get('fdv'))
-    pc=c.get('priceChange') or {}
-    vol1h=num((c.get('volume') or {}).get('h1'))
-    return {
-      'score':num(c.get('score')),'liq':liq,'m5':num(pc.get('m5')),'h1':num(pc.get('h1')),
-      'bs':b/max(s,1),'lmc':liq/max(mc,1),'age':num(c.get('ageMinutes'),999999),
-      'vol1h':vol1h,'vol_liq':vol1h/max(liq,1),
-      'flow':flows.get(c.get('address'),{'trades':0,'buys':0,'sells':0,'buy_usd':0,'sell_usd':0,'unique_wallets':0,'ratio':0,'max_sell':0})
-    }
+    return activity.market_features(c, flows.get(c.get('address')))
 
 STRATEGIES=[
  {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':lambda f: f['score']>=98 and f['liq']>=25000 and 3<=f['m5']<=18 and 1.1<=f['bs']<=3.0 and f['lmc']>=.15 and 8<=f['age']<=180},
@@ -276,7 +269,8 @@ def close_position(book,pos,coin,reason):
            'exit_dex_fee_usd':round(quote['dex_fee_usd'],6),'exit_network_fee_usd':round(quote['network_fee_usd'],6),
            'exit_price_impact_pct':round(quote['impact_pct'],4),
            'exit_slippage_pct':round(quote['slippage_pct']+quote['latency_pct'],4),
-           'execution_mode':'REALISTIC_COSTS_V1'}
+           'execution_mode':EXECUTION_MODEL_VERSION,
+           'execution_source':'DEX_SPOT_WITH_MODELED_FRICTION'}
     book['history'].insert(0,trade); book['position']=None
 
 def realize_partial(book,pos,coin,fraction,label):
@@ -302,8 +296,8 @@ def realize_partial(book,pos,coin,fraction,label):
     return pnl
 
 def update_positions(flows,feed):
-    # Mark open positions from the same recent market snapshot used for entries.
-    # This avoids one extra DEX request per position-management cycle.
+    # Use the shared discovery feed when it contains the exact held pool. If
+    # the pool rotated out, refresh it independently without blocking this loop.
     prices={}
     for coin in feed or []:
         address=coin.get('address'); pair=coin.get('pairAddress')
@@ -314,9 +308,13 @@ def update_positions(flows,feed):
     for book in [*STATE['books'].values(), *exit_only_books]:
         pos=book.get('position')
         if not pos: continue
-        pair_key=(pos.get('address'),pos.get('pairAddress'))
-        coin=prices.get(pair_key)
-        if not coin: continue
+        coin=POSITION_MARK_FEED.resolve(pos,prices,now_ms())
+        if not coin:
+            age=max(0,now_ms()-int(num(pos.get('updated_at'))))
+            pos['quote_status']='stale' if age>POSITION_STALE_AFTER_MS else 'refreshing'
+            pos['quote_age_ms']=age
+            pos['quote_unavailable_reason']='exact_pool_not_in_recent_entry_feed'
+            continue
         price=num(coin.get('priceUsd'))
         entry=num(pos['entry_price']); peak=max(num(pos.get('peak_price'),entry),price)
         pct=(price-entry)/entry*100; hold=(now_ms()-int(pos['opened_at']))/60000
@@ -340,13 +338,18 @@ def update_positions(flows,feed):
         elif hold>=MAX_HOLD_MIN:
             reason='ABSOLUTE_MAX_HOLD_60'
 
+        marked_at=num(coin.get('mark_received_at'),now_ms())
+        quote_age=max(0,now_ms()-int(marked_at))
         pos.update({'current_price':price,'peak_price':peak,'execution_exit_price':round(live_quote['fill_price'],12),
                     'pnl_pct':round(total_live_pct,3),'open_pnl_usd':round(open_pnl,4),
                     'estimated_exit_fee_usd':round(live_quote['dex_fee_usd']+live_quote['network_fee_usd'],6),
                     'estimated_exit_impact_pct':round(live_quote['impact_pct'],4),
                     'partial_realized_pnl':round(num(pos.get('partial_realized_pnl')),4),
                     'remaining_fraction':round(remaining_qty/max(num(pos.get('original_quantity'),remaining_qty),1e-18),4),
-                    'updated_at':now_ms()})
+                    'updated_at':now_ms(),'mark_received_at':marked_at,
+                    'mark_source':coin.get('mark_source','SHARED_LIVE_FEED_EXACT_POOL'),
+                    'quote_status':'fresh' if quote_age<=POSITION_STALE_AFTER_MS else 'stale',
+                    'quote_age_ms':quote_age,'quote_unavailable_reason':None})
         if reason: close_position(book,pos,coin,reason)
 def maybe_open(feed,flows):
     now=now_ms()
@@ -451,7 +454,10 @@ def maybe_open(feed,flows):
             'entry_network_fee_usd':round(opening['network_fee_usd'],6),
             'entry_price_impact_pct':round(opening['impact_pct'],4),
             'entry_slippage_pct':round(opening['slippage_pct']+opening['latency_pct'],4),
-            'execution_mode':'REALISTIC_COSTS_V1',
+            'execution_mode':EXECUTION_MODEL_VERSION,
+            'execution_source':'DEX_SPOT_WITH_MODELED_FRICTION',
+            'quote_status':'fresh','mark_received_at':stamp,
+            'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','quote_age_ms':0,
             'price_crosscheck':price_integrity.check(coin),
             'entry_policy_version':activity.POLICY_VERSION,
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
@@ -472,6 +478,9 @@ def stats(book):
     unreal=0.0
     p=book.get('position')
     if p: unreal=num(p.get('open_pnl_usd'))
+    marked_at=num((p or {}).get('mark_received_at'),num((p or {}).get('updated_at')))
+    mark_age_ms=max(0,now_ms()-int(marked_at)) if p else 0
+    valuation_stale=bool(p and (mark_age_ms>POSITION_STALE_AFTER_MS or p.get('quote_status')=='stale'))
     equity=num(book.get('balance'))+unreal
     partial_count=sum(len(t.get('partial_exits') or []) for t in h)+len((p or {}).get('partial_exits') or [])
     locked_partial=sum(num(t.get('partial_realized_pnl')) for t in h)+num((p or {}).get('partial_realized_pnl'))
@@ -480,6 +489,7 @@ def stats(book):
             'profit_factor_status':'finite' if gl>0 else ('infinite_no_losses' if gp>0 else 'undefined_no_results'),
             'realized_pnl':round(num(book.get('balance'))-start,2),
             'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(p),
+            'valuation_stale':valuation_stale,'mark_age_ms':mark_age_ms,
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),
             'active_policy_trades':sum(t.get('entry_policy_version')==activity.POLICY_VERSION for t in h),
             'active_policy_wins':sum(t.get('entry_policy_version')==activity.POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h)}
@@ -488,6 +498,8 @@ def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
     STATE['stats']={k:stats(v) for k,v in STATE['books'].items()}
     STATE['data_integrity_note']='Историята съдържа непотвърдени цени, включително XFUN. Не е доказателство за реална доходност. Новите входове минават независима проверка.'
+    STATE['execution_basis']=EXECUTION_MODEL_VERSION
+    STATE['execution_note']='DEX exact-pool spot marks with modeled fees, impact, slippage and latency; paper estimate only, no transaction is built, signed, or sent.'
     STATE['activity_config']={**activity.policy_config(),'stop_loss_net_pct':STOP_LOSS,
                               'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL}
     previous_setup=STATE.get('portfolio_setup') or {}

@@ -20,8 +20,8 @@ class Budget(unittest.TestCase):
   self.assertLessEqual(size+.26,100)
  def test_nonfinite_budget_never_passes(self):
   for bad in [float('nan'),float('inf'),'bad']:self.assertEqual(r.plan_notional(200,bad,100,0,5,.5,.03),0)
- def test_latest_explicit_disabled_daily_cap_is_visible(self):
-  self.assertEqual((m.STOP_LOSS_PCT,m.TAKE_PROFIT_PCT,m.TRADE_NOTIONAL_USD,m.MAX_DAILY_LOSS_USD),(5,10,200,0))
+ def test_latest_daily_cap_is_visible(self):
+  self.assertEqual((m.STOP_LOSS_PCT,m.TAKE_PROFIT_PCT,m.TRADE_NOTIONAL_USD,m.MAX_DAILY_LOSS_USD),(5,10,200,100))
 
 class Persistence(unittest.TestCase):
  def test_complete_json_replaces_whole_file(self):

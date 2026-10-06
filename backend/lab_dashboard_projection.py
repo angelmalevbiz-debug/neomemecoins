@@ -15,7 +15,9 @@ def compact_strategy_lab(data):
                 for field in ('symbol', 'address', 'pairAddress', 'strategy_id', 'opened_at', 'pnl_pct',
                               'open_pnl_usd', 'notional_usd', 'entry_price', 'execution_entry_price',
                               'current_price', 'entry_dex_fee_usd', 'entry_network_fee_usd',
-                              'estimated_exit_fee_usd', 'estimated_exit_impact_pct', 'execution_mode')
+                              'estimated_exit_fee_usd', 'estimated_exit_impact_pct', 'execution_mode',
+                              'execution_source', 'updated_at', 'mark_received_at', 'mark_source',
+                              'quote_status', 'quote_age_ms', 'quote_unavailable_reason')
             }
         else:
             position = None
@@ -66,7 +68,9 @@ def compact_strategy_lab(data):
                 field: position.get(field)
                 for field in ('symbol', 'address', 'pairAddress', 'strategy_id', 'opened_at',
                               'pnl_pct', 'open_pnl_usd', 'notional_usd', 'entry_price',
-                              'execution_entry_price', 'current_price', 'execution_mode')
+                              'execution_entry_price', 'current_price', 'execution_mode',
+                              'updated_at', 'mark_received_at', 'mark_source', 'quote_status',
+                              'quote_age_ms', 'quote_unavailable_reason')
             }
         else:
             position = None
@@ -93,6 +97,8 @@ def compact_strategy_lab(data):
         'started_at': data.get('started_at'),
         'updated_at': data.get('updated_at'),
         'status': data.get('status', 'offline'),
+        'execution_basis': data.get('execution_basis'),
+        'execution_note': data.get('execution_note'),
         'books': books,
         'stats': data.get('stats') or {},
         'data_integrity_note': data.get('data_integrity_note'),

@@ -56,7 +56,7 @@ class ExitTests(unittest.TestCase):
   self.addCleanup(patch.stopall)
   self.addCleanup(self.mon.stop)
  def test_fixed_net_contract(self):
-  self.assertEqual((m.STOP_LOSS_PCT,m.TAKE_PROFIT_PCT,m.TRADE_NOTIONAL_USD,m.MAX_DAILY_LOSS_USD),(5,10,200,0))
+  self.assertEqual((m.STOP_LOSS_PCT,m.TAKE_PROFIT_PCT,m.TRADE_NOTIONAL_USD,m.MAX_DAILY_LOSS_USD),(5,10,200,100))
  def test_profit_requires_ten_net_not_chart(self):
   self.coin['priceUsd']=20;self.mon.update_positions({A:self.coin});self.assertEqual(len(m.STATE.positions),1)
  def test_net_ten_closes(self):

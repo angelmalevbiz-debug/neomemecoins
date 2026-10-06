@@ -17,6 +17,7 @@ for key in ['NEO_TRADE_NOTIONAL_USD', 'NEO_MAX_DAILY_LOSS_USD', 'NEO_STRICT_ENTR
     os.environ.pop(key, None)
 import market_monitor as m
 import engine_entry_policy as policy
+import winner_ensemble
 
 
 class EngineEntryTests(unittest.TestCase):
@@ -75,9 +76,10 @@ class EngineEntryTests(unittest.TestCase):
 
     def test_preserve_user_risk_settings(self):
         self.assertEqual(m.TRADE_NOTIONAL_USD, 200)
-        self.assertEqual(m.MAX_DAILY_LOSS_USD, 0)
+        self.assertEqual(m.MAX_DAILY_LOSS_USD, 100)
         self.assertEqual(m.STOP_LOSS_PCT, 5)
         self.assertEqual(m.MAX_POSITIONS, 8)
+        self.assertEqual(m.MAX_DRAWDOWN_PCT, 20)
         self.assertEqual(m.TAKE_PROFIT_PCT, 10)
 
     def test_valid_formerly_overfiltered_entry_reaches_quote_and_opens(self):
@@ -85,7 +87,9 @@ class EngineEntryTests(unittest.TestCase):
         self.assertEqual(len(m.STATE.positions), 1)
         pos = m.STATE.positions[0]
         self.assertEqual(pos['notional_usd'], 200)
-        self.assertEqual(pos['entry_policy_version'], policy.POLICY_VERSION)
+        self.assertEqual(pos['entry_policy_version'], winner_ensemble.ENTRY_POLICY_VERSION)
+        self.assertEqual(pos['strategy_id'], winner_ensemble.VERSION)
+        self.assertEqual(pos['strategy_matches'], ['EARLY', 'MOMENTUM', 'PRECISION'])
         self.assertEqual(m.STATE.entry_diagnostics['status'], 'opened')
         self.assertLess(pos['entry_roundtrip_pnl_pct'], 0)
         self.assertIsNone(pos['hard_stop_net_pct'])
@@ -148,17 +152,20 @@ class EngineEntryTests(unittest.TestCase):
         self.assertFalse(m.STATE.positions)
         self.assertIn('quote_inconsistent', m.STATE.entry_diagnostics['rejections'])
 
-    def test_effective_early_signal_rejects_below_configured_liquidity_and_score(self):
-        for key,val in [('liquidityUsd',3999),('score',57.9)]:
+    def test_winner_signal_rejects_below_configured_liquidity_and_score(self):
+        for key,val in [('liquidityUsd',14999),('score',84.9)]:
             self.monitor.maybe_open([{**self.coin,key:val}])
             self.assertFalse(m.STATE.positions)
-            self.assertIn('gold_signal',m.STATE.entry_diagnostics['rejections'])
+            self.assertIn('winner_signal',m.STATE.entry_diagnostics['rejections'])
 
-    def test_original_gold_requires_observed_wallet(self):
+    def test_market_winner_rule_does_not_invent_verified_flow(self):
         self.flow['unique_wallets']=0
+        self.flow['quality']='UNKNOWN'
         self.monitor.maybe_open([self.coin])
-        self.assertFalse(m.STATE.positions)
-        self.assertIn('gold_signal',m.STATE.entry_diagnostics['rejections'])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertEqual(m.STATE.positions[0]['entry_flow']['quality'],'UNKNOWN')
+        self.assertEqual(m.STATE.positions[0]['signal_evidence'],'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS')
+        self.assertTrue(self.mocks[2].called)
 
     def test_independent_price_failure_blocks_before_quote(self):
         self.mocks[6].return_value={'status':'blocked','reason':'price_source_disagreement'}
@@ -181,9 +188,10 @@ class EngineEntryTests(unittest.TestCase):
 
     def test_reported_thresholds_match_real_policy(self):
         snapshot = m.STATE.snapshot()
-        self.assertEqual(snapshot['config']['entry_score'], 58)
-        self.assertEqual(snapshot['config']['min_liquidity_usd'], 4000)
-        self.assertEqual(snapshot['config']['entry_policy_version'], policy.POLICY_VERSION)
+        self.assertEqual(snapshot['config']['entry_score'], winner_ensemble.MIN_SCORE)
+        self.assertEqual(snapshot['config']['min_liquidity_usd'], winner_ensemble.MIN_LIQUIDITY_USD)
+        self.assertEqual(snapshot['config']['entry_policy_version'], winner_ensemble.ENTRY_POLICY_VERSION)
+        self.assertEqual(snapshot['config']['ensemble_strategies'], list(winner_ensemble.STRATEGIES))
         self.assertIn('entry_diagnostics', snapshot)
 
 if __name__ == '__main__':

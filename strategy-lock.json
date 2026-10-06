@@ -3,10 +3,10 @@
   "locked_at_utc": "2026-10-06",
   "source_commit": "USER_AUTHORIZED_PAPER_AUDIT_REPAIR_20261005",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "2cf961b8349afaebcc31074d7146fc3e5c105f1d357ff030f72d34c157c916df",
-  "production_strategy_id": "ORDER_FLOW_EARLY_FIXED_PAPER_V9",
+  "sha256": "a9811c84e2ef18948e4507a5c199fcd28ec04c82a10f841462d788834ff6804d",
+  "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
-    "entry_score": 58,
+    "entry_score": 85,
     "max_positions": 8,
     "stop_loss_pct": 5,
     "take_profit_pct": 10,
@@ -18,52 +18,42 @@
       25,
       200
     ],
-    "max_daily_loss_usd": 0,
-    "min_liquidity_usd": 4000,
+    "max_daily_loss_usd": 100,
+    "min_liquidity_usd": 15000,
     "max_position_full_loss_usd": 250,
     "max_total_exposure_pct": 100,
-    "max_drawdown_pct": 0,
+    "max_drawdown_pct": 20,
     "stop_execution_buffer_pct": 0.5,
-    "primary_daily_and_drawdown_caps_enabled": false
+    "primary_daily_and_drawdown_caps_enabled": true
   },
-  "policy": "User authorized audit, simulator repairs, parallel PAPER experimentation and reset of all PAPER accounts. No live execution or automatic production strategy promotion.",
+  "policy": "User-authorized combined four-rule $1,000 PAPER account with independent simulated quote, risk, and safety gates; no live execution.",
   "integrity_note": "Mandatory validated flow coverage, exact pool/mint checks, complete safety checks, one effective threshold object, bounded recorded quote latency and uncapped actual modeled losses.",
   "execution_mode": "PAPER_QUOTE_OR_OBSERVED_POOL_MODEL",
-  "entry_policy_version": "ORDER_FLOW_VALIDATED_THRESHOLDS_V9",
+  "entry_policy_version": "WINNER_ENSEMBLE_ENTRY_V1",
   "entry_policy_limits": {
-    "ultra_early": {
-      "max_age_minutes": 45,
-      "min_score": 58,
-      "min_liquidity_usd": 4000,
-      "min_flow_trades": 1,
-      "min_flow_ratio": 1.05,
-      "min_conviction": 30
-    },
-    "early": {
-      "max_age_minutes": 180,
-      "min_score": 70,
-      "min_liquidity_usd": 5000,
-      "min_flow_trades": 2,
-      "min_flow_ratio": 1.1,
-      "min_conviction": 45
-    },
-    "momentum": {
-      "min_score": 78,
-      "min_liquidity_usd": 7500,
-      "min_flow_trades": 3,
-      "min_flow_ratio": 1.2,
-      "min_conviction": 55
-    },
-    "max_entry_impact_pct": 1.75,
-    "max_roundtrip_cost_pct": 2.75,
-    "max_worst_case_cost_pct": 4,
-    "reentry_cooldown_seconds": 1200,
-    "risk_overlay": "PLANNED_NET_STOP_NO_FILL_GUARANTEE"
+    "ensemble": [
+      "EARLY",
+      "MOMENTUM",
+      "PRECISION",
+      "ULTRA_PRECISION"
+    ],
+    "max_positions": 8,
+    "max_position_full_loss_usd": 250,
+    "max_total_exposure_pct": 100,
+    "max_daily_loss_usd": 100,
+    "max_drawdown_pct": 20,
+    "execution_gates": [
+      "fresh market snapshot",
+      "exact pool and mint safety",
+      "fresh buy/sell quotes",
+      "impact and roundtrip-cost bounds",
+      "available shared cash"
+    ]
   },
   "support_files_sha256": {
     "backend/astra6_brain.py": "2b5ec59be59a93122ce6c08bedd1205c6330d12af75211c60336f616f17390de",
     "backend/compat_file_lock.py": "8ba79d6e53250fba0a3f0dc2f997ed89094210d170d84c4b66c200f5ab9d64df",
-    "backend/engine_entry_policy.py": "93447d5b0cb5541a35e94835ca6c4ae823bc576bb12cd8eb51f2c87d45ffbc8b",
+    "backend/engine_entry_policy.py": "d39b0ecd63468b6bb0207b0035d7a66f38956c6317e1cff72b249fab1b02cbfe",
     "backend/engine_execution.py": "2a4f68ef51327a1fbc5cb1a80c2de2ddbae2a52a39ac7dcdc495fa686dabb20a",
     "backend/engine_exit_policy.py": "667010bcc5e047996d90a9bcecb7b9eaf9baeee10864aeb2dfa9b23a8dbd0e3c",
     "backend/engine_rug_guard.py": "5c732df903fdfcb692a8b2d64afd1276f1350658471d17c4c8363cefd58ae7e3",
@@ -78,13 +68,18 @@
     "backend/paper_state_reset.py": "72a270787ca7af6af6b7d3883aae3e09cba3e5a7bc73359f56ec33e14b7b828b",
     "backend/paper_training.py": "1da09922c3a6c6a8096577f879224275e579995f172c03dbaff50c852fdc5c14",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "069a51224b4e05a03f531705ea1ba9a015eac55ba118c694d0c5301bfcfbae44",
+    "backend/strategy_lab.py": "ce20fd2372eb307b4e4cdeeaf468f22f993781a3fc5754d1b9f070c2dca6e42c",
     "backend/training_bridge.py": "be12a2904711f25932f375d5faa23ffa6eda3fdf5911aaf3dfbd408afccd50a2",
     "backend/training_worker.py": "ad806420804950da3547a7ae380ce7ff61860df70c2eb566921d1a4c2dc24918",
-    "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006"
+    "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
+    "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
+    "backend/lab_dashboard_projection.py": "6714791cc22c0330843c902c76cfd058062a6fc4f9afd2c7cfa41d8a0cc28da0",
+    "backend/lab_activity.py": "6f39bd931024205cbd08644652fee9ddad5a14d5438c315310cb8620155e17ab",
+    "backend/winner_ensemble.py": "96d40a7d1e7623af693dce792e7ccbf0414702a18ab41a9b6e727d9cfcd9fa77",
+    "backend/market_monitor.py": "a9811c84e2ef18948e4507a5c199fcd28ec04c82a10f841462d788834ff6804d"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
-  "runtime_note": "Primary engine remains a fixed control with main defaults explicitly disclosed; learner runs in a separate process and separate independently funded books.",
+  "runtime_note": "Primary PAPER account runs the four selected Lab entry rules against one shared balance; independent validated training remains separate and can never send live orders.",
   "stop_execution_mode": "JUPITER_USDC_QUOTE_LATENCY_BUFFER_V6",
   "stop_execution_note": "Planned net stop -5%; all observed gap losses and unavailable liquidation risk retained. Never clamps a loss or realizes native SOL as USDC.",
   "entry_data_fallbacks": {
@@ -150,6 +145,13 @@
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"
   },
   "support_file_changes": {
-    "backend/live_tape.py": "Decoder-supported PumpSwap-only tape; lower RPC poll rate, freshest-first processing, and current-window-only backlog gating; complete safety gates remain mandatory"
+    "backend/live_tape.py": "Decoder-supported PumpSwap-only tape; lower RPC poll rate, freshest-first processing, and current-window-only backlog gating; complete safety gates remain mandatory",
+    "backend/strategy_lab.py": "Fresh exact-pool spot refresh for held positions, stale valuation labels, and explicit modeled-cost execution basis",
+    "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
+    "backend/lab_dashboard_projection.py": "Expose position mark age/source and paper-only modeled execution basis",
+    "backend/market_monitor.py": "One shared $1,000 PAPER account for four entry rules, up to eight concurrent positions, fixed exits, daily loss and drawdown gates, quote and safety checks remain mandatory",
+    "backend/engine_entry_policy.py": "Shared fresh pair/mint and market snapshot validation, explicit ensemble signal rejection and execution cost limits",
+    "backend/lab_activity.py": "Single canonical feature builder and unchanged four promoted entry rules shared by Lab and main PAPER ensemble",
+    "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account"
   }
 }

@@ -17,6 +17,7 @@ _ADDRESS = re.compile(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$')
 LABELS = {
     'risk_budget_unavailable': 'недостатъчен оставащ дневен бюджет за минималната позиция',
     'gold_signal': 'няма достатъчно ранен buy-flow импулс',
+    'winner_signal': 'няма сигнал от четирите PAPER стратегии',
     'flow_quality': 'непълен или забавен проверен order flow',
     'audit_pending': 'непотвърден траен audit запис; изчаква повторен запис',
     'liquidation_unavailable': 'неизвестна ликвидационна оценка на отворена позиция',
@@ -94,15 +95,21 @@ def number(value: Any, default: float = 0.0) -> float:
         return default
 
 
-def signal_rejections(coin, flow, context, *, min_score, min_liquidity,
-                      min_conviction, now):
-    thresholds = gold_order_flow.EntryThresholds(min_score, min_liquidity, min_conviction)
+def signal_data_rejections(coin, *, now):
+    """Market identity and freshness required for every PAPER entry signal."""
     reasons=[]
     if not _ADDRESS.fullmatch(str(coin.get('address') or '')) or not _ADDRESS.fullmatch(str(coin.get('pairAddress') or '')):
         reasons.append('invalid_pair')
     if number(coin.get('priceUsd'))<=0: reasons.append('invalid_price')
     observed=number(coin.get('updatedAt'))
     if not observed or not 0<=now-observed<=MAX_FEED_AGE_MS:reasons.append('stale_feed')
+    return reasons
+
+
+def signal_rejections(coin, flow, context, *, min_score, min_liquidity,
+                      min_conviction, now):
+    thresholds = gold_order_flow.EntryThresholds(min_score, min_liquidity, min_conviction)
+    reasons=signal_data_rejections(coin,now=now)
     if str(flow.get('quality', flow.get('status', 'UNKNOWN'))).upper() not in {'GOOD', 'COMPLETE', 'HEALTHY', 'VALID'}:
         reasons.append('flow_quality')
     if not gold_order_flow.qualifies(coin,flow,context,thresholds):reasons.append('gold_signal')

@@ -108,6 +108,30 @@ RULES = {
 }
 
 
+def market_features(coin: dict[str, Any], flow: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Features shared by Lab and the main PAPER winner ensemble.
+
+    All values come from the current market snapshot; the caller supplies only
+    flow events available at decision time. No account or future trade data is
+    used to decide whether an entry rule matches.
+    """
+    tx = (coin.get('txns') or {}).get('m5') or {}
+    buys, sells = number(tx.get('buys')), number(tx.get('sells'))
+    liquidity = number(coin.get('liquidityUsd'))
+    market_cap = number(coin.get('marketCap') or coin.get('fdv'))
+    changes = coin.get('priceChange') or {}
+    volume_h1 = number((coin.get('volume') or {}).get('h1'))
+    return {
+        'score': number(coin.get('score')), 'liq': liquidity,
+        'm5': number(changes.get('m5')), 'h1': number(changes.get('h1')),
+        'bs': buys / max(sells, 1), 'lmc': liquidity / max(market_cap, 1),
+        'age': number(coin.get('ageMinutes'), 999999),
+        'vol1h': volume_h1, 'vol_liq': volume_h1 / max(liquidity, 1),
+        'flow': flow or {'trades': 0, 'buys': 0, 'sells': 0, 'buy_usd': 0,
+                         'sell_usd': 0, 'unique_wallets': 0, 'ratio': 0, 'max_sell': 0},
+    }
+
+
 def cooldown_remaining_ms(book: dict, address: str, now: int) -> int:
     latest = max((t for t in book.get('history', []) if t.get('address') == address),
                  key=lambda t: number(t.get('closed_at')), default=None)

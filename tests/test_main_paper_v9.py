@@ -16,6 +16,7 @@ import market_monitor as m
 import gold_order_flow as flow_policy
 import engine_entry_policy as entry_policy
 import engine_exit_policy as exit_policy
+import winner_ensemble
 
 A, B, C = 'A'*44, 'B'*44, 'C'*44
 
@@ -141,22 +142,74 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual(restored.demo_balance_usd,m.STATE.demo_balance_usd)
         self.assertEqual([json.loads(x)['event'] for x in m.AUDIT_PATH.read_text().splitlines()],['ENTRY','EXIT'])
 
-    def test_final_flow_revalidated_after_quote(self):
+    def test_winner_signal_revalidated_after_quote(self):
         self.entry_patches()
-        with patch.object(m.STATE,'live_flow',side_effect=[self.flow,dict(self.flow,quality='DEGRADED')]):
-            self.monitor.maybe_open([self.coin])
+        m.STATE.feed=[dict(self.coin)]
+        original_prepare=m.paper_quotes.prepare_entry.side_effect
+        def change_signal_during_quote(*args):
+            m.STATE.feed=[dict(self.coin,score=84)]
+            return original_prepare(*args)
+        m.paper_quotes.prepare_entry.side_effect=change_signal_during_quote
+        self.monitor.maybe_open([self.coin])
         self.assertFalse(m.STATE.positions)
-        self.assertIn('flow_quality',m.STATE.entry_diagnostics['rejections'])
+        self.assertIn('winner_signal',m.STATE.entry_diagnostics['rejections'])
 
-    def test_unknown_flow_and_pending_rug_never_open(self):
+    def test_future_signal_at_quote_commit_is_rejected(self):
         self.entry_patches()
-        with patch.object(m.STATE,'live_flow',return_value=dict(self.flow,quality='UNKNOWN')):
-            self.monitor.maybe_open([self.coin])
+        m.STATE.feed=[dict(self.coin)]
+        original_prepare=m.paper_quotes.prepare_entry.side_effect
+        def future_snapshot_during_quote(*args):
+            m.STATE.feed=[dict(self.coin,updatedAt=self.clock[0]+1)]
+            return original_prepare(*args)
+        m.paper_quotes.prepare_entry.side_effect=future_snapshot_during_quote
+        self.monitor.maybe_open([self.coin])
         self.assertFalse(m.STATE.positions)
+        self.assertIn('stale_feed',m.STATE.entry_diagnostics['rejections'])
+
+    def test_degraded_flow_can_open_only_after_independent_checks(self):
+        self.entry_patches()
+        with patch.object(m.STATE,'live_flow',return_value=dict(self.flow,quality='DEGRADED')):
+            self.monitor.maybe_open([self.coin])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertEqual(m.STATE.positions[0]['entry_flow']['quality'],'DEGRADED')
+        self.assertEqual(m.STATE.positions[0]['signal_evidence'],'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS')
+
+    def test_pending_rug_never_opens_even_with_winner_signal(self):
+        self.entry_patches()
         with patch.object(m.rug_guard,'check',return_value={'status':'pending','reasons':['risk_check_pending']}):
             self.monitor.maybe_open([self.coin])
         self.assertFalse(m.STATE.positions)
         self.assertIn('risk_check_pending',m.STATE.entry_diagnostics['rejections'])
+
+    def test_shared_account_opens_multiple_distinct_winner_positions_and_persists_attribution(self):
+        self.entry_patches()
+        coins=[dict(self.coin,address=address*44,pairAddress=pair*44,symbol=f'COIN-{address}',score=95)
+               for address,pair in [('A','B'),('C','D'),('E','F')]]
+        m.STATE.feed=copy.deepcopy(coins)
+        self.monitor.maybe_open(coins)
+        self.assertEqual(len(m.STATE.positions),3)
+        self.assertEqual({p['address'] for p in m.STATE.positions},{coin['address'] for coin in coins})
+        self.assertEqual({p['session_id'] for p in m.STATE.positions},{m.STATE.demo_session_id})
+        self.assertTrue(all(p['strategy_id']==winner_ensemble.VERSION for p in m.STATE.positions))
+        self.assertTrue(all(p['strategy_matches']==list(winner_ensemble.STRATEGIES) for p in m.STATE.positions))
+        self.assertLessEqual(m.STATE.reserved_usd(),m.STATE.demo_balance_usd)
+        self.assertAlmostEqual(m.STATE.available_balance_usd()+m.STATE.reserved_usd(),1000)
+        restored=m.State()
+        self.assertEqual(len(restored.positions),3)
+        self.assertEqual(restored.positions[0]['strategy_matches'],list(winner_ensemble.STRATEGIES))
+        self.monitor.book_paper_exit(m.STATE.positions[0],dict(self.quote,token_input_raw=100000000),'TEST_CLOSE',coins[0])
+        self.assertEqual(m.State().history[0]['strategy_matches'],list(winner_ensemble.STRATEGIES))
+
+    def test_overlapping_winner_signals_and_duplicate_feed_pool_create_one_trade_per_mint(self):
+        self.entry_patches()
+        first=dict(self.coin,score=95)
+        same_mint_other_pool=dict(first,pairAddress='C'*44)
+        second=dict(self.coin,address='D'*44,pairAddress='E'*44,score=95)
+        self.monitor.maybe_open([first,same_mint_other_pool,second])
+        self.assertEqual(len(m.STATE.positions),2)
+        self.assertEqual(m.STATE.trade_seq,2)
+        self.assertEqual({p['address'] for p in m.STATE.positions},{A,'D'*44})
+        self.assertEqual(m.STATE.entry_diagnostics['rejections']['cooldown'],1)
 
     def test_full_loss_risk_and_total_exposure_bound_quote_size(self):
         self.entry_patches()
@@ -176,7 +229,7 @@ class MainPaperRepair(unittest.TestCase):
         self.assertIn('liquidation_unavailable',m.STATE.entry_diagnostics['rejections'])
         m.STATE.positions=[]
         m.STATE.demo_balance_usd=900
-        with patch.object(m,'MAX_DRAWDOWN_PCT',5): self.monitor.maybe_open([self.coin])
+        with patch.object(m,'MAX_DAILY_LOSS_USD',0),patch.object(m,'MAX_DRAWDOWN_PCT',5): self.monitor.maybe_open([self.coin])
         self.assertIn('drawdown_limit',m.STATE.entry_diagnostics['rejections'])
         self.assertFalse(m.STATE.positions)
 

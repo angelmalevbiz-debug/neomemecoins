@@ -43,6 +43,8 @@ class StrategyLabDashboardProjection(unittest.TestCase):
                 'symbol': 'MEME', 'address': 'mint', 'pairAddress': 'pair',
                 'execution_entry_price': 0.02, 'current_price': 0.021,
                 'entry_dex_fee_usd': 0.3, 'entry_network_fee_usd': 0.01,
+                'quote_status': 'stale', 'quote_age_ms': 22_000,
+                'mark_source': 'DEXSCREENER_EXACT_POOL_API',
             }}}
         })
 
@@ -50,6 +52,17 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertEqual(position['pairAddress'], 'pair')
         self.assertEqual(position['current_price'], 0.021)
         self.assertEqual(position['entry_dex_fee_usd'], 0.3)
+        self.assertEqual(position['quote_status'], 'stale')
+        self.assertEqual(position['quote_age_ms'], 22_000)
+        self.assertEqual(position['mark_source'], 'DEXSCREENER_EXACT_POOL_API')
+
+    def test_execution_note_and_basis_are_projected(self):
+        projected = compact_strategy_lab({
+            'execution_basis': 'DEX_SPOT_MODELED_COSTS_V2',
+            'execution_note': 'paper estimate only',
+        })
+        self.assertEqual(projected['execution_basis'], 'DEX_SPOT_MODELED_COSTS_V2')
+        self.assertEqual(projected['execution_note'], 'paper estimate only')
 
     def test_projects_funded_cohort_separately_from_testing_books(self):
         state = compact_strategy_lab({

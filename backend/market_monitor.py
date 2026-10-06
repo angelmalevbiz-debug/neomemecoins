@@ -15,6 +15,7 @@ import pumpswap_stop_quote as pumpswap_stop
 import engine_runtime as runtime
 import engine_exit_policy as exit_policy
 import training_bridge
+import winner_ensemble
 from lab_dashboard_projection import compact_strategy_lab
 
 HOST = os.getenv('NEO_MONITOR_HOST', '127.0.0.1')
@@ -45,10 +46,10 @@ LEARNING_WINDOW = 60
 HEALTH_WINDOW = 12
 STARTING_BALANCE_USD = 1000.0
 TRADE_NOTIONAL_USD = float(os.getenv('NEO_TRADE_NOTIONAL_USD', '200'))
-MAX_DAILY_LOSS_USD = float(os.getenv('NEO_MAX_DAILY_LOSS_USD', '0'))
+MAX_DAILY_LOSS_USD = float(os.getenv('NEO_MAX_DAILY_LOSS_USD', '100'))
 MAX_POSITION_RISK_USD = float(os.getenv('NEO_MAX_POSITION_RISK_USD', '250'))
 MAX_TOTAL_EXPOSURE_PCT = float(os.getenv('NEO_MAX_TOTAL_EXPOSURE_PCT', '100'))
-MAX_DRAWDOWN_PCT = float(os.getenv('NEO_MAX_DRAWDOWN_PCT', '0'))
+MAX_DRAWDOWN_PCT = float(os.getenv('NEO_MAX_DRAWDOWN_PCT', '20'))
 MIN_LIQUIDITY_USD = 10000.0
 
 # One validated effective threshold object governs every EARLY signal call.
@@ -240,7 +241,8 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
         'execution_exit_price', 'notional_usd', 'score', 'current_score',
         'opened_at', 'updated_at', 'closed_at', 'exit_price', 'exit_reason',
         'trade_no', 'session_id', 'pnl_usd', 'pnl_pct', 'balance_before',
-        'balance_after', 'dex_url', 'strategy_id', 'entry_policy_version',
+        'balance_after', 'dex_url', 'strategy_id', 'strategy_matches',
+        'signal_evidence', 'entry_policy_version',
         'exit_policy_version', 'signal_pnl_pct', 'entry_roundtrip_pnl_pct',
         'observed_exit_pnl_pct', 'observed_exit_pnl_usd', 'paper_stop_capped',
         'stop_execution_source',
@@ -311,7 +313,7 @@ class State:
         self.pending_audit: list[dict[str, Any]] = []
         self.audit_status = 'ok'
         self.equity_peak_usd = STARTING_BALANCE_USD
-        self.entry_diagnostics = {'status': 'starting', 'policy_version': entry_policy.POLICY_VERSION}
+        self.entry_diagnostics = {'status': 'starting', 'policy_version': winner_ensemble.ENTRY_POLICY_VERSION}
         self.risk_day_key = time.strftime('%Y-%m-%d', time.gmtime())
         self.risk_day_start_balance_usd = STARTING_BALANCE_USD
         if load_state: self.load()
@@ -440,7 +442,7 @@ class State:
                 demo_started_at=now_ms(), demo_session_id=new_session, trade_seq=0,
                 equity_peak_usd=STARTING_BALANCE_USD,
                 risk_day_key=time.strftime('%Y-%m-%d', time.gmtime()), risk_day_start_balance_usd=STARTING_BALANCE_USD,
-                entry_diagnostics={'status': 'reset', 'policy_version': entry_policy.POLICY_VERSION})
+                entry_diagnostics={'status': 'reset', 'policy_version': winner_ensemble.ENTRY_POLICY_VERSION})
             self.event(f'New PAPER session with ${STARTING_BALANCE_USD:.2f}; archive {archive.name}.')
             self.save()
             return str(archive)
@@ -596,15 +598,16 @@ class State:
                 'config': {
                     'scan_seconds': SCAN_SECONDS,
                     'position_scan_seconds': POSITION_SCAN_SECONDS,
-                    'entry_score': STRICT_ENTRY_SCORE,
+                    'entry_score': winner_ensemble.MIN_SCORE,
                     'max_positions': MAX_POSITIONS,
                     'stop_loss_pct': STOP_LOSS_PCT,
                     'stop_loss_basis': 'EXECUTABLE_NET_PNL',
                     'stop_trigger_net_pct': -STOP_LOSS_PCT,
                     'take_profit_basis': 'EXECUTABLE_NET_PNL',
                     'reentry_seconds': 1200, 'loss_reentry_seconds': 1200,
-                    'signal_strategy': 'ORDER_FLOW_EARLY_FIXED_PAPER_V9',
-                    'signal_source_commit': order_flow.SOURCE_COMMIT,
+                    'signal_strategy': winner_ensemble.VERSION,
+                    'ensemble_strategies': list(winner_ensemble.STRATEGIES),
+                    'signal_source_commit': winner_ensemble.VERSION,
                     'risk_overlay': 'PLANNED_NET_STOP_NO_FILL_GUARANTEE',
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
                     'rug_guard': rug_guard.VERSION,
@@ -616,7 +619,7 @@ class State:
                     'take_profit_pct': TAKE_PROFIT_PCT,
                     'trailing_pct': TRAILING_PCT,
                     'max_hold_minutes': MAX_HOLD_MINUTES,
-                    'min_liquidity_usd': STRICT_MIN_LIQUIDITY_USD,
+                    'min_liquidity_usd': winner_ensemble.MIN_LIQUIDITY_USD,
                     'trade_notional_usd': TRADE_NOTIONAL_USD,
                     'max_daily_loss_usd': MAX_DAILY_LOSS_USD,
                     'max_position_full_loss_risk_usd': MAX_POSITION_RISK_USD,
@@ -626,12 +629,11 @@ class State:
                     'daily_loss_cap_enabled': MAX_DAILY_LOSS_USD > 0,
                     'starting_balance_usd': STARTING_BALANCE_USD,
                     'execution_mode': 'PAPER_QUOTE_OR_OBSERVED_POOL_MODEL',
-                    'execution_note': 'PAPER only; observed quotes with modeled fills, full fees and uncapped gap losses. Validated learning portfolios are separate.',
-                    'entry_policy_version': entry_policy.POLICY_VERSION,
+                    'execution_note': 'PAPER only; four market-signal rules share one account. Exact-pool quotes and fees are modeled, not executed fills; gaps and unsellable losses remain possible.',
+                    'entry_policy_version': winner_ensemble.ENTRY_POLICY_VERSION,
                     'exit_policy': 'fixed', 'exit_policy_version': exit_policy.VERSION,
                     'effective_config_hash': effective_config_hash(),
-                    'effective_entry_thresholds': EFFECTIVE_ENTRY_THRESHOLDS.as_dict(),
-                    'signal_source_commit': order_flow.SOURCE_COMMIT,
+                    'effective_entry_thresholds': winner_ensemble.rule_config(),
                     'max_quoted_candidates_per_scan': entry_policy.MAX_QUOTED_CANDIDATES,
                     'strict_entry_score': STRICT_ENTRY_SCORE,
                     'strict_min_conviction': STRICT_MIN_CONVICTION,
@@ -701,7 +703,8 @@ def trade_metrics(trades):
 
 
 def effective_config_hash():
-    config = {'entry': EFFECTIVE_ENTRY_THRESHOLDS.as_dict(), 'entry_version': entry_policy.POLICY_VERSION,
+    config = {'entry_version': winner_ensemble.ENTRY_POLICY_VERSION,
+              'ensemble_version': winner_ensemble.VERSION, 'ensemble_rules': winner_ensemble.rule_config(),
               'exit_version': exit_policy.VERSION, 'stop_pct': STOP_LOSS_PCT, 'take_profit_pct': TAKE_PROFIT_PCT,
               'risk_buffer_pct': STOP_EXECUTION_BUFFER_PCT, 'daily_loss_usd': MAX_DAILY_LOSS_USD,
               'max_positions': MAX_POSITIONS, 'notional_usd': TRADE_NOTIONAL_USD,
@@ -1433,7 +1436,7 @@ class Monitor:
 
     def maybe_open(self, feed: list[dict[str, Any]]) -> None:
         if not STATE.running or not self.entry_lock.acquire(blocking=False): return
-        report = {'policy_version': entry_policy.POLICY_VERSION, 'checked_at': now_ms(),
+        report = {'policy_version': winner_ensemble.ENTRY_POLICY_VERSION, 'checked_at': now_ms(),
                   'candidates': len(feed), 'evaluated': 0, 'signal_passed': 0,
                   'quoted': 0, 'opened': 0, 'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS}
         try:
@@ -1496,21 +1499,18 @@ class Monitor:
             market_cap = num(coin.get('marketCap') or coin.get('fdv'))
             liquidity_mc_ratio = liquidity / max(market_cap, 1.0)
 
-            flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
-            context = self.market_context(coin)
-            rejected = entry_policy.signal_rejections(
-                coin, flow, context, min_score=EFFECTIVE_ENTRY_THRESHOLDS.min_score,
-                min_liquidity=EFFECTIVE_ENTRY_THRESHOLDS.min_liquidity,
-                min_conviction=EFFECTIVE_ENTRY_THRESHOLDS.min_conviction, now=now_ms(),
-            )
+            rejected = entry_policy.signal_data_rejections(coin, now=now_ms())
             if rejected:
                 reject(report, rejected, coin)
                 continue
-            report['signal_passed'] += 1
-            entry_mode = order_flow.entry_mode(coin, flow, context, EFFECTIVE_ENTRY_THRESHOLDS)
-            if not entry_mode:
-                reject(report, ['gold_signal'], coin)
+            strategy_matches = winner_ensemble.matches(coin)
+            if not strategy_matches:
+                reject(report, ['winner_signal'], coin)
                 continue
+            report['signal_passed'] += 1
+            entry_mode = 'WINNER_ENSEMBLE'
+            flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
+            context = self.market_context(coin)
             # Start independent price and rug checks together. Both helpers are
             # cached/asynchronous; running them concurrently avoids serial provider
             # latency without weakening known-risk vetoes.
@@ -1534,9 +1534,10 @@ class Monitor:
             if report['quoted'] >= entry_policy.MAX_QUOTED_CANDIDATES:
                 reject(report, ['quote_budget'], coin)
                 continue
-            strategy_id = 'ORDER_FLOW_EARLY_FIXED_PAPER_V9'
-            # Main policy stays fixed. Candidate training/promotions run in the
-            # separate training PAPER accounts with their own validation gates.
+            strategy_id = winner_ensemble.VERSION
+            # These are the Lab market rules in one shared PAPER account. They
+            # do not claim verified chain-flow evidence; execution gates below
+            # remain mandatory, and training candidates remain isolated.
             learning = {'sample': 0, 'win_rate': 0, 'profit_factor': None,
                         'recent_losses': 0, 'bonus': 0, 'size_multiplier': 1.0}
             recovery = False
@@ -1644,14 +1645,15 @@ class Monitor:
                 if STATE.demo_session_id!=session_at_check or not STATE.running or len(STATE.positions)>=MAX_POSITIONS:
                     return
                 current_coin = next((c for c in STATE.feed if c.get('address') == address and c.get('pairAddress') == coin.get('pairAddress')), coin)
-                final_flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
-                final_context = self.market_context(current_coin)
-                final_rejections = entry_policy.signal_rejections(current_coin,final_flow,final_context,
-                    min_score=EFFECTIVE_ENTRY_THRESHOLDS.min_score,min_liquidity=EFFECTIVE_ENTRY_THRESHOLDS.min_liquidity,
-                    min_conviction=EFFECTIVE_ENTRY_THRESHOLDS.min_conviction,now=now_ms())
+                final_rejections = entry_policy.signal_data_rejections(current_coin,now=now_ms())
+                final_strategy_matches = winner_ensemble.matches(current_coin)
+                if not final_strategy_matches:
+                    final_rejections.append('winner_signal')
                 if final_rejections:
                     reject(report,final_rejections,coin)
                     continue
+                final_flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
+                final_context = self.market_context(current_coin)
                 if STATE.available_balance_usd()<entry_quote['capital_committed_usd'] or (MAX_DAILY_LOSS_USD > 0 and STATE.risk_day_pnl()<=-MAX_DAILY_LOSS_USD):
                     reject(report,['balance'],coin); return
                 live_open_risk=sum(num(p.get('planned_risk_usd')) for p in STATE.positions)
@@ -1677,9 +1679,11 @@ class Monitor:
                     'execution_entry_price': round(entry_quote['fill_price'], 12),
                     'current_price': price, 'peak_price': price,
                     'trade_no': next_trade_no, 'session_id': STATE.demo_session_id, 'strategy_id': strategy_id,
+                    'strategy_matches': final_strategy_matches,
+                    'signal_evidence': 'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS',
                     'entry_mode': entry_mode,
                     'provisional_early_safety': bool(safety.get('provisional_early')),
-                    'learning_mode': 'FIXED_MAIN_SEPARATE_VALIDATED_TRAINING', 'entry_flow': final_flow,
+                    'learning_mode': 'FIXED_WINNER_ENSEMBLE_SEPARATE_VALIDATED_TRAINING', 'entry_flow': final_flow,
                     'entry_context': context, 'entry_conviction': context.get('conviction'),
                     'entry_hold_mode': context.get('mode'), 'learning_sample': learning['sample'],
                     'learning_win_rate': learning['win_rate'], 'learning_profit_factor': learning['profit_factor'],
@@ -1710,11 +1714,11 @@ class Monitor:
                     'jupiter_entry_price_impact_pct': impact_pct,
                     'jupiter_slippage_bps': int(live_quote.get('slippage_bps') or paper_quotes.SLIPPAGE_BPS),
                     'entry_roundtrip_pnl_pct': round(immediate_roundtrip_pct, 4),
-                    'entry_policy_version': entry_policy.POLICY_VERSION,
+                    'entry_policy_version': winner_ensemble.ENTRY_POLICY_VERSION,
                     'exit_policy': 'fixed', 'exit_policy_version': exit_policy.VERSION,
                     'effective_config_hash': effective_config_hash(),
-                    'effective_entry_thresholds': EFFECTIVE_ENTRY_THRESHOLDS.as_dict(),
-                    'signal_source_commit': order_flow.SOURCE_COMMIT,
+                    'effective_entry_thresholds': winner_ensemble.rule_config(),
+                    'signal_source_commit': winner_ensemble.VERSION,
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
                     'entry_quote': live_quote.get('raw_quote'),
                     'preflight_buy_quote': live_quote.get('preflight_buy_quote'),

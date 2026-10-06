@@ -207,18 +207,19 @@ class RpcAndDurability(unittest.TestCase):
                 stop=next((i for i,r in enumerate(rows) if r['signature']==options.get('until')),len(rows))
                 out.append({'result':rows[start:min(stop,start+options['limit'])]})
             return out
+        self.rec.tx_budget=180
         first=self.rec.poll([META],rpc)
-        self.assertEqual(first['backlog'],40);self.assertEqual(first['pair_coverage'][PAIR]['status'],'UNKNOWN')
-        self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0],page_size=100,page_budget=1,tx_budget=60)
+        self.assertEqual(first['backlog'],0);self.assertEqual(first['pair_coverage'][PAIR]['status'],'UNKNOWN')
+        self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0],page_size=100,page_budget=1,tx_budget=180)
         self.rec.poll([META],rpc);final=self.rec.poll([META],rpc)
         self.assertEqual(final['classifications']['non_swap'],180);self.assertEqual(final['backlog'],0)
-        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s081')
+        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s091')
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
 
     def test_large_single_rpc_page_completes_fresh_pool_without_false_pagination(self):
         self.rec.page_size=1000
-        self.rec.tx_budget=80
+        self.rec.tx_budget=200
         rows=[{'signature':f'fresh-{i:03}','slot':i,'blockTime':NOW//1000,'err':None}
               for i in range(80,0,-1)]
         signature_pages=[]
@@ -234,11 +235,34 @@ class RpcAndDurability(unittest.TestCase):
             return answers
 
         snapshot=self.rec.poll([META],rpc)
-        self.assertEqual(signature_pages,[1000])
+        self.assertEqual(signature_pages,[100])
         self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
         self.assertFalse(snapshot['pair_coverage'][PAIR]['pagination_pending'])
         self.assertEqual(snapshot['backlog'],0)
         self.assertEqual(snapshot['classifications']['non_swap'],80)
+
+    def test_signature_discovery_budget_is_shared_across_active_pools(self):
+        self.rec.page_size=1000
+        self.rec.tx_budget=60
+        feed=[dict(META,address=pubkey(20+i),pair=pubkey(40+i)) for i in range(12)]
+        limits=[]
+
+        def rpc(calls):
+            answers=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    limits.append(params[1]['limit'])
+                    answers.append({'result':[]})
+                else:
+                    answers.append({'result':non_swap()})
+            return answers
+
+        snapshot=self.rec.poll(feed,rpc)
+        self.assertEqual(len(limits),12)
+        self.assertEqual(set(limits),{2})
+        self.assertLessEqual(sum(limits),self.rec.tx_budget//2)
+        self.assertEqual(snapshot['tracked_pairs'],12)
+        self.assertEqual(snapshot['coverage'],1.0)
 
     def test_current_pending_signatures_are_processed_before_old_retries(self):
         self.rec.tx_budget=1

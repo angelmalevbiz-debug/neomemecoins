@@ -73,7 +73,7 @@
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "4a8ed4b4ea79f0336252c560f4b658264ee6dbef9bfe64ddcbe8e8db3f71fb50",
     "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
-    "backend/live_tape.py": "35d66b279c9d0fba49abdf247278869e83a1ff600131300a53831bba44d9e2a2",
+    "backend/live_tape.py": "022f19206d30631525c45eb62809c30cf7c2df1d282ca1b6762aaf1f594fc688",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -141,7 +141,7 @@
     "backend/engine_exit_policy.py": "Versioned net fixed policy and original adaptive candidate, no chart stop",
     "backend/engine_execution.py": "Fresh exact-quantity quote path, landing delay, final signal age and forced refresh",
     "backend/honest_quote_transport.py": "Low-priority background learner route probes use shorter HTTP deadlines and recheck exit priority under the shared quote lock; existing strategy quote flow is unchanged",
-    "backend/live_tape.py": "Use one bounded 1000-signature RPC page per tracked pool per poll to complete current flow windows faster; request, transaction, and pool budgets remain bounded",
+    "backend/live_tape.py": "Limit new signature discovery to half the transaction decode budget across active pools and pages, reserving capacity to drain durable retries/backlog; preserve complete-window evidence and bounded RPC batching",
     "backend/pumpswap_stop_quote.py": "Strict reserve/fee identities and no fabricated USDC settlement",
     "backend/paper_execution_quotes.py": "Compatibility facade delegates common execution model",
     "backend/engine_runtime.py": "Atomic durable ledger support and bounded Windows share retry",
@@ -160,7 +160,7 @@
     "backend/training_quote_probe.py": "Require fresh complete flow, exact mint/pool identity, independent price, full safety/rent proof and fresh two-way quotes; record evidence only, never fills"
   },
   "support_file_changes": {
-    "backend/live_tape.py": "Use a bounded 1000-signature page to reduce current-window pagination while preserving the configured per-poll page, transaction, and tracked-pool limits",
+    "backend/live_tape.py": "Reserve half the decoder capacity for pending durable work while spreading bounded signature discovery across tracked pools and page rounds",
     "backend/strategy_lab.py": "Fresh exact-pool spot refresh for held positions, stale valuation labels, and explicit modeled-cost execution basis",
     "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
     "backend/lab_dashboard_projection.py": "Expose position mark age/source and paper-only modeled execution basis",

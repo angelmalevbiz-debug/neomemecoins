@@ -24,9 +24,9 @@ RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
 MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-# A six-signature page forced every busy pool through hundreds of serial
-# pagination rounds before its five-minute window could be trusted. Fetch a
-# full bounded RPC page per pool; PAGE_BUDGET still caps the batched calls.
+# PAGE_SIZE is a ceiling. Discovery uses at most half of the transaction
+# processing budget, shared across active pools and pagination rounds. The
+# remaining capacity drains retries/backlog instead of letting intake grow.
 PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','1000'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
@@ -340,14 +340,17 @@ class TapeRecorder:
                     self.db.execute('INSERT INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(pair,mint,json.dumps(metadata)))
             active.append(metadata)
         # One shared page batch per round, rather than one HTTP call per pool.
-        # The provider batch helper splits to its configured maximum safely.
+        # The page size is a ceiling: reserve half the decoder budget for
+        # draining durable work while keeping discovery balanced across pools.
+        page_limit = max(1, min(self.page_size,
+                                self.tx_budget // max(2, 2*len(active)*self.page_budget)))
         for _ in range(self.page_budget):
             if not active:
                 break
             calls,states = [],[]
             for metadata in active:
                 state = self.db.execute('SELECT * FROM pairs WHERE pair=?',(metadata['pair'],)).fetchone()
-                options = {'limit':self.page_size,'commitment':'confirmed'}
+                options = {'limit':page_limit,'commitment':'confirmed'}
                 if state['cursor']:
                     options['until'] = state['cursor']
                 if state['before_sig']:
@@ -374,7 +377,7 @@ class TapeRecorder:
                 head = state['scan_head'] or (rows[0].get('signature') if rows else state['cursor'])
                 bootstrap = state['cursor'] is None
                 reached_time = bootstrap and any(r.get('blockTime') and int(r['blockTime'])*1000<cutoff for r in rows)
-                complete = len(rows)<self.page_size or reached_time or any(r.get('signature')==state['cursor'] for r in rows)
+                complete = len(rows)<page_limit or reached_time or any(r.get('signature')==state['cursor'] for r in rows)
                 before = rows[-1].get('signature') if rows else state['before_sig']
                 stalled = not complete and before==state['before_sig']
                 with self.db:

@@ -36,7 +36,7 @@ def _number(value, default=0.0):
 
 def _closed_trades(book):
     return [row for row in book.get('history', [])
-            if isinstance(row, dict) and row.get('closed_at')]
+            if isinstance(row, dict) and row.get('closed_at') and row.get('promotion_eligible') is not False]
 
 
 def historical_metrics(book):

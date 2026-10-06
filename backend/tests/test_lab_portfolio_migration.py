@@ -12,6 +12,7 @@ from lab_portfolio_migration import (
     PROMOTED_STRATEGIES,
     TOTAL_CAPITAL_USD,
     begin_promotion_drain,
+    historical_metrics,
     promote_strategy_lab,
 )
 import strategy_lab as lab
@@ -19,6 +20,15 @@ from strategy_lab import STRATEGIES
 
 
 class StrategyLabPortfolioMigrationTests(unittest.TestCase):
+    def test_research_only_trades_are_excluded_from_promotion_metrics(self):
+        book={'history':[
+            {'closed_at':1,'pnl_usd':100,'promotion_eligible':False},
+            {'closed_at':2,'pnl_usd':5,'promotion_eligible':True},
+        ]}
+        metrics=historical_metrics(book)
+        self.assertEqual(metrics['closed_trades'],1)
+        self.assertEqual(metrics['realized_net_pnl_usd'],5)
+
     def fixture_state(self, root):
         books = {}
         for strategy in STRATEGIES:

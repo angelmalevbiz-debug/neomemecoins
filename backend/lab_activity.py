@@ -203,6 +203,47 @@ def affordable_entry(coin: dict, balance: float, limit: float,
     return None
 
 
+def research_entry(coin: dict, balance: float, limit: float,
+                   entry: Callable, exit: Callable, *, max_cost_pct: float,
+                   minimum_notional: float = MIN_NOTIONAL_USD) -> dict | None:
+    """Best honest PAPER sizing under a research-only cost ceiling.
+
+    The executable 2.75% gate in affordable_entry remains unchanged.
+    This path exists only for isolated research episodes.
+    """
+    balance, limit = number(balance), number(limit)
+    minimum_notional = max(0.01, number(minimum_notional, MIN_NOTIONAL_USD))
+    max_cost_pct = max(MAX_ENTRY_COST_PCT, number(max_cost_pct, MAX_ENTRY_COST_PCT))
+    if min(balance, limit) < minimum_notional:
+        return None
+    probe = entry(coin, minimum_notional)
+    network = number(probe.get('network_fee_usd'), math.inf)
+    size = math.floor(min(limit, balance - network) * 100) / 100
+    attempted, best = set(), None
+    for _ in range(50):
+        if size < minimum_notional:
+            break
+        size = max(minimum_notional, math.floor(size * 100) / 100)
+        if size in attempted:
+            break
+        attempted.add(size)
+        opening = entry(coin, size)
+        committed = number(opening.get('capital_committed_usd'), math.inf)
+        quantity = number(opening.get('quantity'))
+        closing = exit(coin, quantity)
+        net = number(closing.get('net_proceeds_usd')) - committed
+        pct = net / size * 100
+        if quantity > 0 and committed <= balance + 1e-9 and -max_cost_pct <= pct <= 0:
+            candidate={'notional':size,'entry':opening,'mark':closing,
+                       'initial_pnl_usd':net,'initial_pnl_pct':pct,'cost_qualified':False}
+            if best is None or pct > best['initial_pnl_pct']:
+                best=candidate
+        if size == minimum_notional:
+            break
+        size = max(minimum_notional, size * 0.85)
+    return best
+
+
 def policy_config() -> dict:
     return {'version': POLICY_VERSION, 'reentry_seconds': REENTRY_SECONDS,
             'loss_reentry_seconds': LOSS_REENTRY_SECONDS,

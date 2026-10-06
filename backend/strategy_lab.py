@@ -44,6 +44,10 @@ BASE_SLIPPAGE_BPS=float(os.getenv('NEO_LAB_BASE_SLIPPAGE_BPS','10'))
 LATENCY_BUFFER_BPS=float(os.getenv('NEO_LAB_LATENCY_BUFFER_BPS','10'))
 NETWORK_FEE_SOL=float(os.getenv('NEO_LAB_NETWORK_FEE_SOL','0.0001'))
 MAX_PRICE_IMPACT_PCT=float(os.getenv('NEO_LAB_MAX_PRICE_IMPACT_PCT','20'))
+ALLOW_COST_REJECTED_RESEARCH=os.getenv('NEO_LAB_ALLOW_COST_REJECTED_RESEARCH','0').strip().lower() in ('1','true','yes','on')
+RESEARCH_MAX_ENTRY_COST_PCT=float(os.getenv('NEO_LAB_RESEARCH_MAX_ENTRY_COST_PCT','5'))
+if not math.isfinite(RESEARCH_MAX_ENTRY_COST_PCT) or RESEARCH_MAX_ENTRY_COST_PCT < activity.MAX_ENTRY_COST_PCT:
+    raise ValueError('invalid PAPER research cost ceiling')
 EXECUTION_MODEL_VERSION='DEX_SPOT_MODELED_COSTS_V2'
 POSITION_STALE_AFTER_MS=12_000
 
@@ -393,6 +397,8 @@ def maybe_open(feed,flows):
         blocked_price=0
         blocked_cooldown=0
         flow_rejected=0
+        research_only_candidates=0
+        executable_candidates=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
             if not rule.matches(features):
@@ -413,12 +419,24 @@ def maybe_open(feed,flows):
             )
             if proposed is None:
                 blocked_cost+=1
+                if ALLOW_COST_REJECTED_RESEARCH:
+                    proposed=activity.research_entry(
+                        coin,balance,entry_limit,entry_execution,exit_execution,
+                        max_cost_pct=RESEARCH_MAX_ENTRY_COST_PCT,minimum_notional=min_notional
+                    )
+                    if proposed is not None:
+                        research_only_candidates+=1
+            else:
+                proposed['cost_qualified']=True
+                executable_candidates+=1
+            if proposed is None:
                 continue
-            eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
-                             coin,features,proposed))
+            eligible.append((1 if proposed.get('cost_qualified') else 0,proposed['initial_pnl_pct'],
+                             num(features.get('score')),coin,features,proposed))
         book['entry_diagnostics']={
             'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
-            'cooldown_rejected':blocked_cooldown,'affordable_candidates':len(eligible),
+            'cooldown_rejected':blocked_cooldown,'affordable_candidates':executable_candidates,
+            'research_only_candidates':research_only_candidates,
             'price_verification_rejected':blocked_price,
             'risk_limited_notional_usd':round(entry_limit,4),
         }
@@ -434,7 +452,7 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']='verified_flow_unavailable'
         if not eligible:
             continue
-        _,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1]))
+        _,_,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1],item[2]))
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
         qty=num(opening['quantity'])
@@ -464,6 +482,9 @@ def maybe_open(feed,flows):
             'entry_policy_version':activity.POLICY_VERSION,
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
             'entry_size_reduced':notional+0.02<entry_limit,
+            'entry_cost_qualified':bool(proposed.get('cost_qualified',True)),
+            'research_only':not bool(proposed.get('cost_qualified',True)),
+            'promotion_eligible':bool(proposed.get('cost_qualified',True)),
             'pnl_pct':round(proposed['initial_pnl_pct'],3),
             'open_pnl_usd':round(proposed['initial_pnl_usd'],4),
             'execution_exit_price':round(mark['fill_price'],12),
@@ -503,7 +524,9 @@ def persist(status='online',error=None):
     STATE['execution_basis']=EXECUTION_MODEL_VERSION
     STATE['execution_note']='DEX exact-pool spot marks with modeled fees, impact, slippage and latency; paper estimate only, no transaction is built, signed, or sent.'
     STATE['activity_config']={**activity.policy_config(),'stop_loss_net_pct':STOP_LOSS,
-                              'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL}
+                              'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL,
+                              'research_cost_rejects_enabled':ALLOW_COST_REJECTED_RESEARCH,
+                              'research_max_entry_cost_pct':RESEARCH_MAX_ENTRY_COST_PCT}
     previous_setup=STATE.get('portfolio_setup') or {}
     default_setup_status='ACTIVE' if all(
         abs(num(STATE['books'][key].get('starting_balance'))-PROMOTED_ALLOCATION)<1e-8

@@ -128,6 +128,15 @@ class ActivityTests(unittest.TestCase):
         c=coin();c.update(dexId='pumpswap',marketCap=10000,liquidityUsd=10000)
         self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution))
 
+    def test_research_only_sizing_keeps_costs_and_does_not_relax_executable_gate(self):
+        c=coin();c.update(dexId='pumpswap',marketCap=10000,liquidityUsd=10000)
+        self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution))
+        q=a.research_entry(c,500,150,lab.entry_execution,lab.exit_execution,max_cost_pct=5)
+        self.assertIsNotNone(q)
+        self.assertFalse(q['cost_qualified'])
+        self.assertLess(q['initial_pnl_pct'],-a.MAX_ENTRY_COST_PCT)
+        self.assertGreaterEqual(q['initial_pnl_pct'],-5)
+
     def test_no_history_balance_or_open_position_reset(self):
         for b in lab.STATE['books'].values():
             b['history']=[{'trade_no':7,'address':ADDRESS,'pnl_usd':1,'closed_at':NOW}]

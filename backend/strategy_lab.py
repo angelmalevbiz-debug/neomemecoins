@@ -338,9 +338,9 @@ def update_positions(flows,feed):
         # Entry logic stays strategy-specific; exits are identical and include
         # DEX fee, price impact, slippage/latency and network cost.
         if total_live_pct<=-STOP_LOSS:
-            reason='STOP_LOSS_3_NET'
+            reason=f'STOP_LOSS_{STOP_LOSS:g}_NET'
         elif total_live_pct>=TAKE_PROFIT:
-            reason='TAKE_PROFIT_10_NET'
+            reason=f'TAKE_PROFIT_{TAKE_PROFIT:g}_NET'
         elif hold>=MAX_HOLD_MIN:
             reason='ABSOLUTE_MAX_HOLD_60'
 

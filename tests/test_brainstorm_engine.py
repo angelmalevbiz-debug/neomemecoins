@@ -119,6 +119,38 @@ class BrainstormEngineTests(unittest.TestCase):
         self.assertFalse(decision['allow'])
         self.assertIn('chaotic_regime_needs_extra_consensus', decision['vetoes'])
 
+    def test_strong_early_scout_can_act_before_slow_strategy_consensus(self):
+        coin=self.strong_coin()
+        coin['marketCap']=30_000
+        coin['liquidityUsd']=15_000
+        coin['priceChange']['m5']=4
+        scout={'enabled':True,'allow':True,'score':0.88,'confirmations':7}
+        decision=b.evaluate_pre(
+            coin,['EARLY_SCOUT'],[],safety={'status':'pass'},validation={'status':'pass'},
+            flow={'buy_sell_usd_ratio':3.0,'trades':10},scout=scout,now_ms=1000,
+        )
+        self.assertTrue(decision['allow'])
+        self.assertTrue(decision['early_scout_strong'])
+        self.assertNotIn('insufficient_strategy_consensus',decision['vetoes'])
+
+    def test_early_scout_never_bypasses_safety_gate(self):
+        scout={'enabled':True,'allow':True,'score':0.95,'confirmations':8}
+        decision=b.evaluate_pre(
+            self.strong_coin(),['EARLY_SCOUT'],[],safety={'status':'review'},validation={'status':'pass'},
+            flow={'buy_sell_usd_ratio':4.0,'trades':15},scout=scout,now_ms=1000,
+        )
+        self.assertFalse(decision['allow'])
+        self.assertIn('safety_not_passed',decision['vetoes'])
+
+    def test_weak_scout_does_not_bypass_consensus(self):
+        scout={'enabled':True,'allow':False,'score':0.60,'confirmations':3}
+        decision=b.evaluate_pre(
+            self.strong_coin(),['EARLY_SCOUT'],[],safety={'status':'pass'},validation={'status':'pass'},
+            flow={'buy_sell_usd_ratio':2.0,'trades':8},scout=scout,now_ms=1000,
+        )
+        self.assertFalse(decision['allow'])
+        self.assertIn('insufficient_strategy_consensus',decision['vetoes'])
+
 
 if __name__ == '__main__':
     unittest.main()

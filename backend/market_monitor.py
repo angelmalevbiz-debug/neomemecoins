@@ -17,6 +17,7 @@ import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
 import brainstorm_engine
+import early_scout
 import entry_size_backoff
 from lab_dashboard_projection import compact_strategy_lab
 
@@ -248,6 +249,7 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
         'opened_at', 'updated_at', 'closed_at', 'exit_price', 'exit_reason',
         'trade_no', 'session_id', 'pnl_usd', 'pnl_pct', 'balance_before',
         'balance_after', 'dex_url', 'strategy_id', 'strategy_matches',
+        'early_scout_version', 'early_scout_score', 'early_scout_confirmations',
         'brainstorm_version', 'brainstorm_confidence', 'brainstorm_match_count', 'brainstorm_family_count',
         'signal_evidence', 'entry_policy_version',
         'exit_policy_version', 'signal_pnl_pct', 'entry_roundtrip_pnl_pct',
@@ -558,6 +560,8 @@ class State:
             public_history = self.history if PUBLIC_HISTORY_LIMIT == 0 else self.history[:PUBLIC_HISTORY_LIMIT]
             brainstorm_history = [t for t in self.history if t.get('brainstorm_version') == brainstorm_engine.VERSION or isinstance(t.get('brainstorm'), dict)]
             brainstorm_metrics = trade_metrics(brainstorm_history)
+            early_scout_history = [t for t in self.history if 'EARLY_SCOUT' in (t.get('strategy_matches') or [])]
+            early_scout_metrics = trade_metrics(early_scout_history)
             tape = read_live_tape()
             return {
                 'running': self.running,
@@ -587,6 +591,9 @@ class State:
                     'brainstorm_trades': brainstorm_metrics['closed_trades'],
                     'brainstorm_wins': brainstorm_metrics['wins'],
                     'brainstorm_win_rate': brainstorm_metrics['win_rate'],
+                    'early_scout_trades': early_scout_metrics['closed_trades'],
+                    'early_scout_wins': early_scout_metrics['wins'],
+                    'early_scout_win_rate': early_scout_metrics['win_rate'],
                     'brainstorm_target_win_rate_pct': round(brainstorm_engine.TARGET_WIN_RATE * 100, 1),
                     'brainstorm_target_met': bool(brainstorm_metrics['closed_trades'] and brainstorm_metrics['win_rate'] is not None and brainstorm_metrics['win_rate'] >= brainstorm_engine.TARGET_WIN_RATE * 100),
                     'metrics': {'lifetime': lifetime,
@@ -635,6 +642,12 @@ class State:
                     'brainstorm_min_confidence': brainstorm_engine.MIN_CONFIDENCE,
                     'brainstorm_min_matches': brainstorm_engine.MIN_MATCHES,
                     'brainstorm_min_families': brainstorm_engine.MIN_FAMILIES,
+                    'early_scout_enabled': early_scout.ENABLED,
+                    'early_scout_version': early_scout.VERSION,
+                    'early_scout_market_cap_band_usd': [early_scout.MIN_MARKET_CAP, early_scout.MAX_MARKET_CAP],
+                    'early_scout_max_age_minutes': early_scout.MAX_AGE_MINUTES,
+                    'early_scout_min_score': early_scout.MIN_SCORE,
+                    'early_scout_min_confirmations': early_scout.MIN_CONFIRMATIONS,
                     'signal_source_commit': winner_ensemble.VERSION,
                     'risk_overlay': 'PLANNED_NET_STOP_NO_FILL_GUARANTEE',
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
@@ -743,6 +756,11 @@ def effective_config_hash():
               'brainstorm_min_confidence': brainstorm_engine.MIN_CONFIDENCE,
               'brainstorm_min_matches': brainstorm_engine.MIN_MATCHES,
               'brainstorm_min_families': brainstorm_engine.MIN_FAMILIES,
+              'early_scout_version': early_scout.VERSION, 'early_scout_enabled': early_scout.ENABLED,
+              'early_scout_market_cap_band': [early_scout.MIN_MARKET_CAP, early_scout.MAX_MARKET_CAP],
+              'early_scout_max_age_minutes': early_scout.MAX_AGE_MINUTES,
+              'early_scout_min_score': early_scout.MIN_SCORE,
+              'early_scout_min_confirmations': early_scout.MIN_CONFIRMATIONS,
               'exit_version': exit_policy.VERSION, 'stop_pct': STOP_LOSS_PCT, 'take_profit_pct': TAKE_PROFIT_PCT,
               'risk_buffer_pct': STOP_EXECUTION_BUFFER_PCT, 'daily_loss_usd': MAX_DAILY_LOSS_USD,
               'max_positions': MAX_POSITIONS, 'notional_usd': TRADE_NOTIONAL_USD,
@@ -1548,9 +1566,20 @@ class Monitor:
             if rejected:
                 reject(report, rejected, coin)
                 continue
-            strategy_matches = winner_ensemble.matches(coin)
+            pair_address = str(coin.get('pairAddress') or '')
+            scout_fast = STATE.live_flow(address, 30, pair_address)
+            scout_slow = STATE.live_flow(address, 300, pair_address)
+            scout_decision = early_scout.evaluate(
+                coin, list(STATE.price_history.get(address, [])), scout_fast, scout_slow, now_ms=now_ms(),
+            )
+            strategy_matches = list(winner_ensemble.matches(coin))
+            if scout_decision.get('allow') and 'EARLY_SCOUT' not in strategy_matches:
+                strategy_matches.append('EARLY_SCOUT')
             if not strategy_matches:
-                reject(report, ['winner_signal'], coin)
+                reject(report, ['winner_signal'], coin, {
+                    'early_scout_score': scout_decision.get('score'),
+                    'early_scout_vetoes': scout_decision.get('vetoes'),
+                })
                 continue
             report['signal_passed'] += 1
             retry_after = self.entry_quote_retry_after.get(address, 0)
@@ -1559,8 +1588,8 @@ class Monitor:
                 continue
             if retry_after:
                 self.entry_quote_retry_after.pop(address, None)
-            entry_mode = 'WINNER_ENSEMBLE'
-            flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
+            entry_mode = 'EARLY_SCOUT_ASSISTED' if scout_decision.get('allow') else 'WINNER_ENSEMBLE'
+            flow = scout_fast
             context = self.market_context(coin)
             # Start independent price and rug checks together. Both helpers are
             # cached/asynchronous; running them concurrently avoids serial provider
@@ -1586,7 +1615,7 @@ class Monitor:
             if not price_review:
                 brainstorm_pre = brainstorm_engine.evaluate_pre(
                     coin, strategy_matches, list(STATE.history), safety=safety,
-                    validation=validation, flow=flow, context=context, now_ms=now_ms(),
+                    validation=validation, flow=flow, context=context, scout=scout_decision, now_ms=now_ms(),
                 )
                 if not brainstorm_pre.get('allow', True):
                     reject(report, ['brainstorm_confidence'], coin, {
@@ -1729,7 +1758,7 @@ class Monitor:
             if brainstorm_pre is None:
                 brainstorm_pre = brainstorm_engine.evaluate_pre(
                     coin, strategy_matches, list(STATE.history), safety=safety,
-                    validation=validation, flow=flow, context=context, now_ms=now_ms(),
+                    validation=validation, flow=flow, context=context, scout=scout_decision, now_ms=now_ms(),
                 )
                 if not brainstorm_pre.get('allow', True):
                     reject(report, ['brainstorm_confidence'], coin, {
@@ -1777,17 +1806,24 @@ class Monitor:
                     return
                 current_coin = next((c for c in STATE.feed if c.get('address') == address and c.get('pairAddress') == coin.get('pairAddress')), coin)
                 final_rejections = entry_policy.signal_data_rejections(current_coin,now=now_ms())
-                final_strategy_matches = winner_ensemble.matches(current_coin)
+                final_pair_address = str(current_coin.get('pairAddress') or coin.get('pairAddress') or '')
+                final_flow = STATE.live_flow(address, 30, final_pair_address)
+                final_slow_flow = STATE.live_flow(address, 300, final_pair_address)
+                final_scout = early_scout.evaluate(
+                    current_coin, list(STATE.price_history.get(address, [])), final_flow, final_slow_flow, now_ms=now_ms(),
+                )
+                final_strategy_matches = list(winner_ensemble.matches(current_coin))
+                if final_scout.get('allow') and 'EARLY_SCOUT' not in final_strategy_matches:
+                    final_strategy_matches.append('EARLY_SCOUT')
                 if not final_strategy_matches:
                     final_rejections.append('winner_signal')
                 if final_rejections:
                     reject(report,final_rejections,coin)
                     continue
-                final_flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
                 final_context = self.market_context(current_coin)
                 final_brainstorm_pre = brainstorm_engine.evaluate_pre(
                     current_coin, final_strategy_matches, list(STATE.history), safety=safety,
-                    validation=validation, flow=final_flow, context=final_context, now_ms=now_ms(),
+                    validation=validation, flow=final_flow, context=final_context, scout=final_scout, now_ms=now_ms(),
                 )
                 final_brainstorm = brainstorm_engine.evaluate_post(
                     final_brainstorm_pre,
@@ -1829,17 +1865,21 @@ class Monitor:
                     'current_price': price, 'peak_price': price,
                     'trade_no': next_trade_no, 'session_id': STATE.demo_session_id, 'strategy_id': strategy_id,
                     'strategy_matches': final_strategy_matches,
+                    'early_scout': final_scout,
+                    'early_scout_version': final_scout.get('version'),
+                    'early_scout_score': final_scout.get('score'),
+                    'early_scout_confirmations': final_scout.get('confirmations'),
                     'brainstorm': final_brainstorm,
                     'brainstorm_version': final_brainstorm.get('version'),
                     'brainstorm_confidence': final_brainstorm.get('confidence'),
                     'brainstorm_match_count': final_brainstorm.get('match_count'),
                     'brainstorm_family_count': final_brainstorm.get('family_count'),
                     'signal_evidence': 'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS',
-                    'entry_mode': entry_mode,
+                    'entry_mode': 'EARLY_SCOUT_ASSISTED' if final_scout.get('allow') else entry_mode,
                     'provisional_early_safety': bool(safety.get('provisional_early')),
                     'learning_mode': 'BRAINSTORM_META_ONLINE_CALIBRATION', 'entry_flow': final_flow,
-                    'entry_context': context, 'entry_conviction': context.get('conviction'),
-                    'entry_hold_mode': context.get('mode'), 'learning_sample': learning['sample'],
+                    'entry_context': final_context, 'entry_conviction': final_context.get('conviction'),
+                    'entry_hold_mode': final_context.get('mode'), 'learning_sample': learning['sample'],
                     'learning_win_rate': learning['win_rate'], 'learning_profit_factor': learning['profit_factor'],
                     'learning_recent_losses': learning['recent_losses'], 'learning_bonus': learning['bonus'],
                     'learning_avg_pnl_pct': learning.get('avg_pnl_pct'),

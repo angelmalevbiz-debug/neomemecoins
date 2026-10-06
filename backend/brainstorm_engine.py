@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-VERSION = "BRAINSTORM_META_V2"
+VERSION = "BRAINSTORM_META_V3_EARLY_SCOUT"
 ENABLED = os.getenv("NEO_BRAINSTORM_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
 TARGET_WIN_RATE = float(os.getenv("NEO_BRAINSTORM_TARGET_WIN_RATE", "0.70"))
 MIN_CONFIDENCE = float(os.getenv("NEO_BRAINSTORM_MIN_CONFIDENCE", "0.70"))
@@ -254,7 +254,7 @@ def evaluate_pre(
     coin: dict[str, Any], matches: list[str], history: list[dict[str, Any]], *,
     safety: dict[str, Any] | None = None, validation: dict[str, Any] | None = None,
     flow: dict[str, Any] | None = None, context: dict[str, Any] | None = None,
-    now_ms: int | None = None,
+    scout: dict[str, Any] | None = None, now_ms: int | None = None,
 ) -> dict[str, Any]:
     stamp = int(now_ms or time.time() * 1000)
     if not ENABLED:
@@ -285,6 +285,10 @@ def evaluate_pre(
     regime = _regime(coin, flow)
     regime_score = _regime_brain(regime["name"], families)
     champion_score, champion_detail = _champion_brain(history, matches, stamp)
+    scout_enabled = bool((scout or {}).get("enabled"))
+    scout_score_raw = _clamp(_num((scout or {}).get("score"), 0.5)) if scout_enabled else 0.5
+    scout_brain = 0.5 + (scout_score_raw - 0.5) * 0.6
+    scout_strong = bool((scout or {}).get("allow")) and scout_score_raw >= 0.74 and int((scout or {}).get("confirmations") or 0) >= 5
 
     brains = {
         "consensus": consensus,
@@ -297,24 +301,35 @@ def evaluate_pre(
         "history": history_score,
         "regime": regime_score,
         "champion": champion_score,
+        "early_scout": scout_brain,
         "safety": safety_brain,
         "validation": validation_brain,
     }
-    weights = {
-        "consensus": 0.12, "diversity": 0.07, "market_score": 0.11,
-        "liquidity": 0.07, "flow": 0.10, "momentum": 0.07,
-        "structure": 0.06, "history": 0.08, "regime": 0.08, "champion": 0.08,
-        "safety": 0.08, "validation": 0.08,
-    }
+    if scout_strong:
+        # Ultra-early signals intentionally arrive before several slower strategy rules.
+        # They still need independent microstructure evidence plus hard safety/price gates.
+        weights = {
+            "early_scout": 0.28, "flow": 0.14, "momentum": 0.10,
+            "safety": 0.11, "validation": 0.11, "market_score": 0.07,
+            "structure": 0.05, "regime": 0.05, "liquidity": 0.03,
+            "history": 0.03, "champion": 0.03,
+        }
+    else:
+        weights = {
+            "consensus": 0.10, "diversity": 0.06, "market_score": 0.09,
+            "liquidity": 0.06, "flow": 0.09, "momentum": 0.06,
+            "structure": 0.05, "history": 0.07, "regime": 0.07, "champion": 0.07,
+            "early_scout": 0.12, "safety": 0.08, "validation": 0.08,
+        }
     confidence = sum(brains[k] * weights[k] for k in weights)
     calibration_score, calibration_detail = _calibration_brain(history, confidence, stamp)
     confidence = 0.90 * confidence + 0.10 * calibration_score
     adaptive = _drift_and_threshold(history, stamp)
     dynamic_threshold = adaptive["threshold"]
     vetoes = []
-    if len(matches) < MIN_MATCHES:
+    if len(matches) < MIN_MATCHES and not scout_strong:
         vetoes.append("insufficient_strategy_consensus")
-    if len(families) < MIN_FAMILIES:
+    if len(families) < MIN_FAMILIES and not scout_strong:
         vetoes.append("insufficient_strategy_diversity")
     if safety_brain < 1.0:
         vetoes.append("safety_not_passed")
@@ -341,6 +356,8 @@ def evaluate_pre(
         "brains": {k: round(v, 4) for k, v in brains.items()},
         "history_evidence": history_detail,
         "champion_evidence": champion_detail,
+        "early_scout": scout or {},
+        "early_scout_strong": scout_strong,
         "calibration": calibration_detail,
         "adaptive_threshold": adaptive,
         "regime": regime,

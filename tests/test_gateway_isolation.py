@@ -135,6 +135,9 @@ class GatewayIsolation(unittest.TestCase):
         self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_BRAINSTORM_ENABLED'],'1')
         self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_BRAINSTORM_TARGET_WIN_RATE'],'0.70')
         self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_BRAINSTORM_MIN_CONFIDENCE'],'0.70')
+        self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_EARLY_SCOUT_ENABLED'],'1')
+        self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_EARLY_SCOUT_MAX_MARKET_CAP'],'60000')
+        self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_EARLY_SCOUT_MIN_CONFIRMATIONS'],'5')
         self.assertEqual(self.gateway.TARGET_PAPER_ENV['NEO_WINNER_STRATEGIES'],'ALL')
         self.assertIn('/experiments/angel-hf-4-10/',self.gateway.TARGET_PAPER_ENV['NEO_STRATEGY_LAB_PATH'])
 

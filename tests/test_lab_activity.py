@@ -59,6 +59,54 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),121000)
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW+121000),0)
 
+    def test_scalper_has_longer_cooldown_after_a_loss(self):
+        b={'id':'SCALPER','history':[{'address':ADDRESS,'closed_at':NOW-3599000,'pnl_usd':-1}]}
+        self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),1000)
+        b['history'][0]['pnl_usd']=1
+        self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),0)
+
+    def test_scalper_requires_verified_flow_and_positive_trend(self):
+        rule=a.RULES['SCALPER']
+        f={'score':95,'liq':50000,'m5':4,'bs':1.2,'lmc':.1,'age':60,
+           'h1':8,'vol_liq':2,'flow':copy.deepcopy(flows()[ADDRESS])}
+        self.assertTrue(rule.matches(f))
+        for key,value in [('trades',0),('ratio',1.1),('buy_usd',50),('unique_wallets',1),('max_sell',300)]:
+            bad=copy.deepcopy(f);bad['flow'][key]=value
+            self.assertFalse(rule.matches(bad),key)
+        for key,value in [('m5',-0.1),('h1',-0.1),('liq',24999),('age',241)]:
+            bad=copy.deepcopy(f);bad[key]=value
+            self.assertFalse(rule.matches(bad),key)
+
+    def test_scalper_risk_is_capped_at_25_percent_and_pauses_below_minimum(self):
+        self.assertEqual(a.entry_notional_limit('SCALPER',100,150),25)
+        self.assertEqual(a.entry_notional_limit('SCALPER',40,150),10)
+        self.assertEqual(a.entry_notional_limit('SCALPER',19.09,150),4.7725)
+        self.assertEqual(a.entry_notional_limit('SCALPER',7.99,150),0)
+        self.assertEqual(a.entry_minimum_notional('SCALPER'),2)
+        self.assertEqual(a.entry_notional_limit('PRECISION',19.09,150),19.09)
+
+    def test_scalper_sizes_down_and_keeps_cost_checks_at_low_balance(self):
+        lab.STATE['books']['SCALPER']['balance']=19.09
+        c=coin();c['priceChange']['h1']=20
+        with patch.object(lab,'now_ms',return_value=NOW):
+            lab.maybe_open([c],flows())
+        book=lab.STATE['books']['SCALPER']
+        self.assertIsNotNone(book['position'])
+        self.assertLessEqual(book['position']['notional_usd'],19.09*.25)
+        self.assertGreaterEqual(book['position']['notional_usd'],a.SCALPER_MIN_NOTIONAL_USD)
+        self.assertEqual(book['entry_diagnostics']['risk_limited_notional_usd'],4.7725)
+        self.assertGreaterEqual(book['position']['entry_roundtrip_pnl_pct'],-a.MAX_ENTRY_COST_PCT)
+
+    def test_scalper_stops_below_risk_sized_minimum(self):
+        lab.STATE['books']['SCALPER']['balance']=7.99
+        c=coin();c['priceChange']['h1']=20
+        with patch.object(lab,'now_ms',return_value=NOW):
+            lab.maybe_open([c],flows())
+        book=lab.STATE['books']['SCALPER']
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'scalper_risk_cap_below_minimum')
+        self.assertEqual(book['entry_diagnostics']['risk_limited_notional_usd'],0)
+
     def test_budget_includes_network(self):
         for balance in [9.99,10,20,100,500]:
             q=a.affordable_entry(coin(),balance,150,lab.entry_execution,lab.exit_execution)
@@ -97,19 +145,87 @@ class ActivityTests(unittest.TestCase):
             self.assertEqual(b['position']['entry_policy_version'],a.POLICY_VERSION)
             self.assertLess(b['position']['open_pnl_usd'],0)
             self.assertGreaterEqual(b['position']['entry_roundtrip_pnl_pct'],-2.75)
+        promoted=[lab.STATE['books'][key] for key in lab.PROMOTED_STRATEGIES]
+        self.assertEqual(sum(book['starting_balance'] for book in promoted),1000)
+        for book in promoted:
+            self.assertEqual(book['portfolio_group'],'PROMOTED_PAPER')
+            self.assertLessEqual(book['position']['notional_usd'],book['starting_balance']*.25)
+
+    def test_promotion_drain_blocks_new_entries_without_disabling_position_exits(self):
+        book=lab.STATE['books']['EARLY']
+        book['promotion_pending']=True
+        with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([coin()],flows())
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'promotion_waiting_for_existing_position_exit')
+
+    def test_legacy_promotion_position_keeps_using_shared_feed_for_exit(self):
+        legacy={
+            'id':'LEGACY_EARLY','strategy_id':'EARLY','name':'Early legacy',
+            'starting_balance':500,'balance':500,'history':[],'trade_seq':1,
+            'position':{'trade_no':1,'strategy_id':'EARLY','address':ADDRESS,'pairAddress':PAIR,
+                        'entry_price':.01,'current_price':.01,'quantity':10000,'original_quantity':10000,
+                        'notional_usd':100,'remaining_cost_basis_usd':100,'opened_at':NOW-1000,
+                        'partial_realized_pnl':0,'entry_network_fee_usd':0}
+        }
+        lab.STATE['portfolio_setup']={'legacy_draining_books':{'EARLY':legacy}}
+        quote={'fill_price':.0094,'net_proceeds_usd':94,'dex_fee_usd':0,'network_fee_usd':0,
+               'impact_pct':0,'slippage_pct':0,'latency_pct':0}
+        with patch.object(lab,'exit_execution',return_value=quote),patch.object(lab,'now_ms',return_value=NOW):
+            lab.update_positions({},[coin()])
+        self.assertIsNone(legacy['position'])
+        self.assertEqual(legacy['history'][0]['pnl_usd'],-6)
+        self.assertEqual(lab.STATE['books']['EARLY']['balance'],250)
 
     def test_flow_map_reads_the_configured_shared_tape(self):
         with tempfile.TemporaryDirectory() as folder:
             tape_path=Path(folder)/'live_tape.json'
             stamp=lab.now_ms()
-            tape_path.write_text(__import__('json').dumps({'events':[
-                {'ts':stamp,'address':ADDRESS,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
-                {'ts':stamp,'address':ADDRESS,'direction':'SELL','usd_amount':40,'wallet':'seller'},
+            base={'ts':stamp,'event_time':stamp,'observed_at':stamp+100,'available_at':stamp+200,
+                  'confirmed_swap':True,'quality_flags':[],'pairAddress':PAIR,'address':ADDRESS}
+            tape_path.write_text(__import__('json').dumps({'pair_coverage':{PAIR:{'status':'COMPLETE'}},'events':[
+                {**base,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
+                {**base,'direction':'SELL','usd_amount':40,'wallet':'seller'},
             ]}),encoding='utf-8')
             with patch.object(lab,'LIVE_TAPE_PATH',tape_path):observed=lab.flow_map()
         self.assertEqual(observed[ADDRESS]['trades'],2)
         self.assertEqual(observed[ADDRESS]['ratio'],6)
         self.assertEqual(observed[ADDRESS]['unique_wallets'],2)
+
+    def test_flow_map_rejects_incomplete_pairs_and_bad_event_provenance(self):
+        with tempfile.TemporaryDirectory() as folder:
+            tape_path=Path(folder)/'live_tape.json';stamp=lab.now_ms()
+            base={'ts':stamp,'event_time':stamp,'observed_at':stamp+100,'available_at':stamp+200,
+                  'confirmed_swap':True,'quality_flags':[],'pairAddress':PAIR,'address':ADDRESS,
+                  'direction':'BUY','usd_amount':240,'wallet':'buyer'}
+            incomplete_pair='7pQvPNLa7s8kN9uUq47XkbKzA9a7JwzsHjFeNFK2M4eH'
+            events=[base,
+                {**base,'wallet':'partial','pairAddress':incomplete_pair},
+                {**base,'wallet':'unverified','quality_flags':['QUOTE_USD_UNKNOWN']},
+                {**base,'wallet':'future','available_at':stamp+60000},
+                {**base,'wallet':'not-swap','confirmed_swap':False}]
+            tape_path.write_text(__import__('json').dumps({'pair_coverage':{
+                PAIR:{'status':'COMPLETE'},incomplete_pair:{'status':'DEGRADED'}},'events':events}),encoding='utf-8')
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path),patch.object(lab,'now_ms',return_value=stamp+250):
+                observed=lab.flow_map()
+        self.assertEqual(observed[ADDRESS]['trades'],1)
+        self.assertEqual(observed[ADDRESS]['unique_wallets'],1)
+
+    def test_scalper_shows_when_coverage_blocks_an_otherwise_valid_signal(self):
+        with tempfile.TemporaryDirectory() as folder:
+            tape_path=Path(folder)/'live_tape.json'
+            tape_path.write_text(__import__('json').dumps({
+                'status':'degraded','coverage':0,'backlog':238,
+                'pair_coverage':{PAIR:{'status':'DEGRADED'}},'events':[]}),encoding='utf-8')
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path),patch.object(lab,'now_ms',return_value=NOW):
+                observed=lab.flow_map()
+                c=coin();c['priceChange']['h1']=20
+                lab.maybe_open([c],observed)
+        diagnostics=lab.STATE['books']['SCALPER']['entry_diagnostics']
+        self.assertIsNone(lab.STATE['books']['SCALPER']['position'])
+        self.assertEqual(diagnostics['blocked_reason'],'verified_flow_unavailable')
+        self.assertEqual(diagnostics['flow_tape_coverage_pct'],0)
+        self.assertEqual(diagnostics['flow_tape_status'],'degraded')
+        self.assertGreater(diagnostics['flow_rejected_candidates'],0)
 
     def test_position_management_uses_the_shared_feed_without_extra_price_api(self):
         book=lab.STATE['books']['PRECISION']

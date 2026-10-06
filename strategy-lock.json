@@ -78,7 +78,7 @@
     "backend/paper_state_reset.py": "72a270787ca7af6af6b7d3883aae3e09cba3e5a7bc73359f56ec33e14b7b828b",
     "backend/paper_training.py": "1da09922c3a6c6a8096577f879224275e579995f172c03dbaff50c852fdc5c14",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "53b5876a6b5d9447b53f3482be3bfddf136f0b8d3acbdf2abe32af3b10c45d12",
+    "backend/strategy_lab.py": "069a51224b4e05a03f531705ea1ba9a015eac55ba118c694d0c5301bfcfbae44",
     "backend/training_bridge.py": "be12a2904711f25932f375d5faa23ffa6eda3fdf5911aaf3dfbd408afccd50a2",
     "backend/training_worker.py": "ad806420804950da3547a7ae380ce7ff61860df70c2eb566921d1a4c2dc24918",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006"
@@ -144,7 +144,7 @@
     "backend/training_worker.py": "Independent process, durable reset boundary and restart",
     "backend/paper_state_reset.py": "User-authorized checksum archives and all PAPER reset/restore",
     "backend/user_gateway.py": "Independent private accounts without inherited central trades and atomic registry",
-    "backend/strategy_lab.py": "Use the configured shared live tape and market snapshot for local PAPER portfolios; avoid an extra price API request per open position.",
+    "backend/strategy_lab.py": "Use shared live tape and market snapshots, promote four qualifying independent PAPER books on a new $1,000 cohort, cap each position at 25% of its book, and preserve losers in the test cohort.",
     "backend/astra6_brain.py": "Shared exit-priority quote transport, cache/backoff, UTF-8 persistence and truthful profit factor",
     "backend/lab_paired_runner.py": "Cross-platform file locking and UTF-8 persistence",
     "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"

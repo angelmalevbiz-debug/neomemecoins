@@ -8,9 +8,13 @@ import math
 import re
 from typing import Any, Callable
 
-POLICY_VERSION = 'LAB_ACTIVE_V2'
+POLICY_VERSION = 'LAB_ACTIVE_V3_VERIFIED_SCALPER'
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
+SCALPER_REENTRY_SECONDS = 600
+SCALPER_LOSS_REENTRY_SECONDS = 3600
+SCALPER_MAX_BALANCE_FRACTION = 0.25
+SCALPER_MIN_NOTIONAL_USD = 2.0
 MAX_FEED_AGE_MS = 20_000
 MAX_ENTRY_COST_PCT = 2.75
 MIN_NOTIONAL_USD = 10.0
@@ -41,9 +45,9 @@ class EntryRule:
     wallets: int = 0
     max_sell: float = math.inf
 
-    def matches(self, f: dict[str, Any]) -> bool:
+    def matches(self, f: dict[str, Any], *, require_flow: bool = True) -> bool:
         flow = f.get('flow') or {}
-        return (
+        market_match = (
             number(f.get('score')) >= self.score
             and number(f.get('liq')) >= max(10_000, self.liquidity)
             and self.move[0] <= number(f.get('m5'), -math.inf) <= self.move[1]
@@ -52,12 +56,14 @@ class EntryRule:
             and self.age[0] <= number(f.get('age'), math.inf) <= self.age[1]
             and self.hour[0] <= number(f.get('h1'), -math.inf) <= self.hour[1]
             and self.volume_liquidity[0] <= number(f.get('vol_liq')) <= self.volume_liquidity[1]
-            and number(flow.get('trades')) >= self.flow_trades
+        )
+        return market_match and (not require_flow or (
+            number(flow.get('trades')) >= self.flow_trades
             and number(flow.get('ratio')) >= self.flow_ratio
             and number(flow.get('buy_usd')) >= self.flow_buy
             and number(flow.get('unique_wallets')) >= self.wallets
             and number(flow.get('max_sell')) <= self.max_sell
-        )
+        ))
 
 
 RULES = {
@@ -69,7 +75,12 @@ RULES = {
     'ORDER_FLOW': EntryRule(80, 15000, (-5, 30), .8, .04, (2, 1e7), flow_trades=3, flow_ratio=1.2, wallets=2),
     'EARLY': EntryRule(85, 15000, (0, 25), .95, .08, (2, 120)),
     'TREND': EntryRule(83, 20000, (-2, 20), .85, .07, (5, 960), (-5, 200)),
-    'SCALPER': EntryRule(78, 10000, (-5, 20), .85, .04, (2, 720)),
+    # The prior 70 closed PAPER trades all entered without any verified recent
+    # flow. Require multi-wallet buy pressure and non-negative short/1h trend.
+    # This is a conservative candidate guard, not a claim of improved returns.
+    'SCALPER': EntryRule(85, 25000, (0, 15), 1.05, .08, (5, 240),
+                         (0, 40), (0, 8), flow_trades=4, flow_ratio=1.5,
+                         flow_buy=150, wallets=3, max_sell=250),
     'VOLUME_SURGE': EntryRule(83, 15000, (1, 35), 1.0, .06, (2, 720), volume_liquidity=(.2, 1e6)),
     'REVERSAL': EntryRule(80, 20000, (-12, 6), 1.0, .08, (5, 960), (-35, 1000)),
     'FLOW_MOMENTUM': EntryRule(80, 15000, (-1, 35), .8, .04, (2, 1e7), flow_trades=3, flow_ratio=1.5, flow_buy=100),
@@ -101,10 +112,27 @@ def cooldown_remaining_ms(book: dict, address: str, now: int) -> int:
     latest = max((t for t in book.get('history', []) if t.get('address') == address),
                  key=lambda t: number(t.get('closed_at')), default=None)
     if latest is not None:
-        seconds = LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0 else REENTRY_SECONDS
+        if book.get('id') == 'SCALPER':
+            seconds = (SCALPER_LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0
+                       else SCALPER_REENTRY_SECONDS)
+        else:
+            seconds = LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0 else REENTRY_SECONDS
         return max(0, int(number(latest.get('closed_at'))) + seconds * 1000 - now)
     last = number((book.get('last_entry_by_address') or {}).get(address))
     return max(0, int(last) + REENTRY_SECONDS * 1000 - now) if last else 0
+
+
+def entry_notional_limit(strategy_id: str, balance: float, requested: float) -> float:
+    """Cap SCALPER risk at 25% of cash without exceeding its minimum size."""
+    balance, requested = max(0.0, number(balance)), max(0.0, number(requested))
+    if strategy_id == 'SCALPER':
+        capped = min(requested, balance * SCALPER_MAX_BALANCE_FRACTION)
+        return capped if capped >= SCALPER_MIN_NOTIONAL_USD else 0.0
+    return min(requested, balance)
+
+
+def entry_minimum_notional(strategy_id: str) -> float:
+    return SCALPER_MIN_NOTIONAL_USD if strategy_id == 'SCALPER' else MIN_NOTIONAL_USD
 
 
 def usable_feed_coin(coin: dict, now: int) -> bool:
@@ -116,20 +144,22 @@ def usable_feed_coin(coin: dict, now: int) -> bool:
 
 
 def affordable_entry(coin: dict, balance: float, limit: float,
-                     entry: Callable, exit: Callable) -> dict | None:
+                     entry: Callable, exit: Callable,
+                     minimum_notional: float = MIN_NOTIONAL_USD) -> dict | None:
     """Try smaller paper sizes without changing the cost model or using leverage."""
     balance, limit = number(balance), number(limit)
-    if min(balance, limit) < MIN_NOTIONAL_USD:
+    minimum_notional = max(0.01, number(minimum_notional, MIN_NOTIONAL_USD))
+    if min(balance, limit) < minimum_notional:
         return None
-    probe = entry(coin, MIN_NOTIONAL_USD)
+    probe = entry(coin, minimum_notional)
     network = number(probe.get('network_fee_usd'), math.inf)
     cap = math.floor(min(limit, balance - network) * 100) / 100
     size = cap
     attempted = set()
     for _ in range(50):
-        if size < MIN_NOTIONAL_USD:
+        if size < minimum_notional:
             return None
-        size = max(MIN_NOTIONAL_USD, math.floor(size * 100) / 100)
+        size = max(minimum_notional, math.floor(size * 100) / 100)
         if size in attempted:
             return None
         attempted.add(size)
@@ -142,15 +172,20 @@ def affordable_entry(coin: dict, balance: float, limit: float,
         if quantity > 0 and committed <= balance + 1e-9 and -MAX_ENTRY_COST_PCT <= pct <= 0:
             return {'notional': size, 'entry': opening, 'mark': closing,
                     'initial_pnl_usd': net, 'initial_pnl_pct': pct}
-        if size == MIN_NOTIONAL_USD:
+        if size == minimum_notional:
             return None
-        size = max(MIN_NOTIONAL_USD, size * 0.85)
+        size = max(minimum_notional, size * 0.85)
     return None
 
 
 def policy_config() -> dict:
     return {'version': POLICY_VERSION, 'reentry_seconds': REENTRY_SECONDS,
             'loss_reentry_seconds': LOSS_REENTRY_SECONDS,
+            'scalper_reentry_seconds': SCALPER_REENTRY_SECONDS,
+            'scalper_loss_reentry_seconds': SCALPER_LOSS_REENTRY_SECONDS,
+            'scalper_max_balance_fraction': SCALPER_MAX_BALANCE_FRACTION,
+            'scalper_min_notional_usd': SCALPER_MIN_NOTIONAL_USD,
+            'scalper_min_balance_for_entry': SCALPER_MIN_NOTIONAL_USD / SCALPER_MAX_BALANCE_FRACTION,
             'max_entry_roundtrip_cost_pct': MAX_ENTRY_COST_PCT,
             'feed_max_age_seconds': MAX_FEED_AGE_MS / 1000,
             'execution_basis': 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'}

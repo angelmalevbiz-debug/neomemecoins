@@ -2,7 +2,8 @@ param(
     [ValidateSet('Start', 'StartMissing', 'Stop', 'Status')][string]$Action = 'Start',
     [int]$MainPort = 8878,
     [int]$GatewayPort = 8879,
-    [string]$SupabasePublishableKey = ''
+    [string]$SupabasePublishableKey = '',
+    [switch]$WatchdogRecovery
 )
 $ErrorActionPreference = 'Stop'
 $repository = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
@@ -10,6 +11,7 @@ $runtime = Join-Path $repository '.runtime/accounts'
 $services = Join-Path $runtime 'services'
 $manifestPath = Join-Path $services 'processes.json'
 $stopMarker = Join-Path $services 'stop.request'
+$watchdogPauseMarker = Join-Path $services 'watchdog.pause'
 $runner = Join-Path $PSScriptRoot 'local_paper_service.py'
 $python = Join-Path $repository '.venv/Scripts/python.exe'
 
@@ -38,6 +40,9 @@ if ($Action -eq 'Status') {
 if ($Action -eq 'Stop') {
     if (!(Test-Path -LiteralPath $manifestPath)) { throw 'No owned local PAPER process manifest exists.' }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+    if (!$WatchdogRecovery) {
+        [IO.File]::WriteAllText($watchdogPauseMarker, [DateTime]::UtcNow.ToString('o'))
+    }
     [IO.File]::WriteAllText($stopMarker, [DateTime]::UtcNow.ToString('o'))
     $deadline = [DateTime]::UtcNow.AddSeconds(60)
     do {
@@ -49,6 +54,9 @@ if ($Action -eq 'Stop') {
 }
 
 if (!(Test-Path -LiteralPath $python)) { throw 'Install the isolated .venv dependencies before starting PAPER services.' }
+if ($Action -eq 'Start' -and (Test-Path -LiteralPath $watchdogPauseMarker)) {
+    Remove-Item -LiteralPath $watchdogPauseMarker
+}
 if ($Action -eq 'StartMissing') {
     if (!(Test-Path -LiteralPath $manifestPath)) { throw 'StartMissing requires a verified existing local PAPER manifest.' }
     $previous = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json

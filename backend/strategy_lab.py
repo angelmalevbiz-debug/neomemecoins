@@ -5,6 +5,7 @@ from typing import Any, Callable
 import requests
 from astra_lab_bridge import merge_astra_snapshot
 from lab_paired_bridge import merge_paired_snapshot
+from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
@@ -16,7 +17,14 @@ COMPACT_PATH=Path(os.getenv('NEO_STRATEGY_LAB_COMPACT_PATH',str(STATE_PATH.paren
 RESET_FLAG_PATH=Path(os.getenv('NEO_STRATEGY_LAB_RESET_FLAG','/var/lib/neo-market/strategy_lab.reset'))
 LIVE_TAPE_PATH=Path(os.getenv('NEO_LIVE_TAPE_PATH','/var/lib/neo-market/live_tape.json'))
 START_BALANCE=float(os.getenv('NEO_LAB_START_BALANCE','500'))
-STRATEGY_START_BALANCES={'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100'))}
+PROMOTED_STRATEGIES=('EARLY','MOMENTUM','PRECISION','ULTRA_PRECISION')
+PROMOTED_TOTAL_CAPITAL=1000.0
+PROMOTED_ALLOCATION=250.0
+PROMOTED_MAX_POSITION_FRACTION=0.25
+STRATEGY_START_BALANCES={
+    'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100')),
+    **{strategy_id:PROMOTED_ALLOCATION for strategy_id in PROMOTED_STRATEGIES},
+}
 TRADE_NOTIONAL=float(os.getenv('NEO_LAB_TRADE_NOTIONAL','150'))
 POLL_SECONDS=float(os.getenv('NEO_LAB_POLL_SECONDS','2'))
 ENTRY_REFRESH_SECONDS=float(os.getenv('NEO_LAB_ENTRY_REFRESH_SECONDS','2'))
@@ -36,6 +44,7 @@ MAX_PRICE_IMPACT_PCT=float(os.getenv('NEO_LAB_MAX_PRICE_IMPACT_PCT','20'))
 
 SESSION=requests.Session()
 SESSION.headers.update({'user-agent':'NEO-Strategy-Lab/1.0','accept':'application/json'})
+FLOW_TAPE_DIAGNOSTICS={'status':'unknown','coverage_pct':0.0,'backlog':0,'verified_events_60s':0}
 
 def now_ms(): return int(time.time()*1000)
 def num(v,d=0.0):
@@ -113,20 +122,37 @@ def atomic_write(data):
     atomic_write_path(STATE_PATH,data)
 
 def flow_map():
+    global FLOW_TAPE_DIAGNOSTICS
     tape=load_json(LIVE_TAPE_PATH,{})
-    cutoff=now_ms()-60_000
-    out={}
+    now=now_ms(); cutoff=now-60_000
+    coverage=tape.get('pair_coverage') or {}
+    out={}; verified_events=0
     for e in tape.get('events',[]):
-        if int(e.get('ts',0))<cutoff: continue
+        pair=str(e.get('pairAddress') or '')
+        if coverage.get(pair,{}).get('status')!='COMPLETE': continue
+        event_time=num(e.get('event_time'),num(e.get('ts')))
+        observed=num(e.get('observed_at'))
+        available=num(e.get('available_at'),num(e.get('ingested_at')))
+        if (e.get('confirmed_swap') is not True or e.get('quality_flags')
+                or event_time<cutoff or event_time<=0 or observed<=0
+                or event_time>observed or observed>available or available>now+5000):
+            continue
         a=e.get('address')
-        if not a: continue
+        wallet=e.get('wallet'); usd=num(e.get('usd_amount'))
+        if not a or not wallet or usd<=0: continue
         f=out.setdefault(a,{'trades':0,'buys':0,'sells':0,'buy_usd':0.0,'sell_usd':0.0,'wallets':set(),'max_sell':0.0})
-        usd=num(e.get('usd_amount')); f['trades']+=1
-        if e.get('wallet'): f['wallets'].add(e['wallet'])
+        f['trades']+=1; verified_events+=1
+        f['wallets'].add(wallet)
         if e.get('direction')=='BUY': f['buys']+=1; f['buy_usd']+=usd
         else: f['sells']+=1; f['sell_usd']+=usd; f['max_sell']=max(f['max_sell'],usd)
     for f in out.values():
         f['unique_wallets']=len(f.pop('wallets')); f['ratio']=f['buy_usd']/max(f['sell_usd'],1)
+    FLOW_TAPE_DIAGNOSTICS={
+        'status':str(tape.get('status') or 'offline'),
+        'coverage_pct':round(max(0.0,min(1.0,num(tape.get('coverage'))))*100,1),
+        'backlog':max(0,int(num(tape.get('backlog')))),
+        'verified_events_60s':verified_events,
+    }
     return out
 def enrich(c,flows):
     tx=(c.get('txns') or {}).get('m5') or {}
@@ -182,6 +208,9 @@ STRATEGIES=[
 def empty_book(s):
     start=STRATEGY_START_BALANCES.get(s['id'],START_BALANCE)
     return {'id':s['id'],'name':s['name'],'starting_balance':start,'balance':start,
+            'portfolio_group':'PROMOTED_PAPER' if s['id'] in PROMOTED_STRATEGIES else 'TEST',
+            'allocation_usd':start,
+            'max_position_fraction':PROMOTED_MAX_POSITION_FRACTION if s['id'] in PROMOTED_STRATEGIES else 1.0,
             'position':None,'history':[],'trade_seq':0,'last_entry_by_address':{},'created_at':now_ms()}
 
 def load_state():
@@ -193,13 +222,36 @@ def load_state():
     else:
         raw=load_json(STATE_PATH,{})
     books={}
+    stored_books=raw.get('books') or {}
+    setup=raw.get('portfolio_setup') or {}
+    cohort_active=setup.get('version')=='PROMOTED_PAPER_COHORT_V1' and setup.get('status')=='ACTIVE'
+    cohort_draining=setup.get('version')=='PROMOTED_PAPER_COHORT_V1' and setup.get('status')=='DRAINING'
     for s in STRATEGIES:
-        b=(raw.get('books') or {}).get(s['id']) or empty_book(s)
-        b['id']=s['id']; b['name']=s['name']; books[s['id']]=b
+        existing=stored_books.get(s['id'])
+        b=existing or empty_book(s)
+        b['id']=s['id']; b['name']=s['name']
+        if s['id'] in PROMOTED_STRATEGIES and (cohort_draining or b.get('promotion_pending')):
+            b['portfolio_group']='PROMOTION_DRAINING'
+            b['allocation_usd']=num(b.get('starting_balance'),START_BALANCE)
+            b['max_position_fraction']=1.0
+        elif s['id'] in PROMOTED_STRATEGIES and (cohort_active or existing is None):
+            b['portfolio_group']='PROMOTED_PAPER'
+            b['allocation_usd']=PROMOTED_ALLOCATION
+            b['max_position_fraction']=PROMOTED_MAX_POSITION_FRACTION
+        elif s['id'] in PROMOTED_STRATEGIES:
+            b['portfolio_group']='TEST'
+            b['allocation_usd']=num(b.get('starting_balance'),START_BALANCE)
+            b['max_position_fraction']=1.0
+        else:
+            b['portfolio_group']='TEST'
+            b['allocation_usd']=b.get('allocation_usd',b.get('starting_balance',START_BALANCE))
+            b['max_position_fraction']=1.0
+        books[s['id']]=b
     return {'started_at':now_ms() if reset_requested else (raw.get('started_at') or now_ms()),
             'updated_at':now_ms(),'status':'starting','books':books,
             'activity_version':raw.get('activity_version'),
-            'activity_started_at':raw.get('activity_started_at')}
+            'activity_started_at':raw.get('activity_started_at'),
+            'portfolio_setup':raw.get('portfolio_setup')}
 
 STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
@@ -257,7 +309,9 @@ def update_positions(flows,feed):
         address=coin.get('address'); pair=coin.get('pairAddress')
         if address and pair and num(coin.get('priceUsd'))>0:
             prices[(address,pair)]=coin
-    for book in STATE['books'].values():
+    portfolio_setup=STATE.get('portfolio_setup') or {}
+    exit_only_books=(portfolio_setup.get('legacy_draining_books') or {}).values()
+    for book in [*STATE['books'].values(), *exit_only_books]:
         pos=book.get('position')
         if not pos: continue
         pair_key=(pos.get('address'),pos.get('pairAddress'))
@@ -302,15 +356,43 @@ def maybe_open(feed,flows):
             candidates.append((c,enrich(c,flows)))
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
-        if book.get('position') or num(book.get('balance'))<activity.MIN_NOTIONAL_USD:
+        if book.get('position'):
+            continue
+        if book.get('promotion_pending'):
+            book['entry_diagnostics']={
+                'at':now,'matched_candidates':0,'cost_rejected':0,
+                'cooldown_rejected':0,'affordable_candidates':0,
+                'price_verification_rejected':0,
+                'blocked_reason':'promotion_waiting_for_existing_position_exit',
+                'balance_usd':round(num(book.get('balance')),4),
+            }
+            continue
+        balance=num(book.get('balance'))
+        entry_limit=activity.entry_notional_limit(strategy['id'],balance,TRADE_NOTIONAL)
+        if strategy['id'] in PROMOTED_STRATEGIES:
+            entry_limit=min(entry_limit,balance*PROMOTED_MAX_POSITION_FRACTION)
+        min_notional=activity.entry_minimum_notional(strategy['id'])
+        if entry_limit<min_notional:
+            book['entry_diagnostics']={
+                'at':now,'matched_candidates':0,'cost_rejected':0,
+                'cooldown_rejected':0,'affordable_candidates':0,
+                'price_verification_rejected':0,
+                'blocked_reason':('scalper_risk_cap_below_minimum'
+                                  if strategy['id']=='SCALPER' else 'insufficient_balance'),
+                'balance_usd':round(balance,4),'risk_limited_notional_usd':round(entry_limit,4),
+            }
             continue
         eligible=[]
         checked=0
         blocked_cost=0
         blocked_price=0
         blocked_cooldown=0
+        flow_rejected=0
+        rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
-            if not activity.RULES[strategy['id']].matches(features):
+            if not rule.matches(features):
+                if strategy['id']=='SCALPER' and rule.matches(features,require_flow=False):
+                    flow_rejected+=1
                 continue
             validation=price_integrity.check(coin)
             if validation.get('status')!='pass':
@@ -321,7 +403,8 @@ def maybe_open(feed,flows):
                 continue
             checked+=1
             proposed=activity.affordable_entry(
-                coin,num(book['balance']),TRADE_NOTIONAL,entry_execution,exit_execution
+                coin,balance,entry_limit,entry_execution,exit_execution,
+                minimum_notional=min_notional
             )
             if proposed is None:
                 blocked_cost+=1
@@ -332,7 +415,18 @@ def maybe_open(feed,flows):
             'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':len(eligible),
             'price_verification_rejected':blocked_price,
+            'risk_limited_notional_usd':round(entry_limit,4),
         }
+        if strategy['id']=='SCALPER':
+            book['entry_diagnostics'].update({
+                'flow_rejected_candidates':flow_rejected,
+                'flow_tape_status':FLOW_TAPE_DIAGNOSTICS['status'],
+                'flow_tape_coverage_pct':FLOW_TAPE_DIAGNOSTICS['coverage_pct'],
+                'verified_flow_events_60s':FLOW_TAPE_DIAGNOSTICS['verified_events_60s'],
+                'flow_tape_backlog':FLOW_TAPE_DIAGNOSTICS['backlog'],
+            })
+            if flow_rejected:
+                book['entry_diagnostics']['blocked_reason']='verified_flow_unavailable'
         if not eligible:
             continue
         _,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1]))
@@ -361,7 +455,7 @@ def maybe_open(feed,flows):
             'price_crosscheck':price_integrity.check(coin),
             'entry_policy_version':activity.POLICY_VERSION,
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
-            'entry_size_reduced':notional+0.02<min(TRADE_NOTIONAL,num(book['balance'])),
+            'entry_size_reduced':notional+0.02<entry_limit,
             'pnl_pct':round(proposed['initial_pnl_pct'],3),
             'open_pnl_usd':round(proposed['initial_pnl_usd'],4),
             'execution_exit_price':round(mark['fill_price'],12),
@@ -396,6 +490,28 @@ def persist(status='online',error=None):
     STATE['data_integrity_note']='Историята съдържа непотвърдени цени, включително XFUN. Не е доказателство за реална доходност. Новите входове минават независима проверка.'
     STATE['activity_config']={**activity.policy_config(),'stop_loss_net_pct':STOP_LOSS,
                               'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL}
+    previous_setup=STATE.get('portfolio_setup') or {}
+    default_setup_status='ACTIVE' if all(
+        abs(num(STATE['books'][key].get('starting_balance'))-PROMOTED_ALLOCATION)<1e-8
+        and not STATE['books'][key].get('history')
+        and not STATE['books'][key].get('promotion_pending')
+        for key in PROMOTED_STRATEGIES
+    ) else 'UNCONFIGURED'
+    STATE['portfolio_setup']={**previous_setup,
+        'version':'PROMOTED_PAPER_COHORT_V1',
+        'status':previous_setup.get('status') or default_setup_status,
+        'group':'PROMOTED_PAPER',
+        'total_allocated_capital_usd':PROMOTED_TOTAL_CAPITAL,
+        'allocation_per_strategy_usd':PROMOTED_ALLOCATION,
+        'max_position_fraction':PROMOTED_MAX_POSITION_FRACTION,
+        'strategies':list(PROMOTED_STRATEGIES),
+        'accounts_are_independent':True,
+        'real_execution_enabled':False,
+        'legacy_open_positions':sorted(
+            key for key,book in (previous_setup.get('legacy_draining_books') or {}).items()
+            if book.get('position')
+        ),
+    }
     if error: STATE['error']=str(error)[:200]
     else: STATE.pop('error',None)
     published=merge_paired_snapshot(merge_astra_snapshot(STATE))
@@ -405,6 +521,14 @@ def persist(status='online',error=None):
 def main():
     global STATE
     STATE=load_state()
+    if (STATE.get('portfolio_setup') or {}).get('status')=='DRAINING':
+        try:
+            promote_strategy_lab(STATE_PATH.parent)
+            STATE=load_state()
+        except Exception as e:
+            setup=STATE.get('portfolio_setup') or {}
+            setup['promotion_error']=str(e)[:200]
+            STATE['portfolio_setup']=setup
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()

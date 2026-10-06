@@ -194,6 +194,34 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(answers[0]['result'],'one');self.assertIn('error',answers[1]);self.assertEqual(answers[2]['result'],'three')
         self.assertIn('error',tape.align_rpc_answers(calls,[{'id':1,'result':1},{'id':1,'result':2}])[0])
 
+    def test_get_transaction_uses_singleton_rpc_requests_while_signatures_stay_batched(self):
+        payloads=[]
+
+        class Response:
+            def __init__(self,payload):self.payload=payload
+            def raise_for_status(self):return None
+            def json(self):return [{'id':1,'result':self.payload[0]['params'][0]}]
+
+        def post(url,json,timeout):
+            payloads.append(json)
+            return Response(json)
+
+        signatures=[f'transaction-{i}' for i in range(8)]
+        transaction_calls=[('getTransaction',[signature,{'encoding':'jsonParsed'}]) for signature in signatures]
+        with patch.object(tape.SESSION,'post',side_effect=post), patch.object(tape,'RPC_TRANSACTION_CONCURRENCY',4):
+            answers=tape.rpc_batch(transaction_calls)
+            transaction_payloads=list(payloads)
+            payloads.clear()
+            signature_calls=[('getSignaturesForAddress',[pubkey(20+i),{'limit':1}]) for i in range(8)]
+            signature_answers=tape.rpc_batch(signature_calls)
+
+        self.assertEqual(len(transaction_payloads),len(transaction_calls))
+        self.assertTrue(all(len(payload)==1 for payload in transaction_payloads))
+        self.assertEqual([answer['result'] for answer in answers],signatures)
+        self.assertEqual(len(payloads),1)
+        self.assertEqual(len(payloads[0]),len(signature_calls))
+        self.assertEqual(len(signature_answers),len(signature_calls))
+
     def test_over_60_signatures_never_silently_dropped_and_restart_resume(self):
         rows=[{'signature':f's{i:03}','slot':i,'blockTime':NOW//1000,'err':None} for i in range(180,0,-1)]
         requests=[]

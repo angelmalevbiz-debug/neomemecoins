@@ -7,6 +7,7 @@ and events. Unknown programs/ambiguous bodies degrade coverage, never imply
 that there were no sellers. A signature is terminal only after classification.
 """
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import json
 import hashlib
 import math
@@ -24,13 +25,14 @@ RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
 MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-# PAGE_SIZE is a ceiling. Discovery uses at most half of the transaction
-# processing budget, shared across active pools and pagination rounds. The
-# remaining capacity drains retries/backlog instead of letting intake grow.
+# PAGE_SIZE is a ceiling. Discovery shares the capped transaction budget
+# across active pools and pagination rounds; a minimum page of one signature
+# keeps each supported pool progressing when the pool count is high.
 PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','1000'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
-TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
+TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','12')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
+RPC_TRANSACTION_CONCURRENCY = max(1,int(os.getenv('NEO_TAPE_RPC_TX_CONCURRENCY','4')))
 WINDOW_MS = 300_000
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
@@ -143,6 +145,19 @@ def align_rpc_answers(calls,data):
 def rpc_batch(calls):
     if not calls:
         return []
+    # PublicNode accepts batched signature discovery, but rejects a batch of
+    # getTransaction calls with -32600. Keep body retrieval bounded and
+    # concurrent as individual JSON-RPC requests instead of retrying an
+    # unsupported provider batch forever.
+    if all(method == 'getTransaction' for method,_ in calls):
+        def fetch_one(indexed_call):
+            index,(method,params) = indexed_call
+            payload = [{'jsonrpc':'2.0','id':1,'method':method,'params':params}]
+            response = SESSION.post(RPC_URL,json=payload,timeout=15)
+            response.raise_for_status()
+            return align_rpc_answers([calls[index]],response.json())[0]
+        with ThreadPoolExecutor(max_workers=min(RPC_TRANSACTION_CONCURRENCY,len(calls))) as pool:
+            return list(pool.map(fetch_one,enumerate(calls)))
     if len(calls)>RPC_BATCH_SIZE:
         answers=[]
         for start in range(0,len(calls),RPC_BATCH_SIZE):
@@ -340,8 +355,8 @@ class TapeRecorder:
                     self.db.execute('INSERT INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(pair,mint,json.dumps(metadata)))
             active.append(metadata)
         # One shared page batch per round, rather than one HTTP call per pool.
-        # The page size is a ceiling: reserve half the decoder budget for
-        # draining durable work while keeping discovery balanced across pools.
+        # The page size is a ceiling: spread the bounded body-processing budget
+        # across active pools while keeping discovery balanced and predictable.
         page_limit = max(1, min(self.page_size,
                                 self.tx_budget // max(2, 2*len(active)*self.page_budget)))
         for _ in range(self.page_budget):

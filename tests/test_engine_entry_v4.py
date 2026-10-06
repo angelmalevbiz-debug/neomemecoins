@@ -135,10 +135,46 @@ class EngineEntryTests(unittest.TestCase):
         self.assertEqual(m.STATE.entry_diagnostics['rejections']['quote_inconsistent'], 1)
 
     def test_costs_above_cap_are_still_rejected(self):
-        self.exit.update(expected_usdc=190.0, floor_usdc=188.0)
-        self.monitor.maybe_open([self.coin])
+        attempted = []
+
+        def too_costly_at_every_size(_address, _pair, notional):
+            attempted.append(notional)
+            amount = float(notional)
+            quote = {**self.entry, 'input_usdc_raw': int(amount * 1_000_000),
+                     'token_raw_amount': int(amount / self.coin['priceUsd'] * 1_000_000),
+                     'price_impact_pct': 1.0, 'quoted_at': m.now_ms()}
+            sale = {**self.exit, 'expected_usdc': amount * .95,
+                    'floor_usdc': amount * .94, 'quoted_at': m.now_ms()}
+            return quote, sale
+
+        with patch.object(m.paper_quotes, 'prepare_entry', side_effect=too_costly_at_every_size):
+            self.monitor.maybe_open([self.coin])
+        self.assertEqual(attempted, [200.0, 100.0, 50.0])
         self.assertFalse(m.STATE.positions)
         self.assertIn('roundtrip_cost', m.STATE.entry_diagnostics['rejections'])
+
+    def test_smaller_fresh_quote_can_open_after_cost_checked_size_retry(self):
+        attempted = []
+
+        def size_sensitive_quotes(_address, _pair, notional):
+            attempted.append(notional)
+            amount = float(notional)
+            quote = {**self.entry, 'input_usdc_raw': int(amount * 1_000_000),
+                     'token_raw_amount': int(amount / self.coin['priceUsd'] * 1_000_000),
+                     'price_impact_pct': 2.1 if amount > 100 else 1.0,
+                     'quoted_at': m.now_ms()}
+            sale = {**self.exit,
+                    'expected_usdc': amount * (.95 if amount > 100 else .985),
+                    'floor_usdc': amount * (.94 if amount > 100 else .975),
+                    'quoted_at': m.now_ms()}
+            return quote, sale
+
+        with patch.object(m.paper_quotes, 'prepare_entry', side_effect=size_sensitive_quotes):
+            self.monitor.maybe_open([self.coin])
+        self.assertEqual(attempted, [200.0, 100.0])
+        self.assertEqual(len(m.STATE.positions), 1)
+        self.assertEqual(m.STATE.positions[0]['notional_usd'], 100.0)
+        self.assertEqual(m.STATE.entry_diagnostics['size_retries'], 1)
 
     def test_impact_cap_is_enforced(self):
         self.entry['price_impact_pct'] = 2.01

@@ -1,9 +1,9 @@
 {
   "name": "NEO verified PAPER execution and isolated learning",
   "locked_at_utc": "2026-10-06",
-  "source_commit": "USER_AUTHORIZED_PAPER_AUDIT_REPAIR_20261005",
+  "source_commit": "USER_AUTHORIZED_PAPER_QUOTE_SIZE_BACKOFF_20261006",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "a9811c84e2ef18948e4507a5c199fcd28ec04c82a10f841462d788834ff6804d",
+  "sha256": "26c07c6cefb5bfcc5333c7c3bfeb5fd98c73679ec92d59b74235e0e482803a21",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
     "entry_score": 85,
@@ -24,7 +24,9 @@
     "max_total_exposure_pct": 100,
     "max_drawdown_pct": 20,
     "stop_execution_buffer_pct": 0.5,
-    "primary_daily_and_drawdown_caps_enabled": true
+    "primary_daily_and_drawdown_caps_enabled": true,
+    "quote_size_backoff_min_usd": 25,
+    "quote_size_backoff_max_attempts": 3
   },
   "policy": "User-authorized combined four-rule $1,000 PAPER account with independent simulated quote, risk, and safety gates; no live execution.",
   "integrity_note": "Mandatory validated flow coverage, exact pool/mint checks, complete safety checks, one effective threshold object, bounded recorded quote latency and uncapped actual modeled losses.",
@@ -48,12 +50,22 @@
       "fresh buy/sell quotes",
       "impact and roundtrip-cost bounds",
       "available shared cash"
-    ]
+    ],
+    "quote_size_backoff": {
+      "minimum_notional_usd": 25,
+      "max_fresh_quote_attempts": 3,
+      "retry_only_after": [
+        "impact",
+        "roundtrip_cost",
+        "worst_case_cost"
+      ],
+      "all_existing_execution_and_safety_gates_apply": true
+    }
   },
   "support_files_sha256": {
     "backend/astra6_brain.py": "2b5ec59be59a93122ce6c08bedd1205c6330d12af75211c60336f616f17390de",
     "backend/compat_file_lock.py": "8ba79d6e53250fba0a3f0dc2f997ed89094210d170d84c4b66c200f5ab9d64df",
-    "backend/engine_entry_policy.py": "d39b0ecd63468b6bb0207b0035d7a66f38956c6317e1cff72b249fab1b02cbfe",
+    "backend/engine_entry_policy.py": "2e76016fa72d7404ff005f0171b2c4859f891b4aa71baf7b07ee99c1e92f08df",
     "backend/engine_execution.py": "2a4f68ef51327a1fbc5cb1a80c2de2ddbae2a52a39ac7dcdc495fa686dabb20a",
     "backend/engine_exit_policy.py": "667010bcc5e047996d90a9bcecb7b9eaf9baeee10864aeb2dfa9b23a8dbd0e3c",
     "backend/engine_rug_guard.py": "5c732df903fdfcb692a8b2d64afd1276f1350658471d17c4c8363cefd58ae7e3",
@@ -76,7 +88,8 @@
     "backend/lab_dashboard_projection.py": "6714791cc22c0330843c902c76cfd058062a6fc4f9afd2c7cfa41d8a0cc28da0",
     "backend/lab_activity.py": "6f39bd931024205cbd08644652fee9ddad5a14d5438c315310cb8620155e17ab",
     "backend/winner_ensemble.py": "96d40a7d1e7623af693dce792e7ccbf0414702a18ab41a9b6e727d9cfcd9fa77",
-    "backend/market_monitor.py": "a9811c84e2ef18948e4507a5c199fcd28ec04c82a10f841462d788834ff6804d"
+    "backend/market_monitor.py": "26c07c6cefb5bfcc5333c7c3bfeb5fd98c73679ec92d59b74235e0e482803a21",
+    "backend/entry_size_backoff.py": "20bbabd06df2b9aa61b006cd06fb56f216f48b54f2743c38cd21a174a44cbb41"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs the four selected Lab entry rules against one shared balance; independent validated training remains separate and can never send live orders.",

@@ -81,6 +81,7 @@ LABELS = {
     'roundtrip_cost': 'твърде скъпи вход и изход',
     'worst_case_cost': 'недостатъчен запас до стопа',
     'quote_budget': 'изчакване на следващата проверка на котировките',
+    'quote_retry_cooldown': 'пауза преди нова котировка за същия token',
     'daily_limit': 'достигнат дневен лимит',
     'position_open': 'вече има отворена позиция',
     'balance': 'недостатъчен свободен баланс',
@@ -147,6 +148,8 @@ def finish(report):
     if report['opened']:
         report['status'] = 'opened'
         report['message'] = 'Отворена е нова тестова позиция след проверка на котировките и разходите.'
+        if report.get('size_retries'):
+            report['message'] += f" Размерът е намален при {report['size_retries']} повторни проверки."
     elif 'position_open' in counts:
         report['status'] = 'position_open'
         report['message'] = f"Достигнат е лимитът от {report.get('max_positions', '?')} едновременни PAPER позиции; изходите продължават."
@@ -157,8 +160,13 @@ def finish(report):
         report['status'] = 'waiting'
         top = counts.most_common(2)
         why = '; '.join(f'{LABELS.get(k, k)}: {v}' for k, v in top) or 'няма подходящ сигнал'
+        attempts = report.get('quote_attempts', report.get('quoted', 0))
+        quote_summary = (f"{report.get('quoted', 0)} token-а стигнаха до котировка; "
+                         f"{attempts} проверки на котировки")
+        if report.get('size_retries'):
+            quote_summary += f" ({report['size_retries']} повторни проверки с по-малък размер)"
         report['message'] = (f"Проверени {report['evaluated']} от {report['candidates']} token-а; "
                              f"{report['signal_passed']} минаха входните филтри; "
-                             f"{report['quoted']} проверки на котировки. Откази: {why}.")
+                             f"{quote_summary}. Откази: {why}.")
     report['reason_labels'] = {k: LABELS.get(k, k) for k in counts}
     return report

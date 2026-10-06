@@ -16,6 +16,7 @@ import engine_runtime as runtime
 import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
+import entry_size_backoff
 from lab_dashboard_projection import compact_strategy_lab
 
 HOST = os.getenv('NEO_MONITOR_HOST', '127.0.0.1')
@@ -635,6 +636,11 @@ class State:
                     'effective_config_hash': effective_config_hash(),
                     'effective_entry_thresholds': winner_ensemble.rule_config(),
                     'max_quoted_candidates_per_scan': entry_policy.MAX_QUOTED_CANDIDATES,
+                    'max_quote_attempts_per_scan': entry_policy.MAX_QUOTED_CANDIDATES,
+                    'quote_size_backoff_version': entry_size_backoff.VERSION,
+                    'quote_size_backoff_min_usd': entry_size_backoff.MIN_ENTRY_NOTIONAL_USD,
+                    'quote_size_backoff_attempts': entry_size_backoff.MAX_SIZE_ATTEMPTS,
+                    'quote_retry_cooldown_ms': entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS,
                     'strict_entry_score': STRICT_ENTRY_SCORE,
                     'strict_min_conviction': STRICT_MIN_CONVICTION,
                     'strict_min_liquidity_usd': STRICT_MIN_LIQUIDITY_USD,
@@ -711,6 +717,10 @@ def effective_config_hash():
               'max_position_full_loss_usd': MAX_POSITION_RISK_USD,'max_exposure_pct': MAX_TOTAL_EXPOSURE_PCT,'max_drawdown_pct':MAX_DRAWDOWN_PCT,
               'max_impact_pct': STRICT_MAX_ENTRY_IMPACT_PCT, 'max_cost_pct': STRICT_MAX_ROUNDTRIP_COST_PCT,
               'max_conservative_cost_pct': STRICT_MAX_WORST_CASE_COST_PCT,
+              'quote_size_backoff_version': entry_size_backoff.VERSION,
+              'quote_size_backoff_min_usd': entry_size_backoff.MIN_ENTRY_NOTIONAL_USD,
+              'quote_size_backoff_attempts': entry_size_backoff.MAX_SIZE_ATTEMPTS,
+              'quote_retry_cooldown_ms': entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS,
               'execution_evidence_version': 'QUOTE_EVIDENCE_V9',
               'quote_adapter': paper_quotes.transport.ADAPTER_VERSION,
               'slippage_tolerance_bps': paper_quotes.SLIPPAGE_BPS,
@@ -1074,6 +1084,7 @@ class Monitor:
         self.position_lock = threading.Lock()
         self.position_poll_lock = threading.Lock()
         self.entry_lock = threading.Lock()
+        self.entry_quote_retry_after: dict[str, int] = {}
         self.discovery = runtime.DiscoveryCache(discover, refresh_seconds=8, max_age_seconds=90)
 
     def prewarm_entry_checks(self, feed: list[dict[str, Any]]) -> None:
@@ -1438,7 +1449,9 @@ class Monitor:
         if not STATE.running or not self.entry_lock.acquire(blocking=False): return
         report = {'policy_version': winner_ensemble.ENTRY_POLICY_VERSION, 'checked_at': now_ms(),
                   'candidates': len(feed), 'evaluated': 0, 'signal_passed': 0,
-                  'quoted': 0, 'opened': 0, 'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS}
+                  'quoted': 0, 'quote_attempts': 0, 'size_retries': 0, 'opened': 0,
+                  'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS,
+                  'max_quote_attempts_per_scan': entry_policy.MAX_QUOTED_CANDIDATES}
         try:
             self._maybe_open_checked(feed, report)
         except Exception as exc:
@@ -1508,6 +1521,12 @@ class Monitor:
                 reject(report, ['winner_signal'], coin)
                 continue
             report['signal_passed'] += 1
+            retry_after = self.entry_quote_retry_after.get(address, 0)
+            if retry_after > now_ms():
+                reject(report, ['quote_retry_cooldown'], coin, {'retry_after_ms': retry_after})
+                continue
+            if retry_after:
+                self.entry_quote_retry_after.pop(address, None)
             entry_mode = 'WINNER_ENSEMBLE'
             flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
             context = self.market_context(coin)
@@ -1530,9 +1549,6 @@ class Monitor:
                 continue
             if safety.get('status') != 'pass' or safety.get('provisional_early'):
                 reject(report, safety.get('reasons') or ['risk_check_pending'], coin)
-                continue
-            if report['quoted'] >= entry_policy.MAX_QUOTED_CANDIDATES:
-                reject(report, ['quote_budget'], coin)
                 continue
             strategy_id = winner_ensemble.VERSION
             # These are the Lab market rules in one shared PAPER account. They
@@ -1570,46 +1586,86 @@ class Monitor:
             )
             if notional < 10:
                 reject(report,['risk_budget_unavailable'],coin); return
-            report['quoted'] += 1
             dex_id = str(coin.get('dexId') or '').lower()
-            if dex_id == 'pumpswap':
-                prepared = pumpswap_stop.prepare_entry(
-                    coin, notional, sol_usd,
-                    buffer_bps=paper_quotes.BUFFER_BPS,
-                    slippage_bps=paper_quotes.SLIPPAGE_BPS,
-                )
-            else:
-                prepared = paper_quotes.prepare_entry(
-                    address, str(coin.get('pairAddress') or ''), notional
-                )
-            if not prepared:
-                reject(report,['quote_inconsistent'],coin)
-                continue
-            live_quote,initial_exit=prepared
             entry_network_fee=pre_network_fee
-            expected_token_raw=int(live_quote['token_raw_amount'])
-            immediate_exit_net = max(0.0, num(initial_exit.get('expected_usdc')) - entry_network_fee)
-            worst_case_exit_net = max(0.0, num(initial_exit.get('floor_usdc')) - entry_network_fee)
-            immediate_roundtrip_pct = (
-                (immediate_exit_net - notional - entry_network_fee - entry_rent) / max(notional, 1e-18)
-            ) * 100.0
-            worst_case_roundtrip_pct = (
-                (worst_case_exit_net - notional - entry_network_fee - entry_rent) / max(notional, 1e-18)
-            ) * 100.0
-            impact_pct = num(live_quote.get('price_impact_pct'))
-            quote_rejected = entry_policy.quote_rejections(
-                live_quote, immediate_roundtrip_pct, worst_case_roundtrip_pct,
-                max_impact=STRICT_MAX_ENTRY_IMPACT_PCT,
-                max_cost=STRICT_MAX_ROUNDTRIP_COST_PCT,
-                max_conservative_cost=STRICT_MAX_WORST_CASE_COST_PCT, now=now_ms(),
-            )
-            if quote_rejected:
-                reject(report, quote_rejected, coin, {
-                    'expected_roundtrip_pct': round(immediate_roundtrip_pct, 4),
-                    'conservative_roundtrip_pct': round(worst_case_roundtrip_pct, 4),
-                    'entry_impact_pct': round(impact_pct, 4),
-                })
+            if report['quote_attempts'] >= entry_policy.MAX_QUOTED_CANDIDATES:
+                reject(report, ['quote_budget'], coin)
                 continue
+            report['quoted'] += 1
+            quote_sizes = entry_size_backoff.quote_notional_steps(notional)
+            retry_cause = {'cost': False, 'quote': False}
+
+            def check_quote_size(attempt_notional, attempt_index):
+                if report['quote_attempts'] >= entry_policy.MAX_QUOTED_CANDIDATES:
+                    reject(report, ['quote_budget'], coin)
+                    return None, ['quote_budget']
+                report['quote_attempts'] += 1
+                if attempt_index:
+                    report['size_retries'] += 1
+                if dex_id == 'pumpswap':
+                    prepared = pumpswap_stop.prepare_entry(
+                        coin, attempt_notional, sol_usd,
+                        buffer_bps=paper_quotes.BUFFER_BPS,
+                        slippage_bps=paper_quotes.SLIPPAGE_BPS,
+                    )
+                else:
+                    prepared = paper_quotes.prepare_entry(
+                        address, str(coin.get('pairAddress') or ''), attempt_notional
+                    )
+                if not prepared:
+                    retry_cause['quote'] = True
+                    reject(report, ['quote_inconsistent'], coin,
+                           {'notional_usd': attempt_notional, 'attempt': attempt_index + 1})
+                    return None, ['quote_inconsistent']
+                live_quote, initial_exit = prepared
+                expected_token_raw = int(live_quote['token_raw_amount'])
+                immediate_exit_net = max(0.0, num(initial_exit.get('expected_usdc')) - entry_network_fee)
+                worst_case_exit_net = max(0.0, num(initial_exit.get('floor_usdc')) - entry_network_fee)
+                immediate_roundtrip_pct = (
+                    (immediate_exit_net - attempt_notional - entry_network_fee - entry_rent)
+                    / max(attempt_notional, 1e-18)
+                ) * 100.0
+                worst_case_roundtrip_pct = (
+                    (worst_case_exit_net - attempt_notional - entry_network_fee - entry_rent)
+                    / max(attempt_notional, 1e-18)
+                ) * 100.0
+                impact_pct = num(live_quote.get('price_impact_pct'))
+                quote_rejected = entry_policy.quote_rejections(
+                    live_quote, immediate_roundtrip_pct, worst_case_roundtrip_pct,
+                    max_impact=STRICT_MAX_ENTRY_IMPACT_PCT,
+                    max_cost=STRICT_MAX_ROUNDTRIP_COST_PCT,
+                    max_conservative_cost=STRICT_MAX_WORST_CASE_COST_PCT, now=now_ms(),
+                )
+                if quote_rejected:
+                    retry_cause['cost'] = True
+                    next_notional = quote_sizes[attempt_index + 1] if attempt_index + 1 < len(quote_sizes) else None
+                    reject(report, quote_rejected, coin, {
+                        'notional_usd': attempt_notional,
+                        'next_notional_usd': next_notional,
+                        'expected_roundtrip_pct': round(immediate_roundtrip_pct, 4),
+                        'conservative_roundtrip_pct': round(worst_case_roundtrip_pct, 4),
+                        'entry_impact_pct': round(impact_pct, 4),
+                    })
+                    return None, quote_rejected
+                return {
+                    'live_quote': live_quote, 'initial_exit': initial_exit,
+                    'expected_token_raw': expected_token_raw, 'impact_pct': impact_pct,
+                    'immediate_roundtrip_pct': immediate_roundtrip_pct,
+                    'worst_case_roundtrip_pct': worst_case_roundtrip_pct,
+                }, []
+
+            selected_quote = entry_size_backoff.first_quote_passing_costs(notional, check_quote_size)
+            if selected_quote is None:
+                if retry_cause['cost'] or retry_cause['quote']:
+                    self.entry_quote_retry_after[address] = now_ms() + entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS
+                continue
+            notional, selected_data, _attempt_count = selected_quote
+            live_quote = selected_data['live_quote']
+            initial_exit = selected_data['initial_exit']
+            expected_token_raw = selected_data['expected_token_raw']
+            impact_pct = selected_data['impact_pct']
+            immediate_roundtrip_pct = selected_data['immediate_roundtrip_pct']
+            worst_case_roundtrip_pct = selected_data['worst_case_roundtrip_pct']
             stop_signal_trigger_pct = None
             quote_slippage_pct = paper_quotes.BUFFER_BPS / 100.0
             quote_network_fee = entry_network_fee

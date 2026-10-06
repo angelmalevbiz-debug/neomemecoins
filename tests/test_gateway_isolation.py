@@ -117,6 +117,27 @@ class GatewayIsolation(unittest.TestCase):
         self.assertEqual(len(s['history']), 400)
         self.assertEqual(s['demo_balance_usd'], 600)
 
+    def test_target_paper_profile_requires_exact_email_and_stays_paper_only(self):
+        account={'user_id':'target'}
+        with patch.object(self.gateway,'TARGET_PAPER_EMAIL','target@example.com'):
+            self.assertTrue(self.gateway.apply_target_profile({'id':'target','email':'target@example.com'},account))
+            self.assertEqual(account['paper_profile'],self.gateway.TARGET_PAPER_PROFILE)
+            other={'user_id':'other'}
+            self.assertFalse(self.gateway.apply_target_profile({'id':'other','email':'other@example.com'},other))
+            self.assertNotIn('paper_profile',other)
+        env={'NEO_ENGINE_MODE':'PAPER','NEO_EXECUTION_MODE':'PAPER'}
+        env.update(self.gateway.TARGET_PAPER_ENV)
+        self.assertEqual(env['NEO_ENGINE_MODE'],'PAPER')
+        self.assertEqual(env['NEO_EXECUTION_MODE'],'PAPER')
+        self.assertNotIn('NEO_ENGINE_MODE',self.gateway.TARGET_PAPER_ENV)
+        self.assertNotIn('NEO_EXECUTION_MODE',self.gateway.TARGET_PAPER_ENV)
+
+    def test_target_paper_profile_does_not_match_email_case_or_prefix_by_accident(self):
+        with patch.object(self.gateway,'TARGET_PAPER_EMAIL','target@example.com'):
+            self.assertTrue(self.gateway.is_target_user({'email':'TARGET@example.com'}))
+            self.assertFalse(self.gateway.is_target_user({'email':'x-target@example.com'}))
+            self.assertFalse(self.gateway.is_target_user({'email':'target@example.com.evil'}))
+
     def test_corrupt_registry_refuses_silent_reset(self):
         p=Path(self.gateway.STORE_PATH)
         p.write_text('{broken', encoding='utf-8')

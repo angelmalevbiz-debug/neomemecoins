@@ -6,6 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
+EnvironmentFile=-/etc/neo/neo-user-gateway.env
 WorkingDirectory=/root/neomemecoins
 Environment=PYTHONUNBUFFERED=1
 Environment=NEO_USER_GATEWAY_HOST=127.0.0.1

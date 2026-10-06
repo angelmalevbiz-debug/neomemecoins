@@ -89,5 +89,36 @@ class BrainstormEngineTests(unittest.TestCase):
             self.assertFalse(decision['enabled'])
 
 
+    def test_bad_recent_run_raises_dynamic_threshold(self):
+        history=[]
+        # Recent BRAINSTORM outcomes are deliberately poor; threshold must tighten.
+        for i in range(16):
+            history.append({
+                'closed_at': 2000-i, 'pnl_usd': -1 if i < 12 else 1,
+                'brainstorm': {'version': b.VERSION}, 'brainstorm_version': b.VERSION,
+                'brainstorm_confidence': 0.75, 'strategy_matches': self.strong_matches(),
+            })
+        adaptive=b._drift_and_threshold(history, 3000)
+        self.assertGreater(adaptive['threshold'], 0.70)
+        self.assertGreater(adaptive['penalty'], 0)
+
+    def test_breakout_regime_is_detected(self):
+        coin=self.strong_coin()
+        coin['priceChange']['h1']=25
+        coin['volume']={'h1': 900_000}
+        regime=b._regime(coin, {'buy_sell_usd_ratio': 2.0})
+        self.assertEqual(regime['name'], 'breakout_trend')
+
+    def test_chaotic_regime_requires_extra_consensus(self):
+        coin=self.strong_coin()
+        coin['priceChange']={'m5': 31, 'h1': 130}
+        decision=b.evaluate_pre(
+            coin, ['MOMENTUM','FLOW_ELITE','ULTRA_PRECISION'], [],
+            safety={'status':'pass'}, validation={'status':'pass'}, now_ms=1000,
+        )
+        self.assertFalse(decision['allow'])
+        self.assertIn('chaotic_regime_needs_extra_consensus', decision['vetoes'])
+
+
 if __name__ == '__main__':
     unittest.main()

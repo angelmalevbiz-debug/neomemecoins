@@ -302,11 +302,12 @@ class RpcAndDurability(unittest.TestCase):
         requested=[]
 
         def rpc(calls):
-            requested.extend(params[0] for method,params in calls if method=='getTransaction')
+            requested.extend((params[0],params[1]) for method,params in calls if method=='getTransaction')
             return [{'result':non_swap()} for _ in calls]
 
         self.rec.process(rpc)
-        self.assertEqual(requested,['current'])
+        self.assertEqual([signature for signature,_ in requested],['current'])
+        self.assertEqual(requested[0][1]['maxSupportedTransactionVersion'],1)
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='old'").fetchone()[0],'pending')
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='current'").fetchone()[0],'non_swap')
 

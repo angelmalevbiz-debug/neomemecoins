@@ -419,7 +419,7 @@ class TapeRecorder:
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
-        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':0}]) for sig in groups]
+        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':1}]) for sig in groups]
         if not calls:
             return
         try:

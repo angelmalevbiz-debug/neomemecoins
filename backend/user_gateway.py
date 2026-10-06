@@ -31,7 +31,7 @@ SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
 TARGET_PAPER_EMAIL = os.getenv("NEO_TARGET_PAPER_EMAIL", "").strip().lower()
 TARGET_PAPER_PROFILE = "HF_50H_SL4_TP10_COSTS_V2"
-TARGET_HISTORY_RESTORE_VERSION = "BACKUP_UNION_V1"
+TARGET_HISTORY_RESTORE_VERSION = "FULL_ACCOUNT_ARCHIVE_UNION_V2"
 BACKUP_ROOT = Path(os.getenv("NEO_MARKET_BACKUP_ROOT", "/var/lib/neo-market/backups"))
 TARGET_PAPER_ENV = {
     "NEO_STOP_LOSS_PCT": "4",
@@ -174,22 +174,42 @@ def restore_target_history(user_id, account):
     if BACKUP_ROOT.exists():
         sources.extend(BACKUP_ROOT.glob(f"**/{safe_id}.json"))
         sources.extend(BACKUP_ROOT.glob(f"**/states/users/{safe_id}/state.json"))
+    market_root = USER_ENGINE_ROOT.parent
+    for archive_root in market_root.glob("audit-archive-*"):
+        sources.extend(archive_root.glob(f"**/{safe_id}/state.json"))
+        sources.extend(archive_root.glob(f"**/{safe_id}/audit.jsonl"))
+    if engine_audit_path(user_id).exists():
+        sources.append(engine_audit_path(user_id))
+    sources.append(state_path)
     sources = sorted({p.resolve() for p in sources if p.is_file()}, key=lambda p: p.stat().st_mtime)
-    sources.append(state_path.resolve())
     merged = {}
     source_count = 0
     for source in sources:
+        recovered = []
         try:
-            payload = json.loads(source.read_text(encoding="utf-8"))
+            if source.suffix == ".jsonl":
+                for line in source.read_text(encoding="utf-8", errors="replace").splitlines():
+                    try:
+                        row = json.loads(line)
+                    except Exception:
+                        continue
+                    if str(row.get("event") or "").upper() != "EXIT":
+                        continue
+                    trade = row.get("payload")
+                    if isinstance(trade, dict):
+                        recovered.append(trade)
+            else:
+                payload = json.loads(source.read_text(encoding="utf-8"))
+                history = payload.get("history") if isinstance(payload, dict) else None
+                if isinstance(history, list):
+                    recovered.extend(t for t in history if isinstance(t, dict))
         except Exception:
             continue
-        history = payload.get("history") if isinstance(payload, dict) else None
-        if not isinstance(history, list):
+        if not recovered:
             continue
         source_count += 1
-        for trade in history:
-            if isinstance(trade, dict):
-                merged[trade_identity(trade)] = copy.deepcopy(trade)
+        for trade in recovered:
+            merged[trade_identity(trade)] = copy.deepcopy(trade)
     for trade in account.get("history") or []:
         if isinstance(trade, dict):
             merged.setdefault(trade_identity(trade), copy.deepcopy(trade))
@@ -200,6 +220,8 @@ def restore_target_history(user_id, account):
     backup = state_path.with_name(f"state.pre-history-restore-{now_ms()}.json")
     backup.write_bytes(state_path.read_bytes())
     current["history"] = restored
+    max_trade_no = max([int(current.get("trade_seq") or 0)] + [int(t.get("trade_no") or 0) for t in restored])
+    current["trade_seq"] = max_trade_no
     atomic_json(state_path, current)
     account["history_restore_version"] = TARGET_HISTORY_RESTORE_VERSION
     account["history_restore_before"] = before

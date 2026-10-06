@@ -22,36 +22,62 @@ _BRIDGE = None
 ROUTE_EVIDENCE_TTL_MS = 30_000
 SOL = 'So11111111111111111111111111111111111111112'
 RECENT_OBSERVATION_IDS = 8192
+RECORDER_BATCH_SIZE = 128
+WORKER_RESTART_MAX_SECONDS = 30
 
 
 class TrainingBridge:
     def __init__(self, root, config=None):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        self.queue = queue.Queue(maxsize=4096)
+        self.queue = queue.Queue(maxsize=8192)
         self.cache = {}
         self.lock = threading.Lock()
         self.pending_ids = set()
         self.recent_ids = OrderedDict()
         self.coalesced = 0
         self.dropped = 0
+        sidecar_dropped = 0
+        recording_baseline = 0
         try:
             previous = json.loads((self.root / 'training.json').read_text(encoding='utf-8'))
             # Keep the producer count monotonic across parent-process restarts;
             # the worker stores a reset baseline for the current PAPER epoch.
-            self.dropped = int(number(previous.get('recording_drops_baseline'))) + int(number(previous.get('recording_drops_total')))
+            recording_baseline = int(number(previous.get('recording_drops_baseline')))
+            self.dropped = recording_baseline + int(number(previous.get('recording_drops_total')))
             for row_id in previous.get('seen_ids', [])[-RECENT_OBSERVATION_IDS:]:
                 if isinstance(row_id, str):
                     self.recent_ids[row_id] = None
         except (OSError, ValueError, TypeError):
             pass
         self.error = None
+        # Queue drops must outlive a process restart. Without this small
+        # sidecar, a restart could hide a coverage gap and later approve a
+        # candidate against incomplete evidence.
+        try:
+            recorder = json.loads((self.root / 'recorder_status.json').read_text(encoding='utf-8'))
+            sidecar_dropped = int(number(recorder.get('dropped_total')))
+            self.dropped = max(self.dropped, sidecar_dropped)
+        except (OSError, ValueError, TypeError):
+            pass
+        # If the older learner checkpoint knows about drops but no sidecar
+        # exists yet, the writer thread will publish that count on startup.
+        self._persisted_dropped = sidecar_dropped
+        self.recording_drop_baseline = recording_baseline
+        self.recording_drop_gap = self.dropped > recording_baseline
+        if self.recording_drop_gap:
+            self.error = 'Training epoch has recorded gaps; candidate promotion stays blocked until an archived PAPER reset'
         self.processed = 0
         self.latest = {'status': 'starting', 'paper_only': True}
         self.config = config
         self.process = None
+        self.worker_restart_attempts = 0
+        self.worker_restart_at = 0.0
+        self.worker_exit_reported_pid = None
+        self.worker_snapshot_mtime_at_launch = 0
         self.closed = False
         self.stop_event = threading.Event()
+        self._deferred = None
         self.thread = threading.Thread(target=self.run, name='paper-training', daemon=True)
         self.thread.start()
 
@@ -102,58 +128,163 @@ class TrainingBridge:
             with self.lock:
                 self.pending_ids.discard(row_id)
 
+    def _persist_drop_count(self):
+        if self.dropped <= self._persisted_dropped:
+            return True
+        try:
+            atomic_json(self.root / 'recorder_status.json', {
+                'version': 1, 'dropped_total': self.dropped,
+                'updated_at': int(time.time()*1000)})
+            self._persisted_dropped = self.dropped
+            return True
+        except Exception as exc:
+            self.error = f'Cannot persist training recorder gap: {type(exc).__name__}: {exc}'
+            return False
+
+    def _write_batch(self, batch):
+        """Append adjacent observations with one durable sync, preserving order."""
+        encoded = ''.join(json.dumps(item, ensure_ascii=False, allow_nan=False,
+                                     separators=(',', ':')) + '\n' for item in batch)
+        with (self.root / 'observations.jsonl').open('a', encoding='utf-8') as handle:
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def _write_reset_boundary(self):
+        if not self._persist_drop_count():
+            raise RuntimeError('cannot archive training reset before recorder gap is durable')
+        journal = self.root / 'observations.jsonl'
+        atomic_json(self.root / 'reset.request.json', {
+            'at': int(time.time()*1000),
+            # Queue order gives an exact durable boundary; timestamps alone
+            # cannot exclude future-dated imports.
+            'journal_offset': journal.stat().st_size if journal.exists() else 0,
+            'recording_drops_total': self.dropped})
+        with self.lock:
+            self.cache.clear()
+            self.pending_ids.clear()
+            self.recent_ids.clear()
+            self.coalesced = 0
+        self.recording_drop_baseline = self.dropped
+        self.recording_drop_gap = False
+        self._persisted_dropped = self.dropped
+        self.error = None
+
+    def _start_worker(self, config_path):
+        snapshot = self.root / 'training_snapshot.json'
+        try:
+            self.worker_snapshot_mtime_at_launch = snapshot.stat().st_mtime_ns
+        except OSError:
+            self.worker_snapshot_mtime_at_launch = 0
+        self.worker_exit_reported_pid = None
+        diagnostic = (self.root / 'worker_error.log').open('ab')
+        try:
+            self.process = subprocess.Popen(
+                [sys.executable, str(Path(__file__).with_name('training_worker.py')),
+                 '--root', str(self.root.resolve()), '--config', str(config_path.resolve())],
+                stdout=subprocess.DEVNULL, stderr=diagnostic,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+        finally:
+            diagnostic.close()
+
+    def _ensure_worker(self, config_path):
+        if self.process is not None:
+            returncode = self.process.poll()
+            if returncode is None:
+                snapshot = self.root / 'training_snapshot.json'
+                try:
+                    snapshot_ready = snapshot.stat().st_mtime_ns > self.worker_snapshot_mtime_at_launch
+                except OSError:
+                    snapshot_ready = False
+                if snapshot_ready and self.error and self.error.startswith('Training worker'):
+                    self.error = ('Training epoch has recorded gaps; candidate promotion stays blocked until an archived PAPER reset'
+                                  if self.recording_drop_gap else None)
+                    self.worker_restart_attempts = 0
+                return
+            pid = getattr(self.process, 'pid', None)
+            if pid != self.worker_exit_reported_pid:
+                self.worker_exit_reported_pid = pid
+                self.worker_restart_attempts += 1
+                delay = min(2 ** (self.worker_restart_attempts - 1), WORKER_RESTART_MAX_SECONDS)
+                self.worker_restart_at = time.monotonic() + delay
+                self.error = f'Training worker exited with code {returncode}; retrying in {delay}s'
+        if time.monotonic() < self.worker_restart_at:
+            return
+        try:
+            self._start_worker(config_path)
+        except Exception as exc:
+            self.worker_restart_attempts += 1
+            delay = min(2 ** (self.worker_restart_attempts - 1), WORKER_RESTART_MAX_SECONDS)
+            self.worker_restart_at = time.monotonic() + delay
+            self.error = f'Training worker could not start: {type(exc).__name__}: {exc}; retrying in {delay}s'
+
     def run(self):
         try:
             config_path = self.root / 'worker_config.json'
             atomic_json(config_path, self.config or {})
-            with (self.root / 'worker_error.log').open('ab') as diagnostic:
-                self.process = subprocess.Popen(
-                    [sys.executable, str(Path(__file__).with_name('training_worker.py')),
-                     '--root', str(self.root.resolve()), '--config', str(config_path.resolve())],
-                    stdout=subprocess.DEVNULL, stderr=diagnostic,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            self._persist_drop_count()
+            self._ensure_worker(config_path)
             while not self.stop_event.is_set():
-                try:
-                    item = self.queue.get(timeout=.1)
-                except queue.Empty:
-                    self.read_snapshot()
+                if self._deferred is not None:
+                    item, self._deferred = self._deferred, None
+                else:
+                    try:
+                        item = self.queue.get(timeout=.1)
+                    except queue.Empty:
+                        self._ensure_worker(config_path)
+                        self.read_snapshot()
+                        continue
+                if item is None:
+                    self.queue.task_done()
+                    return
+                if isinstance(item, dict) and item.get('_reset'):
+                    try:
+                        self._write_reset_boundary()
+                        self.read_snapshot()
+                    except Exception as exc:
+                        self.error = f'{type(exc).__name__}: {exc}'
+                    finally:
+                        self.queue.task_done()
                     continue
-                row_id = item.get('id') if isinstance(item, dict) and not item.get('_reset') else None
+
+                batch = [item]
+                while len(batch) < RECORDER_BATCH_SIZE:
+                    try:
+                        following = self.queue.get_nowait()
+                    except queue.Empty:
+                        break
+                    if following is None or (isinstance(following, dict) and following.get('_reset')):
+                        # Handle control messages at their exact queue position.
+                        # Keeping the item deferred avoids reordering around a
+                        # reset boundary or shutdown sentinel.
+                        self._deferred = following
+                        break
+                    batch.append(following)
                 try:
-                    if item is None:
-                        return
-                    if item.get('_reset'):
-                        journal = self.root / 'observations.jsonl'
-                        atomic_json(self.root / 'reset.request.json', {
-                            'at': int(time.time()*1000),
-                            # Queue ordering gives an exact durable boundary;
-                            # timestamps alone cannot exclude future-dated imports.
-                            'journal_offset': journal.stat().st_size if journal.exists() else 0,
-                            'recording_drops_total': self.dropped})
-                        with self.lock:
-                            self.cache.clear()
-                            self.pending_ids.clear()
-                            self.recent_ids.clear()
-                            self.coalesced = 0
-                        self.error = None
-                    else:
-                        # Persist provenance before evaluating. Accepted observations are
-                        # a replayable shared stream, not a count of independent trades.
-                        with (self.root / 'observations.jsonl').open('a', encoding='utf-8') as handle:
-                            handle.write(json.dumps(item, ensure_ascii=False, allow_nan=False)+'\n')
-                            handle.flush()
-                            os.fsync(handle.fileno())
-                        self.processed += 1
+                    # The append-only journal is durable before it enters the
+                    # training process. Batch syncing keeps the reader fast
+                    # without making main-bot entry/exit handling wait.
+                    self._write_batch(batch)
+                    self.processed += len(batch)
+                    for row in batch:
+                        row_id = row.get('id') if isinstance(row, dict) else None
                         self._record_persisted(row_id)
+                    self._persist_drop_count()
+                    self._ensure_worker(config_path)
                     self.read_snapshot()
                 except Exception as exc:
-                    self._forget_pending(row_id)
+                    for row in batch:
+                        row_id = row.get('id') if isinstance(row, dict) else None
+                        self._forget_pending(row_id)
+                    self.dropped += len(batch)
+                    self._persist_drop_count()
                     self.error = f'{type(exc).__name__}: {exc}'
                     self.latest = dict(self.latest, recorder={
                         'processed': self.processed, 'backlog': self.queue.qsize(),
                         'dropped': self.dropped, 'error': self.error}, status='degraded')
                 finally:
-                    self.queue.task_done()
+                    for _ in batch:
+                        self.queue.task_done()
         except Exception as exc:
             self.error = f'{type(exc).__name__}: {exc}'
             self.latest = {'status': 'error', 'paper_only': True, 'error': self.error}
@@ -186,6 +317,7 @@ class TrainingBridge:
             self.error = 'Training recorder shutdown before queue drained'
             self.stop_event.set()
         self.thread.join(timeout=3)
+        self._persist_drop_count()
         if self.process and self.process.poll() is None:
             self.process.terminate()
             self.process.wait(timeout=5)
@@ -435,8 +567,14 @@ def enabled():
 def snapshot():
     if _BRIDGE:
         result = copy.deepcopy(_BRIDGE.latest)
+        dropped_total = _BRIDGE.dropped
+        dropped_baseline = getattr(_BRIDGE, 'recording_drop_baseline', 0)
         result['recorder'] = {'processed': _BRIDGE.processed, 'backlog': _BRIDGE.queue.qsize(),
-                              'dropped': _BRIDGE.dropped, 'coalesced': _BRIDGE.coalesced,
+                              # The dashboard's current-training gap must not
+                              # inherit archived losses from before a reset.
+                              'dropped': max(0, dropped_total - dropped_baseline),
+                              'dropped_total': dropped_total, 'dropped_baseline': dropped_baseline,
+                              'coalesced': _BRIDGE.coalesced,
                               'error': _BRIDGE.error}
         if _BRIDGE.error:
             result['status'] = 'degraded'

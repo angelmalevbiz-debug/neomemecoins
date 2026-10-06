@@ -67,15 +67,19 @@ def atomic_json(path, value):
             json.dump(value, handle, ensure_ascii=False, allow_nan=False)
             handle.flush()
             os.fsync(handle.fileno())
-        for attempt in range(20):
+        # Training state grows with its durable observation-ID set. On Windows
+        # endpoint scanners/readers may briefly deny replacement of a large
+        # checkpoint; retry in this background learner instead of dropping its
+        # worker after a transient sharing violation.
+        for attempt in range(100):
             try:
                 os.replace(name, path)
                 break
             except PermissionError:
-                if os.name != "nt" or attempt == 19:
+                if attempt == 99:
                     raise
-                # Windows cannot rename over a brief concurrent reader handle.
-                time.sleep(.01)
+                # A brief concurrent reader or scanner can deny replacement.
+                time.sleep(.03)
     finally:
         if os.path.exists(name):
             os.unlink(name)
@@ -204,8 +208,17 @@ class PaperTrainingEngine:
             self.config = _config(config)
             self.state = self._fresh()
             self.save()
+        # The journal can contain hundreds of thousands of observations. A
+        # list membership check here made every new row scan the entire history
+        # and eventually let the asynchronous learner fall behind the market.
+        # Keep the persisted list for restart compatibility, and use this
+        # in-memory index for constant-time duplicate detection.
+        self._seen_ids = set(self.state.get("seen_ids", []))
         self._index_post_exit_assessments()
         self._index_rejected_signals()
+
+    def has_seen(self, row_id):
+        return bool(row_id) and row_id in self._seen_ids
 
     def _index_post_exit_assessments(self):
         """Rebuild once per load/reset; each row then visits active windows only."""
@@ -305,6 +318,7 @@ class PaperTrainingEngine:
         if initial_cash is not None:
             self.config = _config({**self.config, "initial_cash": initial_cash})
         self.state = self._fresh()
+        self._seen_ids = set()
         self._index_post_exit_assessments()
         self._index_rejected_signals()
         self.save()
@@ -1049,7 +1063,7 @@ class PaperTrainingEngine:
             row_id = str(row.get("id") or digest(row)) if isinstance(row, dict) else None
         except (ValueError, TypeError):
             row_id = None
-        if row_id and row_id in self.state["seen_ids"]:
+        if row_id and row_id in self._seen_ids:
             self.state["duplicate_observations"] += 1
             if persist:
                 self.save()
@@ -1067,6 +1081,7 @@ class PaperTrainingEngine:
                                                   max(0, int(number(row.get("recording_drops_total"))) -
                                                       self.state["recording_drops_baseline"]))
         self.state["seen_ids"].append(row["id"])
+        self._seen_ids.add(row["id"])
         self.state["episodes"].setdefault(episode, {"first_available_at": now, "observations": 0})["observations"] += 1
         trial_before = self.state["training"]
         monitor_before = self.state["monitor"]

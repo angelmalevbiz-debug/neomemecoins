@@ -22,7 +22,7 @@ export type PaperTrainingSnapshot = {
   books?: TrainingBook[]; control_comparison?: Comparison; monitor_comparison?: Comparison | null;
   last_training?: { at: number; status: string; candidate?: string; rejected_checks?: string[] } | null;
   versions?: { id: string; status: string; at: number }[];
-  recorder?: { backlog: number; dropped: number; processed: number; error: string | null };
+  recorder?: { backlog: number; dropped: number; dropped_total?: number; dropped_baseline?: number; processed: number; error: string | null };
   error?: string; reason?: string;
 };
 const money = (value = 0) => `$${value.toFixed(2)}`;
@@ -46,7 +46,7 @@ export default function PaperTrainingPanel({ data }: { data?: PaperTrainingSnaps
     {data?.last_training && <p className="mt-2 text-xs text-amber-200">{data.last_training.status} · кандидат {data.last_training.candidate || '—'}{data.last_training.rejected_checks?.length ? ` · ${data.last_training.rejected_checks.join(', ')}` : ''}</p>}
     {comparison && <p className="mt-2 text-xs text-slate-400">Измерена разлика спрямо контрол: {money(comparison.net_improvement_usd)} · {comparison.paired_episode_count} сравнени епизода · неблагоприятни разходи: {money(comparison.stress_net_pnl_usd)} · 95% приближен интервал: {comparison.approximate_cluster_mean_95_ci?.map(v => money(v)).join(' … ') || 'недостатъчно данни'}.</p>}
     {(data?.error || data?.recorder?.error) && <p className="mt-2 text-xs text-red-300">{data.error || data.recorder?.error}</p>}
-    {data?.recorder && <p className="mt-2 text-[10px] text-slate-500">Опашка {data.recorder.backlog} · записани {data.recorder.processed} · незаписани {data.recorder.dropped}. Липсващите наблюдения намаляват покритието.</p>}
+    {data?.recorder && <p className="mt-2 text-[10px] text-slate-500">Опашка {data.recorder.backlog} · записани {data.recorder.processed} · пропуснати в текущото обучение {data.recorder.dropped}{(data.recorder.dropped_baseline ?? 0) > 0 ? ` · архивирани предишни пропуски ${data.recorder.dropped_baseline}` : ''}. Пропуските в текущото обучение намаляват покритието.</p>}
     <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[850px] text-left text-[10px]">
       <thead className="text-slate-500"><tr>{['Портфейл', 'Начало', 'Свободни', 'Equity', 'Нетен PnL', 'Отворени / затворени', 'Уникални епизоди', 'Drawdown', 'Провали / откази'].map(h => <th key={h} className="px-2 py-3">{h}</th>)}</tr></thead>
       <tbody>{(data?.books || []).map(book => <tr key={book.id} className="border-t border-white/[0.05] text-slate-300">

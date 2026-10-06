@@ -4,10 +4,47 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from paper_state_reset import reset_offline,reset_all_offline,restore_archive
+from paper_state_reset import reset_offline,reset_all_offline,reset_training_offline,restore_archive
+from paper_training import PaperTrainingEngine
 
 
 class PaperResetTests(unittest.TestCase):
+    def test_training_only_reset_archives_gaps_and_preserves_demo_account(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);training=root/'training';training.mkdir()
+            state=root/'state.json';original=b'{"demo_balance_usd":1000.94,"history":[{"pnl_usd":0.94}]}'
+            state.write_bytes(original)
+            engine=PaperTrainingEngine(training/'training.json')
+            engine.state['recording_drops_baseline']=3
+            engine.state['recording_drops_total']=5
+            engine.save()
+            (training/'recorder_status.json').write_text(json.dumps({'version':1,'dropped_total':12}),encoding='utf-8')
+            old_journal=b'{"id":"old-incomplete-evidence"}\n'
+            (training/'observations.jsonl').write_bytes(old_journal)
+
+            result=reset_training_offline(training)
+
+            self.assertEqual(state.read_bytes(),original)
+            fresh=json.loads((training/'training.json').read_text(encoding='utf-8'))
+            self.assertEqual(fresh['recording_drops_baseline'],12)
+            self.assertEqual(fresh['recording_drops_total'],0)
+            self.assertEqual(fresh['recording_start_offset'],0)
+            self.assertEqual(fresh['seen_ids'],[])
+            self.assertEqual((training/'observations.jsonl').read_bytes(),b'')
+            self.assertEqual(result['training']['simulation_count'],0)
+            self.assertEqual(result['training']['unique_observations'],0)
+            archive=Path(result['archive'])
+            self.assertEqual((archive/'observations.jsonl').read_bytes(),old_journal)
+            manifest=json.loads((archive/'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(manifest['files']['observations.jsonl']['sha256'],hashlib.sha256(old_journal).hexdigest())
+
+    def test_training_only_reset_refuses_non_training_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state=root/'state.json';before=b'{"demo_balance_usd":900}'
+            state.write_bytes(before)
+            with self.assertRaises(ValueError):reset_training_offline(root)
+            self.assertEqual(state.read_bytes(),before)
+
     def test_reset_restorable_checked_archive_and_independent_training_capital(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp)

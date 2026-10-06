@@ -124,6 +124,34 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertEqual(reopened["unique_observations"], finished["unique_observations"])
         self.assertEqual(self.control(reopened)["net_pnl_usd"], self.control(finished)["net_pnl_usd"])
 
+    def test_exited_learning_worker_is_restarted_and_resumes_from_journal(self):
+        self.start()
+        self.wait_for(lambda s:s["unique_observations"] == 0)
+        first_pid = self.bridge.process.pid
+        self.bridge.process.terminate()
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            process = self.bridge.process
+            if process is not None and process.pid != first_pid and process.poll() is None:
+                break
+            time.sleep(.02)
+        else:
+            self.fail("learning bridge did not restart its failed worker")
+
+        at = int(time.time()*1000)
+        self.observe(at)
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            try:
+                snapshot = json.loads((self.root/"training_snapshot.json").read_text(encoding="utf-8"))
+                if (snapshot.get("unique_observations") == 1 and
+                        self.bridge.process.poll() is None and self.bridge.error is None):
+                    return
+            except (OSError, ValueError):
+                pass
+            time.sleep(.02)
+        self.fail("restarted worker did not resume and process durable journal")
+
     def test_durable_reset_boundary_excludes_future_dated_old_journal_after_restart(self):
         self.start()
         # A reset must exclude the earlier journal prefix even if imported
@@ -134,6 +162,8 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertTrue(self.bridge.submit({"_reset": True}))
         clean = self.wait_for(lambda s:s["unique_observations"] == 0)
         self.assertEqual(clean["simulation_count"], 0)
+        self.assertEqual(self.bridge.recording_drop_baseline, self.bridge.dropped)
+        self.assertFalse(self.bridge.recording_drop_gap)
         saved = json.loads((self.root/"training.json").read_text(encoding="utf-8"))
         self.assertGreater(saved["recording_start_offset"], 0)
         self.stop(); self.start()
@@ -166,6 +196,7 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         bridge.lock = threading.Lock(); bridge.pending_ids = set(); bridge.recent_ids = training_bridge.OrderedDict()
         bridge.coalesced = 0
         bridge.closed = False; bridge.dropped = 0; bridge.error = None
+        bridge.recording_drop_baseline = 0
         bridge.processed = 0; bridge.latest = {"paper_only": True}
         self.assertTrue(bridge.submit({"id": "one"}))
         started = time.monotonic()
@@ -173,9 +204,22 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertLess(time.monotonic()-started, .1)
         with patch.object(training_bridge, "_BRIDGE", bridge):
             self.assertEqual(training_bridge.snapshot()["recorder"]["dropped"], 1)
+            self.assertEqual(training_bridge.snapshot()["recorder"]["dropped_total"], 1)
         self.assertIn("queue full", bridge.error.lower())
         bridge.closed = True
         self.assertFalse(bridge.submit({"id": "three"}))
+
+    def test_recorder_snapshot_separates_current_training_gap_from_archived_drops(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.queue = queue.Queue(maxsize=1)
+        bridge.lock = threading.Lock(); bridge.pending_ids = set(); bridge.recent_ids = training_bridge.OrderedDict()
+        bridge.coalesced = 0; bridge.closed = False; bridge.dropped = 12; bridge.error = None
+        bridge.processed = 0; bridge.latest = {"paper_only": True}; bridge.recording_drop_baseline = 9
+        with patch.object(training_bridge, "_BRIDGE", bridge):
+            recorder = training_bridge.snapshot()["recorder"]
+        self.assertEqual(recorder["dropped"], 3)
+        self.assertEqual(recorder["dropped_baseline"], 9)
+        self.assertEqual(recorder["dropped_total"], 12)
 
     def test_duplicate_observation_ids_are_coalesced_without_queue_pressure(self):
         bridge = TrainingBridge.__new__(TrainingBridge)
@@ -194,6 +238,44 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertTrue(bridge.submit({"id": "same-evidence"}))
         self.assertEqual(bridge.queue.qsize(), 0)
         self.assertEqual(bridge.coalesced, 2)
+
+    def test_recorder_batches_rows_into_one_durable_journal_sync(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.root = self.root
+        rows = [{"id": "one", "available_at": 1}, {"id": "two", "available_at": 2}]
+        with patch("training_bridge.os.fsync") as sync:
+            bridge._write_batch(rows)
+        self.assertEqual(sync.call_count, 1)
+        saved = [json.loads(line) for line in (self.root / "observations.jsonl").read_text().splitlines()]
+        self.assertEqual(saved, rows)
+
+    def test_queue_drop_counter_is_durable_and_keeps_learning_epoch_degraded(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.root = self.root
+        bridge.dropped = 7
+        bridge._persisted_dropped = 0
+        bridge.error = None
+        self.assertTrue(bridge._persist_drop_count())
+        status = json.loads((self.root / "recorder_status.json").read_text(encoding="utf-8"))
+        self.assertEqual(status["dropped_total"], 7)
+
+        self.start()
+        self.assertEqual(self.bridge.dropped, 7)
+        self.assertIn("recorded gaps", self.bridge.error)
+
+    def test_legacy_checkpoint_drop_count_migrates_to_durable_sidecar(self):
+        engine = PaperTrainingEngine(self.root / "training.json")
+        engine.state["recording_drops_total"] = 9
+        engine.save()
+
+        self.start()
+        deadline = time.monotonic() + 2
+        while not (self.root / "recorder_status.json").exists() and time.monotonic() < deadline:
+            time.sleep(.01)
+        saved = json.loads((self.root / "recorder_status.json").read_text(encoding="utf-8"))
+        self.assertEqual(saved["dropped_total"], 9)
+        self.assertEqual(self.bridge.dropped, 9)
+        self.assertIn("recorded gaps", self.bridge.error)
 
     def test_recent_duplicate_ids_are_restored_from_durable_training_state(self):
         engine = PaperTrainingEngine(self.root / "training.json")

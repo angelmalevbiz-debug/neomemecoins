@@ -131,6 +131,78 @@ def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
             'training_archive': str(training_archive), 'training': engine.snapshot()}
 
 
+def reset_training_offline(training_root, *, training_balance=500.0):
+    """Archive and restart one PAPER learner without touching any trading account.
+
+    Writers must be stopped. The worker lock is acquired here as a second
+    guard, the old observation journal is checksum-archived and moved, and the
+    new learner inherits the monotonic recorder-drop baseline. This permits a
+    clean evidence epoch while keeping prior gaps visible in the archive.
+    """
+    training_root = Path(training_root).resolve()
+    if training_root.name != 'training':
+        raise ValueError('training-only reset requires a dedicated training directory')
+    if not math.isfinite(training_balance) or training_balance <= 0:
+        raise ValueError('positive finite training capital required')
+    training_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if (training_root / 'reset.request.json').exists():
+        raise FileExistsError('a PAPER learner reset is already pending')
+
+    from compat_file_lock import flock, LOCK_EX, LOCK_NB, LOCK_UN
+    from paper_training import PaperTrainingEngine, number
+
+    lock_path = training_root / 'training.process.lock'
+    with lock_path.open('a+') as lock:
+        flock(lock, LOCK_EX | LOCK_NB)
+        try:
+            old_path = training_root / 'training.json'
+            old = json.loads(old_path.read_text(encoding='utf-8')) if old_path.exists() else {}
+            if not isinstance(old, dict):
+                raise ValueError('invalid PAPER training state; reset refused')
+            baseline = max(0, int(number(old.get('recording_drops_baseline'))))
+            epoch_drops = max(0, int(number(old.get('recording_drops_total'))))
+            drops_total = baseline + epoch_drops
+            status_path = training_root / 'recorder_status.json'
+            if status_path.exists():
+                recorder = json.loads(status_path.read_text(encoding='utf-8'))
+                if not isinstance(recorder, dict):
+                    raise ValueError('invalid PAPER recorder status; reset refused')
+                drops_total = max(drops_total, int(number(recorder.get('dropped_total'))))
+
+            stamp = int(time.time() * 1000)
+            prepared = training_root / f'.reset-training-{uuid.uuid4().hex}.json'
+            engine = PaperTrainingEngine(prepared)
+            engine.reset(initial_cash=training_balance)
+            engine.state['recording_drops_baseline'] = drops_total
+            engine.state['recording_drops_total'] = 0
+            engine.state['recording_start_at'] = stamp
+            engine.state['recording_start_offset'] = 0
+            engine.save()
+            try:
+                archive = archive_files(
+                    training_root,
+                    ['training.json', 'training_snapshot.json', 'training_events.jsonl',
+                     'recorder_status.json', 'observations.jsonl'],
+                    move_names={'observations.jsonl'},
+                )
+                (training_root / 'observations.jsonl').touch(exist_ok=True)
+                os.replace(prepared, old_path)
+                engine.path = old_path
+                atomic_json(training_root / 'training_snapshot.json', engine.snapshot())
+                atomic_json(status_path, {'version': 1, 'dropped_total': drops_total,
+                                          'updated_at': stamp})
+                events = training_root / 'training_events.jsonl'
+                if events.exists():
+                    events.write_text('', encoding='utf-8')
+                return {'archive': str(archive), 'training': engine.snapshot(),
+                        'recording_drops_baseline': drops_total}
+            finally:
+                if prepared.exists():
+                    prepared.unlink()
+        finally:
+            flock(lock, LOCK_UN)
+
+
 def restore_archive(archive, root):
     archive, root = Path(archive).resolve(), Path(root).resolve()
     manifest = json.loads((archive / 'manifest.json').read_text(encoding='utf-8'))

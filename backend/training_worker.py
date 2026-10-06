@@ -9,7 +9,10 @@ from engine_runtime import atomic_json as _atomic_json
 from paper_training import PaperTrainingEngine
 from paper_state_reset import archive_files
 
-MAX_BATCH_ROWS = 512
+# Checkpoint the learner in larger batches. Its state includes exact observation
+# IDs for idempotent offline replay, so saving every 512 rows rewrote a growing
+# journal index too often as the live stream accumulated.
+MAX_BATCH_ROWS = 4096
 
 
 def atomic_json(path, data):
@@ -67,7 +70,7 @@ def follow(root, config):
                         row = json.loads(line)
                         if int(row.get('available_at', 0)) < minimum_time:
                             continue
-                        if row.get('id') in engine.state['seen_ids']:
+                        if engine.has_seen(row.get('id')):
                             continue
                         engine.ingest(row, persist=False)
             if changed:

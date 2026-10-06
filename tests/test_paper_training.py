@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import paper_training
 from paper_training import AsyncTrainingRecorder, BASELINE, MODEL, PaperTrainingEngine, normalize_quote
 from training_bridge import TrainingBridge
 
@@ -54,6 +55,22 @@ class PaperTrainingTests(unittest.TestCase):
         # $10 fixtures keep simple arithmetic; production default is $20 with
         # explicit real account-reserve costs from the shared recording bridge.
         return PaperTrainingEngine(self.path, {"notional": 10, **config})
+
+    def test_large_state_atomic_replace_retries_temporary_permission_errors(self):
+        replace = paper_training.os.replace
+        attempts = []
+
+        def transient_denial(source, target):
+            attempts.append((source, target))
+            if len(attempts) < 4:
+                raise PermissionError("temporary file sharing violation")
+            return replace(source, target)
+
+        with patch.object(paper_training.os, "replace", side_effect=transient_denial), \
+                patch.object(paper_training.time, "sleep"):
+            paper_training.atomic_json(self.path, {"checkpoint": "complete"})
+        self.assertEqual(len(attempts), 4)
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), {"checkpoint": "complete"})
 
     def test_next_observation_and_latency_no_favourable_stale_fill(self):
         e = self.engine()
@@ -390,12 +407,16 @@ class PaperTrainingTests(unittest.TestCase):
         rows = episode(NOW, MINT)
         e.replay(rows)
         count = e.snapshot()["simulation_count"]
+        self.assertTrue(e.has_seen(rows[0]["id"]))
         e.replay(rows)
         self.assertEqual(e.snapshot()["simulation_count"], count)
         self.assertEqual(e.snapshot()["unique_market_episodes"], 1)
+        restored = PaperTrainingEngine(self.path)
+        self.assertTrue(restored.has_seen(rows[0]["id"]))
+        self.assertFalse(restored.ingest(rows[0]))
         # Distinct decision IDs within the same market episode are still one cluster.
-        e.ingest(row(NOW + 5000, identifier="different"))
-        self.assertEqual(e.snapshot()["unique_market_episodes"], 1)
+        restored.ingest(row(NOW + 5000, identifier="different"))
+        self.assertEqual(restored.snapshot()["unique_market_episodes"], 1)
 
     def test_rejected_signal_path_is_not_trade_or_executed_profit(self):
         e = self.engine()

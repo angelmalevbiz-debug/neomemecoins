@@ -10,6 +10,7 @@ WorkingDirectory=/root/neomemecoins
 Environment=PYTHONUNBUFFERED=1
 Environment=NEO_STRATEGY_LAB_PATH=/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.json
 Environment=NEO_STRATEGY_LAB_COMPACT_PATH=/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab_compact.json
+Environment=NEO_STRATEGY_LAB_RESET_FLAG=/var/lib/neo-market/experiments/angel-hf-4-10/strategy_lab.reset
 Environment=NEO_PAIRED_DIR=/var/lib/neo-lab-paired-hf-4-10
 Environment=NEO_LAB_STOP_LOSS_PCT=4
 Environment=NEO_LAB_TAKE_PROFIT_PCT=10

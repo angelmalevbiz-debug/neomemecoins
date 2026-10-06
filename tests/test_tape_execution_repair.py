@@ -2,6 +2,7 @@
 import base64
 import copy
 import json
+import requests
 import tempfile
 import unittest
 from pathlib import Path
@@ -193,6 +194,39 @@ class RpcAndDurability(unittest.TestCase):
         answers=tape.align_rpc_answers(calls,[{'id':3,'result':'three'},{'id':1,'result':'one'}])
         self.assertEqual(answers[0]['result'],'one');self.assertIn('error',answers[1]);self.assertEqual(answers[2]['result'],'three')
         self.assertIn('error',tape.align_rpc_answers(calls,[{'id':1,'result':1},{'id':1,'result':2}])[0])
+
+    def test_get_transaction_respects_single_call_public_rpc_contract(self):
+        posted=[]
+        class Response:
+            def __init__(self,payload): self.payload=payload
+            def raise_for_status(self): return None
+            def json(self): return [{'id':row['id'],'result':None} for row in self.payload]
+        def post(_url,*,json,timeout):
+            posted.append(json);return Response(json)
+        calls=[('getTransaction',[f's{i}',{}]) for i in range(3)]
+        with patch.object(tape.SESSION,'post',side_effect=post):
+            answers=tape.rpc_batch(calls)
+        self.assertEqual(len(answers),3)
+        self.assertEqual([len(payload) for payload in posted],[1,1,1])
+
+    def test_get_transaction_transport_failure_is_isolated(self):
+        class Response:
+            def raise_for_status(self): return None
+            def json(self): return [{'id':1,'result':None}]
+        with patch.object(tape.SESSION,'post',side_effect=[requests.ConnectionError('reset'),Response()]):
+            answers=tape.rpc_batch([('getTransaction',['a',{}]),('getTransaction',['b',{}])])
+        self.assertEqual(answers[0]['error']['code'],'TRANSACTION_RPC_UNAVAILABLE')
+        self.assertIsNone(answers[1]['result'])
+
+    def test_get_transaction_requests_support_version_one(self):
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,metadata,state,attempts,next_retry)
+                VALUES('v1',?,?,?,?,?,'pending',0,0)''',(PAIR,1,NOW,NOW,json.dumps(META)))
+        seen=[]
+        def rpc(calls):
+            seen.extend(calls);return [{'result':None} for _ in calls]
+        self.rec.process(rpc)
+        self.assertEqual(seen[0][1][1]['maxSupportedTransactionVersion'],1)
 
     def test_over_60_signatures_never_silently_dropped_and_restart_resume(self):
         rows=[{'signature':f's{i:03}','slot':i,'blockTime':NOW//1000,'err':None} for i in range(180,0,-1)]

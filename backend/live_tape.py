@@ -140,15 +140,24 @@ def align_rpc_answers(calls,data):
 def rpc_batch(calls):
     if not calls:
         return []
-    if len(calls)>RPC_BATCH_SIZE:
+    # PublicNode permits only one getTransaction per JSON-RPC request.
+    # Respect that provider contract while retaining normal batching for
+    # cheaper methods such as getSignaturesForAddress.
+    batch_limit=1 if any(method=='getTransaction' for method,_ in calls) else RPC_BATCH_SIZE
+    if len(calls)>batch_limit:
         answers=[]
-        for start in range(0,len(calls),RPC_BATCH_SIZE):
-            answers.extend(rpc_batch(calls[start:start+RPC_BATCH_SIZE]))
+        for start in range(0,len(calls),batch_limit):
+            chunk=calls[start:start+batch_limit]
+            answers.extend(rpc_batch(chunk))
         return answers
     payload = [{'jsonrpc':'2.0','id':i+1,'method':method,'params':params} for i,(method,params) in enumerate(calls)]
-    response = SESSION.post(RPC_URL,json=payload,timeout=15)
-    response.raise_for_status()
-    return align_rpc_answers(calls,response.json())
+    try:
+        response = SESSION.post(RPC_URL,json=payload,timeout=15)
+        response.raise_for_status()
+        return align_rpc_answers(calls,response.json())
+    except (requests.RequestException,RuntimeError,ValueError):
+        code='TRANSACTION_RPC_UNAVAILABLE' if all(method=='getTransaction' for method,_ in calls) else 'RPC_TRANSPORT_UNAVAILABLE'
+        return [{'id':i+1,'error':{'code':code}} for i in range(len(calls))]
 
 
 def _instruction_records(tx):
@@ -398,7 +407,7 @@ class TapeRecorder:
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
-        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':0}]) for sig in groups]
+        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':1}]) for sig in groups]
         if not calls:
             return
         try:

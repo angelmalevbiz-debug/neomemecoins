@@ -24,7 +24,10 @@ RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
 MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','6'))))
+# A six-signature page forced every busy pool through hundreds of serial
+# pagination rounds before its five-minute window could be trusted. Fetch a
+# full bounded RPC page per pool; PAGE_BUDGET still caps the batched calls.
+PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','1000'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))

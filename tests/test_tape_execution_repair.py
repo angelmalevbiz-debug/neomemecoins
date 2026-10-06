@@ -216,6 +216,30 @@ class RpcAndDurability(unittest.TestCase):
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
 
+    def test_large_single_rpc_page_completes_fresh_pool_without_false_pagination(self):
+        self.rec.page_size=1000
+        self.rec.tx_budget=80
+        rows=[{'signature':f'fresh-{i:03}','slot':i,'blockTime':NOW//1000,'err':None}
+              for i in range(80,0,-1)]
+        signature_pages=[]
+
+        def rpc(calls):
+            answers=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    signature_pages.append(params[1]['limit'])
+                    answers.append({'result':rows})
+                else:
+                    answers.append({'result':non_swap()})
+            return answers
+
+        snapshot=self.rec.poll([META],rpc)
+        self.assertEqual(signature_pages,[1000])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertFalse(snapshot['pair_coverage'][PAIR]['pagination_pending'])
+        self.assertEqual(snapshot['backlog'],0)
+        self.assertEqual(snapshot['classifications']['non_swap'],80)
+
     def test_current_pending_signatures_are_processed_before_old_retries(self):
         self.rec.tx_budget=1
         with self.rec.db:

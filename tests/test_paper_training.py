@@ -9,7 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 import paper_training
-from paper_training import AsyncTrainingRecorder, BASELINE, MODEL, PaperTrainingEngine, normalize_quote
+from paper_training import (AsyncTrainingRecorder, BASELINE, MODEL, PaperTrainingEngine,
+                            normalize_quote, training_candidate_signal)
 from training_bridge import TrainingBridge
 
 NOW = 1_800_000_000_000
@@ -55,6 +56,33 @@ class PaperTrainingTests(unittest.TestCase):
         # $10 fixtures keep simple arithmetic; production default is $20 with
         # explicit real account-reserve costs from the shared recording bridge.
         return PaperTrainingEngine(self.path, {"notional": 10, **config})
+
+    def test_training_probe_gate_requires_fresh_complete_exact_pool_evidence(self):
+        coin = {"address": MINT, "pairAddress": PAIR, "priceUsd": 1.0,
+                "liquidityUsd": 100_000, "updatedAt": NOW, "score": 60}
+        flow = {"fresh": True, "quality": "COMPLETE", "latest_at": NOW,
+                "coverage": {"status": "COMPLETE", "address": MINT,
+                             "pairAddress": PAIR},
+                "trades": 3, "unique_wallets": 2, "buy_usd": 25,
+                "buy_sell_usd_ratio": 1.1}
+        self.assertTrue(training_candidate_signal(coin, flow, now=NOW))
+
+        invalid_cases = []
+        stale = copy.deepcopy(coin); stale["updatedAt"] = NOW - 20_001
+        invalid_cases.append((stale, flow))
+        future = copy.deepcopy(flow); future["latest_at"] = NOW + 1
+        invalid_cases.append((coin, future))
+        partial = copy.deepcopy(flow); partial["coverage"]["status"] = "DEGRADED"
+        invalid_cases.append((coin, partial))
+        wrong_pair = copy.deepcopy(flow); wrong_pair["coverage"]["pairAddress"] = MINT
+        invalid_cases.append((coin, wrong_pair))
+        weak = copy.deepcopy(flow); weak["buy_sell_usd_ratio"] = 1.09
+        invalid_cases.append((coin, weak))
+        no_liquidity = copy.deepcopy(coin); no_liquidity["liquidityUsd"] = 9_999
+        invalid_cases.append((no_liquidity, flow))
+        for market, tape in invalid_cases:
+            with self.subTest(market=market, tape=tape):
+                self.assertFalse(training_candidate_signal(market, tape, now=NOW))
 
     def test_large_state_atomic_replace_retries_temporary_permission_errors(self):
         replace = paper_training.os.replace

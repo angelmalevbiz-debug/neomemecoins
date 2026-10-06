@@ -17,6 +17,8 @@ import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
 import entry_size_backoff
+from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
+from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
 
 HOST = os.getenv('NEO_MONITOR_HOST', '127.0.0.1')
@@ -31,6 +33,8 @@ STRATEGY_LAB_COMPACT_PATH = Path(os.getenv('NEO_STRATEGY_LAB_COMPACT_PATH', str(
 POSITION_SCAN_SECONDS = float(os.getenv('NEO_POSITION_SCAN_SECONDS', '0.5'))
 DEX_API = 'https://api.dexscreener.com'
 MAX_FEED = 90
+TRAINING_QUOTE_PROBE_INTERVAL_MS = 60_000
+TRAINING_PREFLIGHT_RETRY_MS = 15_000
 ENTRY_SCORE = 60.0
 MAX_POSITIONS = 8
 STOP_LOSS_PCT = 5.0
@@ -1085,6 +1089,10 @@ class Monitor:
         self.position_poll_lock = threading.Lock()
         self.entry_lock = threading.Lock()
         self.entry_quote_retry_after: dict[str, int] = {}
+        self.training_probe_lock = threading.Lock()
+        self.training_probe_inflight = False
+        self.training_probe_last_attempt_at = 0
+        self.training_probe_retry_after: dict[tuple[str, str], int] = {}
         self.discovery = runtime.DiscoveryCache(discover, refresh_seconds=8, max_age_seconds=90)
 
     def prewarm_entry_checks(self, feed: list[dict[str, Any]]) -> None:
@@ -1460,6 +1468,103 @@ class Monitor:
             with STATE.lock:
                 STATE.entry_diagnostics = entry_policy.finish(report)
             self.entry_lock.release()
+        # Learner route checks run in a separate daemon and only consume the
+        # shared, low-priority quote path after main-account entry evaluation.
+        self.schedule_training_quote_probe(feed)
+
+    def schedule_training_quote_probe(self, feed: list[dict[str, Any]]) -> None:
+        if not training_bridge.enabled():
+            return
+        with STATE.lock:
+            if not STATE.running or STATE.positions:
+                return
+        stamp = now_ms()
+        with self.training_probe_lock:
+            if (self.training_probe_inflight
+                    or stamp-self.training_probe_last_attempt_at < TRAINING_QUOTE_PROBE_INTERVAL_MS):
+                return
+        for coin in feed:
+            mint, pair = str(coin.get('address') or ''), str(coin.get('pairAddress') or '')
+            if not mint or not pair:
+                continue
+            key = (mint, pair)
+            if self.training_probe_retry_after.get(key, 0) > stamp:
+                continue
+            flow = STATE.live_flow(mint, 30, pair)
+            if not training_candidate_signal(coin, flow, now=stamp):
+                continue
+            # These checks are cached/non-blocking. The only quote work below
+            # is placed on its own thread after both independent checks pass.
+            validation = price_integrity.check(coin)
+            safety = rug_guard.check(coin)
+            if (validation.get('status') != 'pass' or validation.get('mint') != mint
+                    or validation.get('pair') != pair or safety.get('status') != 'pass'
+                    or safety.get('mint') != mint or safety.get('pair') != pair
+                    or safety.get('provisional_early')):
+                self.training_probe_retry_after[key] = stamp + TRAINING_PREFLIGHT_RETRY_MS
+                continue
+            with self.training_probe_lock:
+                current = now_ms()
+                if (self.training_probe_inflight
+                        or current-self.training_probe_last_attempt_at < TRAINING_QUOTE_PROBE_INTERVAL_MS):
+                    return
+                self.training_probe_inflight = True
+                self.training_probe_last_attempt_at = current
+            training_bridge.note_quote_probe('PREFLIGHT_PASSED', attempted=True, at=current)
+            worker = threading.Thread(
+                target=self.run_training_quote_probe,
+                args=(dict(coin), copy.deepcopy(flow), copy.deepcopy(safety),
+                      copy.deepcopy(validation)),
+                name='neo-training-route-probe', daemon=True)
+            try:
+                worker.start()
+            except RuntimeError:
+                with self.training_probe_lock:
+                    self.training_probe_inflight = False
+                training_bridge.note_quote_probe('WORKER_START_FAILED', reason='worker_start_failed', at=now_ms())
+            return
+
+    def run_training_quote_probe(self, coin, flow, safety, validation) -> None:
+        mint, pair = str(coin.get('address') or ''), str(coin.get('pairAddress') or '')
+        try:
+            with STATE.lock:
+                current = next((dict(item) for item in STATE.feed
+                                if item.get('address') == mint and item.get('pairAddress') == pair), None)
+                if STATE.positions or not STATE.running or current is None:
+                    training_bridge.note_quote_probe('SKIPPED', reason='account_state_changed', at=now_ms())
+                    return
+            now = now_ms()
+            current_flow = STATE.live_flow(mint, 30, pair)
+            if not training_candidate_signal(current, current_flow, now=now):
+                training_bridge.note_quote_probe('SKIPPED', reason='signal_or_flow_expired', at=now)
+                return
+            quotes, reason = collect_exact_pool_quotes(
+                current, current_flow, safety, validation, now=now)
+            if not quotes:
+                # Preserve the failed preflight as a rejected observation. It
+                # cannot become an executed trade or reuse an older route.
+                training_bridge.observe(current, current_flow, safety=safety,
+                    validation=validation, reasons=[reason, 'entry_quote'],
+                    context=self.market_context(current, {}), now=now_ms())
+                training_bridge.note_quote_probe('ROUTE_REJECTED', reason=reason, at=now_ms())
+                return
+            stamp = now_ms()
+            if (not training_candidate_signal(current, current_flow, now=stamp)
+                    or not 0 <= stamp-num(current.get('updatedAt'), -1) <= TRAINING_DEFAULT_CONFIG['feed_ttl_ms']):
+                training_bridge.note_quote_probe('SKIPPED', reason='signal_or_market_expired', at=stamp)
+                return
+            recorded = training_bridge.observe(
+                current, current_flow, safety=safety, validation=validation,
+                quotes=quotes, context=self.market_context(current, {}), now=stamp)
+            training_bridge.note_quote_probe(
+                'ROUTE_EVIDENCE_RECORDED' if recorded else 'RECORDING_REFUSED',
+                reason='' if recorded else 'observation_not_queued', at=stamp,
+                success=bool(recorded))
+        except Exception as exc:
+            training_bridge.note_quote_probe('ROUTE_REJECTED', reason=type(exc).__name__, at=now_ms())
+        finally:
+            with self.training_probe_lock:
+                self.training_probe_inflight = False
 
     def _maybe_open_checked(self, feed: list[dict[str, Any]], report: dict[str, Any]) -> None:
         def reject(report, reasons, coin=None, metrics=None):

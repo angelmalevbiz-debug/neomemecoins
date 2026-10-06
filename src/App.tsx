@@ -312,7 +312,7 @@ export default function App() {
   const flowStatusLabel = !connected ? connectionLabel
     : !selectedFlowSupported ? `FLOW NOT VERIFIED · ${selectedCoin?.dexId?.toUpperCase() || 'UNKNOWN DEX'}`
       : tapeOnline ? `VERIFIED ON-CHAIN · ${state?.live_tape_status?.tracked_pairs ?? 0} PUMPSWAP POOLS`
-        : 'ON-CHAIN COVERAGE INCOMPLETE · NEW ENTRIES STAY BLOCKED';
+        : 'ORDER FLOW INCOMPLETE · FLOW-BASED EXPERIMENTS PAUSED';
   const snapshotHint = connection.receivedAt ? `Последен получен отговор: ${fullTimeLabel(connection.receivedAt)}.` : 'PAPER сметката още не е заредена.';
   const emptyStateMessage = state ? 'Няма записи в получения отговор.' : 'Данните още не са заредени от backend.';
   const selectedPaperTrades = selectedPaperStrategy && state ? [

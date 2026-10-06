@@ -22,6 +22,7 @@ export type PaperTrainingSnapshot = {
   books?: TrainingBook[]; control_comparison?: Comparison; monitor_comparison?: Comparison | null;
   last_training?: { at: number; status: string; candidate?: string; rejected_checks?: string[] } | null;
   versions?: { id: string; status: string; at: number }[];
+  quote_probe?: { status: string; reason?: string; attempts?: number; successes?: number; last_attempt_at?: number };
   recorder?: { backlog: number; dropped: number; dropped_total?: number; dropped_baseline?: number; processed: number; error: string | null };
   error?: string; reason?: string;
 };
@@ -36,14 +37,16 @@ export default function PaperTrainingPanel({ data }: { data?: PaperTrainingSnaps
         <h2 className="mt-1 text-lg font-black text-white">Паралелни експерименти и проверени версии</h2></div>
       <span className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-400">{data?.status || 'WAIT'} · {data?.active_version || 'v0-control'}</span>
     </div>
-    <div className="mt-3 grid gap-3 text-xs sm:grid-cols-4">
+    <div className="mt-3 grid gap-3 text-xs sm:grid-cols-5">
       <div className="rounded-xl bg-white/[0.03] p-3"><div className="text-slate-500">Симулирани позиции</div><strong className="text-white">{data?.simulation_count ?? 0}</strong></div>
       <div className="rounded-xl bg-white/[0.03] p-3"><div className="text-slate-500">Уникални пазарни епизоди</div><strong className="text-white">{data?.unique_market_episodes ?? 0}</strong></div>
       <div className="rounded-xl bg-white/[0.03] p-3"><div className="text-slate-500">Уникални наблюдения</div><strong className="text-white">{data?.unique_observations ?? 0}</strong></div>
       <div className="rounded-xl bg-white/[0.03] p-3"><div className="text-slate-500">Последно обучение</div><strong className="text-white">{stamp(data?.last_training?.at)}</strong></div>
+      <div className="rounded-xl bg-white/[0.03] p-3"><div className="text-slate-500">Проверени маршрути</div><strong className="text-white">{data?.quote_probe?.successes ?? 0} / {data?.quote_probe?.attempts ?? 0}</strong><div className="mt-1 text-[9px] text-slate-500">{data?.quote_probe?.status || 'WAITING_FOR_QUALIFIED_FLOW'}</div></div>
     </div>
     <p className="mt-3 text-[10px] leading-5 text-slate-500">Всеки портфейл има собствен капитал и лимити. Балансите не се събират като доходност на една сметка. Пазарните епизоди групират token/pool/час; не доказват статистическа независимост. Refused сигнали и пропуснати възможности не са изпълнени сделки.</p>
     {data?.last_training && <p className="mt-2 text-xs text-amber-200">{data.last_training.status} · кандидат {data.last_training.candidate || '—'}{data.last_training.rejected_checks?.length ? ` · ${data.last_training.rejected_checks.join(', ')}` : ''}</p>}
+    {data?.quote_probe && <p className="mt-2 text-[10px] text-slate-500">Последна фонова проверка: {stamp(data.quote_probe.last_attempt_at)}{data.quote_probe.reason ? ` · ${data.quote_probe.reason}` : ''}. Това са само котировки за изпълнимост, не симулирани или реални сделки.</p>}
     {comparison && <p className="mt-2 text-xs text-slate-400">Измерена разлика спрямо контрол: {money(comparison.net_improvement_usd)} · {comparison.paired_episode_count} сравнени епизода · неблагоприятни разходи: {money(comparison.stress_net_pnl_usd)} · 95% приближен интервал: {comparison.approximate_cluster_mean_95_ci?.map(v => money(v)).join(' … ') || 'недостатъчно данни'}.</p>}
     {(data?.error || data?.recorder?.error) && <p className="mt-2 text-xs text-red-300">{data.error || data.recorder?.error}</p>}
     {data?.recorder && <p className="mt-2 text-[10px] text-slate-500">Опашка {data.recorder.backlog} · записани {data.recorder.processed} · пропуснати в текущото обучение {data.recorder.dropped}{(data.recorder.dropped_baseline ?? 0) > 0 ? ` · архивирани предишни пропуски ${data.recorder.dropped_baseline}` : ''}. Пропуските в текущото обучение намаляват покритието.</p>}

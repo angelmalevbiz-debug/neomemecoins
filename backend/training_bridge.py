@@ -69,6 +69,16 @@ class TrainingBridge:
             self.error = 'Training epoch has recorded gaps; candidate promotion stays blocked until an archived PAPER reset'
         self.processed = 0
         self.latest = {'status': 'starting', 'paper_only': True}
+        self.quote_probe_path = self.root / 'quote_probe_status.json'
+        self.quote_probe = {'status': 'WAITING_FOR_QUALIFIED_FLOW', 'attempts': 0,
+                            'successes': 0, 'last_attempt_at': 0,
+                            'last_updated_at': 0, 'reason': ''}
+        try:
+            saved_probe = json.loads(self.quote_probe_path.read_text(encoding='utf-8'))
+            if isinstance(saved_probe, dict):
+                self.quote_probe.update(saved_probe)
+        except (OSError, ValueError, TypeError):
+            pass
         self.config = config
         self.process = None
         self.worker_restart_attempts = 0
@@ -463,6 +473,21 @@ class TrainingBridge:
             self.error = f'Observation refused: {type(exc).__name__}: {exc}'
             return False
 
+    def note_quote_probe(self, status, *, reason='', at=None, attempted=False, success=False):
+        """Persist compact diagnostics for independent, read-only route checks."""
+        with self.lock:
+            if attempted:
+                self.quote_probe['attempts'] = int(number(self.quote_probe.get('attempts'))) + 1
+                self.quote_probe['last_attempt_at'] = int(at or time.time()*1000)
+            if success:
+                self.quote_probe['successes'] = int(number(self.quote_probe.get('successes'))) + 1
+            self.quote_probe.update(status=str(status)[:80], reason=str(reason)[:120],
+                                    last_updated_at=int(at or time.time()*1000))
+            try:
+                atomic_json(self.quote_probe_path, self.quote_probe)
+            except Exception as exc:
+                self.error = f'Quote probe status could not be saved: {type(exc).__name__}'
+
     def _observe(self, coin, flow, *, safety=None, validation=None, quotes=None,
                 reasons=None, context=None, now=None):
         stamp = int(now if now is not None else time.time()*1000)
@@ -564,9 +589,16 @@ def enabled():
     return _BRIDGE is not None
 
 
+def note_quote_probe(status, **kwargs):
+    return _BRIDGE.note_quote_probe(status, **kwargs) if _BRIDGE else False
+
+
 def snapshot():
     if _BRIDGE:
         result = copy.deepcopy(_BRIDGE.latest)
+        with _BRIDGE.lock:
+            if hasattr(_BRIDGE, 'quote_probe'):
+                result['quote_probe'] = copy.deepcopy(_BRIDGE.quote_probe)
         dropped_total = _BRIDGE.dropped
         dropped_baseline = getattr(_BRIDGE, 'recording_drop_baseline', 0)
         result['recorder'] = {'processed': _BRIDGE.processed, 'backlog': _BRIDGE.queue.qsize(),

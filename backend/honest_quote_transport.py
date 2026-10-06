@@ -95,7 +95,8 @@ def quote(inp,out,amount,*,purpose='entry',slippage_bps=100,min_received_at=None
  if data:return data
  priority=ROOT/'quote-exit-priority';priority.mkdir(exist_ok=True)
  marker=priority/(str(os.getpid())+'-'+str(threading.get_ident())+'.json')
- begin=now_ms(); is_exit=purpose=='exit'; deadline=time.monotonic()+(3.0 if is_exit else 4.5)
+ begin=now_ms(); is_exit=purpose=='exit'; is_background=purpose=='background'
+ deadline=time.monotonic()+(3.0 if is_exit else 4.5)
  if is_exit:_write(marker,{'requested_at':begin})
  try:
   while True:
@@ -113,6 +114,11 @@ def quote(inp,out,amount,*,purpose='entry',slippage_bps=100,min_received_at=None
      acquired=False
      try:
       fcntl.flock(h,fcntl.LOCK_EX|fcntl.LOCK_NB); acquired=True
+      if not is_exit:
+       # An exit can arrive after the outer fairness check. Recheck while
+       # holding the shared lock so background training cannot jump its queue.
+       if any(priority.glob('*.json')):
+        continue
       data=_cached(file,min_received_at)
       if data:return data
       try:last=float(STAMP.read_text())
@@ -126,7 +132,8 @@ def quote(inp,out,amount,*,purpose='entry',slippage_bps=100,min_received_at=None
         http=requests.Session();http.headers['User-Agent']='NEO-Paper-Quotes-Audited/1.0';LOCAL.http=http
        sent=now_ms()
        try:
-        r=http.get(URL,params=params,headers={'x-api-key':KEY} if KEY else {},timeout=(1.0,2.5))
+        timeout=(0.35,0.65) if is_background else (1.0,2.5)
+        r=http.get(URL,params=params,headers={'x-api-key':KEY} if KEY else {},timeout=timeout)
         received=now_ms()
         if r.status_code in (401,403):return _fail('AUTHENTICATION_REQUIRED' if r.status_code==401 else 'ACCESS_DENIED',http_status=r.status_code,queue_ms=sent-begin,http_ms=received-sent)
         if r.status_code==429:

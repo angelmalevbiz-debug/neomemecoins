@@ -102,6 +102,18 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertEqual(self.control(snap)["positions"][0]["entry"]["market_price"], 2)
         self.assertEqual(snap["unique_market_episodes"], 1)
 
+    def test_quote_probe_status_is_persisted_across_bridge_restart(self):
+        first = self.start()
+        first.note_quote_probe('ROUTE_EVIDENCE_RECORDED', attempted=True,
+                               success=True, at=1_800_000_000_000)
+        self.assertEqual(first.quote_probe['attempts'], 1)
+        self.assertEqual(first.quote_probe['successes'], 1)
+        self.stop()
+        second = self.start()
+        self.assertEqual(second.quote_probe['status'], 'ROUTE_EVIDENCE_RECORDED')
+        self.assertEqual(second.quote_probe['last_attempt_at'], 1_800_000_000_000)
+        self.assertEqual(second.quote_probe['successes'], 1)
+
     def test_process_restart_recovers_pending_and_durable_completed_results(self):
         self.start()
         at = int(time.time()*1000)

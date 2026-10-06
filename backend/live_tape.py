@@ -34,6 +34,8 @@ TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','12')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 RPC_TRANSACTION_CONCURRENCY = max(1,int(os.getenv('NEO_TAPE_RPC_TX_CONCURRENCY','4')))
 WINDOW_MS = 300_000
+DECISION_FLOW_WINDOW_MS = 30_000
+MAX_DISCOVERY_LAG_MS = WINDOW_MS
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
@@ -365,6 +367,34 @@ class TapeRecorder:
             calls,states = [],[]
             for metadata in active:
                 state = self.db.execute('SELECT * FROM pairs WHERE pair=?',(metadata['pair'],)).fetchone()
+                observed = self.clock()
+                # A pool may leave the small discovery set for minutes or hours.
+                # Replaying every signature since its old cursor makes current
+                # order flow look incomplete indefinitely. Start a new causal
+                # window after an actual monitoring gap, then require the full
+                # decision window to be collected before entries can use it.
+                scan_head_time = None
+                if state['scan_head']:
+                    scan_row = self.db.execute(
+                        'SELECT event_time FROM signatures WHERE signature=? AND pair=?',
+                        (state['scan_head'], metadata['pair'])).fetchone()
+                    if scan_row and scan_row['event_time']:
+                        scan_head_time = int(scan_row['event_time'])
+                inactive_gap = bool(state['last_poll'] and
+                                    observed - int(state['last_poll']) > DECISION_FLOW_WINDOW_MS)
+                stalled_scan = bool(state['before_sig'] and state['scan_head'] and
+                                    (scan_head_time is None or
+                                     observed - scan_head_time > MAX_DISCOVERY_LAG_MS))
+                failed_scan = state['reason'] in {
+                    'SIGNATURE_RPC_UNAVAILABLE', 'SIGNATURE_SCHEMA_MISMATCH',
+                    'PROVIDER_PAGINATION_STALLED'}
+                if inactive_gap or stalled_scan or failed_scan:
+                    with self.db:
+                        self.db.execute('''UPDATE pairs SET cursor=NULL,before_sig=NULL,
+                            scan_head=NULL,complete_since=NULL,reason=NULL WHERE pair=?''',
+                            (metadata['pair'],))
+                    state = self.db.execute('SELECT * FROM pairs WHERE pair=?',
+                                            (metadata['pair'],)).fetchone()
                 options = {'limit':page_limit,'commitment':'confirmed'}
                 if state['cursor']:
                     options['until'] = state['cursor']
@@ -388,7 +418,7 @@ class TapeRecorder:
                     with self.db:
                         self.db.execute('UPDATE pairs SET reason=?,last_poll=? WHERE pair=?',('SIGNATURE_SCHEMA_MISMATCH',self.clock(),pair))
                     continue
-                observed,cutoff = self.clock(),self.clock()-WINDOW_MS
+                observed,cutoff = self.clock(),self.clock()-DECISION_FLOW_WINDOW_MS
                 head = state['scan_head'] or (rows[0].get('signature') if rows else state['cursor'])
                 bootstrap = state['cursor'] is None
                 reached_time = bootstrap and any(r.get('blockTime') and int(r['blockTime'])*1000<cutoff for r in rows)
@@ -460,13 +490,17 @@ class TapeRecorder:
                 continue
             # Unknown event times only affect decisions for the five-minute
             # window in which we actually observed the signature.
+            # Entry gates consume a 30-second flow window. Older unresolved
+            # signatures remain visible in the durable tape and 5-minute chart,
+            # but must not poison completeness for the current decision window.
+            decision_cutoff = current - DECISION_FLOW_WINDOW_MS
             recent_filter = '(event_time>=? OR (event_time IS NULL AND observed>=?))'
             counters = {r['state']:r['n'] for r in self.db.execute(
                 f'SELECT state,count(*) n FROM signatures WHERE pair=? AND {recent_filter} GROUP BY state',
-                (pair,cutoff,cutoff))}
+                (pair,decision_cutoff,decision_cutoff))}
             pending = self.db.execute(
                 f"SELECT count(*) n,min(observed) oldest FROM signatures WHERE pair=? AND state='pending' AND {recent_filter}",
-                (pair,cutoff,cutoff)).fetchone()
+                (pair,decision_cutoff,decision_cutoff)).fetchone()
             latest = self.db.execute('SELECT max(event_time) t FROM events WHERE pair=?',(pair,)).fetchone()['t']
             reason = state['reason']
             if pending['n']:

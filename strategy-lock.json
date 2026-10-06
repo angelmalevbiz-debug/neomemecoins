@@ -73,15 +73,15 @@
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "4a8ed4b4ea79f0336252c560f4b658264ee6dbef9bfe64ddcbe8e8db3f71fb50",
     "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
-    "backend/live_tape.py": "5916562abfd7d301ccfc362ca437334fcfe085c383f7c41c5577ad64a3e25a91",
+    "backend/live_tape.py": "e27f22e0ae5c8b958aefadb3848a0bd615de2e408cb7a12ff1eb156320099359",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
-    "backend/paper_state_reset.py": "80cdf337e5f8db84fe9848e929b0c450f38d413fee82e881bf8b5fedcfe89892",
+    "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
     "backend/strategy_lab.py": "ce20fd2372eb307b4e4cdeeaf468f22f993781a3fc5754d1b9f070c2dca6e42c",
-    "backend/training_bridge.py": "f67c612250675e547982d22989fab24f0e63725ca4bf52f51aa254ed7d12e7e2",
+    "backend/training_bridge.py": "deaaf5dcf6ca779cd7494ad5db43194c6ae560ec19dbb60f01eb54a9716fbe61",
     "backend/training_worker.py": "9390cc7cc78afb2dc791d03e8c51fb85374a5edf5330d22ddd614048fba65ae2",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
     "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
@@ -134,9 +134,9 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Bound live tape RPC requests to supported singleton transaction reads with v1 support while preserving strict incomplete-coverage gates.",
+  "hash_change_reasons": "Bound live tape RPC requests to supported singleton transaction reads with v1 support while preserving strict incomplete-coverage gates. Reset recorder sidecars with each session and coalesce duplicate learner polls to prevent false degraded status from queue saturation. Restrict live flow completeness checks to the exact 30-second decision window while preserving older unknown signatures in durable history.",
   "support_file_changes": {
-    "backend/live_tape.py": "Keep batched signature discovery, fetch transaction bodies as bounded singleton calls with Solana v1 support, and cap parallelism plus per-poll intake to avoid unsupported RPC batches.",
+    "backend/live_tape.py": "Keep bounded batched signature discovery and singleton transaction reads. Restart after tracking gaps or stale pagination, replay only the 30-second decision window for flow validation, and keep older raw tape history for replay.",
     "backend/strategy_lab.py": "Fresh exact-pool spot refresh for held positions, stale valuation labels, and explicit modeled-cost execution basis",
     "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
     "backend/lab_dashboard_projection.py": "Expose position mark age/source and paper-only modeled execution basis",
@@ -145,7 +145,8 @@
     "backend/lab_activity.py": "Single canonical feature builder and unchanged four promoted entry rules shared by Lab and main PAPER ensemble",
     "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account",
     "backend/paper_training.py": "Require fresh complete exact-pool flow before allocating quote capacity to learner route evidence",
-    "backend/training_bridge.py": "Persist and report read-only learner route preflight status",
-    "backend/training_quote_probe.py": "Bounded read-only two-way exact-pool Jupiter quote evidence for isolated PAPER learning"
+    "backend/training_bridge.py": "Coalesce repeated same-pair learner snapshots within a bounded interval while preserving material price, flow, safety, validation, and quote evidence; this reduces queue overload without slowing execution exits.",
+    "backend/training_quote_probe.py": "Bounded read-only two-way exact-pool Jupiter quote evidence for isolated PAPER learning",
+    "backend/paper_state_reset.py": "Archive and reset recorder/quote-probe diagnostics together with PAPER history so each authorized clean session starts with truthful zeroed counters."
   }
 }

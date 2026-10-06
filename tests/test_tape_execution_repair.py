@@ -245,6 +245,73 @@ class RpcAndDurability(unittest.TestCase):
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
 
+    def test_stale_pagination_restarts_at_live_head_without_erasing_history(self):
+        now=self.clock[0]
+        old_times={'old-cursor':now-3*tape.WINDOW_MS,
+                   'old-page':now-2*tape.WINDOW_MS,
+                   'stale-head':now-tape.WINDOW_MS-1}
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO pairs(pair,mint,cursor,before_sig,scan_head,
+                complete_since,last_poll,reason,metadata) VALUES(?,?,?,?,?,?,?,?,?)''',
+                (PAIR,MINT,'old-cursor','old-page','stale-head',now-4*tape.WINDOW_MS,
+                 now-1000,'PAGINATION_PENDING',json.dumps(META)))
+            for index,(signature,event_time) in enumerate(old_times.items()):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                    observed,metadata,state) VALUES(?,?,?,?,?,?,'processed')''',
+                    (signature,PAIR,index+1,event_time,now-5000,json.dumps(META)))
+
+        requests=[]
+        def rpc(calls):
+            result=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    requests.append(params[1])
+                    result.append({'result':[{'signature':'fresh-head','slot':999,
+                                              'blockTime':now//1000,'err':None}]})
+                else:
+                    result.append({'result':non_swap()})
+            return result
+
+        snapshot=self.rec.poll([META],rpc)
+        state=self.rec.db.execute('SELECT * FROM pairs WHERE pair=?',(PAIR,)).fetchone()
+        coverage=snapshot['pair_coverage'][PAIR]
+        self.assertEqual(len(requests),1)
+        self.assertNotIn('before',requests[0])
+        self.assertNotIn('until',requests[0])
+        self.assertEqual(state['cursor'],'fresh-head')
+        self.assertIsNone(state['before_sig'])
+        self.assertIsNone(state['scan_head'])
+        self.assertEqual(coverage['status'],'COMPLETE')
+        self.assertGreaterEqual(coverage['complete_since_ms'],now-tape.DECISION_FLOW_WINDOW_MS)
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures WHERE pair=?',(PAIR,)).fetchone()[0],4)
+
+    def test_inactive_pair_restarts_fresh_window_even_without_pending_page(self):
+        now=self.clock[0]
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO pairs(pair,mint,cursor,before_sig,scan_head,
+                complete_since,last_poll,reason,metadata) VALUES(?,?,?,?,?,?,?,?,?)''',
+                (PAIR,MINT,'old-cursor',None,None,now-tape.WINDOW_MS,
+                 now-tape.DECISION_FLOW_WINDOW_MS-1,None,json.dumps(META)))
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                observed,metadata,state) VALUES(?,?,?,?,?,?,'processed')''',
+                ('old-cursor',PAIR,1,now-tape.WINDOW_MS,now-tape.WINDOW_MS,json.dumps(META)))
+
+        requests=[]
+        def rpc(calls):
+            out=[]
+            for _,params in calls:
+                requests.append(params[1])
+                out.append({'result':[{'signature':'fresh-head','slot':2,
+                                       'blockTime':now//1000,'err':None}]})
+            return out
+
+        self.rec.discover([META],rpc)
+        self.assertNotIn('until',requests[0])
+        self.assertEqual(self.rec.db.execute('SELECT cursor FROM pairs WHERE pair=?',(PAIR,)).fetchone()[0],
+                         'fresh-head')
+        self.assertIsNone(self.rec.db.execute('SELECT before_sig FROM pairs WHERE pair=?',(PAIR,)).fetchone()[0])
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures WHERE pair=?',(PAIR,)).fetchone()[0],2)
+
     def test_large_single_rpc_page_completes_fresh_pool_without_false_pagination(self):
         self.rec.page_size=1000
         self.rec.tx_budget=200
@@ -330,6 +397,36 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(snapshot['current_backlog'],0)
         self.assertEqual(snapshot['stale_pending'],1)
         self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],0)
+
+    def test_unknown_trade_older_than_decision_window_does_not_poison_live_flow(self):
+        def rpc(calls):
+            return [{'result':[]} for _ in calls]
+
+        self.rec.poll([META],rpc)
+        old=self.clock[0]-tape.DECISION_FLOW_WINDOW_MS-1
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state,attempts,next_retry) VALUES('older-unknown',?,?, ?,?,?, 'unclassified',1,0)''',
+                (PAIR,1,old,old,json.dumps(META)))
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],0)
+        self.assertEqual(snapshot['status'],'online')
+
+    def test_unclassified_signature_in_decision_window_blocks_live_flow(self):
+        def rpc(calls):
+            return [{'result':[]} for _ in calls]
+
+        self.rec.poll([META],rpc)
+        current=self.clock[0]-tape.DECISION_FLOW_WINDOW_MS+1
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state,attempts,next_retry) VALUES('current-unknown',?,?, ?,?,?, 'unclassified',1,0)''',
+                (PAIR,1,current,current,json.dumps(META)))
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'DEGRADED')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['reason'],'UNCLASSIFIED_TRANSACTIONS')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],1)
 
     def test_transaction_null_is_pending_then_success_after_restart(self):
         available=[False]

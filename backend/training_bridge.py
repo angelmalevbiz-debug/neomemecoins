@@ -24,6 +24,7 @@ SOL = 'So11111111111111111111111111111111111111112'
 RECENT_OBSERVATION_IDS = 8192
 RECORDER_BATCH_SIZE = 128
 WORKER_RESTART_MAX_SECONDS = 30
+OBSERVATION_MIN_INTERVAL_MS = 3000
 
 
 class TrainingBridge:
@@ -35,6 +36,7 @@ class TrainingBridge:
         self.lock = threading.Lock()
         self.pending_ids = set()
         self.recent_ids = OrderedDict()
+        self.last_observation_samples = {}
         self.coalesced = 0
         self.dropped = 0
         sidecar_dropped = 0
@@ -174,6 +176,7 @@ class TrainingBridge:
             self.cache.clear()
             self.pending_ids.clear()
             self.recent_ids.clear()
+            self.last_observation_samples.clear()
             self.coalesced = 0
         self.recording_drop_baseline = self.dropped
         self.recording_drop_gap = False
@@ -473,6 +476,93 @@ class TrainingBridge:
             self.error = f'Observation refused: {type(exc).__name__}: {exc}'
             return False
 
+    @staticmethod
+    def _stable_sample_value(value):
+        """Remove poll timestamps while retaining point-in-time market evidence."""
+        volatile = {
+            'available_at', 'observed_at', 'decision_at', 'updatedat', 'updated_at',
+            'checked_at', 'reference_received_at', 'quoted_at', 'last_updated_at',
+            'received_at', 'timestamp', 'age_ms', 'age_seconds',
+        }
+        if isinstance(value, dict):
+            return {key: TrainingBridge._stable_sample_value(item)
+                    for key, item in value.items() if str(key).lower() not in volatile}
+        if isinstance(value, list):
+            return [TrainingBridge._stable_sample_value(item) for item in value]
+        return value
+
+    @staticmethod
+    def _moved(current, previous, fraction):
+        current, previous = number(current), number(previous)
+        scale = max(abs(current), abs(previous), 1e-9)
+        return abs(current - previous) / scale >= fraction
+
+    def _coalesce_market_snapshot(self, key, stamp, coin, flow, safety, validation,
+                                  quotes, reasons, known_buy, known_sell):
+        """Bound repeat polls without suppressing new flow, risk, or route evidence."""
+        tx5 = (coin.get('txns') or {}).get('m5') or {}
+        volume = coin.get('volume') or {}
+        change = coin.get('priceChange') or {}
+        flow = flow or {}
+        sample = {
+            'at': stamp,
+            'price': number(coin.get('priceUsd')),
+            'liquidity': number(coin.get('liquidityUsd')),
+            'market_cap': number(coin.get('marketCap') or coin.get('fdv')),
+            'score': number(coin.get('score')),
+            'risk_score': number(coin.get('riskScore')),
+            'age_minute': int(number(coin.get('ageMinutes'))),
+            'm5_change': number(change.get('m5')),
+            'h1_change': number(change.get('h1')),
+            'm5_volume': number(volume.get('m5')),
+            'm5_buys': int(number(tx5.get('buys'))),
+            'm5_sells': int(number(tx5.get('sells'))),
+            'flow_latest_at': int(number(flow.get('latest_at') or flow.get('last_event_at'))),
+            'flow_values': tuple(number(flow.get(name)) for name in
+                                 ('trades', 'buys', 'sells', 'buy_usd', 'sell_usd',
+                                  'unique_wallets', 'buy_sell_usd_ratio', 'ratio')),
+            'safety': digest(self._stable_sample_value(safety or {})),
+            'validation': digest(self._stable_sample_value(validation or {})),
+            'quotes': digest(self._stable_sample_value(quotes or {})),
+            'route_quotes': bool(quotes and any(name in quotes for name in ('entry', 'exit'))),
+            'known_routes': (bool(known_buy), bool(known_sell)),
+            'reasons': tuple(sorted(set(str(reason) for reason in (reasons or [])))),
+        }
+        with self.lock:
+            if not hasattr(self, 'last_observation_samples'):
+                self.last_observation_samples = {}
+            previous = self.last_observation_samples.get(key)
+            if previous is not None and stamp - previous['at'] < OBSERVATION_MIN_INTERVAL_MS:
+                material = (
+                    sample['reasons'] != previous['reasons']
+                    or sample['safety'] != previous['safety']
+                    or sample['validation'] != previous['validation']
+                    or sample['route_quotes']
+                    or sample['quotes'] != previous['quotes']
+                    or sample['known_routes'] != previous['known_routes']
+                    or sample['flow_latest_at'] > previous['flow_latest_at']
+                    or sample['flow_values'] != previous['flow_values']
+                    or (sample['m5_buys'], sample['m5_sells']) !=
+                       (previous['m5_buys'], previous['m5_sells'])
+                    or self._moved(sample['price'], previous['price'], .005)
+                    or self._moved(sample['liquidity'], previous['liquidity'], .05)
+                    or self._moved(sample['market_cap'], previous['market_cap'], .05)
+                    or self._moved(sample['m5_volume'], previous['m5_volume'], .20)
+                    or abs(sample['score'] - previous['score']) >= 2
+                    or abs(sample['risk_score'] - previous['risk_score']) >= 5
+                    or abs(sample['m5_change'] - previous['m5_change']) >= 1
+                    or abs(sample['h1_change'] - previous['h1_change']) >= 2
+                    or sample['age_minute'] != previous['age_minute']
+                )
+                if not material:
+                    self.coalesced += 1
+                    return True
+            # Reserve the sampling slot before queue insertion. A full queue is
+            # counted once per distinct sample interval instead of once per
+            # half-second retry from the position guard.
+            self.last_observation_samples[key] = sample
+        return False
+
     def note_quote_probe(self, status, *, reason='', at=None, attempted=False, success=False):
         """Persist compact diagnostics for independent, read-only route checks."""
         with self.lock:
@@ -570,6 +660,9 @@ class TrainingBridge:
         }
         # Two distinct safety/quote updates in one millisecond must not collide.
         observation['id'] = digest(observation)
+        if self._coalesce_market_snapshot(key, stamp, coin, normalized_flow, guard,
+                                          price, quotes, reasons, known_buy, known_sell):
+            return True
         return self.submit(observation)
 
 

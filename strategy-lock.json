@@ -87,7 +87,7 @@
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "d29ad57d08d47f389340c13125ce0fe435aeedc51e17818238d71ecbc4744622",
+    "backend/strategy_lab.py": "f21e4dbcb525fb3e7428b0e412c7e204d1cd002ec8c1ac29fd4ad5405990ab67",
     "backend/training_bridge.py": "5e40add75882c7bbee73d010148ea425c42475d9b03b792b1bda22a5249fc14d",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "9390cc7cc78afb2dc791d03e8c51fb85374a5edf5330d22ddd614048fba65ae2",
@@ -140,7 +140,7 @@
   "hash_change_reasons": "Integrate both separately developed branches without losing recorded-data, quote, learner or PnL fixes. Complete the previously orphaned Momentum Rush Brain as an isolated PAPER TEST strategy. Keep strict promoted rules, loss cooldowns and truthful fee/slippage/impact accounting. Record per-book performance uncertainty and observed throughput separately from any target.",
   "support_file_changes": {
     "backend/live_tape.py": "Bound signature discovery, fetch transaction bodies as individual JSON-RPC objects with v1 support, isolate one request failure from concurrent successes, and retain strict current-window coverage checks.",
-    "backend/strategy_lab.py": "Combine bounded Jupiter price checks and net accounting with strict promoted entry/loss guards; register separate TEST-only Momentum Rush Brain using causal exact-pool observations, its own net trade memory and fresh safety checks.",
+    "backend/strategy_lab.py": "Combine bounded Jupiter price checks and net accounting with strict promoted entry/loss guards; register separate TEST-only Momentum Rush Brain using causal exact-pool observations, its own net trade memory and fresh safety checks. Preserve new main Rush-specific 7 percent net take-profit, 20 minute maximum hold and liquidity/verified-flow/trailing exits; keep other books unchanged.",
     "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
     "backend/lab_dashboard_projection.py": "Expose compact per-strategy entry diagnostics and clearly separated realized, unrealized, and marked PAPER PnL for the dashboard.",
     "backend/market_monitor.py": "Preserve learner evidence probes and primary net exits; select the newest actually observed exact-mint/pool snapshot to prevent reentry using an old pinned mark, while rejecting future evidence and retaining stale-market protection.",

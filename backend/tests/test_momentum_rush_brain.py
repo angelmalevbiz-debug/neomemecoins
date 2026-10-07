@@ -323,5 +323,87 @@ class RushRunnerTests(unittest.TestCase):
         self.assertEqual(other['sell_usd'], 1000)
 
 
+class RushExitTests(unittest.TestCase):
+    def setUp(self):
+        self.book = {'id':brain.STRATEGY_ID,'balance':500,'history':[], 'position':{
+            'strategy_id':brain.STRATEGY_ID,'address':MINT,'pairAddress':PAIR,
+            'entry_price':1,'entry_liquidity_usd':12000,'peak_price':1,
+            'notional_usd':100,'remaining_cost_basis_usd':100,'quantity':100,
+            'opened_at':NOW-60000,'updated_at':NOW-1000,'partial_realized_pnl':0}}
+        state = patch.object(lab,'STATE',{'books':{'RUSH':self.book}})
+        state.start();self.addCleanup(state.stop)
+        clock = patch.object(lab,'now_ms',return_value=NOW)
+        clock.start();self.addCleanup(clock.stop)
+
+    def mark(self, pnl=0, *, mark=None, flow=None):
+        mark = coin(price=1.2, liquidityUsd=12000) if mark is None else mark
+        quote = {'fill_price':1.2,'net_proceeds_usd':100+pnl,'dex_fee_usd':.3,
+                 'network_fee_usd':.01,'impact_pct':.1,'slippage_pct':.1,'latency_pct':.1}
+        with patch.object(lab.POSITION_MARK_FEED,'resolve',return_value=mark), \
+             patch.object(lab,'exit_execution',return_value=quote) as execute:
+            lab.update_positions(flow or {}, [mark])
+        return execute
+
+    def reason(self):
+        return self.book['history'][0]['exit_reason'] if self.book['history'] else None
+
+    def test_net_take_profit_and_20_minute_max_hold(self):
+        self.mark(7)
+        self.assertEqual(self.reason(),'RUSH_TAKE_PROFIT_7_NET')
+        self.assertEqual(self.book['history'][0]['pnl_usd'],7)
+        self.setUp()
+        self.book['position']['opened_at']=NOW-20*60000
+        self.mark(0)
+        self.assertEqual(self.reason(),'RUSH_MAX_HOLD_20')
+
+    def test_net_stop_takes_priority_over_collapse_without_loss_clamp(self):
+        self.mark(-10,mark=coin(liquidityUsd=6000))
+        self.assertEqual(self.reason(),'STOP_LOSS_3_NET')
+        self.assertEqual(self.book['history'][0]['pnl_usd'],-10)
+        self.assertEqual(self.book['balance'],490)
+
+    def test_fresh_liquidity_collapse_exits_but_unknown_liquidity_is_not_zero(self):
+        mark=coin();del mark['liquidityUsd']
+        self.mark(0,mark=mark)
+        self.assertIsNotNone(self.book['position'])
+        self.mark(0,mark=coin(liquidityUsd=7799))
+        self.assertEqual(self.reason(),'RUSH_LIQUIDITY_COLLAPSE')
+
+    def test_trailing_uses_net_peak_and_accounts_for_costs(self):
+        self.mark(6)
+        self.assertEqual(self.book['position']['peak_net_pct'],6)
+        self.mark(3.5)
+        self.assertEqual(self.reason(),'RUSH_PROFIT_TRAIL')
+        self.assertEqual(self.book['history'][0]['pnl_usd'],3.5)
+
+    def test_only_fresh_same_pool_flow_can_trigger_reversal(self):
+        bearish={'trades':4,'ratio':.5,'sell_usd':200,'buy_usd':100,
+                 'window_at':NOW,'available_at':NOW-1}
+        for flow in ({(MINT,OTHER_PAIR):bearish}, {MINT:bearish},
+                     {(MINT,PAIR):{**bearish,'available_at':NOW+1}},
+                     {(MINT,PAIR):{**bearish,'window_at':NOW-60001}}):
+            self.mark(0,flow=flow)
+            self.assertIsNotNone(self.book['position'])
+        self.mark(0,flow={(MINT,PAIR):bearish})
+        self.assertEqual(self.reason(),'RUSH_FLOW_REVERSAL')
+
+    def test_unavailable_stale_future_and_other_pool_marks_cannot_close(self):
+        for mark in (coin(NOW-12001),coin(NOW+1),coin(pairAddress=OTHER_PAIR)):
+            execute=self.mark(-10,mark=mark)
+            execute.assert_not_called()
+            self.assertIsNotNone(self.book['position'])
+            self.assertEqual(self.book['history'],[])
+            self.assertNotIn('peak_net_pct',self.book['position'])
+
+    def test_other_books_keep_standard_exit_framework(self):
+        self.book['id']='MOMENTUM'
+        self.book['position'].update(strategy_id='MOMENTUM',opened_at=NOW-20*60000,
+                                     peak_net_pct=20)
+        self.mark(7,mark=coin(liquidityUsd=1000))
+        self.assertIsNotNone(self.book['position'])
+        self.mark(10)
+        self.assertEqual(self.reason(),'TAKE_PROFIT_10_NET')
+
+
 if __name__ == '__main__':
     unittest.main()

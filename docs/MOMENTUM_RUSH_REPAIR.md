@@ -5,6 +5,13 @@ local branch's data, quote, learner and net-accounting fixes. It completes the
 previously unregistered Momentum Rush helper as an independently funded TEST
 book. The four promoted books retain their own histories and allocations.
 
+The concurrent GitHub integration's faster Rush exits are retained: a 3% net
+stop, 7% net target, 20-minute maximum hold, liquidity collapse below 65% of the
+entry level, a fresh exact-pool flow reversal, and a 2.5 percentage point net
+trail after a 4% net peak. Other books retain their existing exit framework.
+Missing or stale marks do not create simulated fills. A stop threshold does
+not limit the actual loss in a gap.
+
 ## Confirmed problems
 
 - The helper and activity policy existed in GitHub, but the runner had no
@@ -70,3 +77,21 @@ Momentum Swarm and Astra; do not overwrite its state with the Windows ledger.
 
 No empirical 80% success rate or positive trading edge has been established.
 Synthetic regression success verifies behavior and accounting, not returns.
+
+## Executed verification
+
+The integrated revision passed 342 root Python tests, 114 backend Python tests,
+16 frontend regression tests, TypeScript, the strategy hash guard, extension
+syntax checks and the production build. The build emitted a nonfatal bundle-size
+warning. The retained one-shot GitHub migration now exits successfully without
+rewriting an already integrated engine; incompatible partial migrations refuse
+without changing source.
+
+The Windows update used a checksummed archive of nine existing account/state
+files after all owned writers stopped gracefully. Subsequent read-only checks
+confirmed all archived primary trades and all 33 existing Lab ledgers were
+retained; Momentum Rush was added as the 34th book in TEST. Main, tape, Lab and
+gateway returned running status. The tape began decoding actual events (204 in
+one measured projection); coverage was still degraded, with provider pagination
+and some unsupported transactions unresolved. This is partial data recovery,
+not proof of complete flow coverage or a successful new strategy outcome.

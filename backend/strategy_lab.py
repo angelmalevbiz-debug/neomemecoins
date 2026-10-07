@@ -39,6 +39,12 @@ STOP_LOSS=3.0
 TAKE_PROFIT=10.0
 TRAILING=4.0
 MAX_HOLD_MIN=60.0
+RUSH_TAKE_PROFIT=7.0
+RUSH_MAX_HOLD_MIN=20.0
+RUSH_TRAIL_ARM=4.0
+RUSH_TRAIL_DRAWDOWN=2.5
+RUSH_LIQ_MIN_FRACTION=.65
+RUSH_FLOW_MAX_AGE_MS=12_000
 REENTRY_COOLDOWN_MIN=activity.REENTRY_SECONDS/60.0
 
 # Realistic paper execution costs for Strategy Lab. These are applied equally to
@@ -176,11 +182,13 @@ def flow_map():
         if e.get('direction') not in {'BUY','SELL'}: continue
         f=out.setdefault((a,pair),{'trades':0,'buys':0,'sells':0,'buy_usd':0.0,'sell_usd':0.0,'wallets':set(),'max_sell':0.0})
         f['trades']+=1; verified_events+=1
+        f['available_at']=max(num(f.get('available_at')),available)
         f['wallets'].add(wallet)
         if e.get('direction')=='BUY': f['buys']+=1; f['buy_usd']+=usd
         else: f['sells']+=1; f['sell_usd']+=usd; f['max_sell']=max(f['max_sell'],usd)
     for f in out.values():
         f['unique_wallets']=len(f.pop('wallets')); f['ratio']=f['buy_usd']/max(f['sell_usd'],1)
+        f['window_at']=now
     # Keep the historical address lookup only where it identifies one pool.
     # Entry enrichment always prefers the exact mint/pair observation.
     exact_rows=list(out.items())
@@ -473,8 +481,15 @@ def update_positions(flows,feed):
     for book in [*STATE['books'].values(), *exit_only_books]:
         pos=book.get('position')
         if not pos: continue
-        coin=POSITION_MARK_FEED.resolve(pos,prices,now_ms())
-        if not coin:
+        decision_at=now_ms()
+        is_rush=pos.get('strategy_id',book.get('id'))==rush_brain.STRATEGY_ID
+        coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
+        mark_stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
+        rush_mark_fresh=(coin and coin.get('address')==pos.get('address')
+                         and coin.get('pairAddress')==pos.get('pairAddress')
+                         and num(coin.get('priceUsd'))>0 and mark_stamp>0
+                         and 0<=decision_at-mark_stamp<=POSITION_STALE_AFTER_MS)
+        if not coin or (is_rush and not rush_mark_fresh):
             age=max(0,now_ms()-int(num(pos.get('updated_at'))))
             pos['quote_status']='stale' if age>POSITION_STALE_AFTER_MS else 'refreshing'
             pos['quote_age_ms']=age
@@ -483,7 +498,13 @@ def update_positions(flows,feed):
         price=num(coin.get('priceUsd'))
         entry=num(pos['entry_price']); peak=max(num(pos.get('peak_price'),entry),price)
         pct=(price-entry)/entry*100; hold=(now_ms()-int(pos['opened_at']))/60000
-        f=flows.get(pos['address'],{})
+        # Rush reversal signals require an available, recent window from this
+        # held pool. Another pool of the mint cannot trigger an exit.
+        f=flows.get((pos['address'],pos.get('pairAddress')),{}) if is_rush else flows.get(pos['address'],{})
+        window_at=num(f.get('window_at')); available_at=num(f.get('available_at'))
+        flow_fresh=(window_at>0 and available_at>0
+                    and 0<=decision_at-window_at<=RUSH_FLOW_MAX_AGE_MS
+                    and 0<=decision_at-available_at<=RUSH_FLOW_MAX_AGE_MS)
         reason=None
 
         remaining_qty=num(pos.get('quantity'))
@@ -493,14 +514,26 @@ def update_positions(flows,feed):
         total_live_pnl=num(pos.get('partial_realized_pnl'))+open_pnl
         total_live_pct=total_live_pnl/max(num(pos.get('notional_usd')),1e-18)*100
 
-        # Unified 3:10 NET exit framework across all Lab strategies.
-        # Entry logic stays strategy-specific; exits are identical and include
-        # DEX fee, price impact, slippage/latency and network cost.
+        # Rush's faster TEST exits use the same net cost model and 3% stop.
+        # Standard books retain their 3/10/60 framework.
+        peak_net=max(num(pos.get('peak_net_pct'),total_live_pct),total_live_pct)
+        entry_liq=num(pos.get('entry_liquidity_usd'))
+        current_liq=num(coin.get('liquidityUsd'),num((coin.get('liquidity') or {}).get('usd'),math.nan))
         if total_live_pct<=-STOP_LOSS:
             reason='STOP_LOSS_3_NET'
-        elif total_live_pct>=TAKE_PROFIT:
+        elif is_rush and entry_liq>0 and math.isfinite(current_liq) and 0<=current_liq<entry_liq*RUSH_LIQ_MIN_FRACTION:
+            reason='RUSH_LIQUIDITY_COLLAPSE'
+        elif is_rush and flow_fresh and num(f.get('trades'))>=4 and num(f.get('ratio'))<.65 and num(f.get('sell_usd'))>num(f.get('buy_usd')):
+            reason='RUSH_FLOW_REVERSAL'
+        elif is_rush and peak_net>=RUSH_TRAIL_ARM and peak_net-total_live_pct>=RUSH_TRAIL_DRAWDOWN-1e-9:
+            reason='RUSH_PROFIT_TRAIL'
+        elif is_rush and total_live_pct>=RUSH_TAKE_PROFIT:
+            reason='RUSH_TAKE_PROFIT_7_NET'
+        elif not is_rush and total_live_pct>=TAKE_PROFIT:
             reason='TAKE_PROFIT_10_NET'
-        elif hold>=MAX_HOLD_MIN:
+        elif is_rush and hold>=RUSH_MAX_HOLD_MIN:
+            reason='RUSH_MAX_HOLD_20'
+        elif not is_rush and hold>=MAX_HOLD_MIN:
             reason='ABSOLUTE_MAX_HOLD_60'
 
         marked_at=num(coin.get('mark_received_at'),now_ms())
@@ -515,6 +548,7 @@ def update_positions(flows,feed):
                     'mark_source':coin.get('mark_source','SHARED_LIVE_FEED_EXACT_POOL'),
                     'quote_status':'fresh' if quote_age<=POSITION_STALE_AFTER_MS else 'stale',
                     'quote_age_ms':quote_age,'quote_unavailable_reason':None})
+        if is_rush: pos['peak_net_pct']=peak_net
         if reason: close_position(book,pos,coin,reason)
 def maybe_open(feed,flows):
     now=now_ms()
@@ -724,6 +758,9 @@ def maybe_open(feed,flows):
             position['momentum_rush_brain']=brain
             position['risk_guard']=risk
             position['promotion_eligible']=False
+            position['entry_liquidity_usd']=pair_liquidity_usd(coin)
+            position['entry_market_cap_usd']=num(coin.get('marketCap') or coin.get('fdv'))
+            position['peak_net_pct']=proposed['initial_pnl_pct']
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
 
@@ -767,6 +804,12 @@ def persist(status='online',error=None):
                               'rush_max_memory_scan_rows':rush_brain.MAX_MEMORY_SCAN_ROWS,
                               'rush_low_cap_max_balance_fraction':rush_brain.LOW_CAP_MAX_BALANCE_FRACTION,
                               'rush_low_cap_max_notional_usd':rush_brain.LOW_CAP_MAX_NOTIONAL_USD}
+    STATE['activity_config'].update({
+        'rush_stop_loss_net_pct':STOP_LOSS,'rush_take_profit_net_pct':RUSH_TAKE_PROFIT,
+        'rush_max_hold_minutes':RUSH_MAX_HOLD_MIN,'rush_trail_arm_net_pct':RUSH_TRAIL_ARM,
+        'rush_trail_drawdown_net_pct':RUSH_TRAIL_DRAWDOWN,
+        'rush_liquidity_min_fraction':RUSH_LIQ_MIN_FRACTION,
+        'rush_flow_max_age_ms':RUSH_FLOW_MAX_AGE_MS})
     previous_setup=STATE.get('portfolio_setup') or {}
     default_setup_status='ACTIVE' if all(
         abs(num(STATE['books'][key].get('starting_balance'))-PROMOTED_ALLOCATION)<1e-8

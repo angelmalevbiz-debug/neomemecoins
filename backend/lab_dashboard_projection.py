@@ -48,10 +48,12 @@ def compact_strategy_lab(data):
             'history': history,
             **({'runtime_compatibility': raw['runtime_compatibility']}
                if isinstance(raw.get('runtime_compatibility'), dict) else {}),
+            **({'strategy_lifecycle': raw['strategy_lifecycle']}
+               if isinstance(raw.get('strategy_lifecycle'), dict) else {}),
             'entry_diagnostics': {
                 field: raw['entry_diagnostics'][field]
                 for field in (
-                    'at', 'signal_candidates', 'matched_candidates', 'cost_rejected',
+                    'at', 'signal_candidates', 'market_rejected_candidates', 'matched_candidates', 'cost_rejected',
                     'cooldown_rejected', 'affordable_candidates', 'price_verification_rejected',
                     'price_crosscheck_pending', 'flow_missing_candidates',
                     'flow_tape_status', 'flow_tape_coverage_pct',
@@ -123,6 +125,7 @@ def compact_strategy_lab(data):
         'activity_config': data.get('activity_config') or {},
         'portfolio_setup': portfolio_setup,
         'registry_compatibility': data.get('registry_compatibility') or {},
+        'strategy_lifecycle': data.get('strategy_lifecycle') or {},
     }
 
     astra = data.get('astra')

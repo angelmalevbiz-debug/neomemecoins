@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, math, os, threading, time
+import json, math, os, sys, threading, time
 from pathlib import Path
 from typing import Any, Callable
 import requests
@@ -14,6 +14,7 @@ from lab_position_marks import POSITION_MARK_FEED
 import paper_execution_quotes as paper_quotes
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
+import lab_strategy_lifecycle as lifecycle
 
 API_URL=os.getenv('NEO_LOCAL_API','http://127.0.0.1:8788/state')
 DEX='https://api.dexscreener.com'
@@ -174,9 +175,19 @@ def load_json(path,default):
 
 def atomic_write_path(path,data):
     path.parent.mkdir(parents=True,exist_ok=True)
-    tmp=path.with_suffix(path.suffix+'.tmp')
-    tmp.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8')
-    tmp.replace(path)
+    tmp=path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    with tmp.open('w',encoding='utf-8') as handle:
+        json.dump(data,handle,ensure_ascii=False,allow_nan=False)
+        handle.flush()
+        os.fsync(handle.fileno())
+    for attempt in range(8):
+        try:
+            tmp.replace(path)
+            return
+        except PermissionError:
+            if attempt==7:
+                raise
+            time.sleep(min(.4,.025*(2**attempt)))
 
 def atomic_write(data):
     atomic_write_path(STATE_PATH,data)
@@ -451,6 +462,12 @@ def registry_compatibility(books):
             key for key in preserved if books[key].get('position') or books[key].get('positions')),
     }
 
+def review_strategy_lifecycle(books):
+    return lifecycle.apply_lifecycle(
+        books,registered_ids={s['id'] for s in STRATEGIES},
+        promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.POLICY_VERSION,
+        execution_version=EXECUTION_MODEL_VERSION,now=now_ms())
+
 def load_state():
     reset_requested=RESET_FLAG_PATH.exists()
     if reset_requested:
@@ -491,6 +508,7 @@ def load_state():
     return {'started_at':now_ms() if reset_requested else (raw.get('started_at') or now_ms()),
             'updated_at':now_ms(),'status':'starting','books':books,
             'stats':raw.get('stats') or {},'registry_compatibility':compatibility,
+            'strategy_lifecycle':review_strategy_lifecycle(books),
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
             'portfolio_setup':raw.get('portfolio_setup')}
@@ -637,6 +655,7 @@ def update_positions(flows,feed):
         if reason: close_position(book,pos,coin,reason)
 def maybe_open(feed,flows):
     now=now_ms()
+    STATE['strategy_lifecycle']=review_strategy_lifecycle(STATE['books'])
     by_pair={}
     for c in feed:
         if activity.usable_feed_coin(c,now):
@@ -652,6 +671,12 @@ def maybe_open(feed,flows):
     }
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
+        if not lifecycle.entry_enabled(book):
+            book['entry_diagnostics']={
+                'at':now,'blocked_reason':'strategy_retired_observed_losses',
+                'balance_usd':round(num(book.get('balance')),4),
+            }
+            continue
         if book.get('position'):
             continue
         if book.get('promotion_pending'):
@@ -693,6 +718,7 @@ def maybe_open(feed,flows):
         eligible=[]
         checked=0
         signal_candidates=0
+        market_rejected=0
         blocked_cost=0
         blocked_network=0
         blocked_price=0
@@ -714,8 +740,10 @@ def maybe_open(feed,flows):
             matched=(strategy['rule'](features) if is_promoted
                      else rule.matches(features))
             if not matched:
-                if rule.matches(features,require_flow=False):
+                if not is_promoted and rule.matches(features,require_flow=False):
                     flow_rejected+=1
+                else:
+                    market_rejected+=1
                 continue
             signal_candidates+=1
             if sol_usd_from_coin(coin)<=0:
@@ -806,6 +834,7 @@ def maybe_open(feed,flows):
                              coin,features,proposed,validation,brain,risk,candidate_limit))
         book['entry_diagnostics']={
             'at':now,'signal_candidates':signal_candidates,
+            'market_rejected_candidates':market_rejected,
             'matched_candidates':checked,'cost_rejected':blocked_cost,
             'network_cost_rejected':blocked_network,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':len(eligible),
@@ -825,7 +854,9 @@ def maybe_open(feed,flows):
                 'promoted_max_entry_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
                 'profitability_proven':False,
             })
-            if not eligible and promoted_block_reasons:
+            if signal_candidates==0:
+                book['entry_diagnostics']['blocked_reason']='no_market_signal'
+            elif not eligible and promoted_block_reasons:
                 book['entry_diagnostics']['blocked_reason']=next(iter(promoted_block_reasons))
         if strategy['id']==rush_brain.STRATEGY_ID:
             book['entry_diagnostics'].update({
@@ -945,6 +976,7 @@ def stats(book):
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
     STATE['registry_compatibility']=registry_compatibility(STATE['books'])
+    STATE['strategy_lifecycle']=review_strategy_lifecycle(STATE['books'])
     registered={s['id'] for s in STRATEGIES}
     previous_stats=STATE.get('stats') or {}
     STATE['stats']={
@@ -1018,9 +1050,17 @@ def main():
         STATE['activity_started_at']=now_ms()
     last_entry=0
     feed=[]
+    persistence_ready=True
+    failures=0
     while True:
         started=time.time()
         try:
+            # Restore a durable ledger before permitting another PAPER entry.
+            # Failed projection writes leave the old published snapshot stale;
+            # readers already reject stale evidence.
+            if not persistence_ready:
+                persist('degraded','Recovering a failed state write')
+                persistence_ready=True
             flows=flow_map()
             refresh_due=time.time()-last_entry>=ENTRY_REFRESH_SECONDS
             if refresh_due:
@@ -1031,8 +1071,16 @@ def main():
             if refresh_due:
                 maybe_open(feed,flows)
             persist('online')
+            failures=0
         except Exception as e:
-            persist('degraded',e)
-        time.sleep(max(.25,POLL_SECONDS-(time.time()-started)))
+            failures+=1
+            persistence_ready=False
+            print(f'Strategy Lab retry: {type(e).__name__}: {e}',file=sys.stderr,flush=True)
+            try:
+                persist('degraded',e)
+            except Exception as write_error:
+                print(f'Strategy Lab state write failed: {type(write_error).__name__}: {write_error}',file=sys.stderr,flush=True)
+        delay=min(60,2**min(failures,6)) if failures else POLL_SECONDS
+        time.sleep(max(.25,delay-(time.time()-started)))
 
 if __name__=='__main__': main()

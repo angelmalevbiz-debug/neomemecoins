@@ -17,6 +17,7 @@ import gold_order_flow as flow_policy
 import engine_entry_policy as entry_policy
 import engine_exit_policy as exit_policy
 import winner_ensemble
+import promoted_entry_guard as promoted_guard
 
 A, B, C = 'A'*44, 'B'*44, 'C'*44
 
@@ -57,6 +58,11 @@ class MainPaperRepair(unittest.TestCase):
             'updatedAt':self.clock[0]}
         self.flow = {'quality':'COMPLETE','trades':4,'buy_sell_usd_ratio':3,'unique_wallets':3,
             'buyer_wallets':3,'buy_usd':300,'sell_usd':100,'max_sell_usd':50}
+        self.flow['verified_flow'] = {'source':promoted_guard.FLOW_SOURCE,
+            'coverage_status':'COMPLETE','window_ms':promoted_guard.FLOW_WINDOW_MS,
+            'address':A,'pairAddress':B,'window_at':self.clock[0],
+            'latest_event_at':self.clock[0]-100,'available_at':self.clock[0]-50,
+            'trades':4,'unique_wallets':3,'buy_usd':300,'sell_usd':100}
         self.context = {'conviction':80,'mode':'STRONG'}
         self.pos = {'id':'position-1','address':A,'pairAddress':B,'session_id':m.STATE.demo_session_id,
             'entry_price':2,'current_price':2,'quantity':100,'notional_usd':200,'original_notional_usd':200,
@@ -73,13 +79,20 @@ class MainPaperRepair(unittest.TestCase):
         return m.STATE.positions[0]
 
     def entry_patches(self):
+        def flow_for(address, _seconds=30, pair_address=None):
+            proof={**self.flow['verified_flow'],'address':address,'pairAddress':pair_address}
+            return {**self.flow,'verified_flow':proof}
+        def safety_for(coin):
+            return {'status':'pass','mint':coin['address'],'pair':coin['pairAddress'],
+                'checked_at':self.clock[0],
+                'metrics':{'decimals':6,'token_account_rent_lamports':1650000}}
         def prepared(address,pair,notional):
             return ({'token_raw_expected':int(notional/2*1e6),'token_raw_amount':int(notional/2*1e6),
                 'input_usdc_raw':int(notional*1e6),'price_impact_pct':.2,'quoted_at':self.clock[0],
                 'raw_quote':{'fixture':True}}, {'expected_usdc':notional-1,'floor_usdc':notional-2})
-        patches=[patch.object(m.STATE,'live_flow',return_value=self.flow),
+        patches=[patch.object(m.STATE,'live_flow',side_effect=flow_for),
             patch.object(self.monitor,'market_context',return_value=self.context),
-            patch.object(m.rug_guard,'check',return_value={'status':'pass','metrics':{'decimals':6,'token_account_rent_lamports':1650000}}),
+            patch.object(m.rug_guard,'check',side_effect=safety_for),
             patch.object(m.price_integrity,'check',return_value={'status':'pass'}),
             patch.object(m.paper_quotes,'prepare_entry',side_effect=prepared)]
         for p in patches: p.start(); self.addCleanup(p.stop)
@@ -187,7 +200,7 @@ class MainPaperRepair(unittest.TestCase):
         m.STATE.feed=[dict(self.coin)]
         original_prepare=m.paper_quotes.prepare_entry.side_effect
         def change_signal_during_quote(*args):
-            m.STATE.feed=[dict(self.coin,score=84)]
+            m.STATE.feed=[dict(self.coin,score=75)]
             return original_prepare(*args)
         m.paper_quotes.prepare_entry.side_effect=change_signal_during_quote
         self.monitor.maybe_open([self.coin])
@@ -206,13 +219,13 @@ class MainPaperRepair(unittest.TestCase):
         self.assertFalse(m.STATE.positions)
         self.assertIn('stale_feed',m.STATE.entry_diagnostics['rejections'])
 
-    def test_degraded_flow_can_open_only_after_independent_checks(self):
+    def test_degraded_flow_blocks_even_when_other_checks_would_pass(self):
         self.entry_patches()
-        with patch.object(m.STATE,'live_flow',return_value=dict(self.flow,quality='DEGRADED')):
+        with patch.object(m.STATE,'live_flow',return_value={**self.flow,'quality':'DEGRADED',
+                                                           'verified_flow':None}):
             self.monitor.maybe_open([self.coin])
-        self.assertEqual(len(m.STATE.positions),1)
-        self.assertEqual(m.STATE.positions[0]['entry_flow']['quality'],'DEGRADED')
-        self.assertEqual(m.STATE.positions[0]['signal_evidence'],'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS')
+        self.assertFalse(m.STATE.positions)
+        self.assertIn('promoted_verified_flow_unavailable',m.STATE.entry_diagnostics['rejections'])
 
     def test_pending_rug_never_opens_even_with_winner_signal(self):
         self.entry_patches()
@@ -223,7 +236,8 @@ class MainPaperRepair(unittest.TestCase):
 
     def test_shared_account_opens_multiple_distinct_winner_positions_and_persists_attribution(self):
         self.entry_patches()
-        coins=[dict(self.coin,address=address*44,pairAddress=pair*44,symbol=f'COIN-{address}',score=95)
+        coins=[dict(self.coin,address=address*44,pairAddress=pair*44,symbol=f'COIN-{address}',score=95,
+                    volume={'h1':50_000})
                for address,pair in [('A','B'),('C','D'),('E','F')]]
         m.STATE.feed=copy.deepcopy(coins)
         self.monitor.maybe_open(coins)
@@ -272,6 +286,55 @@ class MainPaperRepair(unittest.TestCase):
         with patch.object(m,'MAX_DAILY_LOSS_USD',0),patch.object(m,'MAX_DRAWDOWN_PCT',5): self.monitor.maybe_open([self.coin])
         self.assertIn('drawdown_limit',m.STATE.entry_diagnostics['rejections'])
         self.assertFalse(m.STATE.positions)
+
+    def test_liquidation_failure_during_entry_quote_blocks_commit(self):
+        self.entry_patches()
+        held = self.position()
+        target = dict(self.coin,address=C,pairAddress='D'*44)
+        m.STATE.feed = [target]
+        original_prepare = m.paper_quotes.prepare_entry.side_effect
+        def lose_liquidation_during_quote(*args):
+            held['valuation_status'] = 'unavailable'
+            return original_prepare(*args)
+        m.paper_quotes.prepare_entry.side_effect = lose_liquidation_during_quote
+        self.monitor.maybe_open([target])
+        self.assertEqual([p['id'] for p in m.STATE.positions], [held['id']])
+        self.assertEqual(m.STATE.trade_seq, 1)
+        self.assertEqual(m.STATE.entry_diagnostics['opened'], 0)
+        self.assertIn('liquidation_unavailable',m.STATE.entry_diagnostics['rejections'])
+
+    def test_drawdown_crossed_during_entry_quote_blocks_commit(self):
+        self.entry_patches()
+        held = self.position()
+        target = dict(self.coin,address=C,pairAddress='D'*44)
+        m.STATE.feed = [target]
+        original_prepare = m.paper_quotes.prepare_entry.side_effect
+        def lose_equity_during_quote(*args):
+            held['pnl_usd'] = -100
+            return original_prepare(*args)
+        m.paper_quotes.prepare_entry.side_effect = lose_equity_during_quote
+        with patch.object(m,'MAX_DAILY_LOSS_USD',0),patch.object(m,'MAX_DRAWDOWN_PCT',5):
+            self.monitor.maybe_open([target])
+        self.assertEqual([p['id'] for p in m.STATE.positions], [held['id']])
+        self.assertEqual(m.STATE.trade_seq, 1)
+        self.assertEqual(m.STATE.entry_diagnostics['opened'], 0)
+        self.assertIn('drawdown_limit',m.STATE.entry_diagnostics['rejections'])
+
+    def test_pending_audit_during_entry_quote_blocks_commit(self):
+        self.entry_patches()
+        original_prepare = m.paper_quotes.prepare_entry.side_effect
+        pending = {'event': 'EXIT', 'payload': {'id': 'concurrent-exit'}}
+        def fail_exit_audit_during_quote(*args):
+            m.STATE.pending_audit = [pending]
+            m.STATE.audit_status = 'pending:OSError'
+            return original_prepare(*args)
+        m.paper_quotes.prepare_entry.side_effect = fail_exit_audit_during_quote
+        self.monitor.maybe_open([self.coin])
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.trade_seq, 0)
+        self.assertEqual(m.STATE.pending_audit, [pending])
+        self.assertEqual(m.STATE.entry_diagnostics['opened'], 0)
+        self.assertIn('audit_pending',m.STATE.entry_diagnostics['rejections'])
 
     def test_duplicate_or_nonfinite_saved_state_refuses_reset(self):
         m.STATE.save()
@@ -398,10 +461,13 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual(m.STATE.history[0]['exit_policy_version'],exit_policy.ADAPTIVE_VERSION)
 
     def test_late_and_future_event_not_visible(self):
-        rows=[{'address':A,'pairAddress':B,'ts':self.clock[0]-1000,'available_at':self.clock[0]-500,'usd_amount':50,'direction':'BUY','wallet':'one'},
+        rows=[{'event_id':'confirmed-1','address':A,'pairAddress':B,'ts':self.clock[0]-1000,'event_time':self.clock[0]-1000,
+               'observed_at':self.clock[0]-750,'available_at':self.clock[0]-500,'usd_amount':50,
+               'direction':'BUY','wallet':'one','confirmed_swap':True,'quality_flags':[]},
               {'address':A,'pairAddress':B,'ts':self.clock[0]-2000,'available_at':self.clock[0]+1,'usd_amount':999,'direction':'BUY'},
               {'address':A,'pairAddress':B,'ts':self.clock[0]+1,'available_at':self.clock[0]-1,'usd_amount':999,'direction':'BUY'}]
-        tape={'events':rows,'pair_coverage':{B:{'status':'COMPLETE','complete_since_ms':self.clock[0]-300000}}}
+        tape={'updated_at':self.clock[0],'events':rows,'pair_coverage':{B:{'address':A,'pairAddress':B,
+            'status':'COMPLETE','complete_since_ms':self.clock[0]-300000,'last_poll_at':self.clock[0]}}}
         with patch.object(m,'read_live_tape',return_value=tape): result=m.STATE.live_flow(A,30,B)
         self.assertEqual(result['trades'],1)
         self.assertEqual(result['buy_usd'],50)
@@ -410,8 +476,10 @@ class MainPaperRepair(unittest.TestCase):
     def test_uncertain_valuations_degrade_instead_of_counting_no_sellers(self):
         row={'event_id':'sig:pool:0','address':A,'pairAddress':B,'ts':self.clock[0]-1000,
              'available_at':self.clock[0]-500,'usd_amount':50,'direction':'SELL','wallet':'one',
+             'observed_at':self.clock[0]-750,'confirmed_swap':True,
              'quality_flags':['QUOTE_ASSET_USD_REFERENCE_ESTIMATE']}
-        tape={'events':[row],'pair_coverage':{B:{'status':'COMPLETE','complete_since_ms':self.clock[0]-300000}}}
+        tape={'updated_at':self.clock[0],'events':[row],'pair_coverage':{B:{'address':A,'pairAddress':B,
+            'status':'COMPLETE','complete_since_ms':self.clock[0]-300000,'last_poll_at':self.clock[0]}}}
         with patch.object(m,'read_live_tape',return_value=tape): result=m.STATE.live_flow(A,30,B)
         self.assertEqual(result['quality'],'DEGRADED')
         self.assertFalse(result['fresh'])

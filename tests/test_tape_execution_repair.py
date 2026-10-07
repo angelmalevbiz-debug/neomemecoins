@@ -79,6 +79,32 @@ class ParserTests(unittest.TestCase):
         self.assertLessEqual(len(feed),1)
         self.assertTrue(all(row['dexId']=='pumpswap' for row in feed))
 
+    def test_feed_snapshot_prioritizes_actionable_moderate_flow_pools(self):
+        class Response:
+            def raise_for_status(self):
+                return None
+            def json(self):
+                def coin(index, *, score, activity):
+                    return {
+                        'address': pubkey(index), 'pairAddress': pubkey(index+1),
+                        'symbol': f'C{index}', 'dexId': 'pumpswap',
+                        'score': score, 'liquidityUsd': 12_000, 'marketCap': 100_000,
+                        'ageMinutes': 30, 'priceUsd': 1, 'priceNative': 1,
+                        'priceChange': {'m5': 5, 'h1': 10},
+                        'txns': {'m5': {'buys': activity*2//3, 'sells': activity//3}},
+                        'volume': {'h1': 6_000},
+                    }
+                return {'feed': [coin(40, score=99, activity=900),
+                                 coin(42, score=90, activity=600),
+                                 coin(46, score=99, activity=9),
+                                 coin(44, score=80, activity=60)], 'positions': []}
+
+        with patch.object(tape.SESSION, 'get', return_value=Response()), \
+             patch.object(tape, 'shared_quote_reference', return_value=None), \
+             patch.object(tape, 'MAX_TRACKED', 1):
+            feed = tape.feed_snapshot()
+        self.assertEqual([row['symbol'] for row in feed], ['C44'])
+
     def test_projection_atomic_replace_retries_transient_windows_lock(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -662,6 +688,40 @@ class RpcAndDurability(unittest.TestCase):
         self.clock[0]+=1001
         self.rec.process(lambda calls:[{'result':non_swap()} for _ in calls])
         self.assertEqual(self.rec.snapshot([META])['backlog'],0)
+
+
+class RecorderRecovery(unittest.TestCase):
+    def test_locked_failure_projection_does_not_kill_recorder_and_success_resets_backoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / 'tape.json'
+            out.write_text(json.dumps({'pair_coverage': {PAIR: {'status': 'COMPLETE'}}}))
+            with patch.object(tape, 'OUT', out), \
+                    patch.object(tape, 'poll_once', side_effect=[PermissionError('locked'), {}, KeyboardInterrupt()]) as poll, \
+                    patch.object(tape, 'atomic_write', side_effect=PermissionError('still locked')) as writer, \
+                    patch.object(tape.time, 'monotonic', return_value=0), \
+                    patch.object(tape.time, 'sleep') as sleep, \
+                    patch.object(tape, 'now_ms', return_value=NOW), \
+                    patch.object(tape, 'print') as log:
+                with self.assertRaises(KeyboardInterrupt):
+                    tape.main()
+            self.assertEqual(poll.call_count, 3)
+            degraded = writer.call_args.args[0]
+            self.assertEqual(degraded['pair_coverage'][PAIR]['status'], 'DEGRADED')
+            self.assertEqual(degraded['error'], 'PermissionError')
+            self.assertEqual([call.args[0] for call in sleep.call_args_list], [2, tape.POLL_SECONDS])
+            self.assertTrue(any('failure projection unavailable' in call.args[0] for call in log.call_args_list))
+
+    def test_malformed_saved_projection_cannot_break_error_backoff(self):
+        with tempfile.TemporaryDirectory() as directory:
+            out = Path(directory) / 'tape.json'
+            out.write_text('[]')
+            with patch.object(tape, 'OUT', out), \
+                    patch.object(tape, 'poll_once', side_effect=[RuntimeError('RPC unavailable'), KeyboardInterrupt()]), \
+                    patch.object(tape, 'atomic_write') as writer, \
+                    patch.object(tape.time, 'sleep'), patch.object(tape, 'print'):
+                with self.assertRaises(KeyboardInterrupt):
+                    tape.main()
+            self.assertEqual(writer.call_args.args[0]['status'], 'degraded')
 
 
 class ExecutionHonesty(unittest.TestCase):

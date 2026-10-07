@@ -207,7 +207,24 @@ class ActivityTests(unittest.TestCase):
             b['position']={'trade_no':8,'address':ADDRESS,'keep':'original'}
         before=copy.deepcopy(lab.STATE)
         with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([coin()],flows())
-        self.assertEqual(lab.STATE,before)
+        after=copy.deepcopy(lab.STATE)
+        lifecycle=after.pop('strategy_lifecycle')
+        self.assertEqual(lifecycle['version'],lab.lifecycle.VERSION)
+        self.assertEqual(lifecycle['retired_strategy_ids'],[])
+        self.assertEqual(lifecycle['retired_open_position_ids'],[])
+        self.assertEqual(set(lifecycle['active_registered_strategy_ids']),set(before['books']))
+        for key,b in after['books'].items():
+            if key in lab.PROMOTED_STRATEGIES:
+                self.assertNotIn('strategy_lifecycle',b)
+            else:
+                marker=b.pop('strategy_lifecycle')
+                self.assertEqual(marker['version'],lab.lifecycle.VERSION)
+                self.assertEqual(marker['status'],'active')
+                self.assertTrue(marker['entry_enabled'])
+                self.assertTrue(marker['position_management_enabled'])
+        # Only the lifecycle annotations may differ: money, history, positions,
+        # sequence numbers and every other persisted field stay exactly equal.
+        self.assertEqual(after,before)
 
     def test_entry_records_cost_not_zero_and_preserves_book_balance(self):
         with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([coin()],flows())

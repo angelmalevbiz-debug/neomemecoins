@@ -22,6 +22,9 @@ PROMOTED_STRATEGIES=('EARLY','MOMENTUM','PRECISION','ULTRA_PRECISION')
 PROMOTED_TOTAL_CAPITAL=1000.0
 PROMOTED_ALLOCATION=250.0
 PROMOTED_MAX_POSITION_FRACTION=0.25
+PROMOTED_LOSS_COOLDOWN_SECONDS=1800
+PROMOTED_LOSS_STREAK=3
+PROMOTED_ROLLING_WINDOW=8
 STRATEGY_START_BALANCES={
     'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100')),
     **{strategy_id:PROMOTED_ALLOCATION for strategy_id in PROMOTED_STRATEGIES},
@@ -62,6 +65,23 @@ def num(v,d=0.0):
         x=float(v)
         return x if math.isfinite(x) else d
     except Exception: return d
+
+def promoted_pause_remaining_ms(book,now):
+    """Temporarily pause funded PAPER entries after a recent losing run."""
+    trades=[t for t in book.get('history',[])
+            if t.get('closed_at') and t.get('promotion_eligible') is not False]
+    trades.sort(key=lambda t:num(t.get('closed_at')),reverse=True)
+    if not trades: return 0
+    streak=0
+    for trade in trades:
+        if num(trade.get('pnl_usd'))<0: streak+=1
+        else: break
+    recent=trades[:PROMOTED_ROLLING_WINDOW]
+    rolling_loss=(len(recent)>=PROMOTED_ROLLING_WINDOW
+                  and sum(num(t.get('pnl_usd')) for t in recent)<0)
+    if streak<PROMOTED_LOSS_STREAK and not rolling_loss: return 0
+    latest_close=int(num(trades[0].get('closed_at')))
+    return max(0,latest_close+PROMOTED_LOSS_COOLDOWN_SECONDS*1000-now)
 
 def pair_liquidity_usd(c):
     return num(c.get('liquidityUsd') or (c.get('liquidity') or {}).get('usd'))
@@ -383,6 +403,18 @@ def maybe_open(feed,flows):
                 'balance_usd':round(num(book.get('balance')),4),
             }
             continue
+        if book.get('portfolio_group')=='PROMOTED_PAPER':
+            pause_ms=promoted_pause_remaining_ms(book,now)
+            if pause_ms>0:
+                book['entry_diagnostics']={
+                    'at':now,'matched_candidates':0,'cost_rejected':0,
+                    'cooldown_rejected':0,'affordable_candidates':0,
+                    'price_verification_rejected':0,
+                    'blocked_reason':'promoted_recent_loss_cooldown',
+                    'promoted_cooldown_remaining_ms':pause_ms,
+                    'balance_usd':round(num(book.get('balance')),4),
+                }
+                continue
         balance=num(book.get('balance'))
         entry_limit=activity.entry_notional_limit(strategy['id'],balance,TRADE_NOTIONAL)
         if strategy['id'] in PROMOTED_STRATEGIES:
@@ -409,7 +441,11 @@ def maybe_open(feed,flows):
         executable_candidates=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
-            if not rule.matches(features):
+            # Funded promoted books use the stricter strategy definition declared
+            # in this lab. Shared activity rules stay unchanged for TEST/main PAPER.
+            matched=(strategy['rule'](features) if book.get('portfolio_group')=='PROMOTED_PAPER'
+                     else rule.matches(features))
+            if not matched:
                 if strategy['id']=='SCALPER' and rule.matches(features,require_flow=False):
                     flow_rejected+=1
                 continue

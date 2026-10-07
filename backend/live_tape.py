@@ -26,6 +26,7 @@ from tape_pool_scheduler import TapePoolScheduler
 from pool_reference_proof import proves_no_pool_swap
 from shared_snapshot_io import read_shared_text, replace_shared_snapshot
 from tape_pool_owner_proof import collect_pool_owner_proofs, foreign_reference_candidate
+from pump_event_fees import decode_fee_evidence
 
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
 RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
@@ -238,7 +239,9 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                              and accounts[3] in (USDC,WSOL))
             if (accounts[0]==metadata['pair'] and accounts[3]!=accounts[4]
                     and (tracked_base or tracked_quote)):
-                swaps.append((index,SWAP_DISCRIMINATORS[data[:8]],accounts))
+                instruction_name=('buy_exact_quote_in' if data[:8]==bytes([198,46,21,82,180,217,232,112])
+                                  else 'buy' if SWAP_DISCRIMINATORS[data[:8]]=='BUY' else 'sell')
+                swaps.append((index,SWAP_DISCRIMINATORS[data[:8]],accounts,instruction_name))
             else:
                 unknown = True
         elif (program==PUMP_AMM and data[:8] not in NON_SWAP_DISCRIMINATORS) or (program!=PUMP_AMM and program not in INFRA_PROGRAMS):
@@ -350,6 +353,14 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                         'onchain_direction':direction,'onchain_base_mint':base_mint,'onchain_quote_mint':quote_mint,
                         'onchain_base_raw_amount':str(base_raw),'onchain_quote_raw_amount':str(quote_raw),
                         'provider':metadata.get('provider','solana-rpc'),'note':token_direction,'confirmed_swap':True})
+        fee_evidence=decode_fee_evidence(payload,matches[0][3])
+        if fee_evidence is not None:
+            # Preserve complete gross/net fee facts for later evaluation.
+            # No estimated execution rate or entry/exit limit changes here.
+            decoded[-1]['fee_evidence']={**fee_evidence,
+                'address':token_mint,'pairAddress':pool,'program_id':PUMP_AMM,
+                'event_time':event_time,'observed_at':observed,'available_at':available,
+                'slot':tx.get('slot'),'token_direction':token_direction}
     if len(decoded)!=len(swaps):
         return 'unclassified',decoded,'SWAP_EVENT_COVERAGE_INCOMPLETE'
     flags = {flag for event in decoded for flag in event['quality_flags']}
@@ -359,6 +370,14 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         reason = ('SWAP_ACTOR_NOT_TRANSACTION_SIGNER' if 'SWAP_ACTOR_NOT_TRANSACTION_SIGNER' in flags
                   else 'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE')
         return 'unclassified',decoded,reason
+    for event in decoded:
+        if event.get('fee_evidence') is not None:
+            # The existing swap decoder can retain recognized swaps alongside
+            # unknown pool instructions. Such a transaction does not prove
+            # complete fee provenance, even when its known swaps reconcile.
+            event['fee_evidence']['provenance_authenticated']=(not unknown
+                and type(tx.get('slot')) is int and tx['slot']>0)
+            event['fee_evidence']['full_transaction_swap_coverage']=not unknown
     return 'processed',decoded,None
 
 

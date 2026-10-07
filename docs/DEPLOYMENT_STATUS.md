@@ -1,5 +1,20 @@
 # Current PAPER deployment status
 
+Latest local repair on 2026-10-07: see [Momentum Rush repair](MOMENTUM_RUSH_REPAIR.md).
+The active Windows services run from `C:\Users\Chavd\neomemecoins`; the public
+Pages build uses a separate VPS API. The complete tested integration is committed
+locally on `codex/complete-momentum-rush` and the Windows PAPER runtime was updated
+with all existing histories retained. Final GitHub publication is pending:
+the connector began returning HTTP 403 and local Git has no non-interactive
+push credential. [Draft PR #1](https://github.com/angelmalevbiz-debug/neomemecoins/pull/1)
+contains the earlier repair and must be updated with the concurrent-main
+integration before merging. The VPS administrative connector is offline;
+public backend installation has not been verified. Tape decoding recovered,
+but complete flow coverage and profitability remain unproven.
+
+The dated measurements below describe the prior baseline and should not be
+read as the current endpoint or strategy count.
+
 The maintained repository is [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins). The public app is [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/).
 
 ## Verified public site baseline

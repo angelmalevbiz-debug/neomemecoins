@@ -110,13 +110,21 @@ def run(service, run_token='', ready_file=''):
             with module.MONITOR.position_lock, module.MONITOR.entry_lock, module.STATE.lock:
                 if prior_running is not None:
                     module.STATE.running = prior_running
-                module.STATE.save()
+                # A failed or interrupted load (or a refused second engine) must not
+                # persist the default $1,000 account over the real ledger.
+                if getattr(module.STATE, 'loaded', False):
+                    module.STATE.save()
+                else:
+                    print('PAPER ledger was never loaded; shutdown did not write it', flush=True)
             module.training_bridge.stop()
         elif service == 'tape' and module._RECORDER is not None:
             module._RECORDER.db.commit()
             module._RECORDER.close()
         elif service == 'lab':
-            module.persist('stopped')
+            if getattr(module, 'LOADED', False):
+                module.persist('stopped')
+            else:
+                print('Strategy Lab ledger was never loaded; shutdown did not write it', flush=True)
         elif service == 'gateway':
             for process in list(module.ENGINE_PROCESSES.values()):
                 try:

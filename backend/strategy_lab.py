@@ -485,7 +485,10 @@ def load_state():
         try: RESET_FLAG_PATH.unlink()
         except Exception: pass
     else:
-        raw=load_json(STATE_PATH,{})
+        raw=load_json(STATE_PATH,None) if STATE_PATH.exists() else {}
+        if not isinstance(raw,dict):
+            # An unreadable ledger must never become 34 fresh books on the next save.
+            raise RuntimeError('Strategy Lab state is unreadable; refusing automatic reset')
     stored_books=raw.get('books') or {}
     # A server can contain a locally customized strategy such as Momentum Swarm.
     # Keep its full ledger in place; removing a registration must not erase it.
@@ -525,6 +528,8 @@ def load_state():
 
 STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
+# Set once main() has loaded the durable ledger; shutdown persists only after that.
+LOADED=False
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
     STATE['activity_started_at']=now_ms()
@@ -1100,8 +1105,9 @@ def persist(status='online',error=None):
     atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
 
 def main():
-    global STATE
+    global STATE, LOADED
     STATE=load_state()
+    LOADED=True
     if (STATE.get('portfolio_setup') or {}).get('status')=='DRAINING':
         try:
             promote_strategy_lab(STATE_PATH.parent)

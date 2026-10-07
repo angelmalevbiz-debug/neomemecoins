@@ -88,7 +88,7 @@ type MonitorState = {
   strategy_learning?: StrategyLearning;
   paper_training?: PaperTrainingSnapshot;
   stats: { feed_count: number; open_positions: number; closed_trades: number; wins: number; win_rate: number; realized_today_usd: number; demo_starting_balance_usd: number; demo_balance_usd: number; demo_equity_usd: number; demo_available_usd: number; demo_reserved_usd: number; unrealized_pnl_usd: number; realized_total_usd: number; return_pct: number; demo_started_at: number; demo_session_id: string };
-  config: { signal_strategy?: string; ensemble_strategies?: string[]; risk_overlay?: string; execution_verification_version?: string; scan_seconds: number; position_scan_seconds?: number; entry_score: number; max_positions: number; stop_loss_pct: number; take_profit_pct: number; trailing_pct: number; max_hold_minutes: number; min_liquidity_usd: number; trade_notional_usd: number; max_daily_loss_usd: number; starting_balance_usd: number };
+  config: { signal_strategy?: string; exit_policy?: string; learning_mode?: string; ensemble_strategies?: string[]; risk_overlay?: string; execution_verification_version?: string; scan_seconds: number; position_scan_seconds?: number; entry_score: number; max_positions: number; stop_loss_pct: number; take_profit_pct: number; trailing_pct: number; max_hold_minutes: number; min_liquidity_usd: number; trade_notional_usd: number; max_daily_loss_usd: number; starting_balance_usd: number };
 };
 type TokenDetail = { coin: Coin; history: PricePoint[]; position: Position | null; trades: Position[]; live_tape?: LiveTrade[]; flow?: FlowStats };
 type Filter = 'ALL' | 'SETUP' | 'WATCH' | 'NEW' | 'BOOSTED';
@@ -202,7 +202,9 @@ export default function App() {
 
         const controller = new AbortController();
         activeController = controller;
-        const timeout = window.setTimeout(() => controller.abort(), 4000);
+        // A busy PC behind the tunnel can need several seconds; retries and the
+        // session cache cover failures, so do not abort healthy slow responses.
+        const timeout = window.setTimeout(() => controller.abort(), 12000);
         const response = await fetch(`${API}/user/state`, {
           cache: 'no-store',
           signal: controller.signal,
@@ -536,7 +538,9 @@ export default function App() {
             <div className="mt-2 space-y-2">{(state?.events || []).slice(0, 5).map(event => <div key={`${event.ts}-${event.text}`} className="flex items-start justify-between gap-3 text-[9px]"><span className="text-slate-400">{event.text}</span><span className="shrink-0 text-slate-700">{timeLabel(event.ts)}</span></div>)}</div>
           </div>
           <div data-testid="execution-integrity" className="rounded-xl border border-white/[0.07] bg-black/20 p-3 text-[10px] leading-5 text-slate-500">
-            {state ? <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · цел +{state.config.take_profit_pct}% нето · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m.</> : 'Настройките още не са заредени.'}
+            {state ? (state.config.exit_policy === 'adaptive'
+              ? <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · адаптивен изход по убеденост ({state.config.learning_mode ?? 'ADAPTIVE_CONTEXT_HOLD'}): RUNNER/STRONG без фиксирана цел, NORMAL +20%, CAUTIOUS +14%, WEAK +8% нето; trailing 3–7%; max hold 4–60 min, абсолютно 120 min · {state.config.max_positions} позиция.</>
+              : <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · цел +{state.config.take_profit_pct}% нето · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m.</>) : 'Настройките още не са заредени.'}
           </div>
         </div>}
         <div className="border-b border-white/[0.06] px-4 py-3 text-[10px] leading-5 text-slate-400">

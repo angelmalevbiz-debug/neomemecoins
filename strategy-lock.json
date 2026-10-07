@@ -3,7 +3,7 @@
   "locked_at_utc": "2026-10-07",
   "source_commit": "USER_AUTHORIZED_FUNDED_PAPER_REPAIR_20261007",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "0afcdb0d3cc31814c586bd97908aea39b2b40b867a5734fd66ab36c10f0049bf",
+  "sha256": "bfc1b9a66d040403a23b7eb6e04fa17d61b5e5f9c687938278d9635655de3ff8",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
     "entry_score": 76,
@@ -152,7 +152,7 @@
     "backend/lab_position_marks.py": "7dc9ed982810769c1efd3788c5a919ef88701d95e5fc6d1b17fd64a45e6062f9",
     "backend/live_tape.py": "32493b3309375070e8ac64eb6ebe470483850b574f46366797ffb7e1ea3f05d4",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
-    "backend/market_monitor.py": "0afcdb0d3cc31814c586bd97908aea39b2b40b867a5734fd66ab36c10f0049bf",
+    "backend/market_monitor.py": "bfc1b9a66d040403a23b7eb6e04fa17d61b5e5f9c687938278d9635655de3ff8",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -160,15 +160,15 @@
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "1532164c690757996a8e014d84ee5b4ea3fbfcd1df2ad1964c476568aff3cabc",
+    "backend/strategy_lab.py": "3d0eab12b081332891b885284f5d461f8df5d1c249af59a066abd8d18bd16c32",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "108d4e87093f9269bd79ab5ff60aad07181f44e95f0eec94b66805b1a31a5a03",
-    "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
+    "backend/user_gateway.py": "99359a58f4c59567f2b112028b42da31d9461dcc07c9e51f6d4131dc391bdd98",
     "backend/winner_ensemble.py": "b4bbbbb000c1f818887360d92ed1d00625af940b03d372d78f57b46127efec9c",
     "backend/promoted_entry_guard.py": "7dd94c8ace89bbc6caa4af47aa791f99db12498beaa398afa2922230ac1d37e8",
-    "scripts/start_local_paper.ps1": "a0f05854fff9a68860bf31b6c2164880f68b96c8c9dedfca302a22e8dac78929",
-    "scripts/local_paper_service.py": "4632195031c5ee836e70cb067bb5978ba35a1cf5422aa734cacf52802da95ac4",
+    "scripts/start_local_paper.ps1": "71ef04abf1d06aa4840800e0e90349da21e7c5aedf616b426a91d37ccd44fec2",
+    "scripts/local_paper_service.py": "b19a1b671dbc53a99ef8585f250f4a15c1e4d3da35439c1c0b5e4f17dcaab106",
     "backend/lab_strategy_lifecycle.py": "9361522a951940d9bbdb2c251fb1cff090fcb6466ee3e26d9950b8b492ea6094",
     "backend/market_discovery.py": "c8085461c796455898b1be3f7d441296d3f8abc57097d025ba0aa392b6ba4cd0",
     "backend/paper_market_feasibility.py": "39fdbb2e91a3612abb63c5a6aa36d98cadc74be787f1c645b8107dae43484aa1",
@@ -183,7 +183,8 @@
     "docs/funded-zero-trades-repair.md": "1f257cf13407f02c2b0d391df661c66f7227b1012bfc3ccf6dc13f5539bc7935",
     "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
     "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4",
-    "src/lib/labStrategyView.ts": "5047c0a665df22a96d6a2cc888721a6edd2d0921161934797725d6d8ab473ea9"
+    "src/lib/labStrategyView.ts": "5047c0a665df22a96d6a2cc888721a6edd2d0921161934797725d6d8ab473ea9",
+    "backend/order_flow_adaptive_oct4.py": "7071c5d5b30952536b25b763432113e5cdead5d2858e82795fd324e8fcc1cbb1"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",
@@ -257,16 +258,16 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged. Funded sizing V4 prospectively raises the per-book PAPER entry cap from 25% to 50%; the 1.5% round-trip cost gate and 3% net stop remain, so cost floors near the stop stay blocked. Larger notional increases dollar gains and losses; no return or trade-frequency guarantee.",
+  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged. Funded sizing V4 prospectively raises the per-book PAPER entry cap from 25% to 50%; the 1.5% round-trip cost gate and 3% net stop remain, so cost floors near the stop stay blocked. Larger notional increases dollar gains and losses; no return or trade-frequency guarantee. ORDER_FLOW_ADAPTIVE restore V1: the October 4, 2026 decision policy (ORDER_FLOW_BALANCED_V4 entry filter, conviction/context model, ADAPTIVE_CONTEXT_HOLD modes, adaptive net exit ladder) becomes an explicit, versioned, opt-in per-account strategy profile selected through NEO_SIGNAL_STRATEGY. The default production strategy, its thresholds, cost caps, exits and every ledger are unchanged; the conviction table and hold modes moved verbatim into the policy module. Profile values are strategy-owned and published with a config ownership map. No trade frequency or profitable outcome is inferred. Single-writer stabilization V1: after a live incident in which a slow health probe made the gateway start a second engine for one account on a new port (both wrote the same ledger), the gateway never reallocates a port or spawns while the account engine is tracked or its port is in use (port of legacy edaadfa), caches verified Supabase users for 30 s (port of legacy f8975ac), keeps the last known strategy choice on a transient registry read error, merges the operator strategy field before every registry write, and market_monitor holds an exclusive per-ledger engine lock for its lifetime. The launcher pins shared services to the default strategy. No trading threshold, cost, exit or ledger changes. Shutdown and exit safety V1 (pre-deploy review): the service runner and the Strategy Lab never write a ledger they did not load (a failed or interrupted load, or a second engine refused by the ledger lock, previously saved an empty $1,000 account or 34 empty Lab books over the real ledger); an unreadable Lab ledger is refused instead of rebuilt. ORDER_FLOW_ADAPTIVE positions whose pool has no COMPLETE 30 s exact-pool window keep their entry hold mode and skip the flow-driven exits instead of reading missing tape coverage as selling; the profile no longer spends quotes on a feed older than 6 s. Default strategy thresholds, costs, exits and ledgers are unchanged.",
   "support_file_changes": {
-    "backend/strategy_lab.py": "Raise prospective funded PAPER per-book entry cap from $62.50 to $125 ($250 allocation at 50%), without resizing open positions or weakening cost, flow, price, or risk gates.",
+    "backend/strategy_lab.py": "Raise prospective funded PAPER per-book entry cap from $62.50 to $125 ($250 allocation at 50%), without resizing open positions or weakening cost, flow, price, or risk gates. Refuses an unreadable ledger instead of rebuilding empty books; marks LOADED for shutdown.",
     "backend/promoted_entry_guard.py": "Version the funded PAPER size-cap policy as V4; preserve the 1.5% expected cost cap, 3% net stop and all admission evidence.",
     "src/lib/labStrategyView.ts": "Explain the two-way estimated DEX fees and slippage/latency buffers, and show the remaining net-stop headroom.",
     "docs/funded-zero-trades-repair.md": "Record the prospective larger PAPER position cap and unchanged entry cost and stop rules.",
     "backend/live_tape.py": "Retain existing exact instruction/event coverage and swap decoder; append reconciled observed fees only after successful authenticated decoding, without changing admission or execution fees.",
     "backend/lab_position_marks.py": "Choose the newest exact-mint/pool observation by source timestamp rather than receipt time, so a newly received stale cache row cannot mask a more recent market observation; retain freshness checks.",
     "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances.",
-    "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock.",
+    "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock. Add explicit strategy selection (activate_strategy) with the ensemble as the unchanged default; when ORDER_FLOW_ADAPTIVE is selected use its profile values, the 60-second exact-pool decision window, flat notional without size backoff, adaptive exit policy on positions and publish strategy identity, profile and config ownership in /state. market_context delegates its conviction table and hold modes to the policy module without numeric change. Hold an exclusive per-ledger engine lock (state.json.engine.lock) for the process lifetime so a second engine on the same account refuses to start. State.loaded guards shutdown writes; ORDER_FLOW_ADAPTIVE exits keep the entry hold mode when the held pool has no COMPLETE fast window (flow_context_unavailable); no quotes on a feed older than 6 s.",
     "backend/engine_entry_policy.py": "Explain broad market, confirmed-flow and loss-feedback holds in entry diagnostics.",
     "backend/lab_activity.py": "Keep the research cost model intact while allowing a caller to enforce a stricter bounded round-trip cost cap for funded PAPER entries.",
     "backend/winner_ensemble.py": "Validate unique finite closed outcomes, report excluded data, bound statistics to the latest 100 closes per rule and retain actual overlapping outcomes; held rules require reviewed policy or new valid evidence, never a timed resume.",
@@ -276,9 +277,9 @@
     "backend/paper_state_reset.py": "Archive and reset recorder/quote-probe diagnostics together with PAPER history so each authorized clean session starts with truthful zeroed counters.",
     "backend/momentum_rush_brain.py": "Causal bounded observation scoring and own-ledger memory; 80 percent remains an unvalidated research target.",
     "backend/paper_lab_metrics.py": "Read-only per-book measurements, malformed/truncated history detection and descriptive sample uncertainty; no automatic promotion.",
-    "scripts/start_local_paper.ps1": "Serialize manual PAPER lifecycle mutations with watchdog health/recovery decisions; keep manual startup paused until every owned worker is verified. Preserve ledgers and graceful shutdown.",
+    "scripts/start_local_paper.ps1": "Pin shared PAPER services to the default strategy (NEO_SIGNAL_STRATEGY removed).",
     "tests/test_tape_execution_repair.py": "Verify that the live tape prioritizes eligible moderate-activity candidates while preserving PumpSwap-only and pinned-pool behavior.",
-    "scripts/local_paper_service.py": "Publish the actual worker identity, restrict handshake paths to isolated runtime and honor cancellation after slow imports.",
+    "scripts/local_paper_service.py": "Publish the actual worker identity, restrict handshake paths to isolated runtime and honor cancellation after slow imports. Persist the engine ledger or Lab books at shutdown only when they were loaded.",
     "backend/lab_strategy_lifecycle.py": "Retire repeated observed losses only in the same validated PAPER research regime; keep original evidence, all money/history and normal position exits. Require negative total and both chronological halves plus bounded sample/win evidence. No timed reactivation or profitability promise.",
     "backend/training_worker.py": "Expose the actual learner worker PID for lifecycle verification without changing training or strategy accounting.",
     "scripts/local_paper_watchdog.ps1": "Acquire the shared lifecycle operation mutex before health probes and retain it through recovery; release before sleeping, recover abandoned owners, and keep automatic failures retryable.",
@@ -293,7 +294,9 @@
     "backend/funded_market_candidates.py": "Declare prospective physical established-liquid candidate branches for Momentum and Precision, retaining original screens without token-specific fitting or profit claims.",
     "backend/tape_pool_scheduler.py": "Observe the same declared funded mature candidate branches, preserving bounded leases, exact exit pins and final entry gates.",
     "backend/pump_event_fees.py": "Decode complete supported public PumpSwap fee schemas, reconcile raw gross/net charges and reject partial or unsupported routing; observations never authorize entry or replace current execution fees.",
-    "docs/paper-fee-observation.md": "Document observation-only fee evidence, unsupported schemas, preserved entry/exit models and the distinction between open positions and closed trades."
+    "docs/paper-fee-observation.md": "Document observation-only fee evidence, unsupported schemas, preserved entry/exit models and the distinction between open positions and closed trades.",
+    "backend/order_flow_adaptive_oct4.py": "Versioned October 4 ORDER_FLOW_ADAPTIVE decision policy: strict entry checks with historical rejection names, conviction scoring, hold modes, strategy-owned profile values and config ownership.",
+    "backend/user_gateway.py": "Never churn ports or start a second engine for a tracked/listening account engine; 30 s verified-user cache; tolerant strategy refresh; merge operator strategy field before every registry write; per-account signal_strategy for that engine only."
   },
   "momentum_rush": {
     "strategy_id": "MOMENTUM_RUSH_BRAIN",
@@ -335,5 +338,141 @@
     "requires_complete_raw_reconciliation": true,
     "is_execution_quote": false,
     "entry_permission": false
+  },
+  "strategy_profiles": {
+    "default": "WINNER_ENSEMBLE_PAPER_V1",
+    "selection": "NEO_SIGNAL_STRATEGY per engine process; user_gateway sets it from user_accounts.json accounts.<uuid>.signal_strategy (scripts/paper_runtime.py set-account-strategy); absent means the default, unknown values fail closed",
+    "ORDER_FLOW_ADAPTIVE": {
+      "restore_version": "ORDER_FLOW_ADAPTIVE_OCT4_RESTORE_V1",
+      "source_commit": "neo-meme-trade@5b78efd (2026-10-04)",
+      "module": "backend/order_flow_adaptive_oct4.py",
+      "entry_policy_version": "ORDER_FLOW_BALANCED_V4",
+      "learning_mode": "ADAPTIVE_CONTEXT_HOLD",
+      "exit_policy_version": "GOLD_ADAPTIVE_NET_CANDIDATE_V1",
+      "scan_seconds": 15,
+      "position_scan_seconds": 2.0,
+      "max_positions": 1,
+      "trade_notional_usd": 200.0,
+      "max_daily_loss_usd": 100.0,
+      "stop_loss_pct": 5.0,
+      "same_token_cooldown_seconds": 1200,
+      "strict_entry_score": 85.0,
+      "strict_min_conviction": 72.0,
+      "strict_min_liquidity_usd": 30000.0,
+      "strict_max_entry_impact_pct": 2.0,
+      "strict_max_roundtrip_cost_pct": 2.75,
+      "strict_max_worst_case_cost_pct": 4.5,
+      "max_feed_age_ms": 30000,
+      "max_entry_quote_age_ms": 10000,
+      "max_quoted_candidates": 2,
+      "entry_flow_window_seconds": 60,
+      "conviction_flow_windows_seconds": [
+        30,
+        300
+      ],
+      "size_policy": "FLAT_NOTIONAL_NO_BACKOFF",
+      "entry_checks": [
+        "invalid_pair",
+        "invalid_price",
+        "stale_feed",
+        "score",
+        "liquidity",
+        "momentum",
+        "hour_trend",
+        "market_buyers",
+        "liquidity_ratio",
+        "flow_quality",
+        "flow_count",
+        "flow_ratio",
+        "buy_volume",
+        "wallet_count",
+        "buyer_count",
+        "wallet_ratio",
+        "large_sells",
+        "conviction"
+      ],
+      "hold_modes": [
+        {
+          "mode": "RUNNER",
+          "min_conviction": 85.0,
+          "max_hold_minutes": 60.0,
+          "target_pct": null,
+          "trail_arm_pct": 15.0,
+          "trail_pct": 7.0
+        },
+        {
+          "mode": "STRONG",
+          "min_conviction": 72.0,
+          "max_hold_minutes": 30.0,
+          "target_pct": null,
+          "trail_arm_pct": 12.0,
+          "trail_pct": 6.0
+        },
+        {
+          "mode": "NORMAL",
+          "min_conviction": 58.0,
+          "max_hold_minutes": 15.0,
+          "target_pct": 20.0,
+          "trail_arm_pct": 9.0,
+          "trail_pct": 5.0
+        },
+        {
+          "mode": "CAUTIOUS",
+          "min_conviction": 45.0,
+          "max_hold_minutes": 8.0,
+          "target_pct": 14.0,
+          "trail_arm_pct": 7.0,
+          "trail_pct": 4.0
+        },
+        {
+          "mode": "WEAK",
+          "min_conviction": 0.0,
+          "max_hold_minutes": 4.0,
+          "target_pct": 8.0,
+          "trail_arm_pct": 5.0,
+          "trail_pct": 3.0
+        }
+      ],
+      "exit_ladder": [
+        "STOP_LOSS_NET_TARGET",
+        "CONVICTION_EXIT",
+        "ORDERFLOW_EXIT",
+        "ADAPTIVE_TP_<mode target>",
+        "CONVICTION_PROFIT_LOCK",
+        "ADAPTIVE_TRAILING",
+        "ADAPTIVE_MAX_HOLD",
+        "ABSOLUTE_MAX_HOLD"
+      ],
+      "absolute_max_hold_minutes": 120,
+      "inert_legacy_constants": {
+        "take_profit_pct": 18.0,
+        "trailing_pct": 4.0,
+        "max_hold_minutes": 7
+      },
+      "modern_overlays_retained": [
+        "promoted_entry_guard.flow_admission (confirmed 30s exact-pool PumpSwap window)",
+        "engine_rug_guard fail-closed safety",
+        "pair_price_integrity exact-pool price confirmation",
+        "Jupiter/PumpSwap executable entry and immediate-exit quotes",
+        "LIQUIDITY_EMERGENCY",
+        "STALE_MARKET_EXIT",
+        "EXIT_IMPACT_EMERGENCY",
+        "uncapped net gap losses",
+        "daily loss, drawdown and exposure caps",
+        "atomic ledger writes and audit outbox"
+      ],
+      "environment_overrides_honored": false,
+      "applies_to": "only engine processes started with NEO_SIGNAL_STRATEGY=ORDER_FLOW_ADAPTIVE; the shared main engine, Strategy Lab, learner, live tape and every other account keep the default",
+      "not_restored": [
+        "chart-price stop trigger and -4.5% cancel",
+        "-5% loss clamp",
+        "synthetic fills from chart prices",
+        "unpinned 60s flow without exact pool",
+        "history or balance resets"
+      ],
+      "profitability_proven": false,
+      "missing_flow_exit_policy": "KEEP_ENTRY_HOLD_MODE_SKIP_FLOW_EXITS",
+      "pre_quote_max_signal_age_ms": 6000
+    }
   }
 }

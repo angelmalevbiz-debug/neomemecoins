@@ -9,7 +9,7 @@ import os
 import re
 from typing import Any, Callable
 
-POLICY_VERSION = 'LAB_ACTIVE_V3_VERIFIED_SCALPER'
+POLICY_VERSION = 'LAB_ACTIVE_V4_MOMENTUM_SWARM'
 REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_REENTRY_SECONDS', '60')))
 LOSS_REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_LOSS_REENTRY_SECONDS', '180')))
 SCALPER_REENTRY_SECONDS = max(0, int(os.getenv('NEO_LAB_SCALPER_REENTRY_SECONDS', '600')))
@@ -20,6 +20,7 @@ MAX_FEED_AGE_MS = 20_000
 MAX_ENTRY_COST_PCT = 2.75
 MIN_NOTIONAL_USD = 10.0
 ADDRESS = re.compile(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$')
+RESEARCH_ONLY_STRATEGIES = frozenset({'MOMENTUM_SWARM'})
 
 
 def number(value: Any, default: float = 0.0) -> float:
@@ -71,6 +72,8 @@ RULES = {
     'ULTRA_PRECISION': EntryRule(93, 25000, (1, 25), 1.0, .12, (5, 360)),
     'PRECISION': EntryRule(90, 20000, (0, 30), .95, .09, (3, 480)),
     'MOMENTUM': EntryRule(85, 15000, (3, 40), 1.05, .06, (2, 720)),
+    # Broad research challenger: many more candidates than MOMENTUM; adaptive ranking happens in Strategy Lab.
+    'MOMENTUM_SWARM': EntryRule(70, 10000, (-6, 75), .72, .012, (0, 2880), (-70, 900), (0, 120)),
     'BREAKOUT': EntryRule(86, 20000, (10, 60), 1.2, .06, (2, 720)),
     'LIQUIDITY': EntryRule(80, 40000, (-3, 25), .85, .08, (3, 1440)),
     'ORDER_FLOW': EntryRule(80, 15000, (-5, 30), .8, .04, (2, 1e7), flow_trades=3, flow_ratio=1.2, wallets=2),
@@ -132,6 +135,68 @@ def market_features(coin: dict[str, Any], flow: dict[str, Any] | None = None) ->
                          'sell_usd': 0, 'unique_wallets': 0, 'ratio': 0, 'max_sell': 0},
     }
 
+
+def momentum_swarm_intelligence(f: dict[str, Any]) -> dict[str, Any]:
+    """Broad momentum ranking with only obvious anti-momentum vetoes.
+
+    The candidate rule is intentionally permissive. This scorer ranks current
+    evidence only; it is not a probability of profit.
+    """
+    score = number(f.get('score'))
+    liq = number(f.get('liq'))
+    m5 = number(f.get('m5'))
+    h1 = number(f.get('h1'))
+    bs = number(f.get('bs'))
+    lmc = number(f.get('lmc'))
+    age = number(f.get('age'), 999999)
+    vol_liq = number(f.get('vol_liq'))
+    flow = f.get('flow') or {}
+    flow_trades = number(flow.get('trades'))
+    flow_ratio = number(flow.get('ratio'))
+    buy_usd = number(flow.get('buy_usd'))
+    max_sell = number(flow.get('max_sell'))
+
+    clamp = lambda x: max(0.0, min(1.0, x))
+    momentum = clamp((m5 + 2) / 12.0) if m5 <= 12 else clamp(1.0 - (m5 - 12) / 48.0)
+    anti_chase = 1.0 if m5 <= 24 else clamp(1.0 - (m5 - 24) / 31.0)
+    buy_pressure = clamp((bs - .75) / 1.15)
+    structure = .55 * clamp((lmc - .02) / .10) + .45 * clamp((math.log10(max(liq, 1.0)) - 4.0) / 1.2)
+    volume = clamp(vol_liq / .35) if vol_liq <= .35 else clamp(1.0 - max(0.0, vol_liq - 6.0) / 18.0)
+    trend = clamp((h1 + 25) / 85.0) if h1 <= 60 else clamp(1.0 - (h1 - 60) / 440.0)
+    freshness = 1.0 if age <= 360 else clamp(1.0 - (age - 360) / 1080.0)
+    neo_score = clamp((score - 72) / 23.0)
+    if flow_trades >= 2:
+        flow_quality = .7 * clamp((flow_ratio - .65) / 1.35) + .3 * clamp(flow_trades / 12.0)
+    else:
+        flow_quality = .50
+
+    components = {
+        'momentum': momentum, 'anti_chase': anti_chase, 'buy_pressure': buy_pressure,
+        'structure': structure, 'volume': volume, 'trend': trend,
+        'freshness': freshness, 'neo_score': neo_score, 'flow_quality': flow_quality,
+    }
+    weights = {
+        'momentum': .18, 'anti_chase': .13, 'buy_pressure': .13,
+        'structure': .12, 'volume': .10, 'trend': .09,
+        'freshness': .08, 'neo_score': .09, 'flow_quality': .08,
+    }
+    meta_score = sum(components[k] * weights[k] for k in weights)
+    vetoes = []
+    if m5 >= 40 and bs < 1.05:
+        vetoes.append('vertical_move_without_buy_pressure')
+    if h1 <= -30 and m5 <= 0:
+        vetoes.append('falling_hour_and_short_term')
+    if flow_trades >= 3 and flow_ratio < .65:
+        vetoes.append('verified_sell_flow_dominates')
+    if flow_trades >= 3 and max_sell > max(600.0, buy_usd * 2.2):
+        vetoes.append('large_sell_dominates_recent_flow')
+    return {
+        'version': 'MOMENTUM_SWARM_META_V1',
+        'allow': not vetoes and meta_score >= .38,
+        'score': round(meta_score, 4),
+        'vetoes': vetoes,
+        'components': {k: round(v, 4) for k, v in components.items()},
+    }
 
 def cooldown_remaining_ms(book: dict, address: str, now: int) -> int:
     latest = max((t for t in book.get('history', []) if t.get('address') == address),

@@ -16,7 +16,7 @@ ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_ENTRY_V1'
 DEFAULT_STRATEGIES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 _strategy_env = os.getenv('NEO_WINNER_STRATEGIES', '').strip()
 if _strategy_env.upper() == 'ALL':
-    STRATEGIES = tuple(lab_activity.RULES.keys())
+    STRATEGIES = tuple(name for name in lab_activity.RULES if name not in lab_activity.RESEARCH_ONLY_STRATEGIES)
 elif _strategy_env:
     requested = tuple(part.strip().upper() for part in _strategy_env.split(',') if part.strip())
     unknown = [name for name in requested if name not in lab_activity.RULES]

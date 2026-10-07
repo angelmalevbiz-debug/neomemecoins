@@ -32,8 +32,8 @@ class ActivityTests(unittest.TestCase):
         guard.start();self.addCleanup(guard.stop)
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_33_rules_exist(self):
-        self.assertEqual(len(a.RULES),33)
+    def test_all_34_rules_exist(self):
+        self.assertEqual(len(a.RULES),34)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
 
@@ -44,6 +44,37 @@ class ActivityTests(unittest.TestCase):
                'age':max(10,rule.age[0]),'h1':max(20,rule.hour[0]),
                'vol_liq':max(1,rule.volume_liquidity[0]),'flow':flows()[ADDRESS]}
             self.assertTrue(rule.matches(f),key)
+
+    def test_momentum_swarm_is_materially_broader_than_momentum(self):
+        f={'score':80,'liq':12000,'m5':1,'bs':.95,'lmc':.04,'age':500,
+           'h1':12,'vol_liq':.12,'flow':{'trades':0,'ratio':0,'buy_usd':0,'max_sell':0}}
+        self.assertFalse(a.RULES['MOMENTUM'].matches(f))
+        self.assertTrue(a.RULES['MOMENTUM_SWARM'].matches(f))
+        meta=a.momentum_swarm_intelligence(f)
+        self.assertTrue(meta['allow'])
+        self.assertGreaterEqual(meta['score'],.38)
+
+    def test_momentum_swarm_rejects_obvious_chase_and_sell_flow(self):
+        f={'score':88,'liq':25000,'m5':48,'bs':.90,'lmc':.08,'age':30,
+           'h1':80,'vol_liq':1.0,'flow':{'trades':8,'ratio':.4,'buy_usd':200,'max_sell':900}}
+        self.assertTrue(a.RULES['MOMENTUM_SWARM'].matches(f))
+        meta=a.momentum_swarm_intelligence(f)
+        self.assertFalse(meta['allow'])
+        self.assertIn('vertical_move_without_buy_pressure',meta['vetoes'])
+        self.assertIn('verified_sell_flow_dominates',meta['vetoes'])
+
+    def test_momentum_swarm_similarity_memory_uses_closed_history_only(self):
+        f={'score':84,'liq':30000,'m5':8,'bs':1.3,'lmc':.09,'age':60,
+           'h1':30,'vol_liq':.5,'flow':{'trades':8,'ratio':2,'buy_usd':500,'max_sell':50}}
+        book={'history':[]}
+        neutral=lab.momentum_swarm_meta(book,f,NOW)
+        self.assertTrue(neutral['allow'])
+        for i in range(8):
+            book['history'].append({'closed_at':NOW-1000-i,'pnl_usd':-5,'notional_usd':50,'entry_features':dict(f)})
+        book['history'].append({'closed_at':NOW+1000,'pnl_usd':50,'notional_usd':50,'entry_features':dict(f)})
+        learned=lab.momentum_swarm_meta(book,f,NOW)
+        self.assertLess(learned['memory_score'],.5)
+        self.assertLess(learned['final_score'],neutral['final_score'])
 
     def test_no_low_liquidity_or_missing_prices(self):
         c=coin();self.assertTrue(a.usable_feed_coin(c,NOW))
@@ -256,7 +287,7 @@ class ActivityTests(unittest.TestCase):
         request.assert_not_called()
         self.assertEqual(book['position']['current_price'],coin()['priceUsd'])
 
-    def test_net_stop_all_33_no_loss_clamping(self):
+    def test_net_stop_all_34_no_loss_clamping(self):
         c=coin()
         for b in lab.STATE['books'].values():
             b['position']={'trade_no':1,'address':ADDRESS,'pairAddress':PAIR,'entry_price':1,

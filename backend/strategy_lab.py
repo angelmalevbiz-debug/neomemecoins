@@ -187,10 +187,54 @@ def flow_map():
 def enrich(c,flows):
     return activity.market_features(c, flows.get(c.get('address')))
 
+def momentum_swarm_meta(book, features, now=None):
+    """Blend broad current momentum evidence with similarity memory from closed SWARM trades."""
+    now = int(now or now_ms())
+    base = activity.momentum_swarm_intelligence(features)
+    if not base.get('allow'):
+        return {**base, 'memory_score': .5, 'memory_effective_sample': 0.0, 'final_score': base.get('score', 0)}
+    rows=[]
+    for trade in sorted(book.get('history',[]), key=lambda t:num(t.get('closed_at')), reverse=True):
+        closed=int(num(trade.get('closed_at')))
+        prior=trade.get('entry_features')
+        if not closed or closed>now or not isinstance(prior,dict):
+            continue
+        rows.append(trade)
+        if len(rows)>=60: break
+    scales={'m5':18.0,'h1':120.0,'bs':1.0,'lmc':.12,'vol_liq':2.5,'age':500.0,'score':18.0}
+    weighted=weighted_wins=weighted_pnl=0.0
+    for trade in rows:
+        prior=trade['entry_features']; d=0.0; used=0
+        for key,scale in scales.items():
+            if key not in prior: continue
+            d += min(2.0, abs(num(features.get(key))-num(prior.get(key)))/scale); used += 1
+        if not used: continue
+        weight=math.exp(-1.35*(d/used))
+        if weight<.08: continue
+        pnl=num(trade.get('pnl_usd'))
+        weighted += weight
+        weighted_wins += weight*(1.0 if pnl>0 else 0.0)
+        weighted_pnl += weight*pnl/max(num(trade.get('notional_usd'),TRADE_NOTIONAL),1e-9)*100.0
+    if weighted>=3.0:
+        posterior=(2.0+weighted_wins)/(4.0+weighted)
+        avg_pnl_pct=weighted_pnl/weighted
+        pnl_signal=max(0.0,min(1.0,.5+avg_pnl_pct/20.0))
+        raw=.70*posterior+.30*pnl_signal
+        reliability=max(0.0,min(1.0,weighted/15.0))
+        memory=.5+(raw-.5)*reliability
+    else:
+        posterior=.5; avg_pnl_pct=0.0; memory=.5
+    final=.78*num(base.get('score'))+.22*memory
+    return {**base,'allow':bool(base.get('allow')) and final>=.40,
+            'memory_score':round(memory,4),'memory_posterior':round(posterior,4),
+            'memory_avg_pnl_pct':round(avg_pnl_pct,4),
+            'memory_effective_sample':round(weighted,3),'final_score':round(final,4)}
+
 STRATEGIES=[
  {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':lambda f: f['score']>=98 and f['liq']>=25000 and 3<=f['m5']<=18 and 1.1<=f['bs']<=3.0 and f['lmc']>=.15 and 8<=f['age']<=180},
  {'id':'PRECISION','name':'Precision','rule':lambda f: f['score']>=95 and f['liq']>=20000 and 2<=f['m5']<=22 and 1.0<=f['bs']<=3.2 and f['lmc']>=.12 and 5<=f['age']<=240},
  {'id':'MOMENTUM','name':'Momentum','rule':lambda f: f['score']>=90 and f['liq']>=15000 and 5<=f['m5']<=30 and f['bs']>=1.15 and f['lmc']>=.08 and 3<=f['age']<=300},
+ {'id':'MOMENTUM_SWARM','name':'Momentum Swarm','rule':lambda f: activity.RULES['MOMENTUM_SWARM'].matches(f)},
  {'id':'BREAKOUT','name':'Breakout','rule':lambda f: f['score']>=90 and f['liq']>=20000 and 15<f['m5']<=55 and f['bs']>=1.4 and f['lmc']>=.08 and 3<=f['age']<=300},
  {'id':'LIQUIDITY','name':'Liquidity First','rule':lambda f: f['score']>=85 and f['liq']>=40000 and -2<=f['m5']<=20 and f['bs']>=.9 and f['lmc']>=.12 and 5<=f['age']<=720},
  {'id':'ORDER_FLOW','name':'Order Flow','rule':lambda f: f['score']>=85 and f['liq']>=15000 and -5<=f['m5']<=25 and f['flow']['trades']>=3 and f['flow']['ratio']>=1.3 and f['flow']['unique_wallets']>=1 and f['flow']['max_sell']<max(750,f['flow']['buy_usd']*.8)},
@@ -279,7 +323,7 @@ STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting','last_res
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
     STATE['activity_started_at']=now_ms()
-assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'All 33 entries need a policy'
+assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'Every Strategy Lab entry needs a policy'
 
 def close_position(book,pos,coin,reason):
     market_price=num(coin.get('priceUsd')); qty=num(pos.get('quantity'))
@@ -356,7 +400,7 @@ def update_positions(flows,feed):
         total_live_pnl=num(pos.get('partial_realized_pnl'))+open_pnl
         total_live_pct=total_live_pnl/max(num(pos.get('notional_usd')),1e-18)*100
 
-        # Unified 3:10 NET exit framework across all 33 strategies.
+        # Unified 3:10 NET exit framework across all 34 strategies.
         # Entry logic stays strategy-specific; exits are identical and include
         # DEX fee, price impact, slippage/latency and network cost.
         if total_live_pct<=-STOP_LOSS:
@@ -439,6 +483,7 @@ def maybe_open(feed,flows):
         research_only_candidates=0
         research_rate_limited=0
         executable_candidates=0
+        swarm_meta_rejected=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
             # Funded promoted books use the stricter strategy definition declared
@@ -449,6 +494,12 @@ def maybe_open(feed,flows):
                 if strategy['id']=='SCALPER' and rule.matches(features,require_flow=False):
                     flow_rejected+=1
                 continue
+            swarm_meta = None
+            if strategy['id']=='MOMENTUM_SWARM':
+                swarm_meta=momentum_swarm_meta(book,features,now)
+                if not swarm_meta.get('allow'):
+                    swarm_meta_rejected+=1
+                    continue
             validation=price_integrity.check(coin)
             if validation.get('status')!='pass':
                 blocked_price+=1; continue
@@ -480,13 +531,14 @@ def maybe_open(feed,flows):
             if proposed is None:
                 continue
             eligible.append((1 if proposed.get('cost_qualified') else 0,proposed['initial_pnl_pct'],
-                             num(features.get('score')),coin,features,proposed))
+                             num(features.get('score')),coin,features,proposed,swarm_meta))
         book['entry_diagnostics']={
             'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':executable_candidates,
             'research_only_candidates':research_only_candidates,
             'research_rate_limited':research_rate_limited,
             'price_verification_rejected':blocked_price,
+            'swarm_meta_rejected_candidates':swarm_meta_rejected,
             'risk_limited_notional_usd':round(entry_limit,4),
         }
         if strategy['id']=='SCALPER':
@@ -501,7 +553,11 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']='verified_flow_unavailable'
         if not eligible:
             continue
-        _,_,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1],item[2]))
+        if strategy['id']=='MOMENTUM_SWARM':
+            chosen=max(eligible,key=lambda item:(item[0],num((item[6] or {}).get('final_score')),item[1],item[2]))
+        else:
+            chosen=max(eligible,key=lambda item:(item[0],item[1],item[2]))
+        _,_,_,coin,features,proposed,swarm_meta=chosen
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
         qty=num(opening['quantity'])
@@ -516,6 +572,8 @@ def maybe_open(feed,flows):
             'current_price':price,'peak_price':price,'quantity':qty,'original_quantity':qty,
             'notional_usd':notional,'opened_at':stamp,'updated_at':stamp,
             'score':coin.get('score'),'entry_features':features,
+            'momentum_swarm':swarm_meta if strategy['id']=='MOMENTUM_SWARM' else None,
+            'momentum_swarm_score':(swarm_meta or {}).get('final_score') if strategy['id']=='MOMENTUM_SWARM' else None,
             'partial_realized_pnl':0.0,'partial_exits':[],
             'remaining_cost_basis_usd':capital_basis,
             'entry_dex_fee_bps':round(opening['dex_fee_bps'],4),

@@ -115,6 +115,30 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual(m.best_pairs([pump, raydium], prefer_pumpswap_mints={A})[A]['pairAddress'], B)
         self.assertEqual(m.exact_position_pair({'address': A, 'pairAddress': C}, [pump, raydium]), raydium)
 
+    def test_catalog_prefers_wsol_cost_model_pool_with_usdc_route_fallback(self):
+        sol = {'chainId': 'solana', 'dexId': 'pumpswap', 'baseToken': {'address': A},
+               'pairAddress': B, 'quoteToken': {'address': m.SOL_MINT},
+               'liquidity': {'usd': 300_000}}
+        usdc = {**sol, 'pairAddress': C, 'quoteToken': {'address': m.paper_quotes.USDC},
+                'liquidity': {'usd': 600_000}}
+        for rows in ([sol, usdc], [usdc, sol]):
+            self.assertEqual(m.best_pairs(rows)[A], usdc)
+            self.assertEqual(m.best_pairs(rows, prefer_pumpswap_mints={A})[A], sol)
+            self.assertEqual(m.exact_position_pair({'address': A, 'pairAddress': C}, rows), usdc)
+        # Discovery does not remove USDC markets when no WSOL pool exists.
+        self.assertEqual(m.best_pairs([usdc], prefer_pumpswap_mints={A})[A], usdc)
+
+    def test_catalog_wsol_preference_keeps_liquidity_order_and_normal_market_selection(self):
+        sol = {'chainId': 'solana', 'dexId': 'pumpswap', 'baseToken': {'address': A},
+               'pairAddress': B, 'quoteToken': {'address': m.SOL_MINT},
+               'liquidity': {'usd': 300_000}}
+        larger_sol = {**sol, 'pairAddress': C, 'liquidity': {'usd': 400_000}}
+        raydium = {**larger_sol, 'dexId': 'raydium', 'pairAddress': 'D' * 44,
+                   'liquidity': {'usd': 700_000}}
+        self.assertEqual(m.best_pairs([sol, larger_sol], prefer_pumpswap_mints={A})[A], larger_sol)
+        self.assertEqual(m.best_pairs([sol, raydium, larger_sol], prefer_pumpswap_mints={A})[A], larger_sol)
+        self.assertEqual(m.best_pairs([sol, raydium, larger_sol])[A], raydium)
+
     def test_cached_gecko_market_observation_does_not_become_fresh_on_each_scan(self):
         pair = {'baseToken': {'address': A}, 'pairAddress': B,
                 'priceUsd': '1', '_market_observed_at': self.clock[0] - 120_000}

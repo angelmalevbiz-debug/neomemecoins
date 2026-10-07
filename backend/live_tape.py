@@ -16,12 +16,16 @@ import re
 import sqlite3
 import sys
 import time
+import uuid
 from pathlib import Path
 from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
 import winner_ensemble
 from tape_pool_scheduler import TapePoolScheduler
+from pool_reference_proof import proves_no_pool_swap
+from shared_snapshot_io import read_shared_text, replace_shared_snapshot
+from tape_pool_owner_proof import collect_pool_owner_proofs, foreign_reference_candidate
 
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
 RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
@@ -39,7 +43,7 @@ RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 RPC_TRANSACTION_CONCURRENCY = max(1,int(os.getenv('NEO_TAPE_RPC_TX_CONCURRENCY','4')))
 WINDOW_MS = 300_000
 DECISION_FLOW_WINDOW_MS = 30_000
-MAX_DISCOVERY_LAG_MS = WINDOW_MS
+MAX_DISCOVERY_LAG_MS = DECISION_FLOW_WINDOW_MS
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
@@ -232,6 +236,8 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         elif (program==PUMP_AMM and data[:8] not in NON_SWAP_DISCRIMINATORS) or (program!=PUMP_AMM and program not in INFRA_PROGRAMS):
             unknown = True
     if not swaps:
+        if unknown and proves_no_pool_swap(tx,metadata,available_at=available):
+            return 'non_swap',[],'VERIFIED_FOREIGN_POOL_REFERENCE_NO_SWAP'
         return ('unclassified',[],'UNSUPPORTED_POOL_INSTRUCTION') if unknown else ('non_swap',[],'NO_SUPPORTED_SWAP')
     decimals = {}
     for balance in (meta.get('preTokenBalances') or [])+(meta.get('postTokenBalances') or []):
@@ -379,14 +385,25 @@ class TapeRecorder:
                 with self.db:
                     self.db.execute('INSERT INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(pair,mint,json.dumps(metadata)))
             active.append(metadata)
+        # Reserve only work actually due in the same fresh window that process()
+        # services. A fixed half-budget left unused body capacity even when
+        # there were no retries. Every pool still gets at least one signature
+        # per round, including pinned pools; process() retains its exact cap.
+        observed = self.clock()
+        due = self.db.execute('''SELECT count(*) n FROM (
+            SELECT signature FROM signatures INDEXED BY pending_fresh_idx
+            WHERE state='pending' AND next_retry<=?
+                AND COALESCE(event_time,observed)>=?
+            ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC
+            LIMIT ?)''', (observed,observed-WINDOW_MS,self.tx_budget)).fetchone()['n']
+        discovery_remaining = max(len(active)*self.page_budget,self.tx_budget-due)
         # One shared page batch per round, rather than one HTTP call per pool.
-        # The page size is a ceiling: spread the bounded body-processing budget
-        # across active pools while keeping discovery balanced and predictable.
-        page_limit = max(1, min(self.page_size,
-                                self.tx_budget // max(2, 2*len(active)*self.page_budget)))
-        for _ in range(self.page_budget):
+        # Unused capacity from short pages can serve remaining pools next round.
+        for round_index in range(self.page_budget):
             if not active:
                 break
+            page_limit = max(1,min(self.page_size,
+                                  discovery_remaining // (len(active)*(self.page_budget-round_index))))
             calls,states = [],[]
             for metadata in active:
                 state = self.db.execute('SELECT * FROM pairs WHERE pair=?',(metadata['pair'],)).fetchone()
@@ -435,12 +452,13 @@ class TapeRecorder:
                         self.db.execute('UPDATE pairs SET reason=?,last_poll=? WHERE pair=?',('SIGNATURE_RPC_UNAVAILABLE',self.clock(),pair))
                     continue
                 rows = answer['result']
-                if any(not isinstance(row,dict) or not isinstance(row.get('signature'),str) or not row['signature']
+                if len(rows)>page_limit or any(not isinstance(row,dict) or not isinstance(row.get('signature'),str) or not row['signature']
                        or type(row.get('slot')) is not int or (row.get('blockTime') is not None and type(row['blockTime']) is not int)
                        for row in rows):
                     with self.db:
                         self.db.execute('UPDATE pairs SET reason=?,last_poll=? WHERE pair=?',('SIGNATURE_SCHEMA_MISMATCH',self.clock(),pair))
                     continue
+                discovery_remaining = max(0,discovery_remaining-len(rows))
                 observed,cutoff = self.clock(),self.clock()-DECISION_FLOW_WINDOW_MS
                 head = state['scan_head'] or (rows[0].get('signature') if rows else state['cursor'])
                 bootstrap = state['cursor'] is None
@@ -495,6 +513,27 @@ class TapeRecorder:
             # Discovery has already committed. Preserve every pending item and
             # back off the bodies rather than re-requesting them every second.
             answers = [{'error':{'code':'TRANSACTION_RPC_UNAVAILABLE'}} for _ in calls]
+        bodies_received_at = self.clock()
+        # A current owner observation can help only complete successful foreign
+        # references with no Pump execution. Keep it ephemeral: no saved metadata
+        # claim is trusted and no terminal historical classification is rewritten.
+        classification_metadata, owner_candidates, owner_candidate_keys = {},[],set()
+        for signature,answer in zip(groups,answers):
+            tx = answer.get('result') if not answer.get('error') else None
+            for row in groups[signature]:
+                try:
+                    metadata = json.loads(row['metadata'])
+                    metadata.pop('pool_owner_proof',None)
+                    classification_metadata[(signature,row['pair'])] = metadata
+                    event_time = row['event_time'] if row['event_time'] is not None else row['observed']
+                    if (tx is not None and event_time>=cutoff
+                            and foreign_reference_candidate(tx,metadata,INFRA_PROGRAMS)):
+                        owner_candidates.append((tx,metadata))
+                        owner_candidate_keys.add((signature,row['pair']))
+                except (ValueError,TypeError,AttributeError):
+                    pass
+        owner_proofs = collect_pool_owner_proofs(owner_candidates,rpc,clock=self.clock,
+            tx_budget=self.tx_budget,bodies_received_at=bodies_received_at,infra_programs=INFRA_PROGRAMS)
         for signature,answer in zip(groups,answers):
             tx = answer.get('result') if not answer.get('error') else None
             for row in groups[signature]:
@@ -502,7 +541,12 @@ class TapeRecorder:
                     classification,events,reason = 'retry',[],str((answer.get('error') or {}).get('code') or 'TRANSACTION_NULL')
                 else:
                     try:
-                        classification,events,reason = classify_transaction(tx,json.loads(row['metadata']),observed_at=row['observed'],ingested_at=self.clock())
+                        metadata = classification_metadata[(signature,row['pair'])]
+                        proof = (owner_proofs.get((metadata['pair'],metadata['address']))
+                                 if (signature,row['pair']) in owner_candidate_keys else None)
+                        if proof:
+                            metadata = dict(metadata,pool_owner_proof=proof)
+                        classification,events,reason = classify_transaction(tx,metadata,observed_at=row['observed'],ingested_at=self.clock())
                     except (ValueError,TypeError,KeyError,IndexError,AttributeError,OverflowError):
                         classification,events,reason = 'unclassified',[],'TRANSACTION_SCHEMA_MISMATCH'
                 with self.db:
@@ -583,24 +627,25 @@ class TapeRecorder:
 
 def atomic_write(payload):
     OUT.parent.mkdir(parents=True,exist_ok=True)
-    temporary = OUT.with_name(OUT.name+f'.{os.getpid()}.tmp')
-    with temporary.open('w',encoding='utf-8') as handle:
-        json.dump(payload,handle,ensure_ascii=False,allow_nan=False)
-        handle.flush()
-        os.fsync(handle.fileno())
-    # Windows antivirus/indexers can briefly hold a just-written target open.
-    # Retry only transient replacement permission errors; preserve atomicity and
-    # report a genuine persistent failure to the recorder's backoff loop.
-    for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
-        try:
-            os.replace(temporary,OUT)
-            break
-        except PermissionError:
-            if attempt + 1 >= ATOMIC_REPLACE_ATTEMPTS:
-                raise
-            time.sleep(min(.4, .025 * (2 ** attempt)))
-    else:  # pragma: no cover - the loop either replaces or raises
-        raise PermissionError('Unable to replace the live-tape projection')
+    temporary = OUT.with_name(OUT.name+f'.{os.getpid()}.{uuid.uuid4().hex}.tmp')
+    try:
+        with temporary.open('w',encoding='utf-8') as handle:
+            json.dump(payload,handle,ensure_ascii=False,allow_nan=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # External readers such as antivirus/indexers may still refuse deletion.
+        # Preserve atomicity, bound retry time and report persistent failures.
+        for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
+            try:
+                replace_shared_snapshot(temporary,OUT)
+                return
+            except PermissionError:
+                if attempt + 1 >= ATOMIC_REPLACE_ATTEMPTS:
+                    raise
+                time.sleep(min(.4, .025 * (2 ** attempt)))
+    finally:
+        # A failed projection must not leave partial or rejected temp files.
+        temporary.unlink(missing_ok=True)
 
 
 def poll_once():
@@ -637,7 +682,7 @@ def main():
             print(f'Live tape poll failed: {failure_summary(exc)}', file=sys.stderr, flush=True)
             old = {}
             try:
-                saved = json.loads(OUT.read_text(encoding='utf-8'))
+                saved = json.loads(read_shared_text(OUT,encoding='utf-8'))
                 if isinstance(saved, dict):
                     old = saved
             except (OSError,ValueError):

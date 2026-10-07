@@ -1,9 +1,9 @@
 {
   "name": "NEO broad verified-flow PAPER execution and outcome feedback",
   "locked_at_utc": "2026-10-07",
-  "source_commit": "USER_AUTHORIZED_ENTRY_PIPELINE_REPAIR_20261007",
+  "source_commit": "USER_AUTHORIZED_PAPER_OBSERVATION_REPAIR_20261007",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "367942b34f9a1eb4015cba5fcf2c5fec32f7cb63f15d63f7949acd2a82d6b4cb",
+  "sha256": "0afcdb0d3cc31814c586bd97908aea39b2b40b867a5734fd66ab36c10f0049bf",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
     "entry_score": 76,
@@ -28,7 +28,7 @@
     "quote_size_backoff_min_usd": 25,
     "quote_size_backoff_max_attempts": 3
   },
-  "policy": "A broader market candidate rule joins four selective rules in the shared PAPER account. Every entry still requires fresh confirmed exact-pool flow, completed same-pool safety, independently verified price, executable quotes and strict risk/cost limits. Current-policy closed trades are attributed to matched rules; a rule may be throttled only after at least 12 closes show weak posterior win rate and negative net PnL. This does not establish or promise profitability. Version V4 prospectively adds a mature liquid market candidate rule, shared bounded address discovery, cost-aware tape scheduling, and coordinated quote preparation; all final cost/safety/flow gates are preserved. Funded Lab candidate filters are aligned under separate version V2. No prior ledger is reset or reclassified.",
+  "policy": "A broader market candidate rule joins four selective rules in the shared PAPER account. Every entry still requires fresh confirmed exact-pool flow, completed same-pool safety, independently verified price, executable quotes and strict risk/cost limits. Current-policy closed trades are attributed to matched rules; a rule may be throttled only after at least 12 closes show weak posterior win rate and negative net PnL. This does not establish or promise profitability. Version V4 prospectively adds a mature liquid market candidate rule, shared bounded address discovery, cost-aware tape scheduling, and coordinated quote preparation; all final cost/safety/flow gates are preserved. Funded Lab candidate filters are aligned under separate version V2. No prior ledger is reset or reclassified. Infrastructure repair preserves V4 candidate and execution limits while fixing Windows tape replacement, bounded address discovery, fee-aware quote priority and strict proof of foreign references that executed no Pump swap. No profitable outcome is inferred from these changes.",
   "integrity_note": "Mandatory fresh confirmed flow coverage, exact pool/mint checks, complete same-pool safety, independent price confirmation, modeled expected round-trip cost at most 1.5%, conservative cost at most 2.5%, bounded quotes and uncapped actual modeled losses.",
   "execution_mode": "PAPER_QUOTE_OR_OBSERVED_POOL_MODEL",
   "entry_policy_version": "WINNER_ENSEMBLE_VERIFIED_ENTRY_V4",
@@ -106,7 +106,12 @@
       "all_supported_held_pools_pinned": true,
       "modeled_cost_prioritizes_observation_only": true,
       "quote_sequence_lease_seconds": 15,
-      "exits_preempt_entry_sequences": true
+      "exits_preempt_entry_sequences": true,
+      "discovery_uses_available_body_budget": true,
+      "stalled_scan_head_max_age_ms": 30000,
+      "pool_owner_batches_per_poll_maximum": 1,
+      "pool_owner_observation_after_transaction": true,
+      "quote_candidate_priority": "FEE_ONLY_PLANNING_NO_ADMISSION_AUTHORITY"
     },
     "mature_candidate_rule": {
       "id": "COST_EFFICIENT_FLOW",
@@ -131,7 +136,7 @@
     }
   },
   "support_files_sha256": {
-    "backend/astra6_brain.py": "2b5ec59be59a93122ce6c08bedd1205c6330d12af75211c60336f616f17390de",
+    "backend/astra6_brain.py": "00e189ede49cded7b523c276006d2aa7fd9399b30505284cfdf6d7aa2929c05a",
     "backend/compat_file_lock.py": "8ba79d6e53250fba0a3f0dc2f997ed89094210d170d84c4b66c200f5ab9d64df",
     "backend/engine_entry_policy.py": "c521c66df9cb4a86d1308b15eca1738218569e5a1dbfa31179d6e22449198a0f",
     "backend/engine_execution.py": "2d24c7e485e8f85644bd0cf4ac423ed8eb07144821efab363d0e3155553c5b99",
@@ -143,11 +148,11 @@
     "backend/honest_quote_transport.py": "01dc18a6d603e332b28ec6b6100582fdaad18e5952ed7ef30674f62a6d81b511",
     "backend/lab_activity.py": "480568df1b3ce894e15b7096b6020cdceec8d2be2a2ac123eb26f9d13c45db6d",
     "backend/lab_dashboard_projection.py": "0216b54cea2407278ab876a2c98a09a532c8a7fa42e81eda4ab8ed5ced1fbf3b",
-    "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
+    "backend/lab_paired_runner.py": "2556bd9dd34dbf9561bab59423fb6013e6a60c915b97bfda4d334cb74c1f6e66",
     "backend/lab_position_marks.py": "7dc9ed982810769c1efd3788c5a919ef88701d95e5fc6d1b17fd64a45e6062f9",
-    "backend/live_tape.py": "2135cfa70814dd0465c5f0a035b9fd5fc4290cfb844b3c4c3a203e9d23ed71e3",
+    "backend/live_tape.py": "91590cfeb3bfd0ff460eaed7cfb8746b17ebff4490d566301dc76382f13cef1b",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
-    "backend/market_monitor.py": "367942b34f9a1eb4015cba5fcf2c5fec32f7cb63f15d63f7949acd2a82d6b4cb",
+    "backend/market_monitor.py": "0afcdb0d3cc31814c586bd97908aea39b2b40b867a5734fd66ab36c10f0049bf",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -155,7 +160,7 @@
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "dbfbbef3c5f5d03aa87060da172d7dcce5ef341b7f1c4bcc382d1a1ecdd6bb00",
+    "backend/strategy_lab.py": "9f432e62e64c681ea9669514f989368d2b2d3ece6aa1cf052d126558e406d816",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "108d4e87093f9269bd79ab5ff60aad07181f44e95f0eec94b66805b1a31a5a03",
@@ -165,11 +170,15 @@
     "scripts/start_local_paper.ps1": "a0f05854fff9a68860bf31b6c2164880f68b96c8c9dedfca302a22e8dac78929",
     "scripts/local_paper_service.py": "4632195031c5ee836e70cb067bb5978ba35a1cf5422aa734cacf52802da95ac4",
     "backend/lab_strategy_lifecycle.py": "9361522a951940d9bbdb2c251fb1cff090fcb6466ee3e26d9950b8b492ea6094",
-    "backend/market_discovery.py": "19b750f75b9e7d5955e7953548081c2365054ae5433f2a8367fec5d491a591ad",
+    "backend/market_discovery.py": "c8085461c796455898b1be3f7d441296d3f8abc57097d025ba0aa392b6ba4cd0",
     "backend/paper_market_feasibility.py": "39fdbb2e91a3612abb63c5a6aa36d98cadc74be787f1c645b8107dae43484aa1",
     "backend/tape_pool_scheduler.py": "b4af3ace91dacfcd324657ceb59c79ebdcad78062995d9ccf42e9165d4897536",
     "docs/entry-pipeline-repair.md": "7a972df176f4cda1cee727dd4d2b351d465830506e8021c9b6f091d404f323cf",
-    "scripts/local_paper_watchdog.ps1": "e9427a24e73f93cd618a927cb7f8de131e39666654d78d7279fcb9e7519a2b2b"
+    "scripts/local_paper_watchdog.ps1": "e9427a24e73f93cd618a927cb7f8de131e39666654d78d7279fcb9e7519a2b2b",
+    "backend/shared_snapshot_io.py": "ea4699d1ad28d1b331013d9fd2fcec316a189bd587fc1881dfa369884609b3a7",
+    "backend/entry_quote_priority.py": "4c9478595e77c8d9bb16c1f8504484a800a697aff31e07e1fd79d86f5ac05ae4",
+    "backend/pool_reference_proof.py": "2f6649d0198c3caf9c548c8fb6819418e1f0a0cf006f6d70c759d68dca616615",
+    "backend/tape_pool_owner_proof.py": "f7b4a15a640552f91059e3bd781b0b72446cf5f29cdd2d70d04c6bae1af2ba1a"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",
@@ -245,8 +254,8 @@
   "exit_policy_version": "HONEST_NET_EXIT_V1",
   "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit.",
   "support_file_changes": {
-    "backend/live_tape.py": "Prioritize market candidates within the existing RPC budget and contain repeated projection write failures so stale coverage fails closed while the recorder retries. Record sanitized failing-file basename and Windows error number to distinguish storage failures; do not disclose paths or treat failed evidence as fresh.",
-    "backend/strategy_lab.py": "Preserve funded entry safeguards and independent ledgers; retry durable writes and restore persistence before entries. Stop retired research entries while continuing registered exits. Distinguish promoted market mismatches from unavailable flow.",
+    "backend/live_tape.py": "Use shared native snapshots, ephemeral confirmed no-swap owner proofs and full declared unused body capacity; restart stale 30-second discovery windows while preserving durable history and strict completeness.",
+    "backend/strategy_lab.py": "Read shared Windows snapshots without blocking atomic replacement; candidate rules, costs and accounting remain unchanged.",
     "backend/lab_position_marks.py": "Choose the newest exact-mint/pool observation by source timestamp rather than receipt time, so a newly received stale cache row cannot mask a more recent market observation; retain freshness checks.",
     "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances.",
     "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock.",
@@ -266,7 +275,14 @@
     "backend/lab_strategy_lifecycle.py": "Retire repeated observed losses only in the same validated PAPER research regime; keep original evidence, all money/history and normal position exits. Require negative total and both chronological halves plus bounded sample/win evidence. No timed reactivation or profitability promise.",
     "backend/training_worker.py": "Expose the actual learner worker PID for lifecycle verification without changing training or strategy accounting.",
     "scripts/local_paper_watchdog.ps1": "Acquire the shared lifecycle operation mutex before health probes and retain it through recovery; release before sleeping, recover abandoned owners, and keep automatic failures retryable.",
-    "backend/honest_quote_transport.py": " Atomic shared JSON writes use unique temporary files and bounded retries for Windows replacement sharing violations; preserve the old complete file and raise persistent errors without changing quota or timestamps."
+    "backend/honest_quote_transport.py": " Atomic shared JSON writes use unique temporary files and bounded retries for Windows replacement sharing violations; preserve the old complete file and raise persistent errors without changing quota or timestamps.",
+    "backend/shared_snapshot_io.py": "Read Windows snapshots with delete-sharing handles and replace existing snapshots with ReplaceFileW; preserve complete old/new observations, ACL errors and unique recovery copies.",
+    "backend/entry_quote_priority.py": "Order scarce entry quote work and bounded feed retention by fee-only planning plausibility; keep all candidates and admission gates and original UI ordering.",
+    "backend/pool_reference_proof.py": "Prove no PumpSwap program executed using a complete successful instruction/log call tree and fresh confirmed exact pool ownership; missing/ambiguous evidence stays unclassified.",
+    "backend/tape_pool_owner_proof.py": "Collect at most one bounded confirmed pool-owner RPC batch per recorder poll after eligible foreign-reference transaction bodies, with context slot no earlier than transaction slots.",
+    "backend/market_discovery.py": "Combine bounded independent address-only DEX Screener/DexPaprika catalogs with durable per-provider request reservations, expiry and failure/rate-limit backoff.",
+    "backend/astra6_brain.py": "Read shared Windows observations without blocking the recorder; do not synthesize freshness or alter experimental admission.",
+    "backend/lab_paired_runner.py": "Read the shared tape with native delete-sharing snapshot handles; experimental ledgers remain isolated."
   },
   "momentum_rush": {
     "strategy_id": "MOMENTUM_RUSH_BRAIN",
@@ -274,5 +290,15 @@
     "target_win_rate_pct": 80,
     "target_is_guarantee": false,
     "automatic_main_or_live_promotion": false
+  },
+  "infrastructure_revision": "PAPER_COVERAGE_WINDOWS_QUOTE_PRIORITY_V1",
+  "address_discovery": {
+    "version": "PUMPSWAP_ADDRESS_CATALOG_V2_DUAL_PROVIDER",
+    "max_addresses": 60,
+    "provider_requests_per_minute": {
+      "dexscreener": 1,
+      "dexpaprika": 1
+    },
+    "catalog_prices_authorize_entry": false
   }
 }

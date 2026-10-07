@@ -110,7 +110,7 @@ class ParserTests(unittest.TestCase):
             root = Path(directory)
             destination = root / 'live_tape.json'
             destination.write_text('{"old": true}', encoding='utf-8')
-            replace = tape.os.replace
+            replace = tape.replace_shared_snapshot
             attempts = []
 
             def transient_lock(source, target):
@@ -119,7 +119,7 @@ class ParserTests(unittest.TestCase):
                     raise PermissionError('temporary Windows sharing violation')
                 replace(source, target)
 
-            with patch.object(tape, 'OUT', destination), patch.object(tape.os, 'replace', side_effect=transient_lock), \
+            with patch.object(tape, 'OUT', destination), patch.object(tape, 'replace_shared_snapshot', side_effect=transient_lock), \
                  patch.object(tape.time, 'sleep') as delay:
                 tape.atomic_write({'status': 'ok', 'events': []})
             self.assertEqual(len(attempts), 3)
@@ -440,7 +440,7 @@ class RpcAndDurability(unittest.TestCase):
         self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0],page_size=100,page_budget=1,tx_budget=180)
         self.rec.poll([META],rpc);final=self.rec.poll([META],rpc)
         self.assertEqual(final['classifications']['non_swap'],180);self.assertEqual(final['backlog'],0)
-        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s091')
+        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s081')
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
 
@@ -529,7 +529,7 @@ class RpcAndDurability(unittest.TestCase):
             return answers
 
         snapshot=self.rec.poll([META],rpc)
-        self.assertEqual(signature_pages,[100])
+        self.assertEqual(signature_pages,[200])
         self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
         self.assertFalse(snapshot['pair_coverage'][PAIR]['pagination_pending'])
         self.assertEqual(snapshot['backlog'],0)
@@ -553,8 +553,8 @@ class RpcAndDurability(unittest.TestCase):
 
         snapshot=self.rec.poll(feed,rpc)
         self.assertEqual(len(limits),12)
-        self.assertEqual(set(limits),{2})
-        self.assertLessEqual(sum(limits),self.rec.tx_budget//2)
+        self.assertEqual(set(limits),{5})
+        self.assertLessEqual(sum(limits),self.rec.tx_budget)
         self.assertEqual(snapshot['tracked_pairs'],12)
         self.assertEqual(snapshot['coverage'],1.0)
 

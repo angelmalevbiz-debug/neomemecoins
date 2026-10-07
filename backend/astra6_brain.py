@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 import requests
 import honest_quote_transport as quote_transport
+from shared_snapshot_io import read_shared_text
 
 ID = 'ASTRA_6_BRAIN'
 NAME = 'Astra 6 Brain'
@@ -73,7 +74,7 @@ def n(v: Any, d: float = 0.0) -> float:
 
 def read(path: Path, default: Any = None) -> Any:
     try:
-        return json.loads(path.read_text(encoding='utf-8'))
+        return json.loads(read_shared_text(path, encoding='utf-8'))
     except (OSError, ValueError):
         return default
 

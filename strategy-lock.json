@@ -150,7 +150,7 @@
     "backend/lab_dashboard_projection.py": "0216b54cea2407278ab876a2c98a09a532c8a7fa42e81eda4ab8ed5ced1fbf3b",
     "backend/lab_paired_runner.py": "2556bd9dd34dbf9561bab59423fb6013e6a60c915b97bfda4d334cb74c1f6e66",
     "backend/lab_position_marks.py": "7dc9ed982810769c1efd3788c5a919ef88701d95e5fc6d1b17fd64a45e6062f9",
-    "backend/live_tape.py": "321cf01c38404f8456ede89b05874df616fe33541ee12d31b1e00d1d24e6ef67",
+    "backend/live_tape.py": "32493b3309375070e8ac64eb6ebe470483850b574f46366797ffb7e1ea3f05d4",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/market_monitor.py": "0afcdb0d3cc31814c586bd97908aea39b2b40b867a5734fd66ab36c10f0049bf",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",
@@ -180,7 +180,9 @@
     "backend/pool_reference_proof.py": "2f6649d0198c3caf9c548c8fb6819418e1f0a0cf006f6d70c759d68dca616615",
     "backend/tape_pool_owner_proof.py": "f7b4a15a640552f91059e3bd781b0b72446cf5f29cdd2d70d04c6bae1af2ba1a",
     "backend/funded_market_candidates.py": "60f3bbc4b46199c0824709aa62f72a40215af66ae4c06577bec293c339e21d92",
-    "docs/funded-zero-trades-repair.md": "7d84080a1b7db06af88b2dba38e1868666dd442e3d9dc2e6cab2fc323e483cac"
+    "docs/funded-zero-trades-repair.md": "7d84080a1b7db06af88b2dba38e1868666dd442e3d9dc2e6cab2fc323e483cac",
+    "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
+    "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",
@@ -254,9 +256,9 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees.",
+  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged.",
   "support_file_changes": {
-    "backend/live_tape.py": "Decode exact tracked-base or tracked-quote cash-leg orientation, invert token sides for reversed pools, and require distinct instruction/event matches without guessed swaps.",
+    "backend/live_tape.py": "Retain existing exact instruction/event coverage and swap decoder; append reconciled observed fees only after successful authenticated decoding, without changing admission or execution fees.",
     "backend/strategy_lab.py": "Apply funded V3 candidate branches with unchanged evidence/cost/capital gates and receipt-time/commit evidence checks; retain ledgers and existing exits.",
     "backend/lab_position_marks.py": "Choose the newest exact-mint/pool observation by source timestamp rather than receipt time, so a newly received stale cache row cannot mask a more recent market observation; retain freshness checks.",
     "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances.",
@@ -287,7 +289,9 @@
     "backend/lab_paired_runner.py": "Read the shared tape with native delete-sharing snapshot handles; experimental ledgers remain isolated.",
     "backend/funded_market_candidates.py": "Declare prospective physical established-liquid candidate branches for Momentum and Precision, retaining original screens without token-specific fitting or profit claims.",
     "backend/tape_pool_scheduler.py": "Observe the same declared funded mature candidate branches, preserving bounded leases, exact exit pins and final entry gates.",
-    "docs/funded-zero-trades-repair.md": "Record observed zero-trade causes, declared prospective changes, strict gates, actual validation and unproven trade/return targets."
+    "docs/funded-zero-trades-repair.md": "Record observed zero-trade causes, declared prospective changes, strict gates, actual validation and unproven trade/return targets.",
+    "backend/pump_event_fees.py": "Decode complete supported public PumpSwap fee schemas, reconcile raw gross/net charges and reject partial or unsupported routing; observations never authorize entry or replace current execution fees.",
+    "docs/paper-fee-observation.md": "Document observation-only fee evidence, unsupported schemas, preserved entry/exit models and the distinction between open positions and closed trades."
   },
   "momentum_rush": {
     "strategy_id": "MOMENTUM_RUSH_BRAIN",
@@ -318,5 +322,14 @@
     "evidence_rechecked_before_commit": true,
     "historical_outcomes_unchanged": true,
     "profitability_proven": false
+  },
+  "observed_pump_fees": {
+    "version": "OBSERVED_PUMP_EVENT_FEES_V1",
+    "observation_only": true,
+    "changes_entry_or_exit_fee_model": false,
+    "unsupported_schema_retains_existing_fallback": true,
+    "requires_complete_raw_reconciliation": true,
+    "is_execution_quote": false,
+    "entry_permission": false
   }
 }

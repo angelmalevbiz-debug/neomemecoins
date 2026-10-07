@@ -202,7 +202,9 @@ export default function App() {
 
         const controller = new AbortController();
         activeController = controller;
-        const timeout = window.setTimeout(() => controller.abort(), 4000);
+        // A busy PC behind the tunnel can need several seconds; retries and the
+        // session cache cover failures, so do not abort healthy slow responses.
+        const timeout = window.setTimeout(() => controller.abort(), 12000);
         const response = await fetch(`${API}/user/state`, {
           cache: 'no-store',
           signal: controller.signal,

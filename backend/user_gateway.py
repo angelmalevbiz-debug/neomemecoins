@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy
+import hashlib
 import json
 import os
 import socket
@@ -30,6 +31,11 @@ MAX_USER_PORT = int(os.getenv("NEO_USER_ENGINE_PORT_END", "19800"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qziuovwcauaklgqscqys.supabase.co").rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
+# Two-second dashboard polls must not each cost a Supabase round trip.
+AUTH_CACHE_SECONDS = max(0.0, float(os.getenv("NEO_USER_AUTH_CACHE_SECONDS", "30")))
+# A busy engine gets several readiness probes before a request fails; it is
+# never replaced by a second engine on another port.
+ENGINE_HEALTH_RETRIES = 4
 # Strategy selection is explicit per account. The registry field names a
 # supported engine strategy; absent means the default ensemble.
 ACCOUNT_STRATEGY_FIELD = "signal_strategy"
@@ -38,6 +44,8 @@ SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID)
 
 LOCK = threading.RLock()
 ENGINE_PROCESSES = {}
+AUTH_CACHE: dict[str, tuple[float, dict]] = {}
+AUTH_CACHE_LOCK = threading.Lock()
 SESSION = requests.Session()
 SESSION.headers.update({"User-Agent": "NEO-Meme-User-Gateway/2.0", "Accept": "application/json"})
 
@@ -85,8 +93,12 @@ STORE = load_store()
 
 
 def save_store():
-    STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    atomic_json(STORE_PATH, STORE)
+    with LOCK:
+        # The strategy choice is operator-owned on disk; merge it before writing so a
+        # gateway save (including the one at shutdown) never reverts a CLI edit.
+        refresh_account_strategies()
+        STORE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        atomic_json(STORE_PATH, STORE)
 
 
 def verify_user(headers):
@@ -96,6 +108,17 @@ def verify_user(headers):
     token = auth[7:].strip()
     if not token or not SUPABASE_PUBLISHABLE_KEY:
         return None
+
+    cache_key = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    now = time.monotonic()
+    if AUTH_CACHE_SECONDS > 0:
+        with AUTH_CACHE_LOCK:
+            cached = AUTH_CACHE.get(cache_key)
+            if cached and cached[0] > now:
+                return copy.deepcopy(cached[1])
+            if cached:
+                AUTH_CACHE.pop(cache_key, None)
+
     try:
         response = SESSION.get(
             f"{SUPABASE_URL}/auth/v1/user",
@@ -108,7 +131,18 @@ def verify_user(headers):
         if response.status_code != 200:
             return None
         data = response.json()
-        return data if data.get("id") else None
+        if not data.get("id"):
+            return None
+        if AUTH_CACHE_SECONDS > 0:
+            with AUTH_CACHE_LOCK:
+                if len(AUTH_CACHE) >= 256:
+                    expired = [key for key, (expires_at, _) in AUTH_CACHE.items() if expires_at <= now]
+                    for key in expired:
+                        AUTH_CACHE.pop(key, None)
+                    if len(AUTH_CACHE) >= 256:
+                        AUTH_CACHE.pop(next(iter(AUTH_CACHE)), None)
+                AUTH_CACHE[cache_key] = (now + AUTH_CACHE_SECONDS, copy.deepcopy(data))
+        return data
     except Exception:
         return None
 
@@ -137,13 +171,19 @@ def refresh_account_strategies():
     Only that field is merged; balances, history, positions and ports keep the
     gateway's durable in-memory record, so a later save cannot discard the edit.
     """
-    disk = load_store().get("accounts") or {}
+    try:
+        disk = load_store().get("accounts") or {}
+    except RuntimeError:
+        # A transient read (e.g. a Windows sharing violation during an operator's
+        # atomic replace) keeps the last known choices instead of failing the request.
+        return
     for user_id, record in (STORE.get("accounts") or {}).items():
-        requested = (disk.get(user_id) or {}).get(ACCOUNT_STRATEGY_FIELD)
-        if requested:
-            record[ACCOUNT_STRATEGY_FIELD] = requested
-        else:
-            record.pop(ACCOUNT_STRATEGY_FIELD, None)
+        on_disk = disk.get(user_id) or {}
+        for field in (ACCOUNT_STRATEGY_FIELD, ACCOUNT_STRATEGY_FIELD + "_set_at"):
+            if on_disk.get(field):
+                record[field] = on_disk[field]
+            else:
+                record.pop(field, None)
 
 
 def engine_dir(user_id):
@@ -271,15 +311,25 @@ def bootstrap_if_needed(user, account):
 def start_engine(user, account):
     user_id = str(user["id"])
     existing = ENGINE_PROCESSES.get(user_id)
-    if existing is not None and existing.poll() is None:
-        port = int(account.get("engine_port") or 0)
-        if port and engine_health(port):
-            return port
-
+    tracked_alive = existing is not None and existing.poll() is None
     port = int(account.get("engine_port") or 0)
-    if port and engine_health(port):
-        return port
-    if port <= 0 or port_open(port):
+    if port:
+        if engine_health(port):
+            return port
+        if tracked_alive or port_open(port):
+            # The account's engine is running (or its configured port is in use).
+            # Give readiness a few chances under CPU pressure; never churn to a
+            # new port, because a second engine would write the same ledger.
+            for _ in range(ENGINE_HEALTH_RETRIES):
+                time.sleep(0.25)
+                if engine_health(port):
+                    return port
+            raise RuntimeError(
+                "Configured user engine port is occupied but not healthy; no second engine started."
+            )
+    else:
+        if tracked_alive:
+            raise RuntimeError("User engine is running without a recorded port; no second engine started.")
         port = allocate_port(user_id)
         account["engine_port"] = port
         account["updated_at"] = now_ms()

@@ -160,6 +160,9 @@ $settings = @{
     NEO_STRATEGY_LAB_RESET_FLAG=(Join-Path $runtime 'strategy_lab.reset');
     NEO_JUPITER_LOCK_PATH=(Join-Path $runtime 'quote.lock'); NEO_JUPITER_STAMP_PATH=(Join-Path $runtime 'quote-stamp.txt');
     NEO_TRAINING_ROOT=(Join-Path $runtime 'training');
+    # Shared services always run the default strategy; personal engines get theirs
+    # from the account registry through the gateway. An empty value removes it.
+    NEO_SIGNAL_STRATEGY='';
     SUPABASE_URL='https://qziuovwcauaklgqscqys.supabase.co'; SUPABASE_PUBLISHABLE_KEY=$SupabasePublishableKey
 }
 $original = @{}

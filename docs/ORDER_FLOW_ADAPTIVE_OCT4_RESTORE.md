@@ -130,11 +130,14 @@ candidate is among the tracked pools. Those rejections are reported, not hidden.
 2. Record the choice in the gateway registry (touches only that field):
 
    ```powershell
-   .venv\Scripts\python.exe scripts\paper_runtime.py set-account-strategy --registry .runtime\accounts\user_accounts.json --user <account-uuid-prefix> --strategy ORDER_FLOW_ADAPTIVE
+   .venv\Scripts\python.exe scripts\paper_runtime.py set-account-strategy --registry C:\Users\Chavd\neomemecoins\.runtime\accounts\user_accounts.json --user <account-uuid-prefix> --strategy ORDER_FLOW_ADAPTIVE
    ```
 
-   `--strategy default` removes the choice. Ambiguous prefixes and unknown
-   strategy names refuse to change anything.
+   Use the registry of the checkout that runs the gateway (the output prints the
+   resolved path). `--strategy default` removes the choice. Short (< 8 characters),
+   ambiguous prefixes and unknown strategy names refuse to change anything. The
+   gateway merges this field from disk before every registry write, so an edit made
+   while the gateway runs is not reverted at shutdown.
 3. The gateway adopts the field on its next request, but a running engine keeps
    its startup strategy. Apply it with the launcher's graceful cohort cycle from
    the runtime checkout (the shared stop marker also stops personal engines):

@@ -23,6 +23,7 @@ import market_discovery
 import honest_quote_transport as quote_transport
 import paper_market_feasibility as market_feasibility
 import entry_quote_priority
+import compat_file_lock as file_lock
 from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
 from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
@@ -2503,10 +2504,33 @@ class ApiHandler(BaseHTTPRequestHandler):
         self.send_json({'error': 'not_found'}, 404)
 
 
+ENGINE_LOCK_HANDLE = None
+
+
+def acquire_engine_lock(lock_path: Path | None = None):
+    """One writer per PAPER ledger: a second engine on the same state file refuses to start.
+
+    The lock is held for the life of the process and released by the OS on exit,
+    including a crash, so a restarted engine can always reclaim it.
+    """
+    global ENGINE_LOCK_HANDLE
+    path = Path(lock_path) if lock_path else STATE_PATH.with_name(STATE_PATH.name + '.engine.lock')
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(path, 'a+b')
+    try:
+        file_lock.flock(handle, file_lock.LOCK_EX | file_lock.LOCK_NB)
+    except OSError as exc:
+        handle.close()
+        raise RuntimeError(f'Another PAPER engine already writes {STATE_PATH}; refusing a second writer.') from exc
+    ENGINE_LOCK_HANDLE = handle
+    return handle
+
+
 def main() -> None:
     mode = os.getenv('NEO_ENGINE_MODE', 'PAPER').upper()
     if mode not in {'PAPER', 'REPLAY', 'SHADOW'}:
         raise ValueError('Only PAPER/REPLAY/SHADOW modes are supported')
+    acquire_engine_lock()
     STATE.load()
     STATE.save()
     training_bridge.start(STATE_PATH.parent / 'training')

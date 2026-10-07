@@ -22,7 +22,7 @@ def set_account_strategy(registry, user, strategy):
     positions and engine ports are never modified. The gateway applies the
     choice when it next spawns the account's engine.
     """
-    registry = Path(registry)
+    registry = Path(registry).resolve()
     data = json.loads(registry.read_text(encoding='utf-8'))
     accounts = data.get('accounts')
     if not isinstance(data, dict) or not isinstance(accounts, dict):
@@ -45,7 +45,7 @@ def set_account_strategy(registry, user, strategy):
     record['signal_strategy_set_at'] = int(time.time() * 1000)
     record['updated_at'] = record['signal_strategy_set_at']
     atomic_json(registry, data)
-    return {'account': matches[0][:8] + '…', 'signal_strategy_before': before,
+    return {'registry': str(registry), 'account': matches[0][:8] + '…', 'signal_strategy_before': before,
             'signal_strategy_after': record.get('signal_strategy'),
             'engine_port': record.get('engine_port'), 'ledger_files_touched': 0,
             'applies': 'when the gateway next starts this account engine'}

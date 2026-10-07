@@ -58,21 +58,26 @@ def observed_evidence(book, *, activity_version, execution_version, now):
         closed = _finite(row.get('closed_at'))
         pnl = _finite(row.get('pnl_usd'))
         price = row.get('price_crosscheck') or {}
+        mint = row.get('address')
+        pair = row.get('pairAddress')
+        quote_status = row.get('quote_status')
         if (trade_no is None or trade_no <= 0 or not trade_no.is_integer()
                 or opened is None or closed is None or not 0 < opened <= closed <= now
                 or pnl is None or row.get('strategy_id') != book.get('id')
-                or not row.get('address') or not row.get('pairAddress')
+                or not isinstance(mint, str) or not mint.strip()
+                or not isinstance(pair, str) or not pair.strip()
                 or row.get('entry_policy_version') != activity_version
                 or row.get('execution_mode') != execution_version
                 or not isinstance(price, dict) or price.get('status') != 'pass'
-                or price.get('mint') != row['address'] or price.get('pair') != row['pairAddress']
+                or price.get('mint') != mint or price.get('pair') != pair
                 or row.get('audit_pending') or row.get('quality_flags')
-                or row.get('quote_status') in {'stale', 'unavailable'}
+                or (quote_status is not None and not isinstance(quote_status, str))
+                or quote_status in {'stale', 'unavailable'}
                 or row.get('quote_unavailable_reason')):
             excluded += 1
             continue
         identity = int(trade_no)
-        value = (closed, opened, pnl, row['address'], row['pairAddress'])
+        value = (closed, opened, pnl, mint, pair)
         if identity in conflicts:
             excluded += 1
         elif identity in unique:

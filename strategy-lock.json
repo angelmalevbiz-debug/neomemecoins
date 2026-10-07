@@ -137,7 +137,7 @@
     "backend/promoted_entry_guard.py": "234b35910e5a9f13c67555af35f82aa0332f1737fddbf81af4abdaaea973ca2a",
     "scripts/start_local_paper.ps1": "069d5e3a8b7aef63f43ab5c77ce685a04fe2ac03a4cbfb8911b36a94f7c15962",
     "scripts/local_paper_service.py": "4632195031c5ee836e70cb067bb5978ba35a1cf5422aa734cacf52802da95ac4",
-    "backend/lab_strategy_lifecycle.py": "ff11ef96640e9416bc421040249bc66487a5578cb47cd103330019fde2911831"
+    "backend/lab_strategy_lifecycle.py": "9361522a951940d9bbdb2c251fb1cff090fcb6466ee3e26d9950b8b492ea6094"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",

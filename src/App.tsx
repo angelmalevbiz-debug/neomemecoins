@@ -358,7 +358,8 @@ export default function App() {
       </section>
       <section data-testid="main-entry-learning" className="mt-4 grid gap-4 rounded-3xl border border-white/10 bg-[#0b0e11] p-4 lg:grid-cols-2">
         <div>
-          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">Главен PAPER вход</div><h2 className="mt-1 text-sm font-black text-white">Кандидати и причини за отказ</h2></div><span className="rounded-lg border border-white/10 px-2 py-1 text-[9px] font-black text-slate-400">{state?.entry_diagnostics?.status?.toUpperCase() ?? 'ЧАКА ДАННИ'}</span></div>
+          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">Отделна PAPER сметка</div><h2 className="mt-1 text-sm font-black text-white">Кандидати и причини за отказ</h2></div><span className="rounded-lg border border-white/10 px-2 py-1 text-[9px] font-black text-slate-400">{state?.entry_diagnostics?.status?.toUpperCase() ?? 'ЧАКА ДАННИ'}</span></div>
+          {promotedPortfolio && <p className="mt-2 text-[10px] text-slate-500">Тези проверки са за отделната PAPER сметка. Четирите финансирани стратегии в портфейла имат собствени правила и резултати в таблицата по-долу.</p>}
           <p className="mt-2 text-[10px] leading-5 text-slate-400">{state?.entry_diagnostics?.message ?? 'Изчаква се актуална диагностика от PAPER backend.'}</p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl border border-white/[0.06] bg-black/20 p-2"><div className="text-[8px] uppercase text-slate-600">Проверени кандидати</div><div className="mt-1 text-sm font-black text-white">{state?.entry_diagnostics?.evaluated ?? '—'}</div></div>

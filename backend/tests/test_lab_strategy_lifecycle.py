@@ -108,6 +108,16 @@ class LifecycleEvidenceTests(unittest.TestCase):
         self.assertEqual(review({RESEARCH: stored})['retired_strategy_ids'], [])
         self.assertEqual(stored['strategy_lifecycle']['evidence']['closed_trades'], 8)
 
+    def test_malformed_quote_status_and_pool_identities_are_excluded_without_throwing(self):
+        for field, value in (('quote_status', []), ('quote_status', {}),
+                             ('address', [MINT]), ('address', {'mint': MINT}),
+                             ('pairAddress', [PAIR]), ('pairAddress', {'pair': PAIR}),
+                             ('address', '   '), ('pairAddress', '')):
+            with self.subTest(field=field, value=value):
+                stored = book([-4] * 9)
+                stored['history'][0][field] = value
+                self.assertEqual(review({RESEARCH: stored})['retired_strategy_ids'], [])
+                self.assertEqual(stored['strategy_lifecycle']['evidence']['closed_trades'], 8)
     def test_overflow_cannot_create_non_json_retirement_evidence(self):
         stored = book([-4] * 12)
         for row in stored['history']:

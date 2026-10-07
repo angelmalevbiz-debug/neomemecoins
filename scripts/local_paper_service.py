@@ -2,7 +2,9 @@
 """Hidden local PAPER services with an explicit, graceful shared stop marker."""
 import argparse
 import _thread
+import json
 import os
+import re
 import sys
 import threading
 import time
@@ -31,8 +33,33 @@ def validate_environment():
     return marker
 
 
-def run(service):
+def startup_identity_path(service, run_token, ready_file, marker):
+    if not run_token and not ready_file:
+        return None  # Personal PAPER engines use the runner without a launcher handshake.
+    if not re.fullmatch(r'[0-9a-f]{32}', run_token or '') or not ready_file:
+        raise ValueError('Startup handshake requires a valid token and identity path')
+    path = Path(ready_file).resolve()
+    if path.parent != marker.parent or path.name != f'startup-{service}-{run_token}.json':
+        raise ValueError('Startup identity must match the service and stay beside the local stop marker')
+    return path
+
+
+def publish_worker_identity(path, service, run_token):
+    if path is None:
+        return
+    if path.name != f'startup-{service}-{run_token}.json':
+        raise ValueError('Startup identity does not match the requested service')
+    temporary = path.with_name(path.name + f'.{os.getpid()}.tmp')
+    with temporary.open('w', encoding='utf-8') as handle:
+        json.dump({'service': service, 'run_token': run_token, 'pid': os.getpid()}, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+
+
+def run(service, run_token='', ready_file=''):
     marker = validate_environment()
+    identity_path = startup_identity_path(service, run_token, ready_file, marker)
     if marker.exists():
         return
     if service == 'main':
@@ -45,6 +72,11 @@ def run(service):
         import user_gateway as module
         # Per-user engines inherit the same isolated environment and stop marker.
         module.ENGINE_SCRIPT = Path(__file__).resolve()
+
+    # A bounded launcher timeout can occur while a module imports. Honor its
+    # graceful stop request before publishing readiness or entering the service.
+    if marker.exists():
+        return
 
     stopping = threading.Event()
     prior_running = None
@@ -63,6 +95,7 @@ def run(service):
 
     watcher = threading.Thread(target=watch_stop, name='local-paper-stop', daemon=True)
     watcher.start()
+    publish_worker_identity(identity_path, service, run_token)
     print(f'Local PAPER {service} started; pid={os.getpid()}', flush=True)
     try:
         module.main()
@@ -97,5 +130,7 @@ def run(service):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--service', choices=('main', 'tape', 'lab', 'gateway'), default='main')
+    parser.add_argument('--run-token', default='')
+    parser.add_argument('--ready-file', default='')
     args = parser.parse_args()
-    run(args.service)
+    run(args.service, args.run_token, args.ready_file)

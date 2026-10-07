@@ -108,6 +108,8 @@ test('network errors are readable without inventing an HTTP response or diagnosi
 
 test('backend destinations come only from validated build configuration and permit local HTTP only in development', () => {
   assert.equal(paperApiConfiguration().url, 'https://neo-meme-api.169-58-211-177.sslip.io');
+  assert.equal(paperApiConfiguration(undefined, true).url, '/api');
+  assert.equal(paperApiConfiguration('   ', true).url, '/api');
   assert.deepEqual(paperApiConfiguration(' https://paper.example.com/ '), { url: 'https://paper.example.com', error: '' });
   for (const url of ['http://paper.example.com', 'javascript:alert(1)', 'https://user:password@paper.example.com/', 'https://paper.example.com/?token=abc', 'https://paper.example.com/#fragment', 'https://paper.example.com/unexpected-path', 'not-a-url']) {
     assert.equal(paperApiConfiguration(url).url, '');

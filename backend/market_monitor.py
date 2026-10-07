@@ -16,6 +16,7 @@ import engine_runtime as runtime
 import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
+import promoted_entry_guard as promoted_guard
 import entry_size_backoff
 from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
 from training_quote_probe import collect_exact_pool_quotes
@@ -62,8 +63,18 @@ STRICT_ENTRY_SCORE = float(os.getenv('NEO_STRICT_ENTRY_SCORE', '58'))
 STRICT_MIN_CONVICTION = float(os.getenv('NEO_STRICT_MIN_CONVICTION', '30'))
 STRICT_MIN_LIQUIDITY_USD = float(os.getenv('NEO_STRICT_MIN_LIQUIDITY_USD', '4000'))
 STRICT_MAX_ENTRY_IMPACT_PCT = float(os.getenv('NEO_STRICT_MAX_ENTRY_IMPACT_PCT', '1.75'))
-STRICT_MAX_ROUNDTRIP_COST_PCT = float(os.getenv('NEO_STRICT_MAX_ROUNDTRIP_COST_PCT', '2.75'))
-STRICT_MAX_WORST_CASE_COST_PCT = float(os.getenv('NEO_STRICT_MAX_WORST_CASE_COST_PCT', '4.0'))
+POLICY_MAX_ROUNDTRIP_COST_PCT = 1.5
+POLICY_MAX_WORST_CASE_COST_PCT = 2.5
+STRICT_MAX_ROUNDTRIP_COST_PCT = min(
+    float(os.getenv('NEO_STRICT_MAX_ROUNDTRIP_COST_PCT', str(POLICY_MAX_ROUNDTRIP_COST_PCT))),
+    POLICY_MAX_ROUNDTRIP_COST_PCT,
+    STOP_LOSS_PCT * promoted_guard.MAX_STOP_BUDGET_COST_FRACTION,
+)
+STRICT_MAX_WORST_CASE_COST_PCT = min(
+    float(os.getenv('NEO_STRICT_MAX_WORST_CASE_COST_PCT', str(POLICY_MAX_WORST_CASE_COST_PCT))),
+    POLICY_MAX_WORST_CASE_COST_PCT,
+    STOP_LOSS_PCT * promoted_guard.MAX_STOP_BUDGET_COST_FRACTION,
+)
 EFFECTIVE_ENTRY_THRESHOLDS = order_flow.EntryThresholds(STRICT_ENTRY_SCORE, STRICT_MIN_LIQUIDITY_USD, STRICT_MIN_CONVICTION)
 for _threshold in (STRICT_MAX_ENTRY_IMPACT_PCT, STRICT_MAX_ROUNDTRIP_COST_PCT, STRICT_MAX_WORST_CASE_COST_PCT,
                    TRADE_NOTIONAL_USD, MAX_DAILY_LOSS_USD, POSITION_SCAN_SECONDS, MAX_POSITION_RISK_USD,
@@ -246,7 +257,7 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
         'execution_exit_price', 'notional_usd', 'score', 'current_score',
         'opened_at', 'updated_at', 'closed_at', 'exit_price', 'exit_reason',
         'trade_no', 'session_id', 'pnl_usd', 'pnl_pct', 'balance_before',
-        'balance_after', 'dex_url', 'strategy_id', 'strategy_matches',
+        'balance_after', 'dex_url', 'strategy_id', 'strategy_matches', 'strategy_matches_at_entry',
         'signal_evidence', 'entry_policy_version',
         'exit_policy_version', 'signal_pnl_pct', 'entry_roundtrip_pnl_pct',
         'observed_exit_pnl_pct', 'observed_exit_pnl_usd', 'paper_stop_capped',
@@ -496,6 +507,8 @@ class State:
         quality = str(coverage.get('status') or 'UNKNOWN').upper()
         if not pair_address or num(coverage.get('complete_since_ms'), decision_at+1) > cutoff:
             quality = 'DEGRADED' if quality == 'COMPLETE' else 'UNKNOWN'
+        tape_stamp = num(tape.get('updated_at'))
+        pair_poll = num(coverage.get('last_poll_at'))
         available_rows = [e for e in tape.get('events', []) if e.get('address') == address
                 and (not pair_address or e.get('pairAddress') == pair_address)
                 and cutoff <= num(e.get('ts')) <= decision_at
@@ -507,8 +520,22 @@ class State:
         for event in available_rows:
             if event.get('quality_flags') or num(event.get('usd_amount')) <= 0: continue
             event_id = event.get('event_id')
-            if event_id and event_id in event_ids: continue
-            if event_id: event_ids.add(event_id)
+            direction = event.get('direction')
+            if (event.get('confirmed_swap') is not True or not event.get('wallet')
+                    or not isinstance(event_id, str) or not event_id
+                    or direction not in {'BUY', 'SELL'}):
+                quality = 'DEGRADED'
+                continue
+            event_at = num(event.get('event_time'), num(event.get('ts')))
+            observed_at = num(event.get('observed_at'))
+            available_at = num(event.get('available_at', event.get('ingested_at')))
+            if not (cutoff <= event_at <= observed_at <= available_at <= decision_at):
+                quality = 'DEGRADED'
+                continue
+            if event_id in event_ids:
+                quality = 'DEGRADED'
+                continue
+            event_ids.add(event_id)
             rows.append(event)
         buys = [e for e in rows if e.get('direction') == 'BUY']
         sells = [e for e in rows if e.get('direction') == 'SELL']
@@ -529,6 +556,34 @@ class State:
         repeat_buy_wallets = sum(1 for count in buy_counts.values() if count >= 2)
         whale_buy_usd = sum(num(e.get('usd_amount')) for e in buys if num(e.get('usd_amount')) >= 750)
         whale_sell_usd = sum(num(e.get('usd_amount')) for e in sells if num(e.get('usd_amount')) >= 750)
+        verified_flow = None
+        exact_complete_window = bool(
+            seconds == promoted_guard.FLOW_WINDOW_MS // 1000
+            and quality == 'COMPLETE'
+            and str(coverage.get('status') or '').upper() == 'COMPLETE'
+            and coverage.get('address') == address
+            and coverage.get('pairAddress') == pair_address
+            and 0 < num(coverage.get('complete_since_ms')) <= cutoff
+            and 0 < pair_poll <= decision_at
+            and decision_at - pair_poll <= promoted_guard.FLOW_MAX_AGE_MS
+            and 0 < tape_stamp <= decision_at
+            and decision_at - tape_stamp <= promoted_guard.FLOW_MAX_AGE_MS
+        )
+        if exact_complete_window:
+            verified_flow = {
+                'source': promoted_guard.FLOW_SOURCE,
+                'coverage_status': 'COMPLETE',
+                'window_ms': promoted_guard.FLOW_WINDOW_MS,
+                'address': address,
+                'pairAddress': pair_address,
+                'window_at': tape_stamp,
+                'latest_event_at': max([num(e.get('event_time'), num(e.get('ts'))) for e in rows] or [0]),
+                'available_at': max([num(e.get('available_at', e.get('ingested_at'))) for e in rows] or [0]),
+                'trades': len(rows),
+                'unique_wallets': len({e.get('wallet') for e in rows if e.get('wallet')}),
+                'buy_usd': round(buy_usd, 2),
+                'sell_usd': round(sell_usd, 2),
+            }
         return {
             'quality': quality, 'coverage': coverage, 'decision_at': decision_at,
             'fresh': quality == 'COMPLETE',
@@ -544,6 +599,7 @@ class State:
             'whale_buy_usd': round(whale_buy_usd, 2), 'whale_sell_usd': round(whale_sell_usd, 2),
             'max_buy_usd': round(max([num(e.get('usd_amount')) for e in buys] or [0]), 2),
             'max_sell_usd': round(max([num(e.get('usd_amount')) for e in sells] or [0]), 2),
+            'verified_flow': verified_flow,
         }
 
     def snapshot(self) -> dict[str, Any]:
@@ -566,7 +622,8 @@ class State:
                 'entry_diagnostics': self.entry_diagnostics,
                 'live_tape': [],
                 'live_tape_status': {k: tape.get(k) for k in ('status','tracked_pairs','updated_at','source','error')},
-                'strategy_lab': read_strategy_lab(),
+            'strategy_lab': read_strategy_lab(),
+            'strategy_learning': winner_ensemble.learning_snapshot(self.history),
                 'paper_training': training_bridge.snapshot(),
                 'stats': {
                     'feed_count': len(self.feed),
@@ -634,7 +691,7 @@ class State:
                     'daily_loss_cap_enabled': MAX_DAILY_LOSS_USD > 0,
                     'starting_balance_usd': STARTING_BALANCE_USD,
                     'execution_mode': 'PAPER_QUOTE_OR_OBSERVED_POOL_MODEL',
-                    'execution_note': 'PAPER only; four market-signal rules share one account. Exact-pool quotes and fees are modeled, not executed fills; gaps and unsellable losses remain possible.',
+                    'execution_note': 'PAPER only; broad verified-flow candidate rule plus four selective rules share one account. Exact-pool quotes and fees are modeled, not executed fills; gaps and unsellable losses remain possible.',
                     'entry_policy_version': winner_ensemble.ENTRY_POLICY_VERSION,
                     'exit_policy': 'fixed', 'exit_policy_version': exit_policy.VERSION,
                     'effective_config_hash': effective_config_hash(),
@@ -650,6 +707,12 @@ class State:
                     'strict_min_liquidity_usd': STRICT_MIN_LIQUIDITY_USD,
                     'strict_max_entry_impact_pct': STRICT_MAX_ENTRY_IMPACT_PCT,
                     'strict_max_roundtrip_cost_pct': STRICT_MAX_ROUNDTRIP_COST_PCT,
+                    'strict_max_worst_case_cost_pct': STRICT_MAX_WORST_CASE_COST_PCT,
+                    'verified_entry_policy': {
+                        **promoted_guard.policy_config(STOP_LOSS_PCT),
+                        'maximum_roundtrip_cost_pct': STRICT_MAX_ROUNDTRIP_COST_PCT,
+                        'maximum_worst_case_roundtrip_cost_pct': STRICT_MAX_WORST_CASE_COST_PCT,
+                    },
                     'jupiter_slippage_bps': paper_quotes.SLIPPAGE_BPS,
                     'generic_dex_fee_bps': GENERIC_DEX_FEE_BPS,
                     'base_slippage_bps': BASE_SLIPPAGE_BPS,
@@ -721,6 +784,7 @@ def effective_config_hash():
               'max_position_full_loss_usd': MAX_POSITION_RISK_USD,'max_exposure_pct': MAX_TOTAL_EXPOSURE_PCT,'max_drawdown_pct':MAX_DRAWDOWN_PCT,
               'max_impact_pct': STRICT_MAX_ENTRY_IMPACT_PCT, 'max_cost_pct': STRICT_MAX_ROUNDTRIP_COST_PCT,
               'max_conservative_cost_pct': STRICT_MAX_WORST_CASE_COST_PCT,
+              'verified_entry_policy': promoted_guard.policy_config(STOP_LOSS_PCT),
               'quote_size_backoff_version': entry_size_backoff.VERSION,
               'quote_size_backoff_min_usd': entry_size_backoff.MIN_ENTRY_NOTIONAL_USD,
               'quote_size_backoff_attempts': entry_size_backoff.MAX_SIZE_ATTEMPTS,
@@ -1673,19 +1737,33 @@ class Monitor:
             if rejected:
                 reject(report, rejected, coin)
                 continue
-            strategy_matches = winner_ensemble.matches(coin)
-            if not strategy_matches:
+            market_candidates = winner_ensemble.market_candidates(coin)
+            if not market_candidates:
                 reject(report, ['winner_signal'], coin)
                 continue
-            report['signal_passed'] += 1
             retry_after = self.entry_quote_retry_after.get(address, 0)
             if retry_after > now_ms():
                 reject(report, ['quote_retry_cooldown'], coin, {'retry_after_ms': retry_after})
                 continue
             if retry_after:
                 self.entry_quote_retry_after.pop(address, None)
-            entry_mode = 'WINNER_ENSEMBLE'
+            entry_mode = 'WINNER_ENSEMBLE_VERIFIED_FLOW'
             flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
+            flow_admission = promoted_guard.flow_admission(
+                coin, {'verified_flow': flow.get('verified_flow')}, now_ms())
+            if not flow_admission['allow']:
+                reject(report, [flow_admission['reason']], coin)
+                continue
+            raw_strategy_matches = winner_ensemble.matches(coin, flow)
+            with STATE.lock:
+                learning_history = list(STATE.history)
+            strategy_matches, policy_learning = winner_ensemble.apply_learning(
+                raw_strategy_matches, learning_history)
+            if not strategy_matches:
+                reason = 'loss_learning_hold' if raw_strategy_matches else 'winner_flow_signal'
+                reject(report, [reason], coin, {'market_candidates': market_candidates})
+                continue
+            report['signal_passed'] += 1
             context = self.market_context(coin)
             # Start independent price and rug checks together. Both helpers are
             # cached/asynchronous; running them concurrently avoids serial provider
@@ -1707,12 +1785,24 @@ class Monitor:
             if safety.get('status') != 'pass' or safety.get('provisional_early'):
                 reject(report, safety.get('reasons') or ['risk_check_pending'], coin)
                 continue
+            risk_admission = promoted_guard.risk_admission(
+                coin, safety, now_ms(), promoted_guard.SAFETY_MAX_AGE_MS)
+            if not risk_admission['allow']:
+                reject(report, [risk_admission['reason']], coin)
+                continue
             strategy_id = winner_ensemble.VERSION
-            # These are the Lab market rules in one shared PAPER account. They
-            # do not claim verified chain-flow evidence; execution gates below
-            # remain mandatory, and training candidates remain isolated.
-            learning = {'sample': 0, 'win_rate': 0, 'profit_factor': None,
-                        'recent_losses': 0, 'bonus': 0, 'size_multiplier': 1.0}
+            # The ensemble produces candidate signals only. Verified flow and
+            # safety above, followed by executable quote gates below, govern entry.
+            # Training candidates remain isolated from this account.
+            policy_losses = policy_learning['losses']
+            learning = {
+                'sample': policy_learning['closed_trades'],
+                'win_rate': policy_learning['win_rate_pct'],
+                'profit_factor': policy_learning['profit_factor'],
+                'recent_losses': policy_losses,
+                'bonus': 0, 'size_multiplier': 1.0,
+                'avg_pnl_pct': None,
+            }
             recovery = False
             price = num(coin.get('priceUsd'))
             if price <= 0:
@@ -1857,15 +1947,49 @@ class Monitor:
             with STATE.lock:
                 if STATE.demo_session_id!=session_at_check or not STATE.running or len(STATE.positions)>=MAX_POSITIONS:
                     return
+                # Position liquidation runs concurrently with quote preparation.
+                # Revalidate portfolio vetoes under the same lock as the entry
+                # commit; a preflight pass cannot authorize newly unknown risk.
+                if STATE.pending_audit:
+                    reject(report, ['audit_pending'], coin)
+                    return
+                if any(p.get('valuation_status') == 'unavailable' for p in STATE.positions):
+                    reject(report, ['liquidation_unavailable'], coin)
+                    return
+                if MAX_DRAWDOWN_PCT > 0 and (1-STATE.equity_usd()/max(STATE.equity_peak_usd,1))*100 >= MAX_DRAWDOWN_PCT:
+                    reject(report, ['drawdown_limit'], coin)
+                    return
                 current_coin = next((c for c in STATE.feed if c.get('address') == address and c.get('pairAddress') == coin.get('pairAddress')), coin)
                 final_rejections = entry_policy.signal_data_rejections(current_coin,now=now_ms())
-                final_strategy_matches = winner_ensemble.matches(current_coin)
-                if not final_strategy_matches:
-                    final_rejections.append('winner_signal')
                 if final_rejections:
                     reject(report,final_rejections,coin)
                     continue
                 final_flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
+                final_flow_admission = promoted_guard.flow_admission(
+                    current_coin, {'verified_flow': final_flow.get('verified_flow')}, now_ms())
+                if not final_flow_admission['allow']:
+                    reject(report, [final_flow_admission['reason']], coin)
+                    continue
+                final_market_candidates = winner_ensemble.market_candidates(current_coin)
+                final_raw_strategy_matches = winner_ensemble.matches(current_coin, final_flow)
+                with STATE.lock:
+                    final_learning_history = list(STATE.history)
+                final_strategy_matches, final_policy_learning = winner_ensemble.apply_learning(
+                    final_raw_strategy_matches, final_learning_history)
+                if not final_market_candidates:
+                    reject(report, ['winner_signal'], coin)
+                    continue
+                if not final_strategy_matches:
+                    reason = ('loss_learning_hold'
+                              if final_raw_strategy_matches
+                              else 'winner_flow_signal')
+                    reject(report, [reason], coin)
+                    continue
+                final_risk_admission = promoted_guard.risk_admission(
+                    current_coin, safety, now_ms(), promoted_guard.SAFETY_MAX_AGE_MS)
+                if not final_risk_admission['allow']:
+                    reject(report, [final_risk_admission['reason']], coin)
+                    continue
                 final_context = self.market_context(current_coin)
                 if STATE.available_balance_usd()<entry_quote['capital_committed_usd'] or (MAX_DAILY_LOSS_USD > 0 and STATE.risk_day_pnl()<=-MAX_DAILY_LOSS_USD):
                     reject(report,['balance'],coin); return
@@ -1893,16 +2017,29 @@ class Monitor:
                     'current_price': price, 'peak_price': price,
                     'trade_no': next_trade_no, 'session_id': STATE.demo_session_id, 'strategy_id': strategy_id,
                     'strategy_matches': final_strategy_matches,
-                    'signal_evidence': 'MARKET_SNAPSHOT_WITH_VERIFIED_EXECUTION_CHECKS',
+                    'strategy_matches_at_entry': final_raw_strategy_matches,
+                    'signal_evidence': 'CONFIRMED_PUMPSWAP_FLOW_WITH_VERIFIED_EXECUTION_CHECKS',
                     'entry_mode': entry_mode,
                     'provisional_early_safety': bool(safety.get('provisional_early')),
-                    'learning_mode': 'FIXED_WINNER_ENSEMBLE_SEPARATE_VALIDATED_TRAINING', 'entry_flow': final_flow,
+                    'learning_mode': 'SAME_POLICY_PAPER_OUTCOME_THROTTLE_V1', 'entry_flow': final_flow,
+                    'verified_entry_flow': final_flow.get('verified_flow'),
                     'entry_context': context, 'entry_conviction': context.get('conviction'),
-                    'entry_hold_mode': context.get('mode'), 'learning_sample': learning['sample'],
-                    'learning_win_rate': learning['win_rate'], 'learning_profit_factor': learning['profit_factor'],
-                    'learning_recent_losses': learning['recent_losses'], 'learning_bonus': learning['bonus'],
-                    'learning_avg_pnl_pct': learning.get('avg_pnl_pct'),
+                    'entry_hold_mode': context.get('mode'), 'learning_sample': final_policy_learning['closed_trades'],
+                    'learning_win_rate': final_policy_learning['win_rate_pct'], 'learning_profit_factor': final_policy_learning['profit_factor'],
+                    'learning_recent_losses': final_policy_learning['losses'], 'learning_bonus': 0,
+                    'learning_avg_pnl_pct': None,
                     'learning_size_multiplier': learning.get('size_multiplier'),
+                    'entry_market_features': {
+                        'score': num(current_coin.get('score')),
+                        'liquidity_usd': num(current_coin.get('liquidityUsd')),
+                        'm5_pct': num((current_coin.get('priceChange') or {}).get('m5')),
+                        'h1_pct': num((current_coin.get('priceChange') or {}).get('h1')),
+                        'buys_m5': num(((current_coin.get('txns') or {}).get('m5') or {}).get('buys')),
+                        'sells_m5': num(((current_coin.get('txns') or {}).get('m5') or {}).get('sells')),
+                        'market_cap_usd': num(current_coin.get('marketCap') or current_coin.get('fdv')),
+                        'age_minutes': num(current_coin.get('ageMinutes')),
+                        'volume_h1_usd': num(((current_coin.get('volume') or {}).get('h1'))),
+                    },
                     'requested_notional_usd': round(requested_notional, 8),
                     'notional_usd': round(notional, 8),
                     'size_limited_by_daily_budget': notional<min(TRADE_NOTIONAL_USD,available_before-fixed_cost_budget),

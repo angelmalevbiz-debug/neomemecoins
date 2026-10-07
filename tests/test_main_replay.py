@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 from main_replay import MainReplay
 import engine_execution as execution
+import promoted_entry_guard as promoted_guard
 
 A,B='A'*44,'B'*44
 NOW=1000000
@@ -18,7 +19,12 @@ def observation(at):
                 'volume':{'h1':50000},'signals':[],'updatedAt':at},
         'flow':{'quality':'COMPLETE','fresh':True,'latest_at':at,'trades':4,
                 'buy_sell_usd_ratio':3,'unique_wallets':3,'buyer_wallets':3,
-                'buy_usd':300,'sell_usd':100,'max_sell_usd':50},
+                'buy_usd':300,'sell_usd':100,'max_sell_usd':50,
+                'verified_flow':{'source':promoted_guard.FLOW_SOURCE,
+                    'coverage_status':'COMPLETE','window_ms':promoted_guard.FLOW_WINDOW_MS,
+                    'address':A,'pairAddress':B,'window_at':at,'latest_event_at':at-100,
+                    'available_at':at-50,'trades':4,'unique_wallets':3,
+                    'buy_usd':300,'sell_usd':100}},
         'safety':{'evidence':{'status':'pass','mint':A,'pair':B,'checked_at':at,
                     'metrics':{'decimals':6,'sol_usd':100,'token_account_rent_lamports':1650000}}},
         'source':{'price_evidence':{'status':'pass','mint':A,'pair':B,'reference_received_at':at},'execution_evidence':{}}}

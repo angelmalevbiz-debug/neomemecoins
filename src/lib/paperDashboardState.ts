@@ -9,9 +9,11 @@ export type DashboardConnection = { source: 'none' | 'cache' | 'network'; receiv
 export const initialDashboardConnection: DashboardConnection = { source: 'none', receivedAt: 0, failure: '' };
 export type ConnectionStatus = 'CONNECTING' | 'OFFLINE' | 'CACHED' | 'STALE' | 'ONLINE';
 const DEFAULT_PAPER_API = 'https://neo-meme-api.169-58-211-177.sslip.io';
+// Vite forwards this same-origin path to the existing authenticated gateway.
+const DEFAULT_LOCAL_PAPER_API = '/api';
 
 export function paperApiConfiguration(configuredUrl?: string, development = false): { url: string; error: string } {
-  if (!configuredUrl?.trim()) return { url: DEFAULT_PAPER_API, error: '' };
+  if (!configuredUrl?.trim()) return { url: development ? DEFAULT_LOCAL_PAPER_API : DEFAULT_PAPER_API, error: '' };
   try {
     const url = new URL(configuredUrl.trim());
     const localDevelopment = development && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
@@ -78,7 +80,7 @@ export function backendErrorMessage(error: unknown): string {
   if (message === 'Session expired') return 'Сесията е изтекла. Влез отново в акаунта.';
   if (error instanceof Error && error.name === 'AbortError') return 'Backend не отговори навреме. Връзката се проверява отново.';
   if (/failed to fetch|networkerror|load failed|backend unavailable/i.test(message)) {
-    return 'Няма връзка с backend. Провери мрежата и разрешението на сървъра за този Pages адрес.';
+    return 'Няма връзка с backend. Връзката се проверява отново. Провери адреса и дали услугата работи.';
   }
   return message;
 }

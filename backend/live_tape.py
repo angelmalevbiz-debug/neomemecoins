@@ -14,11 +14,13 @@ import math
 import os
 import re
 import sqlite3
+import sys
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
+import winner_ensemble
 
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
 RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
@@ -114,7 +116,15 @@ def feed_snapshot():
     coins = list(state.get('feed',[]) or [])
     def priority(coin):
         tx = (coin.get('txns') or {}).get('m5') or {}
-        return (float(tx.get('buys') or 0)+float(tx.get('sells') or 0),float(coin.get('score') or 0))
+        activity = float(tx.get('buys') or 0)+float(tx.get('sells') or 0)
+        # Spend the same bounded RPC body budget on actionable pools first.
+        # Extremely active pools often cannot finish pagination within a poll;
+        # a moderate 5m tape can still prove three recent swaps with less lag.
+        candidates = winner_ensemble.market_candidates(coin)
+        flow_capacity = -abs(activity-60) if activity >= 12 else -1000-activity
+        expected_flow = activity >= 30
+        return (bool(candidates),expected_flow,flow_capacity,len(candidates),
+                float(coin.get('score') or 0),activity)
     coins.sort(key=priority,reverse=True)
     pinned = [dict(p.get('coin_snapshot') or {},address=p.get('address'),pairAddress=p.get('pairAddress'))
               for p in state.get('positions',[])]
@@ -622,16 +632,29 @@ def main():
             failures=0
         except Exception as exc:
             failures+=1
+            print(f'Live tape poll failed: {type(exc).__name__}', file=sys.stderr, flush=True)
             old = {}
             try:
-                old = json.loads(OUT.read_text(encoding='utf-8'))
+                saved = json.loads(OUT.read_text(encoding='utf-8'))
+                if isinstance(saved, dict):
+                    old = saved
             except (OSError,ValueError):
                 pass
             old={**STATUS,**old}
             old.update(status='degraded',error=type(exc).__name__,updated_at=now_ms())
-            for record in old.get('pair_coverage',{}).values():
-                record.update(status='DEGRADED',reason='RECORDER_UNAVAILABLE')
-            atomic_write(old)
+            coverage = old.get('pair_coverage', {})
+            if isinstance(coverage, dict):
+                for record in coverage.values():
+                    if isinstance(record, dict):
+                        record.update(status='DEGRADED',reason='RECORDER_UNAVAILABLE')
+            try:
+                atomic_write(old)
+            except (OSError, ValueError, TypeError) as projection_error:
+                # A locked/full disk can reject both the normal projection and
+                # its degraded replacement. Keep the durable recorder alive;
+                # consumers already reject stale confirmed-flow evidence.
+                print(f'Live tape failure projection unavailable: {type(projection_error).__name__}',
+                      file=sys.stderr, flush=True)
         delay=min(60,2**min(failures,6)) if failures else POLL_SECONDS
         time.sleep(max(.25,delay-(time.monotonic()-started)))
 

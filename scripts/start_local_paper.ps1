@@ -18,6 +18,9 @@ $python = Join-Path $repository '.venv/Scripts/python.exe'
 function Get-OwnedProcess($record) {
     $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($record.pid)" -ErrorAction SilentlyContinue
     if ($null -ne $process -and $process.CommandLine -like "*$runner*") {
+        if ($process.CommandLine -notmatch "(?:^|\s)--service\s+$([regex]::Escape($record.service))(?:\s|$)") { return $null }
+        if ($record.PSObject.Properties['run_token'] -and
+            $process.CommandLine -notmatch "(?:^|\s)--run-token\s+$([regex]::Escape($record.run_token))(?:\s|$)") { return $null }
         # ConvertFrom-Json may parse an ISO timestamp with a trailing Z into a
         # DateTime object, whose string form is local time. Compare instants,
         # with a small tolerance for CIM timestamp precision, rather than text.
@@ -26,6 +29,35 @@ function Get-OwnedProcess($record) {
         if ([Math]::Abs(($actualCreated - $expectedCreated).TotalSeconds) -lt 2) { return $process }
     }
     return $null
+}
+
+function Wait-WorkerRecord([string]$Service, [string]$Token, [string]$ReadyFile,
+                           [string]$Stdout, [string]$Stderr) {
+    # Windows venv python.exe can launch another Python process. The launcher
+    # PID is not the service PID; only the runner can identify its actual worker.
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        if (Test-Path -LiteralPath $ReadyFile) {
+            $ready = Get-Content -LiteralPath $ReadyFile -Raw | ConvertFrom-Json
+            if ($ready.service -ne $Service -or $ready.run_token -ne $Token -or
+                ($ready.pid -isnot [long] -and $ready.pid -isnot [int])) {
+                throw "Invalid startup identity for $Service; review $Stderr."
+            }
+            $worker = Get-CimInstance Win32_Process -Filter "ProcessId=$($ready.pid)" -ErrorAction SilentlyContinue
+            if ($null -eq $worker) { throw "The $Service worker exited during startup; review $Stderr." }
+            $record = [pscustomobject]@{
+                service=$Service; pid=$ready.pid; run_token=$Token;
+                created_at=$worker.CreationDate.ToUniversalTime().ToString('o');
+                stdout=$Stdout; stderr=$Stderr
+            }
+            if ($null -eq (Get-OwnedProcess $record)) { throw "The $Service startup PID is not the owned runner." }
+            $port = if ($Service -eq 'main') { $MainPort } elseif ($Service -eq 'gateway') { $GatewayPort } else { $null }
+            if ($null -eq $port -or (Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue |
+                Where-Object OwningProcess -eq $record.pid)) { return $record }
+        }
+        Start-Sleep -Milliseconds 200
+    }
+    throw "The $Service worker did not become ready within 30 seconds; review $Stderr."
 }
 
 if ($Action -eq 'Status') {
@@ -106,11 +138,10 @@ $settings = @{
     NEO_MARKET_UPSTREAM="http://127.0.0.1:$MainPort"; NEO_LOCAL_API="http://127.0.0.1:$MainPort/state";
     NEO_MARKET_STATE_PATH=(Join-Path $runtime 'state.json'); NEO_MARKET_AUDIT_PATH=(Join-Path $runtime 'audit.jsonl');
     NEO_LIVE_TAPE_PATH=(Join-Path $runtime 'live_tape.json'); NEO_TAPE_DB_PATH=(Join-Path $runtime 'live_tape.sqlite3');
-    # Two pools receive 12 signatures each per discovery round. Spreading the
-    # old 12-body budget over 12 busy pools forced one-item pages that could not
-    # catch their live flow. Keep body requests bounded and concurrency at four;
-    # other pools have explicitly unavailable flow until actually monitored.
-    NEO_TAPE_MAX_PAIRS='2'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
+    # Spread the existing 48-transaction body budget over four market candidates.
+    # Candidate-first ranking avoids spending coverage on busy pools the entry policy would reject.
+    # Pools outside this bounded set have unavailable flow until monitored.
+    NEO_TAPE_MAX_PAIRS='4'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
     NEO_TAPE_TX_PER_POLL='48'; NEO_TAPE_HISTORICAL_TX_PER_POLL='1'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
     NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');
@@ -132,13 +163,21 @@ try {
     foreach ($service in $servicesToStart) {
         $stdout = Join-Path $services "$service-$stamp.stdout.log"
         $stderr = Join-Path $services "$service-$stamp.stderr.log"
-        $process = Start-Process -FilePath $python -ArgumentList @('"'+$runner+'"', '--service', $service) -WorkingDirectory $repository -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
-        $metadata = Get-CimInstance Win32_Process -Filter "ProcessId=$($process.Id)"
-        $records += [pscustomobject]@{service=$service;pid=$process.Id;created_at=$metadata.CreationDate.ToUniversalTime().ToString('o');stdout=$stdout;stderr=$stderr}
+        $token = [Guid]::NewGuid().ToString('N')
+        $readyFile = Join-Path $services "startup-$service-$token.json"
+        Start-Process -FilePath $python -ArgumentList @('"'+$runner+'"', '--service', $service,
+            '--run-token', $token, '--ready-file', '"'+$readyFile+'"') -WorkingDirectory $repository -WindowStyle Hidden -RedirectStandardOutput $stdout -RedirectStandardError $stderr | Out-Null
+        $records += Wait-WorkerRecord $service $token $readyFile $stdout $stderr
         @{mode='PAPER';runtime_root=$runtime;main_port=$MainPort;gateway_port=$GatewayPort;processes=$records} | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+        Remove-Item -LiteralPath $readyFile
+    }
+    if (@($records | Where-Object { $null -eq (Get-OwnedProcess $_) }).Count -gt 0) {
+        throw 'A PAPER worker exited before startup completed; review its stderr log.'
     }
 } catch {
-    if ($Action -eq 'Start') { [IO.File]::WriteAllText($stopMarker, [DateTime]::UtcNow.ToString('o')) }
+    # A startup timeout must also stop a late runner whose import has not yet
+    # completed, rather than letting an unrecorded worker start afterward.
+    [IO.File]::WriteAllText($stopMarker, [DateTime]::UtcNow.ToString('o'))
     throw
 } finally {
     foreach ($name in $original.Keys) { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }

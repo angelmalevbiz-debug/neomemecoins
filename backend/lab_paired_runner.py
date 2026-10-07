@@ -18,6 +18,7 @@ import lab_activity as activity
 import lab_paired_costs as costs
 import lab_paired_policy as policy
 import pair_price_integrity as integrity
+from shared_snapshot_io import read_shared_text
 
 ROOT=Path(os.getenv('NEO_PAIRED_DIR','/var/lib/neo-lab-paired'))
 API=os.getenv('NEO_PAIRED_FEED_URL','http://127.0.0.1:8788/state')
@@ -264,7 +265,7 @@ def main():
         feed=[];last_feed=0
         while not STOP.is_set():
             started=time.monotonic();errors=[];now=now_ms()
-            try:tape=json.loads(Path('/var/lib/neo-market/live_tape.json').read_text(encoding='utf-8'))
+            try:tape=json.loads(read_shared_text(Path('/var/lib/neo-market/live_tape.json'),encoding='utf-8'))
             except (OSError,ValueError):tape={};errors.append('tape_unavailable')
             try:runner.update_positions(held_prices(session,runner),tape,now_ms())
             except (requests.RequestException,ValueError,KeyError,TypeError) as exc:

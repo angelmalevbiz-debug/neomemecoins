@@ -21,9 +21,11 @@ import entry_size_backoff
 import market_discovery
 import honest_quote_transport as quote_transport
 import paper_market_feasibility as market_feasibility
+import entry_quote_priority
 from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
 from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
+from shared_snapshot_io import read_shared_text
 
 HOST = os.getenv('NEO_MONITOR_HOST', '127.0.0.1')
 PORT = int(os.getenv('NEO_MONITOR_PORT', '8788'))
@@ -249,7 +251,7 @@ def read_strategy_lab() -> dict[str, Any]:
 
 def read_live_tape() -> dict[str, Any]:
     try:
-        data = json.loads(LIVE_TAPE_PATH.read_text(encoding='utf-8'))
+        data = json.loads(read_shared_text(LIVE_TAPE_PATH, encoding='utf-8'))
         return data if isinstance(data, dict) else {'status': 'offline', 'events': []}
     except Exception:
         return {'status': 'offline', 'events': []}
@@ -272,6 +274,16 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
 
 def api(path: str) -> Any:
     response = SESSION.get(f'{DEX_API}{path}', timeout=15)
+    response.raise_for_status()
+    return response.json()
+
+
+def catalog_provider_api(url: str) -> Any:
+    # Only a fixed address-catalog endpoint calls this helper. Its prices and
+    # observations never become market/flow evidence for account admission.
+    if url != market_discovery.PAPRIKA_URL:
+        raise ValueError('unsupported address catalog provider')
+    response = SESSION.get(url, timeout=(1.0, 5.0))
     response.raise_for_status()
     return response.json()
 
@@ -941,7 +953,7 @@ STATE = State(load_state=False)
 def discover() -> tuple[list[str], dict[str, dict[str, Any]]]:
     metadata: dict[str, dict[str, Any]] = {}
     order: list[str] = []
-    for address in _PUMP_CATALOG.get(api):
+    for address in _PUMP_CATALOG.get(api, provider_fetch=catalog_provider_api):
         metadata[address] = {'sources': ['pumpswap-address-catalog'], 'icon': '',
                              'header': '', 'description': '', 'links': [], 'boost_amount': 0}
         order.append(address)
@@ -1007,6 +1019,16 @@ def fetch_pairs(addresses: list[str]) -> list[dict[str, Any]]:
 
 
 def best_pairs(pairs: list[dict[str, Any]], *, prefer_pumpswap_mints=()) -> dict[str, dict[str, Any]]:
+    def priority(pair, address):
+        catalog_pump = address in prefer_pumpswap_mints and pair.get('dexId') == 'pumpswap'
+        # WSOL supports the shared Lab cost model and validated native reserve
+        # observations. USDC pools still have the aggregate route fallback;
+        # this discovery preference never changes an existing held pool.
+        quote = pair.get('quoteToken')
+        sol_model = bool(catalog_pump and isinstance(quote, dict)
+                         and quote.get('address') == SOL_MINT)
+        return catalog_pump, sol_model, num((pair.get('liquidity') or {}).get('usd'))
+
     best: dict[str, dict[str, Any]] = {}
     for pair in pairs:
         if pair.get('chainId') != 'solana':
@@ -1014,12 +1036,8 @@ def best_pairs(pairs: list[dict[str, Any]], *, prefer_pumpswap_mints=()) -> dict
         address = (pair.get('baseToken') or {}).get('address')
         if not address:
             continue
-        liquidity = num((pair.get('liquidity') or {}).get('usd'))
         old = best.get(address)
-        old_liquidity = num((old.get('liquidity') or {}).get('usd')) if old else -1
-        preferred = address in prefer_pumpswap_mints and pair.get('dexId') == 'pumpswap'
-        old_preferred = bool(old and address in prefer_pumpswap_mints and old.get('dexId') == 'pumpswap')
-        if old is None or (preferred, liquidity) > (old_preferred, old_liquidity):
+        if old is None or priority(pair, address) > priority(old, address):
             best[address] = pair
     return best
 
@@ -1563,7 +1581,9 @@ class Monitor:
                   'quoted': 0, 'quote_attempts': 0, 'size_retries': 0, 'opened': 0,
                   'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS,
                   'max_quote_attempts_per_scan': entry_policy.MAX_QUOTED_CANDIDATES}
-        estimates = [market_feasibility.execution_feasibility(coin, STRICT_MAX_ROUNDTRIP_COST_PCT)
+        estimates = [market_feasibility.execution_feasibility(
+                         coin, STRICT_MAX_ROUNDTRIP_COST_PCT,
+                         base_slippage_bps=0, latency_buffer_bps=0)
                      for coin in feed
                      if not entry_policy.signal_data_rejections(coin, now=report['checked_at'])
                      and winner_ensemble.market_candidates(coin)]
@@ -1764,7 +1784,12 @@ class Monitor:
         now = now_ms()
         # Keep per-token cooldown so high frequency does not become revenge re-entry.
         recent = {t.get('address') for t in STATE.history if now-int(t.get('closed_at',0))<20*60*1000}
-        for coin in feed:
+        prioritized_feed = entry_quote_priority.prioritize_entry_candidates(
+            feed, STRICT_MAX_ROUNDTRIP_COST_PCT,
+            is_candidate=lambda coin: bool(winner_ensemble.market_candidates(coin))
+                and not entry_policy.signal_data_rejections(coin, now=now),
+        )
+        for coin in prioritized_feed:
             if len(STATE.positions) >= MAX_POSITIONS:
                 break
             address = coin.get('address')
@@ -2231,7 +2256,13 @@ class Monitor:
                 if coin['priceUsd'] > 0:
                     feed.append(coin)
             feed.sort(key=lambda c: (num(c.get('score')), num((c.get('volume') or {}).get('h1'))), reverse=True)
-            feed = feed[:MAX_FEED]
+            # Retain plausible market candidates before the bounded feed is
+            # trimmed. Display order stays score-ranked; all entry gates still
+            # run later and held pools are independently refreshed below.
+            feed = entry_quote_priority.bounded_feed(
+                feed, MAX_FEED, STRICT_MAX_ROUNDTRIP_COST_PCT,
+                is_candidate=lambda coin: bool(winner_ensemble.market_candidates(coin)),
+            )
             by_address = {c['address']: c for c in feed}
             for position in STATE.positions:
                 address = position.get('address')

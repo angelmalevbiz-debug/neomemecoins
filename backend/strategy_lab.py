@@ -17,6 +17,7 @@ import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
 import lab_strategy_lifecycle as lifecycle
 import paper_market_feasibility as market_feasibility
+from shared_snapshot_io import read_shared_text
 
 API_URL=os.getenv('NEO_LOCAL_API','http://127.0.0.1:8788/state')
 DEX='https://api.dexscreener.com'
@@ -172,7 +173,7 @@ def exit_execution(c,qty):
             'gross_proceeds_usd':gross,'dex_fee_usd':dex_fee,'net_proceeds_usd':net}
 
 def load_json(path,default):
-    try: return json.loads(path.read_text(encoding='utf-8'))
+    try: return json.loads(read_shared_text(path,encoding='utf-8'))
     except Exception: return default
 
 def atomic_write_path(path,data):

@@ -105,6 +105,10 @@ Momentum Rush Brain is an isolated PAPER TEST experiment. Its integration repair
 observed throughput/net-result reporting and deployment boundaries are documented
 in [Momentum Rush repair](docs/MOMENTUM_RUSH_REPAIR.md).
 
+The October 4, 2026 `ORDER_FLOW_ADAPTIVE` decision policy is available again as an
+opt-in, per-account PAPER strategy profile (`NEO_SIGNAL_STRATEGY`); the default engine
+strategy is unchanged. See [ORDER_FLOW_ADAPTIVE restore](docs/ORDER_FLOW_ADAPTIVE_OCT4_RESTORE.md).
+
 ```bash
 npm install
 npm run dev

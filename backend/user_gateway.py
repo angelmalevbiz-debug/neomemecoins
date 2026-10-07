@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 
 import requests
 from engine_runtime import atomic_json
+import order_flow_adaptive_oct4 as oct4
+import winner_ensemble
 
 HOST = os.getenv("NEO_USER_GATEWAY_HOST", "127.0.0.1")
 PORT = int(os.getenv("NEO_USER_GATEWAY_PORT", "8789"))
@@ -28,6 +30,11 @@ MAX_USER_PORT = int(os.getenv("NEO_USER_ENGINE_PORT_END", "19800"))
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://qziuovwcauaklgqscqys.supabase.co").rstrip("/")
 SUPABASE_PUBLISHABLE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY", "")
 STARTING_BALANCE = 1000.0
+# Strategy selection is explicit per account. The registry field names a
+# supported engine strategy; absent means the default ensemble.
+ACCOUNT_STRATEGY_FIELD = "signal_strategy"
+DEFAULT_SIGNAL_STRATEGY = winner_ensemble.VERSION
+SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID)
 
 LOCK = threading.RLock()
 ENGINE_PROCESSES = {}
@@ -110,6 +117,33 @@ def central_state():
     response = SESSION.get(f"{CENTRAL_UPSTREAM}/state", timeout=12)
     response.raise_for_status()
     return response.json()
+
+
+def account_signal_strategy(account):
+    """Validated per-account strategy; unknown values fail closed (no engine starts)."""
+    requested = str((account or {}).get(ACCOUNT_STRATEGY_FIELD) or "").strip()
+    if not requested:
+        return None
+    if requested not in SUPPORTED_SIGNAL_STRATEGIES:
+        raise RuntimeError(
+            f"Account requests unsupported {ACCOUNT_STRATEGY_FIELD} {requested!r}; engine not started."
+        )
+    return requested
+
+
+def refresh_account_strategies():
+    """Adopt operator edits of signal_strategy from the registry on disk.
+
+    Only that field is merged; balances, history, positions and ports keep the
+    gateway's durable in-memory record, so a later save cannot discard the edit.
+    """
+    disk = load_store().get("accounts") or {}
+    for user_id, record in (STORE.get("accounts") or {}).items():
+        requested = (disk.get(user_id) or {}).get(ACCOUNT_STRATEGY_FIELD)
+        if requested:
+            record[ACCOUNT_STRATEGY_FIELD] = requested
+        else:
+            record.pop(ACCOUNT_STRATEGY_FIELD, None)
 
 
 def engine_dir(user_id):
@@ -251,6 +285,7 @@ def start_engine(user, account):
         account["updated_at"] = now_ms()
         save_store()
 
+    requested_strategy = account_signal_strategy(account)
     bootstrap_if_needed(user, account)
 
     env = os.environ.copy()
@@ -266,6 +301,10 @@ def start_engine(user, account):
         "NEO_ENGINE_MODE": "PAPER",
         "NEO_TRAINING_ROOT": str(engine_dir(user_id) / 'training'),
     })
+    # A gateway-wide strategy variable never leaks into personal engines.
+    env.pop("NEO_SIGNAL_STRATEGY", None)
+    if requested_strategy:
+        env["NEO_SIGNAL_STRATEGY"] = requested_strategy
 
     engine_dir(user_id).mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen(
@@ -289,12 +328,16 @@ def start_engine(user, account):
 
 def ensure_engine(user):
     with LOCK:
+        refresh_account_strategies()
         account = ensure_account_record(user)
         return start_engine(user, account)
 
 
 def proxy_user_engine(user, method, path):
     port = ensure_engine(user)
+    with LOCK:
+        record = (STORE.get("accounts") or {}).get(str(user["id"])) or {}
+        requested_strategy = record.get(ACCOUNT_STRATEGY_FIELD) or DEFAULT_SIGNAL_STRATEGY
     url = f"http://127.0.0.1:{port}{path}"
     if method == "POST":
         response = SESSION.post(url, timeout=15)
@@ -308,6 +351,9 @@ def proxy_user_engine(user, method, path):
             "isolated": True,
             "independent_engine": True,
             "strategy": (data.get('config') or {}).get('signal_strategy', 'UNKNOWN'),
+            "requested_strategy": requested_strategy,
+            # False means the engine must be restarted to apply the registry choice.
+            "strategy_matches_request": (data.get('config') or {}).get('signal_strategy') == requested_strategy,
         }
     return data
 

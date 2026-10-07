@@ -4,6 +4,7 @@ This decides what to observe, never whether to trade. Actual flow completeness,
 safety checks and executable quotes retain their existing admission authority.
 """
 import lab_activity
+import funded_market_candidates
 import paper_market_feasibility as feasibility
 import winner_ensemble
 
@@ -74,7 +75,8 @@ class TapePoolScheduler:
             features = lab_activity.market_features(coin)
             main_rules = winner_ensemble.market_candidates(coin)
             funded_rules = [name for name in FUNDED_RULES
-                            if lab_activity.RULES[name].matches(features, require_flow=False)]
+                            if funded_market_candidates.matched_branches(
+                                name,coin,features,require_flow=False)]
             # Main has no modeled slippage/latency floor: its eventual fresh
             # route quotes supply those costs. Even the fee floor remains a
             # planning estimate because canonical/noncanonical fees can differ.
@@ -144,7 +146,8 @@ class TapePoolScheduler:
             keep = sorted(self.last_selected, key=self.last_selected.get, reverse=True)[:2048]
             self.last_selected = {identity: self.last_selected[identity] for identity in keep}
 
-        diagnostics = {'policy_version': 'STABLE_COST_AWARE_TAPE_DISCOVERY_V1',
+        diagnostics = {'policy_version': 'STABLE_COST_AWARE_TAPE_DISCOVERY_V2',
+                       'funded_candidate_policy_version':funded_market_candidates.VERSION,
                        'checked_at': now, 'model_is_execution_quote': False,
                        'cost_estimates_are_planning_hints': True,
                        'profitability_proven': False, 'lease_ms': self.lease_ms,

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import json, math, os, sys, threading, time
 from pathlib import Path
-from dataclasses import asdict
 from typing import Any, Callable
 import requests
 from astra_lab_bridge import merge_astra_snapshot
@@ -9,6 +8,7 @@ from lab_paired_bridge import merge_paired_snapshot
 from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
 import promoted_entry_guard as promoted_guard
+import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
 from lab_position_marks import POSITION_MARK_FEED
@@ -432,11 +432,7 @@ STRATEGIES=[
 ]
 def promoted_candidate_config():
     """Expose precisely the rules used at funded admission, never legacy lambdas."""
-    return {
-        strategy_id:{field:(None if isinstance(value,float) and not math.isfinite(value) else value)
-                     for field,value in asdict(activity.RULES[strategy_id]).items()}
-        for strategy_id in PROMOTED_STRATEGIES
-    }
+    return funded_candidates.candidate_config()
 
 
 def empty_book(s):
@@ -747,12 +743,13 @@ def maybe_open(feed,flows):
         promoted_cost_rejected=0
         promoted_block_reasons={}
         promoted_cost_examples=[]
+        promoted_candidate_branches={}
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
             is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
-            # One declared market screen serves funded and research books.
-            # Funded entries still require all exact-pool evidence gates below.
-            matched=rule.matches(features)
+            branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
+                      if is_promoted else [])
+            matched=bool(branches) if is_promoted else rule.matches(features)
             if not matched:
                 if not is_promoted and rule.matches(features,require_flow=False):
                     flow_rejected+=1
@@ -761,6 +758,9 @@ def maybe_open(feed,flows):
                 continue
             signal_candidates+=1
             if is_promoted:
+                features={**features,'funded_candidate_branches':branches}
+                for branch in branches:
+                    promoted_candidate_branches[branch]=promoted_candidate_branches.get(branch,0)+1
                 # This is a transparent planning estimate only. It never grants
                 # admission, replaces a price check, or assumes a future gain.
                 feasibility=market_feasibility.execution_feasibility(
@@ -776,14 +776,14 @@ def maybe_open(feed,flows):
                 continue
             risk=None
             if is_promoted:
-                flow_gate=promoted_guard.flow_admission(coin,features,now)
+                flow_gate=promoted_guard.flow_admission(coin,features,now_ms())
                 if not flow_gate['allow']:
                     promoted_flow_rejected+=1
                     reason=flow_gate['reason']
                     promoted_block_reasons[reason]=promoted_block_reasons.get(reason,0)+1
                     continue
                 risk=rug_guard.check(coin)
-                safety_gate=promoted_guard.risk_admission(coin,risk,now,rug_guard.TTL_MS)
+                safety_gate=promoted_guard.risk_admission(coin,risk,now_ms(),rug_guard.TTL_MS)
                 if not safety_gate['allow']:
                     promoted_safety_rejected+=1
                     reason=safety_gate['reason']
@@ -872,7 +872,9 @@ def maybe_open(feed,flows):
             book['entry_diagnostics'].update({
                 'promoted_policy_version':promoted_guard.FUNDED_POLICY_VERSION,
                 'promoted_evidence_guard_version':promoted_guard.VERSION,
-                'promoted_candidate_policy_source':'LAB_ACTIVITY_RULES',
+                'promoted_candidate_policy_source':'FUNDED_MARKET_BRANCHES',
+                'promoted_candidate_policy_version':funded_candidates.VERSION,
+                'promoted_candidate_branch_counts':promoted_candidate_branches,
                 'promoted_flow_rejected':promoted_flow_rejected,
                 'promoted_safety_rejected':promoted_safety_rejected,
                 'promoted_price_rejected':promoted_price_rejected,
@@ -936,6 +938,18 @@ def maybe_open(feed,flows):
             continue
         rank=(lambda item:(num((item[6] or {}).get('final_score')),item[0],item[1])) if strategy['id']==rush_brain.STRATEGY_ID else (lambda item:(item[0],item[1]))
         _,_,coin,features,proposed,validation,brain,risk,candidate_limit=max(eligible,key=rank)
+        if book.get('portfolio_group')=='PROMOTED_PAPER':
+            # Provider work may outlast the short evidence window. Its clock
+            # cannot make a new safety receipt future-dated or revive old flow.
+            commit_now=now_ms()
+            final_gates=(promoted_guard.flow_admission(coin,features,commit_now),
+                         promoted_guard.risk_admission(coin,risk,commit_now,rug_guard.TTL_MS),
+                         promoted_guard.cost_admission(proposed['initial_pnl_pct'],STOP_LOSS))
+            refusal=next((gate['reason'] for gate in final_gates if not gate['allow']),None)
+            if refusal:
+                book['entry_diagnostics']['blocked_reason']=refusal
+                book['entry_diagnostics']['commit_recheck_rejected']=1
+                continue
         if brain:
             book['entry_diagnostics']['risk_limited_notional_usd']=round(candidate_limit,4)
         address=coin['address']; price=num(coin['priceUsd'])
@@ -990,6 +1004,7 @@ def maybe_open(feed,flows):
             position['risk_guard']=risk
             position['entry_evidence_guard_version']=promoted_guard.VERSION
             position['entry_candidate_rule']=promoted_candidate_config()[strategy['id']]
+            position['entry_matched_candidate_branches']=features['funded_candidate_branches']
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
 

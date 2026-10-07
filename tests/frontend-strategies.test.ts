@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isArchivedStrategy, labEntryStatus, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import LabEntryStatus from '../src/components/LabEntryStatus';
+import { isArchivedStrategy, labEntryStatus, labEntryView, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -47,10 +50,93 @@ test('cost limits and quote queue failures explain idleness without presenting m
   assert.equal(planningCostStatus({ checked_market_candidates: 1, minimum_model_roundtrip_cost_pct: NaN, maximum_roundtrip_cost_pct: 1.5 }), null);
   const text = planningCostStatus({ checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2,
     minimum_model_roundtrip_cost_pct: 2.49, maximum_roundtrip_cost_pct: 1.5 });
-  assert.match(text!, /Всички кандидати надхвърлят лимита в модела/);
+  assert.match(text!, /Всички проверени кандидати надхвърлят лимита в модела/);
   assert.match(text!, /2.49% · лимит 1.50%/);
   assert.match(text!, /нужна е изпълнима котировка/);
   assert.match(quoteFailureStatus('ENTRY_SEQUENCE_BUSY'), /изчаква ред/);
   assert.match(quoteFailureStatus('PREFLIGHT_PREVIEW_STALE'), /остаряла/);
   assert.match(quoteFailureStatus('UNRECOGNIZED_FAILURE'), /UNRECOGNIZED_FAILURE/);
+});
+
+const costlyBook = () => ({ ...book('PRECISION', 250, 250, 'PROMOTED_PAPER'),
+  entry_diagnostics: { signal_candidates: 4, affordable_candidates: 0,
+    blocked_reason: 'promoted_verified_flow_unavailable',
+    promoted_cost_feasibility: { checked_market_candidates: 4, fixed_cost_infeasible_candidates: 4,
+      minimum_model_roundtrip_cost_pct: 2.775278, maximum_roundtrip_cost_pct: 1.5,
+      best_candidates: [{ symbol: 'EXAMPLE', model_cost_feasible: false }] } },
+});
+
+test('all matched expensive funded candidates explain waiting before generic missing-flow status', () => {
+  const view = labEntryView(costlyBook());
+  assert.match(view.status, /Няма вход в модела/);
+  assert.match(view.status, /2.78% > лимит 1.50%/);
+  assert.equal(view.costLimited, true);
+  assert.match(view.detail!, /всички текущи сигнали/);
+  assert.match(view.detail!, /не е изпълнена котировка/);
+  assert.doesNotMatch(view.status, /Чака пресен потвърден поток|80%|печал/);
+});
+
+test('partial estimates, unknown costs, and contradictory aggregates never claim all opportunities are too costly', () => {
+  const selected = costlyBook();
+  const cost = selected.entry_diagnostics.promoted_cost_feasibility;
+  const costs = [
+    { ...cost, checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2 },
+    { ...cost, fixed_cost_infeasible_candidates: 3 },
+    { ...cost, unknown_candidates: 1 },
+    { ...cost, checked_market_candidates: 0, fixed_cost_infeasible_candidates: 0 },
+    { ...cost, minimum_model_roundtrip_cost_pct: null },
+    { ...cost, minimum_model_roundtrip_cost_pct: NaN },
+    { ...cost, maximum_roundtrip_cost_pct: Infinity },
+    { ...cost, minimum_model_roundtrip_cost_pct: 1.2 },
+    { ...cost, best_candidates: [{ symbol: 'UNKNOWN', model_cost_feasible: null }] },
+    { ...cost, best_candidates: [{ symbol: 'CHEAP', model_cost_feasible: true }] },
+  ];
+  for (const promoted_cost_feasibility of costs) {
+    const view = labEntryView({ ...selected, entry_diagnostics: {
+      ...selected.entry_diagnostics, promoted_cost_feasibility,
+    } });
+    assert.equal(view.status, 'Чака пресен потвърден поток');
+    assert.equal(view.costLimited, false);
+  }
+  assert.equal(labEntryView({ ...selected, entry_diagnostics: {
+    ...selected.entry_diagnostics, affordable_candidates: 1,
+  } }).costLimited, false);
+});
+
+test('cost planning cannot conceal explicit safety failures, account pauses, or a missing market signal', () => {
+  const selected = costlyBook();
+  for (const blocked_reason of ['promoted_safety_unavailable', 'insufficient_balance', 'promoted_recent_loss_cooldown']) {
+    assert.equal(labEntryView({ ...selected, entry_diagnostics: {
+      ...selected.entry_diagnostics, blocked_reason,
+    } }).costLimited, false);
+    assert.equal(labEntryStatus({ ...selected, entry_diagnostics: {
+      ...selected.entry_diagnostics, blocked_reason, signal_candidates: 0,
+    } }), labEntryStatus({ ...selected, entry_diagnostics: {
+      ...selected.entry_diagnostics, blocked_reason,
+    } }));
+  }
+  assert.equal(labEntryStatus({ ...selected, entry_diagnostics: {
+    ...selected.entry_diagnostics, signal_candidates: 0,
+  } }), 'Няма пазарен сигнал по правилата');
+  assert.equal(labEntryView({ ...selected, portfolio_group: 'TEST' }).costLimited, false);
+});
+
+test('a disconnected or stale backend is distinguished from a loaded strategy without entry opportunities', () => {
+  const view = labEntryView(costlyBook(), false);
+  assert.equal(view.status, 'Изчаква актуални данни от backend');
+  assert.equal(view.costLimited, false);
+  assert.match(view.detail!, /не потвърждава текущите възможности/);
+  assert.doesNotMatch(view.status, /2.78|Няма вход в модела|Чака пресен/);
+});
+
+test('collapsed strategy row exposes modeled cost limits and their provenance without expanding', () => {
+  const html = renderToStaticMarkup(createElement(LabEntryStatus, { book: costlyBook(), backendAvailable: true }));
+  assert.match(html, /data-testid="lab-entry-status"/);
+  assert.match(html, /Няма вход в модела/);
+  assert.match(html, /2.78%.*лимит 1.50%/);
+  assert.match(html, /Оценката изключва impact, мрежа и rent/);
+  assert.match(html, /не е изпълнена котировка/);
+  const stale = renderToStaticMarkup(createElement(LabEntryStatus, { book: costlyBook(), backendAvailable: false }));
+  assert.match(stale, /Изчаква актуални данни от backend/);
+  assert.doesNotMatch(stale, /2.78%/);
 });

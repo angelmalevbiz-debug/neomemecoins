@@ -229,7 +229,15 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         if metadata['pair'] not in accounts:
             continue
         if program==PUMP_AMM and data[:8] in SWAP_DISCRIMINATORS and len(accounts)>=9:
-            if accounts[0]==metadata['pair'] and accounts[3]==metadata['address']:
+            # Pump's base/quote order is onchain identity, whereas market
+            # providers can display either mint as the tracked token. A pool
+            # with WSOL as base still trades its quote token; its token side is
+            # the inverse of the instruction's base-token BUY/SELL side.
+            tracked_base = accounts[3]==metadata['address']
+            tracked_quote = (accounts[4]==metadata['address']
+                             and accounts[3] in (USDC,WSOL))
+            if (accounts[0]==metadata['pair'] and accounts[3]!=accounts[4]
+                    and (tracked_base or tracked_quote)):
                 swaps.append((index,SWAP_DISCRIMINATORS[data[:8]],accounts))
             else:
                 unknown = True
@@ -273,36 +281,51 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         event_payloads.append((log_index,payload))
     if cpi:
         event_payloads = [(1_000_000+index,payload) for index,payload in cpi]
+    matched_swap_indexes = set()
     for log_index,payload in event_payloads:
         direction = EVENT_DISCRIMINATORS.get(payload[:8])
         if not direction or len(payload)<248:
             continue
         pool,wallet,base_account,quote_account = [_b58encode(payload[a:a+32]) for a in (120,152,184,216)]
-        matches = [x for x in swaps if x[1]==direction and x[2][0]==pool and x[2][1]==wallet
+        matches = [x for x in swaps if x[0] not in matched_swap_indexes
+                   and x[1]==direction and x[2][0]==pool and x[2][1]==wallet
                    and x[2][5]==base_account and x[2][6]==quote_account]
-        if not matches or pool!=metadata['pair']:
+        if pool!=metadata['pair']:
             continue
+        if not matches:
+            return 'unclassified',decoded,'SWAP_EVENT_COVERAGE_INCOMPLETE'
         accounts = matches[0][2]
         base_mint,quote_mint = accounts[3],accounts[4]
         base_info,quote_info = decimals.get(base_account),decimals.get(quote_account)
-        if not base_info or base_info[0]!=base_mint:
-            return 'unclassified',[],'BASE_DECIMALS_OR_MINT_MISSING'
-        if quote_mint not in (USDC,WSOL):
+        reversed_pool = quote_mint==metadata['address']
+        token_mint,token_info = (quote_mint,quote_info) if reversed_pool else (base_mint,base_info)
+        cash_mint,cash_info = (base_mint,base_info) if reversed_pool else (quote_mint,quote_info)
+        if not token_info or token_info[0]!=token_mint:
+            reason = 'TRACKED_QUOTE_DECIMALS_OR_MINT_MISSING' if reversed_pool else 'BASE_DECIMALS_OR_MINT_MISSING'
+            return 'unclassified',[],reason
+        if cash_mint not in (USDC,WSOL):
             return 'unclassified',[],'UNSUPPORTED_QUOTE_ASSET'
-        quote_decimals = 6 if quote_mint==USDC else 9
-        if quote_info and quote_info!=(quote_mint,quote_decimals):
+        quote_decimals = 6 if cash_mint==USDC else 9
+        # The reversed base leg must have exact transaction balance metadata.
+        # Its quantity cannot be valued by treating the tracked quote token as
+        # a stable asset or by falling back to the scanner's token price.
+        if reversed_pool and cash_info!=(cash_mint,quote_decimals):
+            return 'unclassified',[],'BASE_DECIMALS_OR_MINT_MISSING'
+        if cash_info and cash_info!=(cash_mint,quote_decimals):
             return 'unclassified',[],'QUOTE_DECIMALS_OR_MINT_MISMATCH'
         event_time = int.from_bytes(payload[8:16],'little',signed=True)*1000
         if not tx.get('blockTime') or not 0<event_time<=available or abs(event_time-int(tx['blockTime'])*1000)>2000:
             return 'unclassified',[],'FUTURE_OR_INCONSISTENT_EVENT_TIME'
         base_raw,quote_raw = int.from_bytes(payload[16:24],'little'),int.from_bytes(payload[112:120],'little')
-        if base_raw<=0 or quote_raw<=0 or not 0<=base_info[1]<=18:
+        if base_raw<=0 or quote_raw<=0 or not 0<=token_info[1]<=18:
             return 'unclassified',[],'INVALID_EVENT_AMOUNT'
-        quote_amount = quote_raw/10**quote_decimals
+        token_raw,cash_raw = (quote_raw,base_raw) if reversed_pool else (base_raw,quote_raw)
+        token_direction = ('SELL' if direction=='BUY' else 'BUY') if reversed_pool else direction
+        quote_amount = cash_raw/10**quote_decimals
         usd,flags,valuation = None,[],'UNKNOWN'
         if wallet not in signers:
             flags.append('SWAP_ACTOR_NOT_TRANSACTION_SIGNER')
-        if quote_mint==USDC:
+        if cash_mint==USDC:
             usd,valuation = quote_amount,'ACTUAL_USDC_QUOTE_LEG'
         else:
             reference,reference_time = metadata.get('quote_usd_reference'),int(metadata.get('quote_reference_at') or 0)
@@ -313,14 +336,20 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                     flags.append('QUOTE_ASSET_USD_REFERENCE_ESTIMATE')
             else:
                 flags.append('QUOTE_USD_UNKNOWN')
+        # One event proves one instruction. Duplicate events cannot compensate
+        # for a different unmatched BUY/SELL in the same transaction.
+        matched_swap_indexes.add(matches[0][0])
         decoded.append({'ts':event_time,'event_time':event_time,'observed_at':observed,'ingested_at':available,'available_at':available,
-                        'event_index':log_index,'direction':direction,'wallet':wallet,'address':base_mint,'pairAddress':pool,
-                        'symbol':metadata.get('symbol','?'),'token_raw_amount':str(base_raw),'token_decimals':base_info[1],
-                        'token_amount':base_raw/10**base_info[1],'quote_asset':quote_mint,'quote_raw_amount':str(quote_raw),
+                        'event_index':log_index,'direction':token_direction,'wallet':wallet,'address':token_mint,'pairAddress':pool,
+                        'symbol':metadata.get('symbol','?'),'token_raw_amount':str(token_raw),'token_decimals':token_info[1],
+                        'token_amount':token_raw/10**token_info[1],'quote_asset':cash_mint,'quote_raw_amount':str(cash_raw),
                         'quote_decimals':quote_decimals,'quote_amount':quote_amount,'usd_amount':round(usd,8) if usd is not None else None,
                         'usd_valuation_source':valuation,'quality_flags':flags,'program_id':PUMP_AMM,'slot':tx.get('slot'),
-                        'usd_valuation_estimated':quote_mint!=USDC,'quote_reference_at':metadata.get('quote_reference_at') if quote_mint!=USDC else None,
-                        'provider':metadata.get('provider','solana-rpc'),'note':direction,'confirmed_swap':True})
+                        'usd_valuation_estimated':cash_mint!=USDC,'quote_reference_at':metadata.get('quote_reference_at') if cash_mint!=USDC else None,
+                        'pool_orientation':'TRACKED_QUOTE' if reversed_pool else 'TRACKED_BASE',
+                        'onchain_direction':direction,'onchain_base_mint':base_mint,'onchain_quote_mint':quote_mint,
+                        'onchain_base_raw_amount':str(base_raw),'onchain_quote_raw_amount':str(quote_raw),
+                        'provider':metadata.get('provider','solana-rpc'),'note':token_direction,'confirmed_swap':True})
     if len(decoded)!=len(swaps):
         return 'unclassified',decoded,'SWAP_EVENT_COVERAGE_INCOMPLETE'
     flags = {flag for event in decoded for flag in event['quality_flags']}

@@ -52,7 +52,7 @@ test('cost limits and quote queue failures explain idleness without presenting m
     minimum_model_roundtrip_cost_pct: 2.49, maximum_roundtrip_cost_pct: 1.5 });
   assert.match(text!, /Всички проверени кандидати надхвърлят лимита в модела/);
   assert.match(text!, /2.49% · лимит 1.50%/);
-  assert.match(text!, /нужна е изпълнима котировка/);
+  assert.match(text!, /нужна е изпълнима котировка/i);
   assert.match(quoteFailureStatus('ENTRY_SEQUENCE_BUSY'), /изчаква ред/);
   assert.match(quoteFailureStatus('PREFLIGHT_PREVIEW_STALE'), /остаряла/);
   assert.match(quoteFailureStatus('UNRECOGNIZED_FAILURE'), /UNRECOGNIZED_FAILURE/);
@@ -72,7 +72,7 @@ test('all matched expensive funded candidates explain waiting before generic mis
   assert.match(view.status, /2.78% > лимит 1.50%/);
   assert.equal(view.costLimited, true);
   assert.match(view.detail!, /всички текущи сигнали/);
-  assert.match(view.detail!, /не е изпълнена котировка/);
+  assert.match(view.detail!, /не е изпълнима котировка/i);
   assert.doesNotMatch(view.status, /Чака пресен потвърден поток|80%|печал/);
 });
 
@@ -134,8 +134,9 @@ test('collapsed strategy row exposes modeled cost limits and their provenance wi
   assert.match(html, /data-testid="lab-entry-status"/);
   assert.match(html, /Няма вход в модела/);
   assert.match(html, /2.78%.*лимит 1.50%/);
-  assert.match(html, /Оценката изключва impact, мрежа и rent/);
-  assert.match(html, /не е изпълнена котировка/);
+  assert.match(html, /не само комисиона/);
+  assert.match(html, /нетен стоп 3\.00%.*0\.22 п\.п\./);
+  assert.match(html, /impact, мрежа и rent/);
   const stale = renderToStaticMarkup(createElement(LabEntryStatus, { book: costlyBook(), backendAvailable: false }));
   assert.match(stale, /Изчаква актуални данни от backend/);
   assert.doesNotMatch(stale, /2.78%/);

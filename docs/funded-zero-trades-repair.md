@@ -31,7 +31,11 @@ funded universe, and its cost model only prioritizes observation.
 Every funded entry still needs complete fresh 30-second exact-pool flow, at
 least three swaps from two wallets, at least 1.2 times buy/sell USD, completed
 fresh same-pool safety, independent price verification, and full modeled costs
-within 1.5%. Each $250 book still commits at most $62.50 per entry. Flow and
+within 1.5%. The initial entries were capped at $62.50 per $250 book. The
+prospective V4 PAPER sizing policy raises the per-entry cap to $125 (half of
+each independent book); existing positions and accounting remain unchanged.
+This increases simulated dollar gains and losses alike, and actual gaps may
+exceed the modeled net stop. Flow and
 safety are checked against the receipt clock and rechecked before committing,
 so provider delay cannot revive old evidence. New entries record their matched
 branch and the separate V3 funded policy. Completed trades and existing exits

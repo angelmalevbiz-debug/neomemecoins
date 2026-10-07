@@ -64,7 +64,8 @@ class FundedLiquidAdmissionTests(unittest.TestCase):
         self.assertEqual(position['entry_policy_version'], guard.FUNDED_POLICY_VERSION)
         self.assertEqual(position['entry_matched_candidate_branches'],
                          ['ESTABLISHED_LIQUID_MOMENTUM'])
-        self.assertEqual(position['notional_usd'], 62.5)
+        self.assertEqual(position['notional_usd'],
+                         lab.PROMOTED_ALLOCATION * lab.PROMOTED_MAX_POSITION_FRACTION)
         self.assertLess(position['open_pnl_usd'], 0)
         self.assertGreaterEqual(position['entry_roundtrip_pnl_pct'], -1.5)
         for field in ('history', 'balance', 'starting_balance'):

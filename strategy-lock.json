@@ -183,7 +183,7 @@
     "docs/funded-zero-trades-repair.md": "1f257cf13407f02c2b0d391df661c66f7227b1012bfc3ccf6dc13f5539bc7935",
     "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
     "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4",
-    "src/lib/labStrategyView.ts": "2baf8ffb6507072f1a40b1d54419bb9a32c8cc14256207c9d4c73bfdef186b20"
+    "src/lib/labStrategyView.ts": "5047c0a665df22a96d6a2cc888721a6edd2d0921161934797725d6d8ab473ea9"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",

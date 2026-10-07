@@ -71,7 +71,7 @@ export function planningCostStatus(data?: CostFeasibility) {
   const allCheckedTooExpensive = Number.isInteger(data.checked_market_candidates)
     && data.fixed_cost_infeasible_candidates === data.checked_market_candidates
     && !(data.unknown_candidates && data.unknown_candidates > 0) && minimum > maximum;
-  return `${allCheckedTooExpensive ? 'Всички проверени кандидати надхвърлят лимита в модела' : 'Моделен минимум за разходите'}: ${minimum.toFixed(2)}% · лимит ${maximum.toFixed(2)}%. Това включва оценената DEX такса при вход и изход и буфер за slippage/забавяне; не включва impact, мрежа и rent.`;
+  return `${allCheckedTooExpensive ? 'Всички проверени кандидати надхвърлят лимита в модела' : 'Моделен минимум за разходите'}: ${minimum.toFixed(2)}% · лимит ${maximum.toFixed(2)}%. Това включва оценената DEX такса при вход и изход и буфер за slippage/забавяне; не включва impact, мрежа и rent. Нужна е изпълнима котировка.`;
 }
 
 export type LabEntryViewDiagnostics = {
@@ -120,7 +120,7 @@ export function labEntryView(book: EntryViewBook, backendAvailable = true): Entr
     const stopHeadroom = stopBudget - cost.minimum_model_roundtrip_cost_pct!;
     return {
       status: `Няма вход в модела: разходи поне ${cost.minimum_model_roundtrip_cost_pct!.toFixed(2)}% > лимит ${cost.maximum_roundtrip_cost_pct!.toFixed(2)}%`,
-      detail: `Това е прогнозната DEX такса за вход и изход плюс буфери, не само комисиона. При нетен стоп ${stopBudget.toFixed(2)}% този минимум оставя ${stopHeadroom.toFixed(2)} п.п. запас; impact, мрежа и rent са извън оценката.`,
+      detail: `За всички текущи сигнали: това е прогнозната DEX такса за вход и изход плюс буфери, не само комисиона. При нетен стоп ${stopBudget.toFixed(2)}% този минимум оставя ${stopHeadroom.toFixed(2)} п.п. запас; impact, мрежа и rent са извън оценката. Не е изпълнима котировка.`,
       costLimited: true,
     };
   }

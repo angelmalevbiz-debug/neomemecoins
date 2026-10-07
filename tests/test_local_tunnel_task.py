@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which('powershell.exe')
@@ -20,6 +21,14 @@ class LocalTunnelTaskTests(unittest.TestCase):
             (fixture/'.runtime/tunnel').mkdir(parents=True)
             for name in ('run_local_tunnel_task.ps1', 'install_local_tunnel_task.ps1'):
                 shutil.copyfile(ROOT/'scripts'/name, scripts/name)
+            # Production may be running during local checks. Keep real mutex
+            # behavior within the fixture without competing with its service.
+            runner = scripts/'run_local_tunnel_task.ps1'
+            source = runner.read_text(encoding='utf-8')
+            production_mutex = r'Local\NeoLocalGatewayTunnelTask'
+            self.assertEqual(source.count(production_mutex), 1)
+            runner.write_text(source.replace(production_mutex,
+                              production_mutex + '-test-' + uuid.uuid4().hex), encoding='utf-8')
             (scripts/'start_local_tunnel.ps1').write_text(starter, encoding='utf-8')
             controller = fixture/'controller.ps1'
             controller.write_text("param([string]$Fixture)\n$ErrorActionPreference='Stop'\n" + body, encoding='utf-8')

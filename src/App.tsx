@@ -12,7 +12,8 @@ import {
 } from 'recharts';
 import { supabase } from './lib/supabase';
 import { promotedPaperPortfolio } from './lib/paperPortfolioState';
-import { isArchivedStrategy, labEntryStatus, partitionLabStrategies, planningCostStatus, quoteFailureStatus, type StrategyLifecycle, type CostFeasibility } from './lib/labStrategyView';
+import { isArchivedStrategy, partitionLabStrategies, planningCostStatus, quoteFailureStatus, type StrategyLifecycle, type CostFeasibility } from './lib/labStrategyView';
+import LabEntryStatus from './components/LabEntryStatus';
 import {
   backendErrorMessage, dashboardConnectionStatus, initialDashboardConnection,
   moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
@@ -576,7 +577,7 @@ export default function App() {
                   <td className={`px-4 py-3 font-black ${pnl >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>{st?.valuation_stale ? '~' : ''}{moneyOrUnavailable(pnl, true)}<div className="mt-1 text-[9px]">{percentageOrUnavailable(st?.return_pct)}</div></td>
                   <td className="px-4 py-3 text-slate-400">{st?.trades ?? 0}<div className="mt-1 text-[9px] text-slate-700">{st?.wins ?? 0}W / {st?.losses ?? 0}L</div></td>
                   <td className="px-4 py-3 font-black text-white">{st?.trades ? `${st.win_rate.toFixed(1)}%` : '—'}<div className="mt-1 text-[9px] font-normal text-slate-600">PF {st?.profit_factor != null ? st.profit_factor.toFixed(2) : st?.wins && !st.losses ? '∞' : '—'}</div></td>
-                  <td className="px-4 py-3"><div className="flex items-center gap-2">{book.position ? <button onClick={() => setSelectedAddress(book.position!.address)} className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] px-3 py-2 text-left"><div className="font-black text-cyan-200">${book.position.symbol}</div><div className={`mt-1 text-[9px] font-black ${book.position.quote_status === 'fresh' ? ((book.position.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300') : 'text-amber-200'}`}>{book.position.quote_status === 'fresh' ? `${(book.position.pnl_pct || 0) >= 0 ? '+' : ''}${(book.position.pnl_pct || 0).toFixed(2)}%` : 'КОТИРОВКА СТАРА'} · ${book.position.notional_usd.toFixed(0)}</div></button> : <span className="max-w-40 text-[9px] text-slate-400">{labEntryStatus(book)}</span>}{bookDexButton}</div></td>
+                  <td className="px-4 py-3"><div className="flex items-center gap-2">{book.position ? <button onClick={() => setSelectedAddress(book.position!.address)} className="rounded-xl border border-cyan-400/15 bg-cyan-400/[0.05] px-3 py-2 text-left"><div className="font-black text-cyan-200">${book.position.symbol}</div><div className={`mt-1 text-[9px] font-black ${book.position.quote_status === 'fresh' ? ((book.position.pnl_pct || 0) >= 0 ? 'text-emerald-300' : 'text-red-300') : 'text-amber-200'}`}>{book.position.quote_status === 'fresh' ? `${(book.position.pnl_pct || 0) >= 0 ? '+' : ''}${(book.position.pnl_pct || 0).toFixed(2)}%` : 'КОТИРОВКА СТАРА'} · ${book.position.notional_usd.toFixed(0)}</div></button> : <LabEntryStatus book={book} backendAvailable={connected} />}{bookDexButton}</div></td>
                 </tr>
                 {expanded && <tr className="border-b border-cyan-400/10 bg-black/20"><td colSpan={6} className="px-4 py-4">
                   <div className="mb-3 text-[10px] text-slate-400">Нетен PAPER PnL: реализиран {moneyOrUnavailable(realizedPnl, true)} · отворен {moneyOrUnavailable(openPnl, true)}.{book.id === 'MOMENTUM_RUSH_BRAIN' && <span className="ml-2 text-amber-200">Цел 80% успеваемост · експериментът още трябва да я докаже.</span>}</div>

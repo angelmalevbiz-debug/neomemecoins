@@ -2328,7 +2328,14 @@ class Monitor:
                     'entry_scan_count': STATE.scan_count, 'dex_url': coin.get('dexUrl'),
                     'coin_snapshot': coin,
                 }
-                STATE.commit('ENTRY', position, positions=STATE.positions+[position], trade_seq=next_trade_no)
+                # Pin the exact-pool observation that passed the final freshness
+                # check together with the entry. Until scan_once refreshes the
+                # held pool, the position guard otherwise sees only a record left
+                # by an earlier trade in this pool or the older candidate snapshot.
+                with STATE.lock:
+                    STATE.commit('ENTRY', position, positions=STATE.positions+[position], trade_seq=next_trade_no,
+                                 position_market={**STATE.position_market,
+                                                  f"{address}:{coin.get('pairAddress')}": dict(current_coin)})
                 report['opened'] += 1
                 open_addresses.add(address)
                 STATE.event(

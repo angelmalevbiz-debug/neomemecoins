@@ -196,6 +196,68 @@ class MainPaperRepair(unittest.TestCase):
         self.assertFalse(m.STATE.positions)
         self.assertEqual(m.STATE.history[0]['exit_reason'],'STALE_MARKET_EXIT')
 
+    def test_reentry_after_cooldown_is_judged_by_entry_observation_not_previous_trade_record(self):
+        # Archived main ledger 2026-10-06/07: all 14 STALE_MARKET_EXIT closes 2-4 s after entry
+        # were re-entries >=20 min after a closed trade in the same pool, booked at the price
+        # pinned during that earlier hold. The entry commit must pin the observation that
+        # passed the final freshness check so the first guard pass never consults that record.
+        self.entry_patches()
+        m.STATE.history=[dict(self.pos,id='position-0',trade_no=1,exit_reason='STOP_LOSS_NET_TARGET',
+            pnl_usd=-5,opened_at=self.clock[0]-31*60_000,closed_at=self.clock[0]-31*60_000+2_100)]
+        m.STATE.trade_seq=1
+        m.STATE.position_market[f'{A}:{B}']=dict(self.coin,priceUsd=1.5,updatedAt=self.clock[0]-31*60_000)
+        m.STATE.feed=[dict(self.coin)]
+        self.monitor.maybe_open([dict(self.coin)])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertEqual(m.STATE.position_market[f'{A}:{B}']['updatedAt'],self.clock[0])
+        self.assertEqual(m.State().position_market[f'{A}:{B}']['updatedAt'],self.clock[0])
+        self.quote['net_proceeds_usd']=m.STATE.positions[0]['notional_usd']
+        self.clock[0]+=2_100
+        m.STATE.feed=[]
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.fast_position_check()
+        self.assertEqual(mark.call_args.args[1]['updatedAt'],self.clock[0]-2_100)
+        self.assertEqual(mark.call_args.args[1]['priceUsd'],2)
+        self.assertFalse(mark.call_args.kwargs['force'])
+        self.assertEqual(m.STATE.positions[0]['exit_state'],'OPEN')
+        self.assertEqual(len(m.STATE.history),1)
+
+    def test_entry_observation_outlives_scanner_pool_switch_before_first_repin(self):
+        # The candidate row handed to maybe_open (<=12 s old at the flow gate) may be older than
+        # the refreshed feed row that passes the final 8 s check. If the scanner shows another
+        # pool before scan_once re-pins the held pool, the older snapshot alone must not read as
+        # a >60 s stale market while the observation that passed the entry gate is 50 s old.
+        self.entry_patches()
+        m.STATE.feed=[dict(self.coin)]
+        self.monitor.maybe_open([dict(self.coin,updatedAt=self.clock[0]-11_000)])
+        opened=m.STATE.positions[0]
+        self.assertEqual(opened['coin_snapshot']['updatedAt'],self.clock[0]-11_000)
+        self.assertEqual(opened['signal_observed_at'],self.clock[0])
+        self.quote['net_proceeds_usd']=opened['notional_usd']
+        self.clock[0]+=50_000
+        self.quote['quoted_at']=self.clock[0]
+        m.STATE.feed=[dict(self.coin,pairAddress=C,updatedAt=self.clock[0])]
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.fast_position_check()
+        self.assertEqual(mark.call_args.args[1]['updatedAt'],self.clock[0]-50_000)
+        self.assertEqual(mark.call_args.args[1]['pairAddress'],B)
+        self.assertFalse(mark.call_args.kwargs['force'])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertFalse(m.STATE.history)
+
+    def test_entry_pinned_observation_expires_like_any_other_record(self):
+        self.entry_patches()
+        m.STATE.feed=[dict(self.coin)]
+        self.monitor.maybe_open([dict(self.coin)])
+        self.clock[0]+=61_000
+        self.quote['quoted_at']=self.clock[0]
+        m.STATE.feed=[]
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.fast_position_check()
+        self.assertTrue(mark.call_args.kwargs['force'])
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.history[0]['exit_reason'],'STALE_MARKET_EXIT')
+
     def test_gap_200_to_160_is_minus_40_not_minus_10(self):
         q,pnl,pct,capped=m.enforce_paper_stop_cap({'net_proceeds_usd':160,'fill_price':1.6},200,0,100)
         self.assertEqual((pnl,pct,capped),(-40,-20,False))

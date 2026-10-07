@@ -403,6 +403,43 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='old'").fetchone()[0],'pending')
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='current'").fetchone()[0],'non_swap')
 
+    def test_large_historical_queue_cannot_fill_unused_live_request_budget(self):
+        self.rec.tx_budget=48
+        self.rec.historical_tx_budget=1
+        with self.rec.db:
+            for i in range(100):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                    observed,metadata,state) VALUES(?,?,?,?,?,?,'pending')''',
+                    (f'old-{i}',PAIR,i,NOW-600_000,NOW-600_000,json.dumps(META)))
+            for i in range(2):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                    observed,metadata,state) VALUES(?,?,?,?,?,?,'pending')''',
+                    (f'live-{i}',PAIR,100+i,NOW,NOW,json.dumps(META)))
+        requested=[]
+        def rpc(calls):
+            requested.extend(params[0] for _,params in calls)
+            return [{'result':non_swap()} for _ in calls]
+        self.rec.process(rpc)
+        self.assertEqual(set(requested[:2]),{'live-0','live-1'})
+        self.assertEqual(len(requested),3)
+        self.assertEqual(self.rec.db.execute("SELECT count(*) FROM signatures WHERE state='pending'").fetchone()[0],99)
+
+    def test_old_page_discovered_now_cannot_displace_live_onchain_time(self):
+        self.rec.tx_budget=1
+        with self.rec.db:
+            for signature,event_time,observed in (
+                    ('old-page',NOW-tape.WINDOW_MS-1,NOW+500),('live',NOW,NOW)):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                    observed,metadata,state) VALUES(?,?,1,?,?,?,'pending')''',
+                    (signature,PAIR,event_time,observed,json.dumps(META)))
+        requested=[]
+        def rpc(calls):
+            requested.extend(params[0] for _,params in calls)
+            return [{'result':non_swap()} for _ in calls]
+        self.rec.process(rpc)
+        self.assertEqual(requested,['live'])
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='old-page'").fetchone()[0],'pending')
+
     def test_old_unknown_history_does_not_block_complete_current_coverage(self):
         def rpc(calls):
             return [{'result':[]} for _ in calls]

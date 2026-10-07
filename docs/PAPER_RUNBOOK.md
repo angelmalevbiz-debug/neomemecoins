@@ -27,6 +27,21 @@ The maintained Pages frontend can use the local PAPER services without Contabo. 
 
 To repair only missing tape or Lab processes while verified main and gateway processes continue running, use `-Action StartMissing`. Stop all owned services gracefully and flush their state with `-Action Stop`; the command does not force-kill a service that is still stopping.
 
+For local use, start the dashboard from the checkout with `npm ci` dependencies
+installed. Its launcher binds only loopback and explicitly selects the local
+gateway, so it does not fall back to the public VPS:
+
+```powershell
+.\scripts\start_local_dashboard.ps1 -Action Start
+.\scripts\start_local_dashboard.ps1 -Action Status
+.\scripts\start_local_dashboard.ps1 -Action Stop
+```
+
+Open `http://127.0.0.1:5173` and sign in with the existing Supabase account.
+The launcher runs in the background and requires the gateway at port 8879.
+It checks process ownership before stopping its own dashboard and refuses to
+replace an unrelated process on port 5173.
+
 In a separate PowerShell window, expose only the loopback gateway and keep that window open:
 
 ```powershell

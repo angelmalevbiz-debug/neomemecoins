@@ -4,13 +4,19 @@ Latest local repair on 2026-10-07: see [Momentum Rush repair](MOMENTUM_RUSH_REPA
 The active Windows services run from `C:\Users\Chavd\neomemecoins`; the public
 Pages build uses a separate VPS API. The complete tested integration is committed
 locally on `codex/complete-momentum-rush` and the Windows PAPER runtime was updated
-with all existing histories retained. Final GitHub publication is pending:
-the connector began returning HTTP 403 and local Git has no non-interactive
-push credential. [Draft PR #1](https://github.com/angelmalevbiz-debug/neomemecoins/pull/1)
-contains the earlier repair and must be updated with the concurrent-main
-integration before merging. The VPS administrative connector is offline;
-public backend installation has not been verified. Tape decoding recovered,
-but complete flow coverage and profitability remain unproven.
+with all existing histories retained. GitHub publication was repaired by selecting
+the existing `angelmalevbiz-debug` Git credential explicitly. [Draft PR #1](https://github.com/angelmalevbiz-debug/neomemecoins/pull/1)
+now contains the concurrent-main integration (`794ff55`); both GitHub regression
+runs passed. It remains unmerged. The user then selected local work only, so the
+additional compatibility/dashboard changes stay local and the VPS was not updated.
+
+The local dashboard is available at `http://127.0.0.1:5173`, using the local
+gateway at `http://127.0.0.1:8879`. Normal Supabase sign-in is required; private
+authenticated account viewing is not certified by the unauthenticated probes.
+Unknown custom Lab ledgers survive source upgrades with an explicit inactive
+status. Their original position policy must be restored before they can resume.
+Tape decoding recovered, but complete flow coverage and profitability remain
+unproven.
 
 The dated measurements below describe the prior baseline and should not be
 read as the current endpoint or strategy count.

@@ -379,6 +379,32 @@ def empty_book(s):
                                      else activity.RUSH_MAX_BALANCE_FRACTION if s['id']==rush_brain.STRATEGY_ID else 1.0),
             'position':None,'history':[],'trade_seq':0,'last_entry_by_address':{},'created_at':now_ms()}
 
+def registry_compatibility(books):
+    """Retain custom ledgers without inventing their entry or exit policy."""
+    registered={s['id'] for s in STRATEGIES}
+    preserved=[]
+    for key,book in books.items():
+        if not isinstance(book,dict):
+            raise ValueError(f'Cannot preserve unsupported Lab book schema: {key}')
+        if key in registered:
+            marker=book.get('runtime_compatibility')
+            if isinstance(marker,dict) and marker.get('version')=='LAB_REGISTRY_COMPATIBILITY_V1':
+                book.pop('runtime_compatibility',None)
+            continue
+        preserved.append(key)
+        book['runtime_compatibility']={
+            'version':'LAB_REGISTRY_COMPATIBILITY_V1','status':'preserved_inactive',
+            'reason':'strategy_not_registered','entry_enabled':False,
+            'position_management_enabled':False,
+        }
+    return {
+        'version':'LAB_REGISTRY_COMPATIBILITY_V1',
+        'status':'attention_required' if preserved else 'compatible',
+        'preserved_strategy_ids':sorted(preserved),
+        'preserved_open_position_ids':sorted(
+            key for key in preserved if books[key].get('position') or books[key].get('positions')),
+    }
+
 def load_state():
     reset_requested=RESET_FLAG_PATH.exists()
     if reset_requested:
@@ -387,8 +413,10 @@ def load_state():
         except Exception: pass
     else:
         raw=load_json(STATE_PATH,{})
-    books={}
     stored_books=raw.get('books') or {}
+    # A server can contain a locally customized strategy such as Momentum Swarm.
+    # Keep its full ledger in place; removing a registration must not erase it.
+    books=dict(stored_books)
     setup=raw.get('portfolio_setup') or {}
     cohort_active=setup.get('version')=='PROMOTED_PAPER_COHORT_V1' and setup.get('status')=='ACTIVE'
     cohort_draining=setup.get('version')=='PROMOTED_PAPER_COHORT_V1' and setup.get('status')=='DRAINING'
@@ -413,8 +441,10 @@ def load_state():
             b['allocation_usd']=b.get('allocation_usd',b.get('starting_balance',START_BALANCE))
             b['max_position_fraction']=activity.RUSH_MAX_BALANCE_FRACTION if s['id']==rush_brain.STRATEGY_ID else 1.0
         books[s['id']]=b
+    compatibility=registry_compatibility(books)
     return {'started_at':now_ms() if reset_requested else (raw.get('started_at') or now_ms()),
             'updated_at':now_ms(),'status':'starting','books':books,
+            'stats':raw.get('stats') or {},'registry_compatibility':compatibility,
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
             'portfolio_setup':raw.get('portfolio_setup')}
@@ -478,7 +508,9 @@ def update_positions(flows,feed):
             prices[(address,pair)]=coin
     portfolio_setup=STATE.get('portfolio_setup') or {}
     exit_only_books=(portfolio_setup.get('legacy_draining_books') or {}).values()
-    for book in [*STATE['books'].values(), *exit_only_books]:
+    registered={s['id'] for s in STRATEGIES}
+    managed_books=[book for key,book in STATE['books'].items() if key in registered]
+    for book in [*managed_books, *exit_only_books]:
         pos=book.get('position')
         if not pos: continue
         decision_at=now_ms()
@@ -791,7 +823,17 @@ def stats(book):
 
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
-    STATE['stats']={k:stats(v) for k,v in STATE['books'].items()}
+    STATE['registry_compatibility']=registry_compatibility(STATE['books'])
+    registered={s['id'] for s in STRATEGIES}
+    previous_stats=STATE.get('stats') or {}
+    STATE['stats']={
+        key:stats(book) if key in registered else {
+            **(previous_stats.get(key) or {}),'runtime_status':'preserved_inactive',
+            'entry_enabled':False,'position_management_enabled':False,
+            'valuation_stale':bool(book.get('position') or book.get('positions')),
+        }
+        for key,book in STATE['books'].items()
+    }
     STATE['data_integrity_note']='Историята съдържа непотвърдени цени, включително XFUN. Не е доказателство за реална доходност. Новите входове минават независима проверка.'
     STATE['execution_basis']=EXECUTION_MODEL_VERSION
     STATE['execution_note']='DEX exact-pool spot marks with modeled fees, impact, slippage and latency; paper estimate only, no transaction is built, signed, or sent.'

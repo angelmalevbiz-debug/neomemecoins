@@ -106,10 +106,12 @@ $settings = @{
     NEO_MARKET_UPSTREAM="http://127.0.0.1:$MainPort"; NEO_LOCAL_API="http://127.0.0.1:$MainPort/state";
     NEO_MARKET_STATE_PATH=(Join-Path $runtime 'state.json'); NEO_MARKET_AUDIT_PATH=(Join-Path $runtime 'audit.jsonl');
     NEO_LIVE_TAPE_PATH=(Join-Path $runtime 'live_tape.json'); NEO_TAPE_DB_PATH=(Join-Path $runtime 'live_tape.sqlite3');
-    # Share one free mainnet RPC tape; batch signature discovery, but fetch
-    # transaction bodies singly with a bounded request budget and concurrency.
-    NEO_TAPE_MAX_PAIRS='12'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
-    NEO_TAPE_TX_PER_POLL='12'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
+    # Two pools receive 12 signatures each per discovery round. Spreading the
+    # old 12-body budget over 12 busy pools forced one-item pages that could not
+    # catch their live flow. Keep body requests bounded and concurrency at four;
+    # other pools have explicitly unavailable flow until actually monitored.
+    NEO_TAPE_MAX_PAIRS='2'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
+    NEO_TAPE_TX_PER_POLL='48'; NEO_TAPE_HISTORICAL_TX_PER_POLL='1'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
     NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');
     NEO_STRATEGY_LAB_COMPACT_PATH=(Join-Path $runtime 'strategy_lab_compact.json');

@@ -31,6 +31,7 @@ MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
 PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','1000'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','12')))
+HISTORICAL_TX_BUDGET = max(0,int(os.getenv('NEO_TAPE_HISTORICAL_TX_PER_POLL','1')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
 RPC_TRANSACTION_CONCURRENCY = max(1,int(os.getenv('NEO_TAPE_RPC_TX_CONCURRENCY','4')))
 WINDOW_MS = 300_000
@@ -325,9 +326,11 @@ def parse_trade(tx,metadata):
 
 
 class TapeRecorder:
-    def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET):
+    def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET,
+                 historical_tx_budget=HISTORICAL_TX_BUDGET):
         self.path,self.clock = Path(path),clock
         self.page_size,self.page_budget,self.tx_budget = page_size,page_budget,tx_budget
+        self.historical_tx_budget = max(0,int(historical_tx_budget))
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
@@ -450,9 +453,23 @@ class TapeRecorder:
             active = next_active
 
     def process(self,rpc):
-        # Drain the freshest actionable signatures first. Historical retries can
-        # remain durable without starving the current five-minute decision window.
-        pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed DESC,slot DESC LIMIT ?",(self.clock(),self.tx_budget)))
+        # Prioritize on-chain time: an old pagination row discovered just now
+        # must not displace an already observed live transaction. Large legacy
+        # retry queues remain durable, but get only a small maintenance budget
+        # instead of filling every unused live request slot on each poll.
+        current = self.clock()
+        cutoff = current-WINDOW_MS
+        order = 'ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC LIMIT ?'
+        pending = list(self.db.execute(
+            "SELECT * FROM signatures WHERE state='pending' AND next_retry<=? "
+            'AND COALESCE(event_time,observed)>=? '+order,
+            (current,cutoff,self.tx_budget)))
+        historical_budget = min(self.historical_tx_budget,max(0,self.tx_budget-len(pending)))
+        if historical_budget:
+            pending.extend(self.db.execute(
+                "SELECT * FROM signatures WHERE state='pending' AND next_retry<=? "
+                'AND COALESCE(event_time,observed)<? '+order,
+                (current,cutoff,historical_budget)))
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)

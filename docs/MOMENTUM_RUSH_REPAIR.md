@@ -95,3 +95,29 @@ gateway returned running status. The tape began decoding actual events (204 in
 one measured projection); coverage was still degraded, with provider pagination
 and some unsupported transactions unresolved. This is partial data recovery,
 not proof of complete flow coverage or a successful new strategy outcome.
+
+## Local follow-up
+
+Git publication recovered using the existing owner account explicitly. PR #1
+contains the integrated source at `794ff55` and its GitHub regression jobs passed.
+After the user selected local work only, subsequent changes remained local.
+
+The local dashboard launcher serves `http://127.0.0.1:5173` and selects the local
+gateway at port 8879. Normal sign-in remains required. Unregistered custom Lab
+books retain their full ledgers and positions, expose `preserved_inactive`, and
+receive no entries or invented exit policy. Restoring their actual policy is
+required before resuming them.
+
+The old tape configuration could retrieve only one signature per pool per poll
+from 12 busy pools and could not catch up with their observed flow. The local
+configuration now monitors two pools with a bounded 48-body budget, four concurrent
+requests, and at most one historical retry per cycle. Current bodies rank by
+on-chain time. Pools outside this capacity retain unavailable flow; guards still
+require actual complete fresh evidence. Historical rows remain durable.
+
+The final source passed 344 root and 119 backend Python tests, 16 frontend
+regressions, TypeScript, strategy hashes, extension checks and production build.
+The dashboard launcher was exercised through start, repeated start, stop and
+restart. Local CORS returned the exact localhost origin; private state returned
+the expected unauthenticated 401. No private authenticated dashboard result or
+financial success rate is inferred from these checks.

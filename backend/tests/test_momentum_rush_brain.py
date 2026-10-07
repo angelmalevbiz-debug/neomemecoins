@@ -330,7 +330,7 @@ class RushExitTests(unittest.TestCase):
             'entry_price':1,'entry_liquidity_usd':12000,'peak_price':1,
             'notional_usd':100,'remaining_cost_basis_usd':100,'quantity':100,
             'opened_at':NOW-60000,'updated_at':NOW-1000,'partial_realized_pnl':0}}
-        state = patch.object(lab,'STATE',{'books':{'RUSH':self.book}})
+        state = patch.object(lab,'STATE',{'books':{brain.STRATEGY_ID:self.book}})
         state.start();self.addCleanup(state.stop)
         clock = patch.object(lab,'now_ms',return_value=NOW)
         clock.start();self.addCleanup(clock.stop)
@@ -397,6 +397,7 @@ class RushExitTests(unittest.TestCase):
 
     def test_other_books_keep_standard_exit_framework(self):
         self.book['id']='MOMENTUM'
+        lab.STATE['books']={'MOMENTUM':self.book}
         self.book['position'].update(strategy_id='MOMENTUM',opened_at=NOW-20*60000,
                                      peak_net_pct=20)
         self.mark(7,mark=coin(liquidityUsd=1000))

@@ -186,9 +186,15 @@ def usable_feed_coin(coin: dict, now: int) -> bool:
 
 def affordable_entry(coin: dict, balance: float, limit: float,
                      entry: Callable, exit: Callable,
-                     minimum_notional: float = MIN_NOTIONAL_USD) -> dict | None:
+                     minimum_notional: float = MIN_NOTIONAL_USD,
+                     max_entry_cost_pct: float = MAX_ENTRY_COST_PCT) -> dict | None:
     """Try smaller paper sizes without changing the cost model or using leverage."""
     balance, limit = number(balance), number(limit)
+    if isinstance(max_entry_cost_pct, bool):
+        return None
+    max_entry_cost_pct = number(max_entry_cost_pct, math.nan)
+    if not math.isfinite(max_entry_cost_pct) or not 0 < max_entry_cost_pct <= MAX_ENTRY_COST_PCT:
+        return None
     minimum_notional = max(0.01, number(minimum_notional, MIN_NOTIONAL_USD))
     if min(balance, limit) < minimum_notional:
         return None
@@ -210,7 +216,7 @@ def affordable_entry(coin: dict, balance: float, limit: float,
         closing = exit(coin, quantity)
         net = number(closing.get('net_proceeds_usd')) - committed
         pct = net / size * 100
-        if quantity > 0 and committed <= balance + 1e-9 and -MAX_ENTRY_COST_PCT <= pct <= 0:
+        if quantity > 0 and committed <= balance + 1e-9 and -max_entry_cost_pct <= pct <= 0:
             return {'notional': size, 'entry': opening, 'mark': closing,
                     'initial_pnl_usd': net, 'initial_pnl_pct': pct}
         if size == minimum_notional:

@@ -113,6 +113,7 @@ class LabRegistryCompatibilityTests(unittest.TestCase):
                 book['position'] = {'fixture': 'preserved registered position'}
         coin = {'address': MINT, 'pairAddress': PAIR, 'symbol': 'SWARM',
                 'priceUsd': .01, 'priceNative': .00008, 'marketCap': 1e6,
+                'quoteTokenAddress': lab.SOL_QUOTE_MINT,
                 'liquidityUsd': 1e6, 'dexId': 'raydium', 'updatedAt': NOW,
                 'score': 100, 'ageMinutes': 50, 'priceChange': {'m5': 12, 'h1': 50},
                 'volume': {'h1': 1e6}, 'txns': {'m5': {'buys': 60, 'sells': 20}}}

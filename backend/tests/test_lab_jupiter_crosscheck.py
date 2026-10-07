@@ -138,6 +138,7 @@ class LabJupiterCrosscheckTests(unittest.TestCase):
         coin = {
             'address': MINT, 'pairAddress': PAIR, 'symbol': 'TEST', 'name': 'Test',
             'priceUsd': 0.001, 'liquidityUsd': 100_000, 'marketCap': 500_000,
+            'priceNative': 0.001 / 150, 'quoteTokenAddress': lab.SOL_QUOTE_MINT,
             'updatedAt': now, 'score': 100, 'dexId': 'raydium', 'ageMinutes': 30,
             'priceChange': {'m5': 10, 'h1': 20},
             'volume': {'h1': 100_000},
@@ -147,10 +148,18 @@ class LabJupiterCrosscheckTests(unittest.TestCase):
         state = {'books': books, 'portfolio_setup': {'status': 'ACTIVE'}}
         confirmed = {**review(), 'status': 'pass', 'reason': '', 'jupiter_tiebreak': True,
                      'jupiter_entry_price': coin['priceUsd']}
+        import promoted_entry_guard as promoted_guard
+        verified={'source':promoted_guard.FLOW_SOURCE,'coverage_status':'COMPLETE',
+                  'window_ms':promoted_guard.FLOW_WINDOW_MS,'address':MINT,'pairAddress':PAIR,
+                  'window_at':now,'latest_event_at':now-100,'available_at':now-50,
+                  'trades':4,'unique_wallets':3,'buy_usd':500,'sell_usd':100}
+        flows={(MINT,PAIR):{'verified_flow':verified}}
+        risk={'status':'pass','mint':MINT,'pair':PAIR,'checked_at':now}
         with patch.object(lab, 'STATE', state), \
              patch.object(lab.price_integrity, 'check', return_value=review()), \
              patch.object(lab, 'cached_jupiter_tiebreak', return_value=confirmed):
-            lab.maybe_open([coin], {})
+            with patch.object(lab.rug_guard, 'check', return_value=risk):
+                lab.maybe_open([coin], flows)
 
         for strategy_id in ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION'):
             position = state['books'][strategy_id]['position']

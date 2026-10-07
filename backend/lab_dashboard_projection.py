@@ -46,6 +46,20 @@ def compact_strategy_lab(data):
             'max_position_fraction': raw.get('max_position_fraction', 1.0),
             'position': position,
             'history': history,
+            **({'runtime_compatibility': raw['runtime_compatibility']}
+               if isinstance(raw.get('runtime_compatibility'), dict) else {}),
+            'entry_diagnostics': {
+                field: raw['entry_diagnostics'][field]
+                for field in (
+                    'at', 'signal_candidates', 'matched_candidates', 'cost_rejected',
+                    'cooldown_rejected', 'affordable_candidates', 'price_verification_rejected',
+                    'price_crosscheck_pending', 'flow_missing_candidates',
+                    'flow_tape_status', 'flow_tape_coverage_pct',
+                    'verified_flow_events_60s', 'flow_tape_backlog', 'blocked_reason',
+                )
+                if isinstance(raw.get('entry_diagnostics'), dict)
+                and field in raw['entry_diagnostics']
+            } if isinstance(raw.get('entry_diagnostics'), dict) else {},
         }
 
     raw_setup = data.get('portfolio_setup') or {}
@@ -104,6 +118,7 @@ def compact_strategy_lab(data):
         'data_integrity_note': data.get('data_integrity_note'),
         'activity_config': data.get('activity_config') or {},
         'portfolio_setup': portfolio_setup,
+        'registry_compatibility': data.get('registry_compatibility') or {},
     }
 
     astra = data.get('astra')

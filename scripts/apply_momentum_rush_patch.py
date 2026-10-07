@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,6 +24,13 @@ def sha256_lf(path: Path) -> str:
 
 lab_path = ROOT / 'backend' / 'strategy_lab.py'
 lab = lab_path.read_text(encoding='utf-8')
+
+# The one-shot migration is retained for old checkouts. Running it again on an
+# integrated engine must preserve the reviewed implementation and its ledger.
+if ("import momentum_rush_brain as " in lab
+        and "'id':'MOMENTUM_RUSH_BRAIN'" in lab):
+    print('Momentum Rush PAPER strategy is already integrated; no files changed')
+    sys.exit(0)
 
 lab = replace_once(
     lab,

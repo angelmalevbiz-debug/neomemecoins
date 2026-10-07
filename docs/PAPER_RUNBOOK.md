@@ -27,16 +27,37 @@ The maintained Pages frontend can use the local PAPER services without Contabo. 
 
 To repair only missing tape or Lab processes while verified main and gateway processes continue running, use `-Action StartMissing`. Stop all owned services gracefully and flush their state with `-Action Stop`; the command does not force-kill a service that is still stopping.
 
-In a separate PowerShell window, expose only the loopback gateway and keep that window open:
+For local use, start the dashboard from the checkout with `npm ci` dependencies
+installed. Its launcher binds only loopback and explicitly selects the local
+gateway, so it does not fall back to the public VPS:
 
 ```powershell
-$neoPaperUrl = 'http://127.0.0.1:8879'
-& 'C:\Program Files (x86)\cloudflared\cloudflared.exe' tunnel --no-autoupdate --protocol http2 --url=$neoPaperUrl
+.\scripts\start_local_dashboard.ps1 -Action Start
+.\scripts\start_local_dashboard.ps1 -Action Status
+.\scripts\start_local_dashboard.ps1 -Action Stop
 ```
 
-Copy the `https://….trycloudflare.com` hostname into the GitHub repository variable `NEO_API_URL`, then rerun the Pages deployment workflow. The checked-in workflow reads that variable at build time. A Quick Tunnel is temporary and has no uptime guarantee; the computer, local PAPER processes, network, and `cloudflared` window must remain available. If the tunnel restarts with a different hostname, update `NEO_API_URL` and rerun Pages deployment. See Cloudflare's [Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+Open `http://127.0.0.1:5173` and sign in with the existing Supabase account.
+The launcher runs in the background and requires the gateway at port 8879.
+It checks process ownership before stopping its own dashboard and refuses to
+replace an unrelated process on port 5173.
 
-The browser gateway uses exact Pages-origin CORS and requires the normal Supabase bearer token for private state. `/user/health` and the shared `/state` diagnostic do not prove that the logged-in private dashboard works. Use the authenticated site to validate the account after deployment. PAPER actions only; no LIVE executor is exposed by this local service.
+Expose only the authenticated loopback gateway with the background launcher:
+
+```powershell
+.\scripts\start_local_tunnel.ps1 -Action Start
+.\scripts\start_local_tunnel.ps1 -Action Status
+```
+
+Copy the `https://….trycloudflare.com` hostname into the GitHub repository variable `NEO_API_URL`, then rerun the Pages deployment workflow. The checked-in workflow reads that variable at build time. The launcher records its own PID, creation time and origin under ignored `.runtime/tunnel`; repeated Start reuses the running tunnel and Stop checks ownership. It does not modify other Cloudflared services. A Quick Tunnel is temporary and has no uptime guarantee; the computer, local PAPER processes, network, and background `cloudflared` process must remain available. If the tunnel restarts with a different hostname, update `NEO_API_URL` and rerun Pages deployment. See Cloudflare's [Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+
+The browser gateway uses exact Pages-origin CORS and requires the normal Supabase bearer token for private state. Its `/state` is also authenticated; do not expose the shared main monitor to make a diagnostic probe pass. `/user/health` and the separate loopback main monitor's `/state` do not prove that the logged-in private dashboard works. Use the authenticated site to validate the account after deployment. PAPER actions only; no LIVE executor is exposed by this local service.
+
+For this layout, provide the private loopback diagnostic separately:
+
+```powershell
+.venv/Scripts/python.exe scripts/check_pages_backend.py --backend https://YOUR-TUNNEL.trycloudflare.com --shared-backend http://127.0.0.1:8878 --output .runtime/pages-backend-check.json
+```
 
 The read-only Pages/backend check deliberately returns a nonzero exit code if the public gateway's CORS origin or shared backend schema is still old. It does not log in, bypass private account authentication, reset accounts, or certify financial results. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for the latest measured deployment boundary.
 

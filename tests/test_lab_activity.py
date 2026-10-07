@@ -30,7 +30,7 @@ class ActivityTests(unittest.TestCase):
     def setUp(self):
         guard=patch.object(lab.price_integrity,'check',return_value={'status':'pass','version':'OFFLINE_FIXTURE'})
         guard.start();self.addCleanup(guard.stop)
-        lab.rush._SAMPLE_BY_PAIR.clear()
+        lab.rush_brain._SAMPLE_BY_PAIR.clear()
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
     def test_all_34_rules_exist(self):
@@ -216,7 +216,8 @@ class ActivityTests(unittest.TestCase):
                 {**base,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
                 {**base,'direction':'SELL','usd_amount':40,'wallet':'seller'},
             ]}),encoding='utf-8')
-            with patch.object(lab,'LIVE_TAPE_PATH',tape_path):observed=lab.flow_map()
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path),patch.object(lab,'now_ms',return_value=stamp+250):
+                observed=lab.flow_map()
         self.assertEqual(observed[ADDRESS]['trades'],2)
         self.assertEqual(observed[ADDRESS]['ratio'],6)
         self.assertEqual(observed[ADDRESS]['unique_wallets'],2)
@@ -289,21 +290,26 @@ class ActivityTests(unittest.TestCase):
 
     def test_momentum_rush_opens_broader_low_cap_setup_without_promoting_it(self):
         c=coin()
-        c.update(score=82,marketCap=40000,liquidityUsd=12000,ageMinutes=12)
-        c['priceChange']={'m5':2,'h1':8}
-        c['volume']={'h1':9000}
-        c['txns']={'m5':{'buys':18,'sells':10}}
-        flow={ADDRESS:{'trades':5,'buys':4,'sells':1,'buy_usd':350,'sell_usd':100,
-                       'unique_wallets':4,'ratio':3.5,'max_sell':50}}
+        c.update(score=86,marketCap=40000,liquidityUsd=12000,ageMinutes=12)
+        c['priceChange']={'m5':8,'h1':30}
+        c['volume']={'h1':20000}
+        c['txns']={'m5':{'buys':40,'sells':10}}
+        flow={ADDRESS:{'trades':8,'buys':6,'sells':2,'buy_usd':800,'sell_usd':100,
+                       'unique_wallets':6,'ratio':4,'max_sell':50}}
         features=a.market_features(c,flow[ADDRESS])
         self.assertFalse(a.RULES['MOMENTUM'].matches(features))
-        with patch.object(lab,'now_ms',return_value=NOW):
-            lab.maybe_open([c],flow)
+        with patch.object(lab.rug_guard,'check',return_value={
+                'status':'pass','mint':ADDRESS,'pair':PAIR,'checked_at':NOW-1}), \
+             patch.object(lab.price_integrity,'check',return_value={
+                'status':'pass','mint':ADDRESS,'pair':PAIR}):
+            for stamp,price in ((NOW-16000,.01),(NOW-8000,.01005),(NOW,.0102)):
+                with patch.object(lab,'now_ms',return_value=stamp):
+                    lab.maybe_open([{**c,'updatedAt':stamp,'priceUsd':price}],flow)
         book=lab.STATE['books']['MOMENTUM_RUSH_BRAIN']
         self.assertEqual(book['portfolio_group'],'TEST')
         self.assertIsNotNone(book['position'])
         self.assertLessEqual(book['position']['notional_usd'],60)
-        self.assertEqual(book['position']['momentum_rush_brain']['target_win_rate_pct'],89.0)
+        self.assertEqual(book['position']['momentum_rush_brain']['target_win_rate_pct'],80.0)
         self.assertFalse(book['position']['momentum_rush_brain']['target_is_guarantee'])
 
     def test_momentum_rush_rejects_bearish_low_cap_flow(self):
@@ -313,7 +319,7 @@ class ActivityTests(unittest.TestCase):
         c['txns']={'m5':{'buys':16,'sells':9}}
         flow={'trades':6,'buys':2,'sells':4,'buy_usd':100,'sell_usd':450,
               'unique_wallets':4,'ratio':.22,'max_sell':1800}
-        meta=lab.rush.evaluate(lab.STATE['books']['MOMENTUM_RUSH_BRAIN'],c,a.market_features(c,flow),NOW)
+        meta=lab.rush_brain.evaluate(lab.STATE['books']['MOMENTUM_RUSH_BRAIN'],c,a.market_features(c,flow),NOW)
         self.assertFalse(meta['allow'])
         self.assertTrue(meta['verified_flow_bearish'])
         self.assertTrue(meta['dump_risk'])

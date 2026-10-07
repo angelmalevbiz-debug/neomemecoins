@@ -8,7 +8,7 @@ import math
 import re
 from typing import Any, Callable
 
-POLICY_VERSION = 'LAB_ACTIVE_V4_MOMENTUM_RUSH_BRAIN'
+POLICY_VERSION = 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN'
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
 SCALPER_REENTRY_SECONDS = 600
@@ -18,6 +18,7 @@ SCALPER_MIN_NOTIONAL_USD = 2.0
 RUSH_REENTRY_SECONDS = 20
 RUSH_LOSS_REENTRY_SECONDS = 90
 RUSH_MIN_NOTIONAL_USD = 5.0
+RUSH_MAX_BALANCE_FRACTION = .35
 MAX_FEED_AGE_MS = 20_000
 MAX_ENTRY_COST_PCT = 2.75
 MIN_NOTIONAL_USD = 10.0
@@ -156,11 +157,14 @@ def cooldown_remaining_ms(book: dict, address: str, now: int) -> int:
 
 
 def entry_notional_limit(strategy_id: str, balance: float, requested: float) -> float:
-    """Cap SCALPER risk at 25% of cash without exceeding its minimum size."""
+    """Cap each experimental book's entry to its own available PAPER balance."""
     balance, requested = max(0.0, number(balance)), max(0.0, number(requested))
     if strategy_id == 'SCALPER':
         capped = min(requested, balance * SCALPER_MAX_BALANCE_FRACTION)
         return capped if capped >= SCALPER_MIN_NOTIONAL_USD else 0.0
+    if strategy_id == 'MOMENTUM_RUSH_BRAIN':
+        capped = min(requested, balance * RUSH_MAX_BALANCE_FRACTION)
+        return capped if capped >= RUSH_MIN_NOTIONAL_USD else 0.0
     return min(requested, balance)
 
 
@@ -226,6 +230,7 @@ def policy_config() -> dict:
             'rush_reentry_seconds': RUSH_REENTRY_SECONDS,
             'rush_loss_reentry_seconds': RUSH_LOSS_REENTRY_SECONDS,
             'rush_min_notional_usd': RUSH_MIN_NOTIONAL_USD,
+            'rush_max_balance_fraction': RUSH_MAX_BALANCE_FRACTION,
             'max_entry_roundtrip_cost_pct': MAX_ENTRY_COST_PCT,
             'feed_max_age_seconds': MAX_FEED_AGE_MS / 1000,
             'execution_basis': 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'}

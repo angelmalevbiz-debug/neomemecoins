@@ -14,6 +14,7 @@ import honest_quote_transport as transport
 
 MINT='HKZDfZnkHZxd9agRDNPyDv4iT6LmAurJnpRtj9wpump'
 PAIR='867dKvaCcyRrUDP66bqNXbujXfjaxsNB9wTpc4CmBdAD'
+USDC=transport.USDC
 NOW=1_800_000_000_000
 
 
@@ -43,7 +44,8 @@ class Http:
     def get(self,url,**kwargs):
         params=kwargs['params']
         self.calls.append({'at':self.clock.ms,'params':dict(params),'url':url,
-            'exit_markers':len(list((self.root/'quote-exit-priority').glob('*.json')))})
+            'exit_markers':len(list((self.root/'quote-exit-priority').glob('*.json'))),
+            'timeout':kwargs.get('timeout')})
         self.clock.sleep(.01)
         if params['inputMint']==MINT:
             self.sales+=1
@@ -156,6 +158,14 @@ class SharedAccountQuotes(unittest.TestCase):
             self.assertEqual(client.sol_usd,120)
             self.assertEqual(shared.call_args.kwargs['purpose'],'background')
             self.assertEqual(client.requests,0)
+
+    def test_training_background_quote_has_bounded_http_time(self):
+        with tempfile.TemporaryDirectory() as directory,ExitStack() as stack:
+            root=Path(directory); clock=Clock(); http=Http(clock,root)
+            self.setup_transport(stack,root,http,clock)
+            data=transport.quote(USDC,MINT,20_000_000,purpose='background')
+            self.assertIsNotNone(data)
+            self.assertEqual(http.calls[0]['timeout'],(.35,.65))
 
     def test_multilingual_state_survives_restart_as_utf8(self):
         book=astra.empty_book(); book['notes']='🚀 Кирилица 日本語'

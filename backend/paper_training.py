@@ -148,6 +148,39 @@ def _config(supplied):
     return result
 
 
+def training_candidate_signal(coin, flow, *, now, config=None):
+    """Cheap causal gate before spending risk/price-check capacity on a learner.
+
+    Mirrors the least restrictive predefined PAPER hypothesis, while retaining
+    fresh exact-pool identity and complete verified on-chain coverage. This is
+    only a request for independent evidence; it never authorizes an entry.
+    """
+    cfg = _config(config)
+    if not isinstance(coin, dict) or not isinstance(flow, dict):
+        return False
+    mint, pair = str(coin.get("address") or ""), str(coin.get("pairAddress") or "")
+    updated = number(coin.get("updatedAt"), -1)
+    if (not ADDRESS.fullmatch(mint) or not ADDRESS.fullmatch(pair)
+            or number(coin.get("priceUsd")) <= 0
+            or number(coin.get("liquidityUsd")) < cfg["min_liquidity"]
+            or not 0 <= now - updated <= cfg["feed_ttl_ms"]):
+        return False
+    coverage = flow.get("coverage") or {}
+    latest = number(flow.get("latest_at"), -1)
+    if (flow.get("fresh") is not True or str(flow.get("quality") or "").upper() != "COMPLETE"
+            or coverage.get("status") != "COMPLETE"
+            or coverage.get("pairAddress") != pair or coverage.get("address") != mint
+            or not 0 <= now - latest <= cfg["flow_ttl_ms"]
+            or number(flow.get("trades")) < cfg["min_flow_trades"]
+            or number(flow.get("unique_wallets")) < cfg["min_flow_wallets"]
+            or number(flow.get("buy_usd")) < cfg["min_flow_buy_usd"]):
+        return False
+    minimum_score = min(params["min_score"] for params in HYPOTHESES.values())
+    minimum_ratio = min(params["min_flow_ratio"] for params in HYPOTHESES.values())
+    return (number(coin.get("score")) >= minimum_score
+            and number(flow.get("buy_sell_usd_ratio", flow.get("ratio"))) >= minimum_ratio)
+
+
 def empty_book(name, params, cash):
     return {"id": name, "params": copy.deepcopy(params), "initial_cash": cash,
             "cash": cash, "positions": {}, "pending": {}, "trades": [],

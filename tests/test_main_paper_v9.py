@@ -94,6 +94,46 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual(len(m.STATE.positions),1)
         self.assertFalse(m.STATE.history)
 
+    def test_reentry_guard_uses_fresh_feed_over_pinned_previous_trade(self):
+        self.position()
+        stale=dict(self.coin,updatedAt=self.clock[0]-120_000)
+        m.STATE.position_market[f'{A}:{B}']=stale
+        m.STATE.feed=[dict(self.coin)]
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.fast_position_check()
+        self.assertEqual(mark.call_args.args[1]['updatedAt'],self.clock[0])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertFalse(m.STATE.history)
+
+    def test_fresh_entry_snapshot_outlives_stale_pinned_tuple(self):
+        self.position()
+        stale=dict(self.coin,updatedAt=self.clock[0]-120_000)
+        m.STATE.position_market[f'{A}:{B}']=stale
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.update_positions({(A,B):stale})
+        self.assertEqual(mark.call_args.args[1]['updatedAt'],self.clock[0])
+        self.assertEqual(len(m.STATE.positions),1)
+        self.assertFalse(m.STATE.history)
+
+    def test_future_and_wrong_pool_observations_do_not_mask_genuine_staleness(self):
+        position=self.position()
+        position['coin_snapshot']=dict(self.coin,updatedAt=self.clock[0]-61_000)
+        m.STATE.position_market[f'{A}:{B}']=dict(self.coin,updatedAt=self.clock[0]+1)
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.update_positions({A:dict(self.coin,pairAddress=C)})
+        self.assertEqual(mark.call_args.args[1]['updatedAt'],self.clock[0]-61_000)
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.history[0]['exit_reason'],'STALE_MARKET_EXIT')
+
+    def test_missing_timestamp_does_not_become_a_fresh_market_observation(self):
+        position=self.position()
+        position['coin_snapshot'].pop('updatedAt')
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote) as mark:
+            self.monitor.update_positions({A:dict(position['coin_snapshot'])})
+        self.assertEqual(mark.call_args.args[1],{})
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.history[0]['exit_reason'],'STALE_MARKET_EXIT')
+
     def test_gap_200_to_160_is_minus_40_not_minus_10(self):
         q,pnl,pct,capped=m.enforce_paper_stop_cap({'net_proceeds_usd':160,'fill_price':1.6},200,0,100)
         self.assertEqual((pnl,pct,capped),(-40,-20,False))

@@ -16,10 +16,19 @@ domain is needed for the GitHub address. Do not commit runtime account data,
 private archives, credentials or recordings to publish a site.
 
 GitHub Pages hosts the static browser application. It does not run the Python
-market monitor, account gateway or learning worker. The web app currently uses
-`https://neo-meme-api.169-58-211-177.sslip.io`; updating the frontend does not
+market monitor, account gateway or learning worker. The build uses the repository
+variable `NEO_API_URL` when configured; its fallback is
+`https://neo-meme-api.169-58-211-177.sslip.io`. Updating the frontend does not
 deploy that service. Deploy the repaired backend separately with the existing
 service manager and isolated account paths described in [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md).
+To display the same PC account through both addresses, set `NEO_API_URL` to the
+HTTPS tunnel for the PC's port 8879 gateway and rebuild Pages. The localhost
+dashboard uses that same gateway directly. Sign in with the same Supabase user
+on both origins; browser sessions are separate. Historical VPS and PC accounts
+are independent and are not merged or reset by publishing the frontend. The
+computer, backend and tunnel must stay running. See the background tunnel
+launcher and temporary-hostname limits in [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md).
+
 The gateway allows the new `https://angelmalevbiz-debug.github.io` origin;
 the Supabase project's Auth redirect allowlist also needs the new app address
 when OAuth is used. Keep existing redirect addresses during migration.

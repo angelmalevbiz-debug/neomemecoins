@@ -4,14 +4,25 @@ This module never builds, signs, or sends a transaction. It ranks early momentum
 setups using only information available at decision time and shrinks uncertainty
 back toward neutral until enough PAPER outcomes exist.
 """
-from collections import deque
+from collections import OrderedDict, deque
+import heapq
+from itertools import islice
 import math
 from typing import Any
 
-VERSION = 'MOMENTUM_RUSH_BRAIN_V1'
-TARGET_WIN_RATE_PCT = 89.0  # research target only; never reported as achieved
+STRATEGY_ID = 'MOMENTUM_RUSH_BRAIN'
+VERSION = 'MOMENTUM_RUSH_BRAIN_V2_CAUSAL'
+TARGET_WIN_RATE_PCT = 80.0  # research target only; never reported as achieved
 MAX_SAMPLES_PER_PAIR = 24
-_SAMPLE_BY_PAIR: dict[tuple[str, str], deque] = {}
+MAX_TRACKED_PAIRS = 256
+SAMPLE_RETENTION_MS = 120_000
+MAX_OBSERVATION_AGE_MS = 20_000
+MIN_OBSERVATION_SPAN_MS = 8_000
+MAX_MEMORY_TRADES = 80
+MAX_MEMORY_SCAN_ROWS = 256
+LOW_CAP_MAX_BALANCE_FRACTION = .12
+LOW_CAP_MAX_NOTIONAL_USD = 60.0
+_SAMPLE_BY_PAIR: OrderedDict[tuple[str, str], deque] = OrderedDict()
 
 
 def number(value: Any, default: float = 0.0) -> float:
@@ -110,40 +121,82 @@ def _base_intelligence(coin: dict, features: dict) -> dict:
     }
 
 
-def _temporal_intelligence(coin: dict, features: dict, now: int) -> dict:
+def _neutral_temporal(samples=0, reason='temporal_warmup') -> dict:
+    return {'samples': samples, 'score': .5, 'ready': False, 'reason': reason,
+            'price_velocity_pct': 0.0, 'price_velocity_pct_per_min': 0.0,
+            'price_acceleration_pct_per_min2': 0.0, 'acceleration_confirmed': False,
+            'liquidity_velocity_pct': 0.0, 'buy_flow_delta_usd': 0.0,
+            'wallet_delta': 0.0, 'veto': False}
+
+
+def observe(coin: dict, features: dict, now: int) -> dict:
+    """Observe a distinct available snapshot of this exact pool, once.
+
+    Polling the same snapshot cannot manufacture momentum. Three snapshots,
+    separated by at least eight seconds, are required to measure acceleration.
+    This bounded, ephemeral market memory is separate from the trade ledger.
+    """
+    now = int(now)
     key = (str(coin.get('address') or ''), str(coin.get('pairAddress') or ''))
-    ring = _SAMPLE_BY_PAIR.setdefault(key, deque(maxlen=MAX_SAMPLES_PER_PAIR))
+    stamp = int(number(coin.get('updatedAt')))
+    if (not all(key) or stamp <= 0 or not 0 <= now - stamp <= MAX_OBSERVATION_AGE_MS
+            or number(coin.get('priceUsd')) <= 0 or number(features.get('liq')) <= 0):
+        return _neutral_temporal(reason='unavailable_or_noncausal_snapshot')
+    for stale_key, samples in list(_SAMPLE_BY_PAIR.items()):
+        if samples and now - samples[-1]['observed_at'] > SAMPLE_RETENTION_MS:
+            _SAMPLE_BY_PAIR.pop(stale_key, None)
+    ring = _SAMPLE_BY_PAIR.get(key)
+    if ring is None:
+        ring = deque(maxlen=MAX_SAMPLES_PER_PAIR)
+        _SAMPLE_BY_PAIR[key] = ring
+    if ring and (stamp < ring[-1]['ts'] or now < ring[-1]['observed_at']):
+        return _neutral_temporal(reason='snapshot_timestamp_regression')
+    _SAMPLE_BY_PAIR.move_to_end(key)
+    while len(_SAMPLE_BY_PAIR) > MAX_TRACKED_PAIRS:
+        _SAMPLE_BY_PAIR.popitem(last=False)
     flow = features.get('flow') or {}
     current = {
-        'ts': int(now), 'price': number(coin.get('priceUsd')),
+        'ts': stamp, 'observed_at': now, 'price': number(coin.get('priceUsd')),
         'liq': number(features.get('liq')), 'buy_usd': number(flow.get('buy_usd')),
         'wallets': number(flow.get('unique_wallets')),
     }
-    reference = None
-    for sample in ring:
-        if now - int(sample['ts']) >= 8_000:
-            reference = sample
-    if reference is None and ring:
-        reference = ring[0]
-    ring.append(current)
-    if not reference or number(reference.get('price')) <= 0:
-        return {'samples': len(ring), 'score': .5, 'price_velocity_pct': 0.0,
-                'liquidity_velocity_pct': 0.0, 'buy_flow_delta_usd': 0.0,
-                'wallet_delta': 0.0, 'veto': False}
+    if not ring or stamp > ring[-1]['ts']:
+        ring.append(current)
+    else:
+        # A repeat with changed fields remains the originally observed snapshot.
+        current = ring[-1]
+    samples = [s for s in ring if s['observed_at'] <= now
+               and 0 <= now - s['ts'] <= SAMPLE_RETENTION_MS]
+    reference = next((s for s in reversed(samples)
+                      if current['ts'] - s['ts'] >= MIN_OBSERVATION_SPAN_MS), None)
+    previous = next((s for s in reversed(samples)
+                     if reference and reference['ts'] - s['ts'] >= MIN_OBSERVATION_SPAN_MS), None)
+    if not reference or not previous:
+        return _neutral_temporal(len(samples))
 
     price_velocity = (current['price'] / max(number(reference.get('price')), 1e-18) - 1) * 100
+    span_minutes = (current['ts'] - reference['ts']) / 60_000
+    previous_span = (reference['ts'] - previous['ts']) / 60_000
+    rate = price_velocity / span_minutes
+    previous_rate = (reference['price'] / previous['price'] - 1) * 100 / previous_span
+    acceleration = (rate - previous_rate) / ((span_minutes + previous_span) / 2)
     liq_velocity = (current['liq'] / max(number(reference.get('liq')), 1e-18) - 1) * 100
     buy_delta = current['buy_usd'] - number(reference.get('buy_usd'))
     wallet_delta = current['wallets'] - number(reference.get('wallets'))
     score = (
-        .45 * clamp((price_velocity + .35) / 2.5)
-        + .22 * clamp((liq_velocity + 2.0) / 12.0)
-        + .20 * clamp((buy_delta + 25.0) / 300.0)
-        + .13 * clamp((wallet_delta + .5) / 4.0)
+        .35 * clamp((rate + .5) / 12.0)
+        + .20 * clamp(.5 + acceleration / 100.0)
+        + .20 * clamp((liq_velocity + 2.0) / 12.0)
+        + .15 * clamp((buy_delta + 25.0) / 300.0)
+        + .10 * clamp((wallet_delta + .5) / 4.0)
     )
     veto = price_velocity <= -1.1 or liq_velocity <= -14
     return {
-        'samples': len(ring), 'score': round(clamp(score), 4),
+        'samples': len(samples), 'score': round(clamp(score), 4), 'ready': True,
+        'reason': '', 'observation_span_ms': current['ts'] - reference['ts'],
+        'price_velocity_pct_per_min': round(rate, 4),
+        'price_acceleration_pct_per_min2': round(acceleration, 4),
+        'acceleration_confirmed': rate > 0 and acceleration >= 0,
         'price_velocity_pct': round(price_velocity, 4),
         'liquidity_velocity_pct': round(liq_velocity, 4),
         'buy_flow_delta_usd': round(buy_delta, 2),
@@ -152,50 +205,72 @@ def _temporal_intelligence(coin: dict, features: dict, now: int) -> dict:
 
 
 def _memory_intelligence(book: dict, features: dict, now: int) -> dict:
-    rows = []
-    for trade in sorted(book.get('history') or [], key=lambda t: number(t.get('closed_at')), reverse=True):
-        prior = trade.get('entry_features')
-        closed = int(number(trade.get('closed_at')))
-        if not isinstance(prior, dict) or closed <= 0 or closed > now:
-            continue
-        rows.append(trade)
-        if len(rows) >= 80:
-            break
+    neutral = {'score': .5, 'effective_sample': 0.0, 'posterior_win_rate': .5,
+               'avg_similar_pnl_pct': 0.0, 'closed_samples': 0,
+               'basis': 'OWN_CLOSED_NET_PAPER_TRADES', 'is_win_rate_estimate': True}
+    if book.get('id') != STRATEGY_ID:
+        return neutral
+
+    def closed_net_trades():
+        # Lab histories are newest first. Bound work per candidate while retaining
+        # the complete ledger; older rows do not participate in this decision.
+        for trade in islice(book.get('history') or [], MAX_MEMORY_SCAN_ROWS):
+            if not isinstance(trade, dict):
+                continue
+            closed = number(trade.get('closed_at'))
+            opened = number(trade.get('opened_at'))
+            net = number(trade.get('net_pnl_usd', trade.get('pnl_usd')), math.nan)
+            if (trade.get('strategy_id') != STRATEGY_ID
+                    or not isinstance(trade.get('entry_features'), dict)
+                    or not 0 < opened < closed <= now or number(trade.get('notional_usd')) <= 0
+                    or not math.isfinite(net) or trade.get('is_partial') is True
+                    or str(trade.get('exit_reason') or '').startswith('PARTIAL')):
+                continue
+            yield trade
+
+    latest = heapq.nlargest(MAX_MEMORY_TRADES, closed_net_trades(), key=lambda t: number(t.get('closed_at')))
+    rows = []; seen = set()
+    for trade in latest:
+        identity = (trade.get('trade_no'), trade.get('address'), trade.get('pairAddress'), trade.get('opened_at'))
+        if identity not in seen:
+            seen.add(identity); rows.append(trade)
     scales = {'m5': 18.0, 'h1': 120.0, 'bs': 1.2, 'lmc': .18,
               'vol_liq': 3.0, 'age': 240.0, 'score': 20.0}
     weighted = weighted_wins = weighted_pnl = 0.0
     for trade in rows:
         prior = trade['entry_features']; distance = 0.0; used = 0
         for key, scale in scales.items():
-            if key not in prior:
+            if not math.isfinite(number(prior.get(key), math.nan)) or not math.isfinite(number(features.get(key), math.nan)):
                 continue
             distance += min(2.0, abs(number(features.get(key)) - number(prior.get(key))) / scale)
             used += 1
-        if not used:
+        if used < 3:
             continue
         weight = math.exp(-1.25 * (distance / used))
         if weight < .08:
             continue
-        pnl = number(trade.get('pnl_usd'))
+        # The Lab's pnl_usd is already the final net total, including its partial
+        # realized legs. Never add partial_exits a second time or learn gross PnL.
+        pnl = number(trade.get('net_pnl_usd', trade.get('pnl_usd')))
         weighted += weight
         weighted_wins += weight * (1.0 if pnl > 0 else 0.0)
-        weighted_pnl += weight * pnl / max(number(trade.get('notional_usd'), 100.0), 1e-9) * 100
+        weighted_pnl += weight * pnl / number(trade.get('notional_usd')) * 100
     if weighted < 4.0:
-        return {'score': .5, 'effective_sample': round(weighted, 3), 'posterior_win_rate': .5,
-                'avg_similar_pnl_pct': 0.0}
+        return {**neutral, 'effective_sample': round(weighted, 3), 'closed_samples': len(rows)}
     posterior = (2.0 + weighted_wins) / (4.0 + weighted)
     avg_pnl = weighted_pnl / weighted
     pnl_signal = clamp(.5 + avg_pnl / 18.0)
     raw = .72 * posterior + .28 * pnl_signal
     reliability = clamp(weighted / 18.0)
     score = .5 + (raw - .5) * reliability
-    return {'score': round(clamp(score), 4), 'effective_sample': round(weighted, 3),
+    return {**neutral, 'score': round(clamp(score), 4), 'effective_sample': round(weighted, 3),
+            'closed_samples': len(rows),
             'posterior_win_rate': round(posterior, 4), 'avg_similar_pnl_pct': round(avg_pnl, 4)}
 
 
-def evaluate(book: dict, coin: dict, features: dict, now: int) -> dict:
+def evaluate(book: dict, coin: dict, features: dict, now: int, *, temporal: dict | None = None) -> dict:
     base = _base_intelligence(coin, features)
-    temporal = _temporal_intelligence(coin, features, now)
+    temporal = observe(coin, features, now) if temporal is None else temporal
     memory = _memory_intelligence(book, features, now)
     final = .65 * number(base.get('base_score')) + .22 * number(temporal.get('score'), .5) + .13 * number(memory.get('score'), .5)
     components = base.get('components') or {}
@@ -208,7 +283,9 @@ def evaluate(book: dict, coin: dict, features: dict, now: int) -> dict:
         number(temporal.get('score'), .5) >= .45,
         number(memory.get('score'), .5) >= .42,
     ])
-    allow = bool(base.get('allow')) and not temporal.get('veto') and votes >= 4 and final >= .50
+    allow = (book.get('id') == STRATEGY_ID and bool(base.get('allow'))
+             and temporal.get('ready') is True and temporal.get('acceleration_confirmed') is True
+             and not temporal.get('veto') and votes >= 4 and final >= .50)
     return {**base, 'allow': allow, 'final_score': round(clamp(final), 4),
             'votes': int(votes), 'votes_required': 4, 'temporal': temporal, 'memory': memory,
             'target_win_rate_pct': TARGET_WIN_RATE_PCT, 'target_is_guarantee': False}
@@ -220,11 +297,11 @@ def candidate_notional_limit(meta: dict, balance: float, requested: float) -> fl
     market_cap = number(meta.get('market_cap_usd'))
     final = number(meta.get('final_score'))
     if market_cap <= 50_000:
-        fraction, absolute = .12, 60.0
+        fraction, absolute = LOW_CAP_MAX_BALANCE_FRACTION, LOW_CAP_MAX_NOTIONAL_USD
     elif market_cap <= 100_000:
         fraction, absolute = .20, 100.0
     else:
         fraction, absolute = .30, requested
-    if final >= .72:
+    if market_cap > 100_000 and final >= .72:
         fraction = min(.35, fraction + .05)
     return max(0.0, min(requested, absolute, balance * fraction))

@@ -101,6 +101,10 @@ The PAPER backend audit, independent training books and causal replay are docume
 [execution model](docs/EXECUTION_MODEL.md) and [strategy validation](docs/STRATEGY_VALIDATION.md).
 Learning promotion is confined to separate PAPER portfolios; no live execution is enabled.
 
+Momentum Rush Brain is an isolated PAPER TEST experiment. Its integration repairs,
+observed throughput/net-result reporting and deployment boundaries are documented
+in [Momentum Rush repair](docs/MOMENTUM_RUSH_REPAIR.md).
+
 ```bash
 npm install
 npm run dev

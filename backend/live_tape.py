@@ -7,6 +7,7 @@ and events. Unknown programs/ambiguous bodies degrade coverage, never imply
 that there were no sellers. A signature is terminal only after classification.
 """
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import json
 import hashlib
 import math
@@ -24,11 +25,18 @@ RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
 OUT = Path(os.getenv('NEO_LIVE_TAPE_PATH', '/var/lib/neo-market/live_tape.json'))
 MAX_TRACKED = int(os.getenv('NEO_TAPE_MAX_PAIRS', '12'))
 MAX_EVENTS = int(os.getenv('NEO_TAPE_MAX_EVENTS', '1600'))
-PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','6'))))
+# PAGE_SIZE is a ceiling. Discovery shares the capped transaction budget
+# across active pools and pagination rounds; a minimum page of one signature
+# keeps each supported pool progressing when the pool count is high.
+PAGE_SIZE = min(1000,max(1,int(os.getenv('NEO_TAPE_PAGE_SIZE','1000'))))
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
-TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','120')))
+TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','12')))
+HISTORICAL_TX_BUDGET = max(0,int(os.getenv('NEO_TAPE_HISTORICAL_TX_PER_POLL','1')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
+RPC_TRANSACTION_CONCURRENCY = max(1,int(os.getenv('NEO_TAPE_RPC_TX_CONCURRENCY','4')))
 WINDOW_MS = 300_000
+DECISION_FLOW_WINDOW_MS = 30_000
+MAX_DISCOVERY_LAG_MS = WINDOW_MS
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
 ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
@@ -61,9 +69,17 @@ def shared_quote_reference():
     reference=quote_transport.quote_asset_reference()
     current=now_ms()
     if current>=_NEXT_REFERENCE_AT and (not reference or current-reference['observed_at']>=45_000):
-        _NEXT_REFERENCE_AT=current+45_000
         quote_transport.quote(WSOL,USDC,1_000_000_000,purpose='background',slippage_bps=100)
         reference=quote_transport.quote_asset_reference()
+        completed=now_ms()
+        refreshed=bool(reference and 0<=completed-reference['observed_at']<45_000)
+        # A transient missed refresh must get another chance before the old
+        # 60-second reference expires. Calls still use the shared transport's
+        # quota, exit priority and provider cooldown; authorization failures
+        # retain the ordinary interval rather than repeatedly hitting auth.
+        error=quote_transport.last_error().get('code')
+        retry_ms=45_000 if refreshed or error in {'AUTHENTICATION_REQUIRED','ACCESS_DENIED'} else 5_000
+        _NEXT_REFERENCE_AT=completed+retry_ms
     return reference
 
 
@@ -140,6 +156,26 @@ def align_rpc_answers(calls,data):
 def rpc_batch(calls):
     if not calls:
         return []
+    # PublicNode accepts batched signature discovery, but rejects a batch of
+    # getTransaction calls with -32600. Keep body retrieval bounded and
+    # concurrent as individual JSON-RPC requests instead of retrying an
+    # unsupported provider batch forever.
+    if all(method == 'getTransaction' for method,_ in calls):
+        def fetch_one(indexed_call):
+            index,(method,params) = indexed_call
+            payload = {'jsonrpc':'2.0','id':1,'method':method,'params':params}
+            try:
+                response = SESSION.post(RPC_URL,json=payload,timeout=15)
+                response.raise_for_status()
+                answer = response.json()
+                return align_rpc_answers([calls[index]],
+                    [answer] if isinstance(answer,dict) else answer)[0]
+            except (requests.RequestException,RuntimeError,ValueError):
+                # A failed body must not discard other successfully fetched
+                # transactions in this bounded concurrent group.
+                return {'id':1,'error':{'code':'TRANSACTION_RPC_UNAVAILABLE'}}
+        with ThreadPoolExecutor(max_workers=min(RPC_TRANSACTION_CONCURRENCY,len(calls))) as pool:
+            return list(pool.map(fetch_one,enumerate(calls)))
     if len(calls)>RPC_BATCH_SIZE:
         answers=[]
         for start in range(0,len(calls),RPC_BATCH_SIZE):
@@ -298,9 +334,11 @@ def parse_trade(tx,metadata):
 
 
 class TapeRecorder:
-    def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET):
+    def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET,
+                 historical_tx_budget=HISTORICAL_TX_BUDGET):
         self.path,self.clock = Path(path),clock
         self.page_size,self.page_budget,self.tx_budget = page_size,page_budget,tx_budget
+        self.historical_tx_budget = max(0,int(historical_tx_budget))
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
@@ -313,9 +351,15 @@ class TapeRecorder:
                 observed INTEGER NOT NULL,metadata TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',
                 attempts INTEGER NOT NULL DEFAULT 0,next_retry INTEGER NOT NULL DEFAULT 0,reason TEXT,PRIMARY KEY(signature,pair));
             CREATE INDEX IF NOT EXISTS pending_idx ON signatures(state,next_retry,observed);
+            CREATE INDEX IF NOT EXISTS signature_pair_window_idx
+                ON signatures(pair,event_time,observed,state);
+            CREATE INDEX IF NOT EXISTS pending_fresh_idx
+                ON signatures(COALESCE(event_time,observed) DESC,observed DESC,slot DESC,next_retry)
+                WHERE state='pending';
             CREATE TABLE IF NOT EXISTS events(event_id TEXT PRIMARY KEY,signature TEXT NOT NULL,pair TEXT NOT NULL,
                 event_time INTEGER NOT NULL,available INTEGER NOT NULL,payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS event_time_idx ON events(event_time);
+            CREATE INDEX IF NOT EXISTS event_pair_time_idx ON events(pair,event_time);
         ''')
         self.db.commit()
 
@@ -337,14 +381,45 @@ class TapeRecorder:
                     self.db.execute('INSERT INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(pair,mint,json.dumps(metadata)))
             active.append(metadata)
         # One shared page batch per round, rather than one HTTP call per pool.
-        # The provider batch helper splits to its configured maximum safely.
+        # The page size is a ceiling: spread the bounded body-processing budget
+        # across active pools while keeping discovery balanced and predictable.
+        page_limit = max(1, min(self.page_size,
+                                self.tx_budget // max(2, 2*len(active)*self.page_budget)))
         for _ in range(self.page_budget):
             if not active:
                 break
             calls,states = [],[]
             for metadata in active:
                 state = self.db.execute('SELECT * FROM pairs WHERE pair=?',(metadata['pair'],)).fetchone()
-                options = {'limit':self.page_size,'commitment':'confirmed'}
+                observed = self.clock()
+                # A pool may leave the small discovery set for minutes or hours.
+                # Replaying every signature since its old cursor makes current
+                # order flow look incomplete indefinitely. Start a new causal
+                # window after an actual monitoring gap, then require the full
+                # decision window to be collected before entries can use it.
+                scan_head_time = None
+                if state['scan_head']:
+                    scan_row = self.db.execute(
+                        'SELECT event_time FROM signatures WHERE signature=? AND pair=?',
+                        (state['scan_head'], metadata['pair'])).fetchone()
+                    if scan_row and scan_row['event_time']:
+                        scan_head_time = int(scan_row['event_time'])
+                inactive_gap = bool(state['last_poll'] and
+                                    observed - int(state['last_poll']) > DECISION_FLOW_WINDOW_MS)
+                stalled_scan = bool(state['before_sig'] and state['scan_head'] and
+                                    (scan_head_time is None or
+                                     observed - scan_head_time > MAX_DISCOVERY_LAG_MS))
+                failed_scan = state['reason'] in {
+                    'SIGNATURE_RPC_UNAVAILABLE', 'SIGNATURE_SCHEMA_MISMATCH',
+                    'PROVIDER_PAGINATION_STALLED'}
+                if inactive_gap or stalled_scan or failed_scan:
+                    with self.db:
+                        self.db.execute('''UPDATE pairs SET cursor=NULL,before_sig=NULL,
+                            scan_head=NULL,complete_since=NULL,reason=NULL WHERE pair=?''',
+                            (metadata['pair'],))
+                    state = self.db.execute('SELECT * FROM pairs WHERE pair=?',
+                                            (metadata['pair'],)).fetchone()
+                options = {'limit':page_limit,'commitment':'confirmed'}
                 if state['cursor']:
                     options['until'] = state['cursor']
                 if state['before_sig']:
@@ -367,11 +442,11 @@ class TapeRecorder:
                     with self.db:
                         self.db.execute('UPDATE pairs SET reason=?,last_poll=? WHERE pair=?',('SIGNATURE_SCHEMA_MISMATCH',self.clock(),pair))
                     continue
-                observed,cutoff = self.clock(),self.clock()-WINDOW_MS
+                observed,cutoff = self.clock(),self.clock()-DECISION_FLOW_WINDOW_MS
                 head = state['scan_head'] or (rows[0].get('signature') if rows else state['cursor'])
                 bootstrap = state['cursor'] is None
                 reached_time = bootstrap and any(r.get('blockTime') and int(r['blockTime'])*1000<cutoff for r in rows)
-                complete = len(rows)<self.page_size or reached_time or any(r.get('signature')==state['cursor'] for r in rows)
+                complete = len(rows)<page_limit or reached_time or any(r.get('signature')==state['cursor'] for r in rows)
                 before = rows[-1].get('signature') if rows else state['before_sig']
                 stalled = not complete and before==state['before_sig']
                 with self.db:
@@ -392,13 +467,27 @@ class TapeRecorder:
             active = next_active
 
     def process(self,rpc):
-        # Drain the freshest actionable signatures first. Historical retries can
-        # remain durable without starving the current five-minute decision window.
-        pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed DESC,slot DESC LIMIT ?",(self.clock(),self.tx_budget)))
+        # Prioritize on-chain time: an old pagination row discovered just now
+        # must not displace an already observed live transaction. Large legacy
+        # retry queues remain durable, but get only a small maintenance budget
+        # instead of filling every unused live request slot on each poll.
+        current = self.clock()
+        cutoff = current-WINDOW_MS
+        order = 'ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC LIMIT ?'
+        pending = list(self.db.execute(
+            "SELECT * FROM signatures INDEXED BY pending_fresh_idx WHERE state='pending' AND next_retry<=? "
+            'AND COALESCE(event_time,observed)>=? '+order,
+            (current,cutoff,self.tx_budget)))
+        historical_budget = min(self.historical_tx_budget,max(0,self.tx_budget-len(pending)))
+        if historical_budget:
+            pending.extend(self.db.execute(
+                "SELECT * FROM signatures INDEXED BY pending_fresh_idx WHERE state='pending' AND next_retry<=? "
+                'AND COALESCE(event_time,observed)<? '+order,
+                (current,cutoff,historical_budget)))
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
-        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':0}]) for sig in groups]
+        calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':1}]) for sig in groups]
         if not calls:
             return
         try:
@@ -439,13 +528,23 @@ class TapeRecorder:
                 continue
             # Unknown event times only affect decisions for the five-minute
             # window in which we actually observed the signature.
-            recent_filter = '(event_time>=? OR (event_time IS NULL AND observed>=?))'
+            # Entry gates consume a 30-second flow window. Older unresolved
+            # signatures remain visible in the durable tape and 5-minute chart,
+            # but must not poison completeness for the current decision window.
+            decision_cutoff = current - DECISION_FLOW_WINDOW_MS
+            # These disjoint ranges use the covering pool/time index. A single
+            # OR predicate made SQLite scan the durable history of every pool
+            # on each poll; an unknown timestamp still uses observation time.
+            recent_rows = '''SELECT state,observed FROM signatures
+                WHERE pair=? AND event_time>=?
+                UNION ALL SELECT state,observed FROM signatures
+                WHERE pair=? AND event_time IS NULL AND observed>=?'''
+            recent_params = (pair,decision_cutoff,pair,decision_cutoff)
             counters = {r['state']:r['n'] for r in self.db.execute(
-                f'SELECT state,count(*) n FROM signatures WHERE pair=? AND {recent_filter} GROUP BY state',
-                (pair,cutoff,cutoff))}
+                f'SELECT state,count(*) n FROM ({recent_rows}) GROUP BY state',recent_params)}
             pending = self.db.execute(
-                f"SELECT count(*) n,min(observed) oldest FROM signatures WHERE pair=? AND state='pending' AND {recent_filter}",
-                (pair,cutoff,cutoff)).fetchone()
+                f"SELECT count(*) n,min(observed) oldest FROM ({recent_rows}) WHERE state='pending'",
+                recent_params).fetchone()
             latest = self.db.execute('SELECT max(event_time) t FROM events WHERE pair=?',(pair,)).fetchone()['t']
             reason = state['reason']
             if pending['n']:

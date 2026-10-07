@@ -65,6 +65,35 @@ class ActivityTests(unittest.TestCase):
         b['history'][0]['pnl_usd']=1
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),0)
 
+    def test_promoted_book_uses_strict_declared_rule(self):
+        c=coin();c['score']=94
+        self.assertTrue(a.RULES['PRECISION'].matches(a.market_features(c,flows()[ADDRESS])))
+        with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([c],flows())
+        self.assertIsNone(lab.STATE['books']['PRECISION']['position'])
+
+    def test_promoted_book_pauses_after_recent_loss_streak(self):
+        book=lab.STATE['books']['EARLY']
+        book['history']=[
+            {'closed_at':NOW-1000,'pnl_usd':-1},
+            {'closed_at':NOW-2000,'pnl_usd':-1},
+            {'closed_at':NOW-3000,'pnl_usd':-1},
+        ]
+        with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([coin()],flows())
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'promoted_recent_loss_cooldown')
+        self.assertGreater(book['entry_diagnostics']['promoted_cooldown_remaining_ms'],0)
+
+    def test_promoted_guard_ignores_noneligible_research_rows(self):
+        book={'history':[
+            {'closed_at':NOW-1000,'pnl_usd':9,'promotion_eligible':False},
+            {'closed_at':NOW-2000,'pnl_usd':-1},
+            {'closed_at':NOW-3000,'pnl_usd':-1},
+            {'closed_at':NOW-4000,'pnl_usd':-1},
+        ]}
+        self.assertGreater(lab.promoted_pause_remaining_ms(book,NOW),0)
+        book['history'][1]['pnl_usd']=1
+        self.assertEqual(lab.promoted_pause_remaining_ms(book,NOW),0)
+
     def test_scalper_requires_verified_flow_and_positive_trend(self):
         rule=a.RULES['SCALPER']
         f={'score':95,'liq':50000,'m5':4,'bs':1.2,'lmc':.1,'age':60,

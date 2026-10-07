@@ -242,8 +242,9 @@ class ParserTests(unittest.TestCase):
     def test_unverified_swap_actor_does_not_inflate_independent_wallets(self):
         tx=transaction()
         for key in tx['transaction']['message']['accountKeys']:key['signer']=False
-        state,events,_=tape.classify_transaction(tx,META,ingested_at=NOW)
+        state,events,reason=tape.classify_transaction(tx,META,ingested_at=NOW)
         self.assertEqual(state,'unclassified');self.assertIn('SWAP_ACTOR_NOT_TRANSACTION_SIGNER',events[0]['quality_flags'])
+        self.assertEqual(reason,'SWAP_ACTOR_NOT_TRANSACTION_SIGNER')
 
     def test_failed_swap_not_counted(self):
         tx=transaction();tx['meta']['err']={'InstructionError':[0,'failure']}

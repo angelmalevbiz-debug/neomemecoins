@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { isArchivedStrategy, labEntryStatus, partitionLabStrategies } from '../src/lib/labStrategyView';
+import { isArchivedStrategy, labEntryStatus, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -40,4 +40,17 @@ test('custom inactive books remain in archive and separate Astra panel is not du
   const groups = partitionLabStrategies([custom, book('ASTRA_6_BRAIN', 250)]);
   assert.deepEqual(groups.archived.map(row => row.id), ['custom']);
   assert.equal(groups.research.length, 0);
+});
+
+test('cost limits and quote queue failures explain idleness without presenting model estimates as executable prices', () => {
+  assert.equal(planningCostStatus({ checked_market_candidates: 0 }), null);
+  assert.equal(planningCostStatus({ checked_market_candidates: 1, minimum_model_roundtrip_cost_pct: NaN, maximum_roundtrip_cost_pct: 1.5 }), null);
+  const text = planningCostStatus({ checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2,
+    minimum_model_roundtrip_cost_pct: 2.49, maximum_roundtrip_cost_pct: 1.5 });
+  assert.match(text!, /Всички кандидати надхвърлят лимита в модела/);
+  assert.match(text!, /2.49% · лимит 1.50%/);
+  assert.match(text!, /нужна е изпълнима котировка/);
+  assert.match(quoteFailureStatus('ENTRY_SEQUENCE_BUSY'), /изчаква ред/);
+  assert.match(quoteFailureStatus('PREFLIGHT_PREVIEW_STALE'), /остаряла/);
+  assert.match(quoteFailureStatus('UNRECOGNIZED_FAILURE'), /UNRECOGNIZED_FAILURE/);
 });

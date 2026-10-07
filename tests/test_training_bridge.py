@@ -7,7 +7,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import training_bridge
 from paper_training import USDC, PaperTrainingEngine
@@ -52,7 +52,11 @@ class TrainingBridgeProcessTests(unittest.TestCase):
 
     def stop(self):
         if self.bridge:
-            self.bridge.close()
+            bridge = self.bridge
+            bridge.close()
+            self.assertFalse(bridge.thread.is_alive())
+            if bridge.process is not None:
+                self.assertIsNotNone(bridge.process.poll())
             self.bridge = None
 
     def wait_for(self, predicate, timeout=8):
@@ -138,9 +142,11 @@ class TrainingBridgeProcessTests(unittest.TestCase):
 
     def test_exited_learning_worker_is_restarted_and_resumes_from_journal(self):
         self.start()
-        self.wait_for(lambda s:s["unique_observations"] == 0)
+        initial = self.wait_for(lambda s:s["unique_observations"] == 0)
         first_pid = self.bridge.process.pid
+        self.assertEqual(initial['worker_pid'], first_pid)
         self.bridge.process.terminate()
+        self.bridge.process.wait(timeout=5)
         deadline = time.monotonic() + 8
         while time.monotonic() < deadline:
             process = self.bridge.process
@@ -158,11 +164,100 @@ class TrainingBridgeProcessTests(unittest.TestCase):
                 snapshot = json.loads((self.root/"training_snapshot.json").read_text(encoding="utf-8"))
                 if (snapshot.get("unique_observations") == 1 and
                         self.bridge.process.poll() is None and self.bridge.error is None):
+                    self.assertEqual(snapshot['worker_pid'], self.bridge.process.pid)
+                    self.assertNotEqual(snapshot['worker_pid'], first_pid)
+                    self.stop()
+                    # Windows cannot rename a process-held file. Shutdown must
+                    # finish the actual learner, not merely its venv launcher.
+                    lock = self.root/'training.process.lock'
+                    moved = self.root/'training.closed.lock'
+                    lock.rename(moved)
+                    moved.rename(lock)
                     return
             except (OSError, ValueError):
                 pass
             time.sleep(.02)
         self.fail("restarted worker did not resume and process durable journal")
+
+    def test_shutdown_sentinel_deferred_behind_batch_is_not_lost(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.root = self.root
+        bridge.config = None
+        bridge.stop_event = threading.Event()
+        bridge.queue = queue.Queue()
+        bridge._deferred = training_bridge._NO_DEFERRED_ITEM
+        bridge._persist_drop_count = Mock(return_value=True)
+        bridge._ensure_worker = Mock()
+        bridge._write_batch = Mock()
+        bridge._record_persisted = Mock()
+        bridge.read_snapshot = Mock()
+        bridge.processed = 0
+        bridge.queue.put({'id':'one'})
+        bridge.queue.put({'id':'two'})
+        bridge.queue.put(None)
+        thread = threading.Thread(target=bridge.run)
+        thread.start()
+        thread.join(timeout=1)
+        if thread.is_alive():
+            bridge.stop_event.set()
+            thread.join(timeout=1)
+            self.fail('Shutdown sentinel was lost after a recorder batch')
+        bridge._write_batch.assert_called_once_with([{'id':'one'},{'id':'two'}])
+        self.assertEqual(bridge.queue.unfinished_tasks, 0)
+
+    def test_bounded_shutdown_persists_gap_for_queue_rows_left_after_slow_batch(self):
+        self.start()
+        self.wait_for(lambda s:s["unique_observations"] == 0)
+        entered = threading.Event()
+        original = self.bridge._write_batch
+
+        def slow_write(rows):
+            entered.set()
+            time.sleep(3.2)
+            original(rows)
+
+        with patch.object(self.bridge, "_write_batch", side_effect=slow_write):
+            self.assertTrue(self.bridge.submit({"id":"slow-batch", "available_at":1}))
+            self.assertTrue(entered.wait(timeout=2))
+            for index in range(5):
+                self.assertTrue(self.bridge.submit({"id":f"queued-{index}", "available_at":index+2}))
+            self.bridge.close()
+
+        saved = json.loads((self.root/"recorder_status.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(saved["dropped_total"], 5)
+        self.assertTrue(self.bridge.recording_drop_gap)
+        self.assertIn("missing observations invalidate evidence coverage", self.bridge.error)
+        self.assertEqual(self.bridge.queue.qsize(), 0)
+        self.assertEqual(self.bridge.queue.unfinished_tasks, 0)
+
+    def test_close_waits_for_worker_creation_and_stops_the_published_process(self):
+        entered, release = threading.Event(), threading.Event()
+        original = TrainingBridge._start_worker
+        def delayed_start(bridge, config_path):
+            entered.set()
+            if not release.wait(timeout=3):
+                raise RuntimeError('Test did not release worker creation')
+            original(bridge, config_path)
+        with patch.object(TrainingBridge, '_start_worker', delayed_start):
+            bridge = self.start()
+            self.assertTrue(entered.wait(timeout=2))
+            errors = []
+            def close():
+                try:bridge.close()
+                except Exception as exc:errors.append(exc)
+            closer = threading.Thread(target=close)
+            closer.start()
+            try:
+                release.set()
+                closer.join(timeout=8)
+                self.assertFalse(closer.is_alive())
+                self.assertEqual(errors, [])
+                self.assertFalse(bridge.thread.is_alive())
+                self.assertIsNotNone(bridge.process)
+                self.assertIsNotNone(bridge.process.poll())
+            finally:
+                release.set()
+                closer.join(timeout=8)
 
     def test_durable_reset_boundary_excludes_future_dated_old_journal_after_restart(self):
         self.start()

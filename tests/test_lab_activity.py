@@ -69,11 +69,14 @@ class ActivityTests(unittest.TestCase):
         b['history'][0]['pnl_usd']=1
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),0)
 
-    def test_promoted_book_uses_strict_declared_rule(self):
+    def test_promoted_book_uses_shared_rule_but_still_requires_flow_evidence(self):
         c=coin();c['score']=94
         self.assertTrue(a.RULES['PRECISION'].matches(a.market_features(c,flows()[ADDRESS])))
         with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([c],flows())
-        self.assertIsNone(lab.STATE['books']['PRECISION']['position'])
+        book=lab.STATE['books']['PRECISION']
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['signal_candidates'],1)
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'promoted_verified_flow_unavailable')
 
     def test_promoted_entries_require_fresh_exact_flow_and_completed_safety(self):
         c=coin()
@@ -88,7 +91,7 @@ class ActivityTests(unittest.TestCase):
         for key in lab.PROMOTED_STRATEGIES:
             book=lab.STATE['books'][key]
             self.assertIsNotNone(book['position'],key)
-            self.assertEqual(book['position']['entry_policy_version'],promoted_guard.VERSION)
+            self.assertEqual(book['position']['entry_policy_version'],promoted_guard.FUNDED_POLICY_VERSION)
             self.assertEqual(book['position']['verified_entry_flow']['address'],ADDRESS)
             self.assertGreaterEqual(book['position']['entry_roundtrip_pnl_pct'],-1.5)
 

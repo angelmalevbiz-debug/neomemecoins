@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
 import winner_ensemble
+from tape_pool_scheduler import TapePoolScheduler
 
 API_URL = os.getenv('NEO_LOCAL_API', 'http://127.0.0.1:8788/state')
 RPC_URL = os.getenv('SOLANA_RPC_URL', 'https://solana-rpc.publicnode.com')
@@ -63,6 +64,7 @@ STATUS = {'status':'starting','tracked_pairs':0,'updated_at':0,
           'source':'solana-mainnet-http-live','poll_seconds':POLL_SECONDS,'schema_version':3}
 _RECORDER = None
 _NEXT_REFERENCE_AT = 0
+_POOL_SCHEDULER = TapePoolScheduler()
 
 
 def shared_quote_reference():
@@ -113,29 +115,11 @@ def feed_snapshot():
     response = SESSION.get(API_URL,timeout=5)
     response.raise_for_status()
     state = response.json()
-    coins = list(state.get('feed',[]) or [])
-    def priority(coin):
-        tx = (coin.get('txns') or {}).get('m5') or {}
-        activity = float(tx.get('buys') or 0)+float(tx.get('sells') or 0)
-        # Spend the same bounded RPC body budget on actionable pools first.
-        # Extremely active pools often cannot finish pagination within a poll;
-        # a moderate 5m tape can still prove three recent swaps with less lag.
-        candidates = winner_ensemble.market_candidates(coin)
-        flow_capacity = -abs(activity-60) if activity >= 12 else -1000-activity
-        expected_flow = activity >= 30
-        return (bool(candidates),expected_flow,flow_capacity,len(candidates),
-                float(coin.get('score') or 0),activity)
-    coins.sort(key=priority,reverse=True)
-    pinned = [dict(p.get('coin_snapshot') or {},address=p.get('address'),pairAddress=p.get('pairAddress'))
-              for p in state.get('positions',[])]
-    # The strict transaction decoder below only verifies the PumpSwap AMM.
-    # Other DEX pools stay outside this flow tape rather than being mislabeled
-    # as zero-flow or making verified PumpSwap coverage permanently degraded.
-    pinned_supported = [coin for coin in pinned if str(coin.get('dexId') or '').lower() == 'pumpswap']
-    supported_coins = [coin for coin in coins if str(coin.get('dexId') or '').lower() == 'pumpswap']
     rows,observed = {},now_ms()
+    coins, scheduling = _POOL_SCHEDULER.select(state, now=observed, max_tracked=MAX_TRACKED)
+    STATUS['entry_scheduling'] = scheduling
     shared_reference=shared_quote_reference()
-    for coin in (pinned_supported+supported_coins)[:MAX_TRACKED]:
+    for coin in coins:
         pair,mint = coin.get('pairAddress'),coin.get('address')
         if not pair or not mint or pair in rows:
             continue
@@ -333,8 +317,13 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                         'provider':metadata.get('provider','solana-rpc'),'note':direction,'confirmed_swap':True})
     if len(decoded)!=len(swaps):
         return 'unclassified',decoded,'SWAP_EVENT_COVERAGE_INCOMPLETE'
-    if any(e['quality_flags'] for e in decoded):
-        return 'unclassified',decoded,'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE'
+    flags = {flag for event in decoded for flag in event['quality_flags']}
+    if flags:
+        # Preserve the coverage failure and the raw event, while naming the
+        # actual defect. Missing signer evidence is not a missing FX quote.
+        reason = ('SWAP_ACTOR_NOT_TRANSACTION_SIGNER' if 'SWAP_ACTOR_NOT_TRANSACTION_SIGNER' in flags
+                  else 'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE')
+        return 'unclassified',decoded,reason
     return 'processed',decoded,None
 
 
@@ -623,6 +612,19 @@ def poll_once():
     return payload
 
 
+def failure_summary(exc):
+    """Name the failing file/error code without paths, messages or credentials."""
+    details=[]
+    filename=getattr(exc,'filename2',None) or getattr(exc,'filename',None)
+    if isinstance(filename,str) and filename:
+        basename=filename.replace('\\','/').rsplit('/',1)[-1]
+        basename=re.sub(r'[^A-Za-z0-9._-]','_',basename)[:120]
+        if basename:details.append(f'file={basename}')
+    winerror=getattr(exc,'winerror',None)
+    if type(winerror) is int:details.append(f'winerror={winerror}')
+    return type(exc).__name__+(f" ({', '.join(details)})" if details else '')
+
+
 def main():
     failures=0
     while True:
@@ -632,7 +634,7 @@ def main():
             failures=0
         except Exception as exc:
             failures+=1
-            print(f'Live tape poll failed: {type(exc).__name__}', file=sys.stderr, flush=True)
+            print(f'Live tape poll failed: {failure_summary(exc)}', file=sys.stderr, flush=True)
             old = {}
             try:
                 saved = json.loads(OUT.read_text(encoding='utf-8'))
@@ -653,7 +655,7 @@ def main():
                 # A locked/full disk can reject both the normal projection and
                 # its degraded replacement. Keep the durable recorder alive;
                 # consumers already reject stale confirmed-flow evidence.
-                print(f'Live tape failure projection unavailable: {type(projection_error).__name__}',
+                print(f'Live tape failure projection unavailable: {failure_summary(projection_error)}',
                       file=sys.stderr, flush=True)
         delay=min(60,2**min(failures,6)) if failures else POLL_SECONDS
         time.sleep(max(.25,delay-(time.monotonic()-started)))

@@ -69,6 +69,15 @@ if ($Action -eq 'Status') {
     } else { Write-Output 'No local PAPER process manifest exists.' }
     exit 0
 }
+# The watchdog holds this same reentrant mutex from its health probe through
+# recovery. Manual mutations therefore cannot expose a partial startup manifest
+# to a competing recovery decision, or be stopped by a stale watchdog probe.
+$operationMutex = [Threading.Mutex]::new($false, 'Local\NeoLocalPaperOperation')
+$operationOwned = $false
+try {
+    try { $operationOwned = $operationMutex.WaitOne(30000) }
+    catch [Threading.AbandonedMutexException] { $operationOwned = $true }
+    if (!$operationOwned) { throw 'Another PAPER lifecycle operation is in progress; no services were changed.' }
 if ($Action -eq 'Stop') {
     if (!(Test-Path -LiteralPath $manifestPath)) { throw 'No owned local PAPER process manifest exists.' }
     $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
@@ -86,9 +95,6 @@ if ($Action -eq 'Stop') {
 }
 
 if (!(Test-Path -LiteralPath $python)) { throw 'Install the isolated .venv dependencies before starting PAPER services.' }
-if ($Action -eq 'Start' -and (Test-Path -LiteralPath $watchdogPauseMarker)) {
-    Remove-Item -LiteralPath $watchdogPauseMarker
-}
 if ($Action -eq 'StartMissing') {
     if (!(Test-Path -LiteralPath $manifestPath)) { throw 'StartMissing requires a verified existing local PAPER manifest.' }
     $previous = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
@@ -129,6 +135,9 @@ if (!$SupabasePublishableKey) {
 }
 if (!$SupabasePublishableKey.StartsWith('sb_publishable_')) { throw 'A Supabase public publishable key is required.' }
 [IO.Directory]::CreateDirectory($services) | Out-Null
+if ($Action -eq 'Start' -and !$WatchdogRecovery) {
+    [IO.File]::WriteAllText($watchdogPauseMarker, [DateTime]::UtcNow.ToString('o'))
+}
 if (Test-Path -LiteralPath $stopMarker) { Remove-Item -LiteralPath $stopMarker }
 $settings = @{
     PYTHONUTF8='1'; PYTHONUNBUFFERED='1'; NEO_ENGINE_MODE='PAPER'; NEO_EXECUTION_MODE='PAPER';
@@ -174,6 +183,9 @@ try {
     if (@($records | Where-Object { $null -eq (Get-OwnedProcess $_) }).Count -gt 0) {
         throw 'A PAPER worker exited before startup completed; review its stderr log.'
     }
+    if ($Action -eq 'Start' -and !$WatchdogRecovery -and (Test-Path -LiteralPath $watchdogPauseMarker)) {
+        Remove-Item -LiteralPath $watchdogPauseMarker
+    }
 } catch {
     # A startup timeout must also stop a late runner whose import has not yet
     # completed, rather than letting an unrecorded worker start afterward.
@@ -183,3 +195,7 @@ try {
     foreach ($name in $original.Keys) { [Environment]::SetEnvironmentVariable($name, $original[$name], 'Process') }
 }
 $records | Select-Object service,pid,stdout,stderr
+} finally {
+    if ($operationOwned) { $operationMutex.ReleaseMutex() }
+    $operationMutex.Dispose()
+}

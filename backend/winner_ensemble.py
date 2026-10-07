@@ -12,9 +12,10 @@ from typing import Any
 import lab_activity
 
 VERSION = 'WINNER_ENSEMBLE_PAPER_V1'
-ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V3'
+ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V4'
 VERIFIED_FLOW_MOMENTUM = 'VERIFIED_FLOW_MOMENTUM'
-STRATEGIES = (VERIFIED_FLOW_MOMENTUM, 'EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
+COST_EFFICIENT_FLOW = 'COST_EFFICIENT_FLOW'
+STRATEGIES = (VERIFIED_FLOW_MOMENTUM, COST_EFFICIENT_FLOW, 'EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 
 # The broad market screen increases the candidate pool. Confirmation remains
 # strict: the promoted-entry guard enforces fresh chain evidence, while this
@@ -24,7 +25,14 @@ RULES = {
         76, 10_000, (-3, 45), .9, .04, (1, 1440), (-25, 300), (.05, 12),
         flow_trades=3, flow_ratio=1.2, wallets=2,
     ),
-    **{name: lab_activity.RULES[name] for name in STRATEGIES[1:]},
+    # Young small-cap pools often exceed the cost ceiling before any impact.
+    # This prospective market screen also examines established liquid pools;
+    # it does not treat their modeled fees as executable quotes or a win rate.
+    COST_EFFICIENT_FLOW: lab_activity.EntryRule(
+        76, 200_000, (-1, 15), 1.1, .015, (1440, 1e7), (-5, 40), (.03, 3),
+        flow_trades=3, flow_ratio=1.2, wallets=2,
+    ),
+    **{name: lab_activity.RULES[name] for name in STRATEGIES[2:]},
 }
 
 MIN_SCORE = min(RULES[name].score for name in STRATEGIES)

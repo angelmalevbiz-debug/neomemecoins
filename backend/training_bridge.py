@@ -25,6 +25,7 @@ RECENT_OBSERVATION_IDS = 8192
 RECORDER_BATCH_SIZE = 128
 WORKER_RESTART_MAX_SECONDS = 30
 OBSERVATION_MIN_INTERVAL_MS = 3000
+_NO_DEFERRED_ITEM = object()
 
 
 class TrainingBridge:
@@ -82,14 +83,17 @@ class TrainingBridge:
         except (OSError, ValueError, TypeError):
             pass
         self.config = config
+        self.worker_lifecycle_lock = threading.Lock()
+        self.close_lock = threading.Lock()
         self.process = None
         self.worker_restart_attempts = 0
         self.worker_restart_at = 0.0
         self.worker_exit_reported_pid = None
         self.worker_snapshot_mtime_at_launch = 0
         self.closed = False
+        self.shutdown_complete = False
         self.stop_event = threading.Event()
-        self._deferred = None
+        self._deferred = _NO_DEFERRED_ITEM
         self.thread = threading.Thread(target=self.run, name='paper-training', daemon=True)
         self.thread.start()
 
@@ -105,6 +109,8 @@ class TrainingBridge:
             # Queue insertion and pending registration share the lock so the
             # writer cannot finish before the ID becomes visible to producers.
             with self.lock:
+                if self.closed:
+                    return False
                 if row_id in self.pending_ids or row_id in self.recent_ids:
                     self.coalesced += 1
                     return True
@@ -117,13 +123,16 @@ class TrainingBridge:
                     self.error = 'Training queue full; missing observations invalidate evidence coverage'
                     return False
             return True
-        try:
-            self.queue.put_nowait(payload)
-            return True
-        except queue.Full:
-            self.dropped += 1
-            self.error = 'Training queue full; missing observations invalidate evidence coverage'
-            return False
+        with self.lock:
+            if self.closed:
+                return False
+            try:
+                self.queue.put_nowait(payload)
+                return True
+            except queue.Full:
+                self.dropped += 1
+                self.error = 'Training queue full; missing observations invalidate evidence coverage'
+                return False
 
     def _record_persisted(self, row_id):
         if not row_id:
@@ -192,8 +201,17 @@ class TrainingBridge:
         self.worker_exit_reported_pid = None
         diagnostic = (self.root / 'worker_error.log').open('ab')
         try:
+            worker_python = sys.executable
+            if os.name == 'nt' and sys.prefix != sys.base_prefix:
+                # Windows venv python.exe is a launcher with a second process.
+                # This learner uses only our source and the standard library;
+                # launch its base interpreter directly so Popen owns the PID
+                # holding training.process.lock, and wait really closes it.
+                worker_python = getattr(sys, '_base_executable', None)
+                if not worker_python or not Path(worker_python).is_file():
+                    raise RuntimeError('Cannot locate the actual Windows training interpreter')
             self.process = subprocess.Popen(
-                [sys.executable, str(Path(__file__).with_name('training_worker.py')),
+                [worker_python, str(Path(__file__).with_name('training_worker.py')),
                  '--root', str(self.root.resolve()), '--config', str(config_path.resolve())],
                 stdout=subprocess.DEVNULL, stderr=diagnostic,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
@@ -201,6 +219,10 @@ class TrainingBridge:
             diagnostic.close()
 
     def _ensure_worker(self, config_path):
+        with self.worker_lifecycle_lock:
+            self._ensure_worker_locked(config_path)
+
+    def _ensure_worker_locked(self, config_path):
         # Shutdown sets closed before queuing its sentinel. A worker exit racing
         # with the final recorder batch must not start a fresh child behind it.
         if self.closed or self.stop_event.is_set():
@@ -242,8 +264,8 @@ class TrainingBridge:
             self._persist_drop_count()
             self._ensure_worker(config_path)
             while not self.stop_event.is_set():
-                if self._deferred is not None:
-                    item, self._deferred = self._deferred, None
+                if self._deferred is not _NO_DEFERRED_ITEM:
+                    item, self._deferred = self._deferred, _NO_DEFERRED_ITEM
                 else:
                     try:
                         item = self.queue.get(timeout=.1)
@@ -326,18 +348,57 @@ class TrainingBridge:
                         time.sleep(.01)
 
     def close(self):
-        self.closed = True
-        try:
-            self.queue.put(None, timeout=.2)
-        except queue.Full:
-            self.dropped += self.queue.qsize()
-            self.error = 'Training recorder shutdown before queue drained'
-            self.stop_event.set()
-        self.thread.join(timeout=3)
-        self._persist_drop_count()
-        if self.process and self.process.poll() is None:
-            self.process.terminate()
-            self.process.wait(timeout=5)
+        with self.close_lock:
+            if self.shutdown_complete:
+                return
+            with self.worker_lifecycle_lock:
+                with self.lock:
+                    already_closed = self.closed
+                    self.closed = True
+            if not already_closed:
+                try:
+                    self.queue.put(None, timeout=.2)
+                except queue.Full:
+                    self.error = 'Training recorder shutdown before queue drained'
+                    self.stop_event.set()
+            self.thread.join(timeout=3)
+            if self.thread.is_alive():
+                self.stop_event.set()
+                self.thread.join(timeout=3)
+            # No worker can start after closed was set under the same lock.
+            process = self.process
+            if process is not None:
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+            if self.thread.is_alive():
+                raise RuntimeError('Training recorder did not stop; shutdown is incomplete')
+            # Only now is the queue stable. Count any rows that the bounded
+            # shutdown could not journal, including a deferred control message.
+            # Never acknowledge them as persisted or erase the coverage gap.
+            abandoned = 0
+            if self._deferred is not _NO_DEFERRED_ITEM:
+                abandoned += self._deferred is not None
+                self._deferred = _NO_DEFERRED_ITEM
+                self.queue.task_done()
+            while True:
+                try:
+                    item = self.queue.get_nowait()
+                except queue.Empty:
+                    break
+                abandoned += item is not None
+                self.queue.task_done()
+            if abandoned:
+                self.dropped += abandoned
+                self.recording_drop_gap = True
+                self.error = 'Training recorder shutdown before queue drained; missing observations invalidate evidence coverage'
+            if not self._persist_drop_count():
+                raise RuntimeError('Training shutdown coverage gap could not be saved')
+            self.shutdown_complete = True
 
     @staticmethod
     def quote_at(quote, stamp):

@@ -6,6 +6,7 @@ execution signal. It never changes completed outcomes or manages existing exits.
 import math
 
 VERSION = 'PROMOTED_EVIDENCE_COST_V1'
+FUNDED_POLICY_VERSION = 'PROMOTED_SHARED_CANDIDATES_EVIDENCE_COST_V2'
 FLOW_SOURCE = 'CONFIRMED_PUMPSWAP_WINDOW'
 FLOW_MAX_AGE_MS = 12_000
 FLOW_WINDOW_MS = 30_000
@@ -89,3 +90,16 @@ def policy_config(stop_loss_pct):
             'requires_exact_pool_fresh_safety': True,
             'evidence_status': 'PROSPECTIVE_POLICY_UNVALIDATED',
             'profitability_proven': False, 'historical_outcomes_unchanged': True}
+
+
+def funded_policy_config(stop_loss_pct, candidate_rules):
+    """Version the funded market screen independently of unchanged evidence gates.
+
+    MAIN uses these evidence gates too, but its candidate policy is separately
+    versioned. The funded Lab screen now consumes the shared declared rules;
+    earlier positions and completed trades keep their original policy version.
+    """
+    return {**policy_config(stop_loss_pct), 'version': FUNDED_POLICY_VERSION,
+            'evidence_guard_version': VERSION,
+            'candidate_policy_source': 'LAB_ACTIVITY_RULES',
+            'candidate_rules': candidate_rules}

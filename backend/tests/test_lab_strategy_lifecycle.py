@@ -218,7 +218,7 @@ class LifecycleIntegrationTests(unittest.TestCase):
         promoted = lab.STATE['books']['EARLY']
         promoted['position'] = None
         coin = self.coin()
-        coin['ageMinutes'] = 90  # Broad TEST rule allows it; the promoted rule does not.
+        coin['ageMinutes'] = 121  # Outside the shared EARLY screen's 120-minute age limit.
         with patch.object(lab.promoted_guard, 'flow_admission') as flow_gate:
             lab.maybe_open([coin], {})
         flow_gate.assert_not_called()

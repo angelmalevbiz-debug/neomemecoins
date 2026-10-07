@@ -107,6 +107,31 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual(len(m.STATE.positions),1)
         self.assertFalse(m.STATE.history)
 
+    def test_catalog_keeps_supported_entry_pool_but_held_pool_marks_stay_exact(self):
+        pump = {'chainId': 'solana', 'dexId': 'pumpswap', 'baseToken': {'address': A},
+                'pairAddress': B, 'liquidity': {'usd': 300_000}}
+        raydium = {**pump, 'dexId': 'raydium', 'pairAddress': C, 'liquidity': {'usd': 600_000}}
+        self.assertEqual(m.best_pairs([pump, raydium])[A]['pairAddress'], C)
+        self.assertEqual(m.best_pairs([pump, raydium], prefer_pumpswap_mints={A})[A]['pairAddress'], B)
+        self.assertEqual(m.exact_position_pair({'address': A, 'pairAddress': C}, [pump, raydium]), raydium)
+
+    def test_cached_gecko_market_observation_does_not_become_fresh_on_each_scan(self):
+        pair = {'baseToken': {'address': A}, 'pairAddress': B,
+                'priceUsd': '1', '_market_observed_at': self.clock[0] - 120_000}
+        snapshot = m.make_coin(A, pair, {})
+        self.assertEqual(snapshot['updatedAt'], self.clock[0] - 120_000)
+        self.assertIn('stale_feed', entry_policy.signal_data_rejections(snapshot, now=self.clock[0]))
+
+    def test_stale_early_cache_cannot_replace_fresh_exact_pool_or_switch_identity(self):
+        stale = {'chainId': 'solana', 'baseToken': {'address': A}, 'pairAddress': B,
+                 'priceUsd': '1', '_market_observed_at': self.clock[0] - 120_000}
+        fresh = {**stale, 'priceUsd': '2'}
+        fresh.pop('_market_observed_at')
+        self.assertEqual(m.early_market_pairs([stale], [fresh], self.clock[0]), [fresh])
+        self.assertEqual(m.early_market_pairs([stale], [{**fresh, 'pairAddress': C}], self.clock[0]), [])
+        recent = {**stale, '_market_observed_at': self.clock[0] - 1000}
+        self.assertEqual(m.early_market_pairs([recent], [], self.clock[0]), [recent])
+
     def test_reentry_guard_uses_fresh_feed_over_pinned_previous_trade(self):
         self.position()
         stale=dict(self.coin,updatedAt=self.clock[0]-120_000)
@@ -245,14 +270,15 @@ class MainPaperRepair(unittest.TestCase):
         self.assertEqual({p['address'] for p in m.STATE.positions},{coin['address'] for coin in coins})
         self.assertEqual({p['session_id'] for p in m.STATE.positions},{m.STATE.demo_session_id})
         self.assertTrue(all(p['strategy_id']==winner_ensemble.VERSION for p in m.STATE.positions))
-        self.assertTrue(all(p['strategy_matches']==list(winner_ensemble.STRATEGIES) for p in m.STATE.positions))
+        expected_matches=['VERIFIED_FLOW_MOMENTUM','EARLY','MOMENTUM','PRECISION','ULTRA_PRECISION']
+        self.assertTrue(all(p['strategy_matches']==expected_matches for p in m.STATE.positions))
         self.assertLessEqual(m.STATE.reserved_usd(),m.STATE.demo_balance_usd)
         self.assertAlmostEqual(m.STATE.available_balance_usd()+m.STATE.reserved_usd(),1000)
         restored=m.State()
         self.assertEqual(len(restored.positions),3)
-        self.assertEqual(restored.positions[0]['strategy_matches'],list(winner_ensemble.STRATEGIES))
+        self.assertEqual(restored.positions[0]['strategy_matches'],expected_matches)
         self.monitor.book_paper_exit(m.STATE.positions[0],dict(self.quote,token_input_raw=100000000),'TEST_CLOSE',coins[0])
-        self.assertEqual(m.State().history[0]['strategy_matches'],list(winner_ensemble.STRATEGIES))
+        self.assertEqual(m.State().history[0]['strategy_matches'],expected_matches)
 
     def test_overlapping_winner_signals_and_duplicate_feed_pool_create_one_trade_per_mint(self):
         self.entry_patches()

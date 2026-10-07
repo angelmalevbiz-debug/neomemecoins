@@ -77,7 +77,7 @@
     "backend/lab_dashboard_projection.py": "cd89be4f8f5e295fdeb4fd05fc66e42011773de58cf2755c3274eb02ebcf162f",
     "backend/lab_paired_runner.py": "9d58e368a833cb28a6734c8e4f4ca6b260ec481249971ad776db49f01104be86",
     "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
-    "backend/live_tape.py": "c1bb42ad27085cbec65ccb067ad70ba83bcd5f6108eaf19bfb3d56eb65282497",
+    "backend/live_tape.py": "42a3ed3952e686f2747537d18246b45761175b519f869250b3caa4c705c3f46d",
     "backend/main_replay.py": "f81e4152a61e00d24a1cb354276aca7ff3fbd4d08c2533d09b1c0c8dc657b6f9",
     "backend/market_monitor.py": "e67d23b08f1fe36708cc7fef21536630b0e313aaf48b3f95dcf730f6db9e7179",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",

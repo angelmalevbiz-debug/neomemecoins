@@ -115,9 +115,24 @@ requests, and at most one historical retry per cycle. Current bodies rank by
 on-chain time. Pools outside this capacity retain unavailable flow; guards still
 require actual complete fresh evidence. Historical rows remain durable.
 
-The final source passed 344 root and 119 backend Python tests, 16 frontend
+The final source passed 346 root and 119 backend Python tests, 16 frontend
 regressions, TypeScript, strategy hashes, extension checks and production build.
 The dashboard launcher was exercised through start, repeated start, stop and
 restart. Local CORS returned the exact localhost origin; private state returned
 the expected unauthenticated 401. No private authenticated dashboard result or
 financial success rate is inferred from these checks.
+
+Transient failures refreshing the shared SOL/USD quote now retry after five
+seconds instead of waiting another 45 seconds and allowing the 60-second
+reference to expire. Successful refreshes and authentication failures retain
+the usual 45-second interval; shared quota, exit priority and provider cooldown
+still apply. Old observations are never repriced using a future reference.
+
+The local source was installed with all four PAPER services running and zero
+stderr output after a checksummed account archive. All 34 existing Lab ledgers
+and the primary's 31 archived completed trades survived the update. The reduced
+pool set cleared pagination and had cursors within 2–3 seconds and no current
+transaction backlog. Complete flow coverage still fluctuates with real unknown
+actors/instructions and missing verified FX evidence. This remains a data-quality
+constraint, not evidence of an 80% trading edge. Rush had no completed trades in
+the measured follow-up.

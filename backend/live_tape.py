@@ -69,9 +69,17 @@ def shared_quote_reference():
     reference=quote_transport.quote_asset_reference()
     current=now_ms()
     if current>=_NEXT_REFERENCE_AT and (not reference or current-reference['observed_at']>=45_000):
-        _NEXT_REFERENCE_AT=current+45_000
         quote_transport.quote(WSOL,USDC,1_000_000_000,purpose='background',slippage_bps=100)
         reference=quote_transport.quote_asset_reference()
+        completed=now_ms()
+        refreshed=bool(reference and 0<=completed-reference['observed_at']<45_000)
+        # A transient missed refresh must get another chance before the old
+        # 60-second reference expires. Calls still use the shared transport's
+        # quota, exit priority and provider cooldown; authorization failures
+        # retain the ordinary interval rather than repeatedly hitting auth.
+        error=quote_transport.last_error().get('code')
+        retry_ms=45_000 if refreshed or error in {'AUTHENTICATION_REQUIRED','ACCESS_DENIED'} else 5_000
+        _NEXT_REFERENCE_AT=completed+retry_ms
     return reference
 
 

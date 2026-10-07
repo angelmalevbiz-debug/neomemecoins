@@ -164,6 +164,55 @@ class ParserTests(unittest.TestCase):
         metadata['quote_reference_at']=NOW+1
         self.assertEqual(tape.classify_transaction(transaction(quote_mint=tape.WSOL),metadata,ingested_at=NOW)[0],'unclassified')
 
+    def test_transient_fx_refresh_retries_before_reference_expiry_then_keeps_normal_interval(self):
+        clock=[NOW]
+        reference=[{'observed_at':NOW-45_000,'usd_per_unit':180,
+                    'source':'JUPITER_CONVERSION_QUOTE_REFERENCE'}]
+        attempts=[]
+        def current_reference():
+            return reference[0] if clock[0]-reference[0]['observed_at']<=60_000 else None
+        def refresh(*args,**kwargs):
+            attempts.append((clock[0],kwargs))
+            if len(attempts)==1:
+                return None
+            reference[0]=dict(reference[0],observed_at=clock[0])
+            return {'_received_at':clock[0]}
+        with patch.object(tape,'now_ms',side_effect=lambda:clock[0]), \
+             patch.object(tape,'_NEXT_REFERENCE_AT',0), \
+             patch.object(tape.quote_transport,'quote_asset_reference',side_effect=current_reference), \
+             patch.object(tape.quote_transport,'quote',side_effect=refresh), \
+             patch.object(tape.quote_transport,'last_error',return_value={'code':'TIMEOUT'}):
+            self.assertEqual(tape.shared_quote_reference()['observed_at'],NOW-45_000)
+            clock[0]=NOW+4999
+            tape.shared_quote_reference()
+            self.assertEqual(len(attempts),1)
+            clock[0]=NOW+5000
+            self.assertEqual(tape.shared_quote_reference()['observed_at'],NOW+5000)
+            self.assertEqual(len(attempts),2)
+            self.assertLess(clock[0],NOW+15_000)
+            clock[0]=NOW+49_999
+            tape.shared_quote_reference()
+            self.assertEqual(len(attempts),2)
+            clock[0]=NOW+50_000
+            tape.shared_quote_reference()
+            self.assertEqual(len(attempts),3)
+        self.assertTrue(all(kwargs['purpose']=='background' for _,kwargs in attempts))
+
+    def test_fx_authorization_failure_keeps_normal_retry_interval(self):
+        clock=[NOW]
+        with patch.object(tape,'now_ms',side_effect=lambda:clock[0]), \
+             patch.object(tape,'_NEXT_REFERENCE_AT',0), \
+             patch.object(tape.quote_transport,'quote_asset_reference',return_value=None), \
+             patch.object(tape.quote_transport,'quote',return_value=None) as provider, \
+             patch.object(tape.quote_transport,'last_error',return_value={'code':'AUTHENTICATION_REQUIRED'}):
+            self.assertIsNone(tape.shared_quote_reference())
+            clock[0]=NOW+5000
+            self.assertIsNone(tape.shared_quote_reference())
+            self.assertEqual(provider.call_count,1)
+            clock[0]=NOW+45_000
+            self.assertIsNone(tape.shared_quote_reference())
+            self.assertEqual(provider.call_count,2)
+
     def test_unverified_swap_actor_does_not_inflate_independent_wallets(self):
         tx=transaction()
         for key in tx['transaction']['message']['accountKeys']:key['signer']=False

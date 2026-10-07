@@ -30,10 +30,11 @@ class ActivityTests(unittest.TestCase):
     def setUp(self):
         guard=patch.object(lab.price_integrity,'check',return_value={'status':'pass','version':'OFFLINE_FIXTURE'})
         guard.start();self.addCleanup(guard.stop)
+        lab.rush._SAMPLE_BY_PAIR.clear()
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_33_rules_exist(self):
-        self.assertEqual(len(a.RULES),33)
+    def test_all_34_rules_exist(self):
+        self.assertEqual(len(a.RULES),34)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
 
@@ -269,7 +270,7 @@ class ActivityTests(unittest.TestCase):
         request.assert_not_called()
         self.assertEqual(book['position']['current_price'],coin()['priceUsd'])
 
-    def test_net_stop_all_33_no_loss_clamping(self):
+    def test_net_stop_all_34_no_loss_clamping(self):
         c=coin()
         for b in lab.STATE['books'].values():
             b['position']={'trade_no':1,'address':ADDRESS,'pairAddress':PAIR,'entry_price':1,
@@ -285,6 +286,37 @@ class ActivityTests(unittest.TestCase):
             self.assertEqual(b['history'][0]['exit_reason'],'STOP_LOSS_3_NET')
             self.assertEqual(b['history'][0]['pnl_pct'],-6)
             self.assertEqual(b['balance'],b['starting_balance']-6)
+
+    def test_momentum_rush_opens_broader_low_cap_setup_without_promoting_it(self):
+        c=coin()
+        c.update(score=82,marketCap=40000,liquidityUsd=12000,ageMinutes=12)
+        c['priceChange']={'m5':2,'h1':8}
+        c['volume']={'h1':9000}
+        c['txns']={'m5':{'buys':18,'sells':10}}
+        flow={ADDRESS:{'trades':5,'buys':4,'sells':1,'buy_usd':350,'sell_usd':100,
+                       'unique_wallets':4,'ratio':3.5,'max_sell':50}}
+        features=a.market_features(c,flow[ADDRESS])
+        self.assertFalse(a.RULES['MOMENTUM'].matches(features))
+        with patch.object(lab,'now_ms',return_value=NOW):
+            lab.maybe_open([c],flow)
+        book=lab.STATE['books']['MOMENTUM_RUSH_BRAIN']
+        self.assertEqual(book['portfolio_group'],'TEST')
+        self.assertIsNotNone(book['position'])
+        self.assertLessEqual(book['position']['notional_usd'],60)
+        self.assertEqual(book['position']['momentum_rush_brain']['target_win_rate_pct'],89.0)
+        self.assertFalse(book['position']['momentum_rush_brain']['target_is_guarantee'])
+
+    def test_momentum_rush_rejects_bearish_low_cap_flow(self):
+        c=coin()
+        c.update(score=86,marketCap=40000,liquidityUsd=14000,ageMinutes=15)
+        c['priceChange']={'m5':3,'h1':10}
+        c['txns']={'m5':{'buys':16,'sells':9}}
+        flow={'trades':6,'buys':2,'sells':4,'buy_usd':100,'sell_usd':450,
+              'unique_wallets':4,'ratio':.22,'max_sell':1800}
+        meta=lab.rush.evaluate(lab.STATE['books']['MOMENTUM_RUSH_BRAIN'],c,a.market_features(c,flow),NOW)
+        self.assertFalse(meta['allow'])
+        self.assertTrue(meta['verified_flow_bearish'])
+        self.assertTrue(meta['dump_risk'])
 
     def test_constants_preserved(self):
         self.assertEqual((lab.STOP_LOSS,lab.TAKE_PROFIT,lab.MAX_HOLD_MIN),(3,10,60))

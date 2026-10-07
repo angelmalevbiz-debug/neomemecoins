@@ -1,7 +1,7 @@
 {
   "name": "NEO verified PAPER execution and isolated learning",
   "locked_at_utc": "2026-10-07",
-  "source_commit": "USER_AUTHORIZED_PROMOTED_PAPER_STRATEGY_GUARD_20261007",
+  "source_commit": "USER_AUTHORIZED_MOMENTUM_RUSH_PAPER_TEST_20261007",
   "strategy_file": "backend/market_monitor.py",
   "sha256": "26c07c6cefb5bfcc5333c7c3bfeb5fd98c73679ec92d59b74235e0e482803a21",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
@@ -80,16 +80,17 @@
     "backend/paper_state_reset.py": "80cdf337e5f8db84fe9848e929b0c450f38d413fee82e881bf8b5fedcfe89892",
     "backend/paper_training.py": "cce2185c04c5a8752aa179aa43943832c8be36fd31b26f8a158b2f194a225ad5",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "33280dd7e6c8b6f85ab162fc720373437932a1a3d9b0cb1b2a66873a9f8e19a5",
+    "backend/strategy_lab.py": "d807eb15b4c08b0ddecec4d7ad3ca275fcddcd1fc36e8788df539ed4f480ddc6",
     "backend/training_bridge.py": "0cc7d8cd61fbedde1ce25717fa022c3d03c279f0b24fe42f188ac0ee438553e5",
     "backend/training_worker.py": "9390cc7cc78afb2dc791d03e8c51fb85374a5edf5330d22ddd614048fba65ae2",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
     "backend/lab_position_marks.py": "555c58a69dcdd5bb131e4bd052dac1f9294b90c10320afe5d889646dd70ae233",
     "backend/lab_dashboard_projection.py": "6714791cc22c0330843c902c76cfd058062a6fc4f9afd2c7cfa41d8a0cc28da0",
-    "backend/lab_activity.py": "6f39bd931024205cbd08644652fee9ddad5a14d5438c315310cb8620155e17ab",
+    "backend/lab_activity.py": "168e7b75b96aa9ec7e10f81cd2c649d9555a4ee5cffc545377cc1a4610ecffdd",
     "backend/winner_ensemble.py": "96d40a7d1e7623af693dce792e7ccbf0414702a18ab41a9b6e727d9cfcd9fa77",
     "backend/market_monitor.py": "26c07c6cefb5bfcc5333c7c3bfeb5fd98c73679ec92d59b74235e0e482803a21",
-    "backend/entry_size_backoff.py": "20bbabd06df2b9aa61b006cd06fb56f216f48b54f2743c38cd21a174a44cbb41"
+    "backend/entry_size_backoff.py": "20bbabd06df2b9aa61b006cd06fb56f216f48b54f2743c38cd21a174a44cbb41",
+    "backend/momentum_rush_brain.py": "5424216aa01ceb1103874b177cdff2267a862dbf557f8d5a461cfd40861255df"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs the four selected Lab entry rules against one shared balance; independent validated training remains separate and can never send live orders.",
@@ -152,19 +153,22 @@
     "backend/training_worker.py": "Independent replay process with batched checkpoints, durable reset boundary, restart and causal journal recovery",
     "backend/paper_state_reset.py": "User-authorized checksum archives, offline PAPER reset/restore and isolated training-only reset that preserves account history",
     "backend/user_gateway.py": "Independent private accounts without inherited central trades and atomic registry",
-    "backend/strategy_lab.py": "Funded PROMOTED_PAPER books now use their declared stricter entry rules and pause new entries after recent eligible losing runs; fees, slippage, impact and PAPER-only execution remain unchanged.",
+    "backend/strategy_lab.py": "Adds an isolated TEST-only Momentum Rush Brain book with broader causal momentum ranking, low-cap sizing, fast PAPER exits, and unchanged modeled fees/slippage/impact; promoted $1,000 cohort remains unchanged.",
     "backend/astra6_brain.py": "Shared exit-priority quote transport, cache/backoff, UTF-8 persistence and truthful profit factor",
     "backend/lab_paired_runner.py": "Cross-platform file locking and UTF-8 persistence",
-    "backend/main_replay.py": "Actual primary engine recorded-only evidence replay"
+    "backend/main_replay.py": "Actual primary engine recorded-only evidence replay",
+    "backend/lab_activity.py": "Registers the broad Momentum Rush TEST family, faster TEST cooldown, and $5 minimum research notional; no live execution and no promoted strategy rule changes.",
+    "backend/momentum_rush_brain.py": "Causal PAPER-only multi-factor momentum scoring with short-window acceleration, similarity memory, low-cap risk sizing, bearish-flow vetoes, and an explicitly non-guaranteed 89% research target."
   },
   "support_file_changes": {
     "backend/live_tape.py": "Decoder-supported PumpSwap-only tape; lower RPC poll rate, freshest-first processing, and current-window-only backlog gating; complete safety gates remain mandatory",
-    "backend/strategy_lab.py": "Funded PROMOTED_PAPER entries use the stricter declared strategy rules and a 30-minute recent-loss cooldown; TEST books and modeled execution costs remain unchanged.",
+    "backend/strategy_lab.py": "Adds an isolated TEST-only Momentum Rush Brain book with broader causal momentum ranking, low-cap sizing, fast PAPER exits, and unchanged modeled fees/slippage/impact; promoted $1,000 cohort remains unchanged.",
     "backend/lab_position_marks.py": "Deduplicated background exact-pool DEX Screener spot refresh, bounded to one request per second with identity validation",
     "backend/lab_dashboard_projection.py": "Expose position mark age/source and paper-only modeled execution basis",
     "backend/market_monitor.py": "One shared $1,000 PAPER account for four entry rules, up to eight concurrent positions, fixed exits, daily loss and drawdown gates, quote and safety checks remain mandatory",
     "backend/engine_entry_policy.py": "Shared fresh pair/mint and market snapshot validation, explicit ensemble signal rejection and execution cost limits",
-    "backend/lab_activity.py": "Single canonical feature builder and unchanged four promoted entry rules shared by Lab and main PAPER ensemble",
-    "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account"
+    "backend/lab_activity.py": "Registers the broad Momentum Rush TEST family, faster TEST cooldown, and $5 minimum research notional; no live execution and no promoted strategy rule changes.",
+    "backend/winner_ensemble.py": "Four-rule signal combination with once-per-mint attribution into one PAPER account",
+    "backend/momentum_rush_brain.py": "Causal PAPER-only multi-factor momentum scoring with short-window acceleration, similarity memory, low-cap risk sizing, bearish-flow vetoes, and an explicitly non-guaranteed 89% research target."
   }
 }

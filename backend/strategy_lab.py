@@ -7,6 +7,7 @@ from astra_lab_bridge import merge_astra_snapshot
 from lab_paired_bridge import merge_paired_snapshot
 from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
+import momentum_rush_brain as rush
 from lab_position_marks import POSITION_MARK_FEED
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
@@ -184,6 +185,7 @@ STRATEGIES=[
  {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':lambda f: f['score']>=98 and f['liq']>=25000 and 3<=f['m5']<=18 and 1.1<=f['bs']<=3.0 and f['lmc']>=.15 and 8<=f['age']<=180},
  {'id':'PRECISION','name':'Precision','rule':lambda f: f['score']>=95 and f['liq']>=20000 and 2<=f['m5']<=22 and 1.0<=f['bs']<=3.2 and f['lmc']>=.12 and 5<=f['age']<=240},
  {'id':'MOMENTUM','name':'Momentum','rule':lambda f: f['score']>=90 and f['liq']>=15000 and 5<=f['m5']<=30 and f['bs']>=1.15 and f['lmc']>=.08 and 3<=f['age']<=300},
+ {'id':'MOMENTUM_RUSH_BRAIN','name':'Momentum Rush Brain','rule':lambda f: True},
  {'id':'BREAKOUT','name':'Breakout','rule':lambda f: f['score']>=90 and f['liq']>=20000 and 15<f['m5']<=55 and f['bs']>=1.4 and f['lmc']>=.08 and 3<=f['age']<=300},
  {'id':'LIQUIDITY','name':'Liquidity First','rule':lambda f: f['score']>=85 and f['liq']>=40000 and -2<=f['m5']<=20 and f['bs']>=.9 and f['lmc']>=.12 and 5<=f['age']<=720},
  {'id':'ORDER_FLOW','name':'Order Flow','rule':lambda f: f['score']>=85 and f['liq']>=15000 and -5<=f['m5']<=25 and f['flow']['trades']>=3 and f['flow']['ratio']>=1.3 and f['flow']['unique_wallets']>=1 and f['flow']['max_sell']<max(750,f['flow']['buy_usd']*.8)},
@@ -271,7 +273,7 @@ STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
     STATE['activity_started_at']=now_ms()
-assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'All 33 entries need a policy'
+assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'Every Strategy Lab entry needs a policy'
 
 def close_position(book,pos,coin,reason):
     market_price=num(coin.get('priceUsd')); qty=num(pos.get('quantity'))
@@ -348,20 +350,34 @@ def update_positions(flows,feed):
         total_live_pnl=num(pos.get('partial_realized_pnl'))+open_pnl
         total_live_pct=total_live_pnl/max(num(pos.get('notional_usd')),1e-18)*100
 
-        # Unified 3:10 NET exit framework across all 33 strategies.
-        # Entry logic stays strategy-specific; exits are identical and include
-        # DEX fee, price impact, slippage/latency and network cost.
+        # Standard books keep the common 3/10 NET framework. The high-frequency
+        # Rush TEST book can secure gains sooner, but never weakens the 3% net stop.
+        is_rush=pos.get('strategy_id')=='MOMENTUM_RUSH_BRAIN'
+        peak_net=max(num(pos.get('peak_net_pct'),total_live_pct),total_live_pct)
+        entry_liq=num(pos.get('entry_liquidity_usd'))
+        current_liq=pair_liquidity_usd(coin)
         if total_live_pct<=-STOP_LOSS:
             reason='STOP_LOSS_3_NET'
-        elif total_live_pct>=TAKE_PROFIT:
+        elif is_rush and entry_liq>0 and current_liq<entry_liq*.65:
+            reason='RUSH_LIQUIDITY_COLLAPSE'
+        elif is_rush and num(f.get('trades'))>=4 and num(f.get('ratio'))<.65 and num(f.get('sell_usd'))>num(f.get('buy_usd')):
+            reason='RUSH_FLOW_REVERSAL'
+        elif is_rush and peak_net>=4 and total_live_pct<=peak_net-2.5:
+            reason='RUSH_PROFIT_TRAIL'
+        elif is_rush and total_live_pct>=7:
+            reason='RUSH_TAKE_PROFIT_7_NET'
+        elif not is_rush and total_live_pct>=TAKE_PROFIT:
             reason='TAKE_PROFIT_10_NET'
-        elif hold>=MAX_HOLD_MIN:
+        elif is_rush and hold>=20:
+            reason='RUSH_MAX_HOLD_20'
+        elif not is_rush and hold>=MAX_HOLD_MIN:
             reason='ABSOLUTE_MAX_HOLD_60'
 
         marked_at=num(coin.get('mark_received_at'),now_ms())
         quote_age=max(0,now_ms()-int(marked_at))
         pos.update({'current_price':price,'peak_price':peak,'execution_exit_price':round(live_quote['fill_price'],12),
                     'pnl_pct':round(total_live_pct,3),'open_pnl_usd':round(open_pnl,4),
+                    'peak_net_pct':round(peak_net,3),
                     'estimated_exit_fee_usd':round(live_quote['dex_fee_usd']+live_quote['network_fee_usd'],6),
                     'estimated_exit_impact_pct':round(live_quote['impact_pct'],4),
                     'partial_realized_pnl':round(num(pos.get('partial_realized_pnl')),4),
@@ -418,6 +434,8 @@ def maybe_open(feed,flows):
             }
             continue
         eligible=[]
+        rush_strategy=strategy['id']=='MOMENTUM_RUSH_BRAIN'
+        rush_best_score=0.0
         checked=0
         blocked_cost=0
         blocked_price=0
@@ -425,10 +443,15 @@ def maybe_open(feed,flows):
         flow_rejected=0
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
-            # Funded promoted books use the stricter strategy definition declared
-            # in this lab. Shared activity rules stay unchanged for TEST/main PAPER.
-            matched=(strategy['rule'](features) if book.get('portfolio_group')=='PROMOTED_PAPER'
-                     else rule.matches(features))
+            # Funded promoted books use their declared strict rules. Rush is a separate
+            # TEST-only brain that ranks a broader causal momentum universe.
+            rush_meta=rush.evaluate(book,coin,features,now) if rush_strategy else None
+            if rush_strategy:
+                rush_best_score=max(rush_best_score,num((rush_meta or {}).get('final_score')))
+                matched=bool((rush_meta or {}).get('allow'))
+            else:
+                matched=(strategy['rule'](features) if book.get('portfolio_group')=='PROMOTED_PAPER'
+                         else rule.matches(features))
             if not matched:
                 if strategy['id']=='SCALPER' and rule.matches(features,require_flow=False):
                     flow_rejected+=1
@@ -441,21 +464,34 @@ def maybe_open(feed,flows):
                 blocked_cooldown+=1
                 continue
             checked+=1
+            candidate_limit=entry_limit
+            if rush_strategy:
+                candidate_limit=min(candidate_limit,rush.candidate_notional_limit(rush_meta or {},balance,candidate_limit))
+            if candidate_limit<min_notional:
+                blocked_cost+=1
+                continue
             proposed=activity.affordable_entry(
-                coin,balance,entry_limit,entry_execution,exit_execution,
+                coin,balance,candidate_limit,entry_execution,exit_execution,
                 minimum_notional=min_notional
             )
             if proposed is None:
                 blocked_cost+=1
                 continue
-            eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
-                             coin,features,proposed))
+            eligible.append((num((rush_meta or {}).get('final_score')),proposed['initial_pnl_pct'],
+                             num(features.get('score')),coin,features,proposed,rush_meta))
         book['entry_diagnostics']={
             'at':now,'matched_candidates':checked,'cost_rejected':blocked_cost,
             'cooldown_rejected':blocked_cooldown,'affordable_candidates':len(eligible),
             'price_verification_rejected':blocked_price,
             'risk_limited_notional_usd':round(entry_limit,4),
         }
+        if rush_strategy:
+            book['entry_diagnostics'].update({
+                'brain_version':rush.VERSION,
+                'brain_best_score':round(rush_best_score,4),
+                'target_win_rate_pct':rush.TARGET_WIN_RATE_PCT,
+                'target_is_guarantee':False,
+            })
         if strategy['id']=='SCALPER':
             book['entry_diagnostics'].update({
                 'flow_rejected_candidates':flow_rejected,
@@ -468,7 +504,11 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']='verified_flow_unavailable'
         if not eligible:
             continue
-        _,_,coin,features,proposed=max(eligible,key=lambda item:(item[0],item[1]))
+        if rush_strategy:
+            chosen=max(eligible,key=lambda item:(item[0],item[1],item[2]))
+        else:
+            chosen=max(eligible,key=lambda item:(item[1],item[2]))
+        _,_,_,coin,features,proposed,rush_meta=chosen
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
         qty=num(opening['quantity'])
@@ -483,6 +523,10 @@ def maybe_open(feed,flows):
             'current_price':price,'peak_price':price,'quantity':qty,'original_quantity':qty,
             'notional_usd':notional,'opened_at':stamp,'updated_at':stamp,
             'score':coin.get('score'),'entry_features':features,
+            'momentum_rush_brain':rush_meta if rush_strategy else None,
+            'entry_liquidity_usd':round(pair_liquidity_usd(coin),4),
+            'entry_market_cap_usd':round(num(coin.get('marketCap') or coin.get('fdv')),4),
+            'peak_net_pct':round(proposed['initial_pnl_pct'],3),
             'partial_realized_pnl':0.0,'partial_exits':[],
             'remaining_cost_basis_usd':capital_basis,
             'entry_dex_fee_bps':round(opening['dex_fee_bps'],4),

@@ -32,8 +32,8 @@ class ActivityTests(unittest.TestCase):
         guard.start();self.addCleanup(guard.stop)
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_33_rules_exist(self):
-        self.assertEqual(len(a.RULES),33)
+    def test_all_34_rules_exist(self):
+        self.assertEqual(len(a.RULES),34)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
 
@@ -64,6 +64,35 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),1000)
         b['history'][0]['pnl_usd']=1
         self.assertEqual(a.cooldown_remaining_ms(b,ADDRESS,NOW),0)
+
+    def test_promoted_book_uses_strict_declared_rule(self):
+        c=coin();c['score']=94
+        self.assertTrue(a.RULES['PRECISION'].matches(a.market_features(c,flows()[ADDRESS])))
+        with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([c],flows())
+        self.assertIsNone(lab.STATE['books']['PRECISION']['position'])
+
+    def test_promoted_book_pauses_after_recent_loss_streak(self):
+        book=lab.STATE['books']['EARLY']
+        book['history']=[
+            {'closed_at':NOW-1000,'pnl_usd':-1},
+            {'closed_at':NOW-2000,'pnl_usd':-1},
+            {'closed_at':NOW-3000,'pnl_usd':-1},
+        ]
+        with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([coin()],flows())
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'promoted_recent_loss_cooldown')
+        self.assertGreater(book['entry_diagnostics']['promoted_cooldown_remaining_ms'],0)
+
+    def test_promoted_guard_ignores_noneligible_research_rows(self):
+        book={'history':[
+            {'closed_at':NOW-1000,'pnl_usd':9,'promotion_eligible':False},
+            {'closed_at':NOW-2000,'pnl_usd':-1},
+            {'closed_at':NOW-3000,'pnl_usd':-1},
+            {'closed_at':NOW-4000,'pnl_usd':-1},
+        ]}
+        self.assertGreater(lab.promoted_pause_remaining_ms(book,NOW),0)
+        book['history'][1]['pnl_usd']=1
+        self.assertEqual(lab.promoted_pause_remaining_ms(book,NOW),0)
 
     def test_scalper_requires_verified_flow_and_positive_trend(self):
         rule=a.RULES['SCALPER']
@@ -186,7 +215,8 @@ class ActivityTests(unittest.TestCase):
                 {**base,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
                 {**base,'direction':'SELL','usd_amount':40,'wallet':'seller'},
             ]}),encoding='utf-8')
-            with patch.object(lab,'LIVE_TAPE_PATH',tape_path):observed=lab.flow_map()
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path),patch.object(lab,'now_ms',return_value=stamp+250):
+                observed=lab.flow_map()
         self.assertEqual(observed[ADDRESS]['trades'],2)
         self.assertEqual(observed[ADDRESS]['ratio'],6)
         self.assertEqual(observed[ADDRESS]['unique_wallets'],2)

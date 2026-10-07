@@ -154,10 +154,17 @@ def rpc_batch(calls):
     if all(method == 'getTransaction' for method,_ in calls):
         def fetch_one(indexed_call):
             index,(method,params) = indexed_call
-            payload = [{'jsonrpc':'2.0','id':1,'method':method,'params':params}]
-            response = SESSION.post(RPC_URL,json=payload,timeout=15)
-            response.raise_for_status()
-            return align_rpc_answers([calls[index]],response.json())[0]
+            payload = {'jsonrpc':'2.0','id':1,'method':method,'params':params}
+            try:
+                response = SESSION.post(RPC_URL,json=payload,timeout=15)
+                response.raise_for_status()
+                answer = response.json()
+                return align_rpc_answers([calls[index]],
+                    [answer] if isinstance(answer,dict) else answer)[0]
+            except (requests.RequestException,RuntimeError,ValueError):
+                # A failed body must not discard other successfully fetched
+                # transactions in this bounded concurrent group.
+                return {'id':1,'error':{'code':'TRANSACTION_RPC_UNAVAILABLE'}}
         with ThreadPoolExecutor(max_workers=min(RPC_TRANSACTION_CONCURRENCY,len(calls))) as pool:
             return list(pool.map(fetch_one,enumerate(calls)))
     if len(calls)>RPC_BATCH_SIZE:

@@ -16,6 +16,7 @@ import requests
 PAGES = "https://angelmalevbiz-debug.github.io/neomemecoins/"
 BACKEND = "https://neo-meme-api.169-58-211-177.sslip.io"
 ORIGIN = "https://angelmalevbiz-debug.github.io"
+SUPPORTED_ENTRY_POLICIES = {"ORDER_FLOW_VALIDATED_THRESHOLDS_V9", "WINNER_ENSEMBLE_ENTRY_V1"}
 
 
 def check(backend=BACKEND, origin=ORIGIN, shared_backend=None):
@@ -70,7 +71,7 @@ def check(backend=BACKEND, origin=ORIGIN, shared_backend=None):
     report["repaired_shared_backend_ready"] = bool(
         report["probes"][-1].get("status_ok") and runtime.get("paper_only") is True
         and runtime.get("paper_training_present")
-        and runtime.get("entry_policy_version") == "ORDER_FLOW_VALIDATED_THRESHOLDS_V9")
+        and runtime.get("entry_policy_version") in SUPPORTED_ENTRY_POLICIES)
     return report
 
 

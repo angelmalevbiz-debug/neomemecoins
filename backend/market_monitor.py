@@ -1337,11 +1337,16 @@ class Monitor:
         for position in positions:
             address, pair = position.get('address'), position.get('pairAddress')
             key = f'{address}:{pair}'
-            incoming = by_address.get((address,pair)) or by_address.get(address)
-            coin = incoming if incoming and incoming.get('pairAddress') == pair else pinned.get(key)
-            coin = coin or position.get('coin_snapshot') or {}
-            if coin.get('pairAddress') != pair: coin = {}
             stamp = now_ms()
+            # Pinned observations survive a closed trade and can be older than
+            # a new entry in the same pool. Use the newest real observation,
+            # never the tuple-key priority or a timestamp synthesized at entry.
+            candidates = [by_address.get((address,pair)), by_address.get(address),
+                          pinned.get(key), position.get('coin_snapshot')]
+            observations = [item for item in candidates if isinstance(item,dict)
+                and item.get('address') == address and item.get('pairAddress') == pair
+                and 0 < num(item.get('updatedAt')) <= stamp]
+            coin = max(observations,key=lambda item:num(item.get('updatedAt')),default={})
             reason = position.get('pending_exit_reason')
             quote_at = num(position.get('execution_quote_at'), num(position.get('updated_at')))
             if stamp < num(position.get('next_exit_retry_at')):

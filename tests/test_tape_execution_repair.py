@@ -200,7 +200,11 @@ class RpcAndDurability(unittest.TestCase):
         class Response:
             def __init__(self,payload):self.payload=payload
             def raise_for_status(self):return None
-            def json(self):return [{'id':1,'result':self.payload[0]['params'][0]}]
+            def json(self):
+                if isinstance(self.payload,dict):
+                    return {'id':1,'result':self.payload['params'][0]}
+                return [{'id':i+1,'result':request['params'][0]}
+                        for i,request in enumerate(self.payload)]
 
         def post(url,json,timeout):
             payloads.append(json)
@@ -216,11 +220,32 @@ class RpcAndDurability(unittest.TestCase):
             signature_answers=tape.rpc_batch(signature_calls)
 
         self.assertEqual(len(transaction_payloads),len(transaction_calls))
-        self.assertTrue(all(len(payload)==1 for payload in transaction_payloads))
+        self.assertTrue(all(isinstance(payload,dict) and payload['method']=='getTransaction'
+                            for payload in transaction_payloads))
         self.assertEqual([answer['result'] for answer in answers],signatures)
         self.assertEqual(len(payloads),1)
         self.assertEqual(len(payloads[0]),len(signature_calls))
         self.assertEqual(len(signature_answers),len(signature_calls))
+
+    def test_one_failed_transaction_body_preserves_other_successful_answers(self):
+        class Response:
+            def __init__(self,signature):self.signature=signature
+            def raise_for_status(self):return None
+            def json(self):return {'id':1,'result':self.signature}
+
+        def post(url,json,timeout):
+            signature=json['params'][0]
+            if signature=='provider-failure':
+                raise tape.requests.Timeout('one transaction timed out')
+            return Response(signature)
+
+        calls=[('getTransaction',[signature,{}]) for signature in
+               ['first','provider-failure','third']]
+        with patch.object(tape.SESSION,'post',side_effect=post):
+            answers=tape.rpc_batch(calls)
+        self.assertEqual(answers[0]['result'],'first')
+        self.assertEqual(answers[1]['error']['code'],'TRANSACTION_RPC_UNAVAILABLE')
+        self.assertEqual(answers[2]['result'],'third')
 
     def test_over_60_signatures_never_silently_dropped_and_restart_resume(self):
         rows=[{'signature':f's{i:03}','slot':i,'blockTime':NOW//1000,'err':None} for i in range(180,0,-1)]

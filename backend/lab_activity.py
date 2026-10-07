@@ -8,13 +8,17 @@ import math
 import re
 from typing import Any, Callable
 
-POLICY_VERSION = 'LAB_ACTIVE_V3_VERIFIED_SCALPER'
+POLICY_VERSION = 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN'
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
 SCALPER_REENTRY_SECONDS = 600
 SCALPER_LOSS_REENTRY_SECONDS = 3600
 SCALPER_MAX_BALANCE_FRACTION = 0.25
 SCALPER_MIN_NOTIONAL_USD = 2.0
+RUSH_REENTRY_SECONDS = 20
+RUSH_LOSS_REENTRY_SECONDS = 90
+RUSH_MIN_NOTIONAL_USD = 5.0
+RUSH_MAX_BALANCE_FRACTION = .35
 MAX_FEED_AGE_MS = 20_000
 MAX_ENTRY_COST_PCT = 2.75
 MIN_NOTIONAL_USD = 10.0
@@ -70,6 +74,8 @@ RULES = {
     'ULTRA_PRECISION': EntryRule(93, 25000, (1, 25), 1.0, .12, (5, 360)),
     'PRECISION': EntryRule(90, 20000, (0, 30), .95, .09, (3, 480)),
     'MOMENTUM': EntryRule(85, 15000, (3, 40), 1.05, .06, (2, 720)),
+    # Broad PAPER universe; final entry comes from momentum_rush_brain.py.
+    'MOMENTUM_RUSH_BRAIN': EntryRule(76, 10000, (-3, 45), .9, .04, (1, 360), (-25, 300), (.05, 12)),
     'BREAKOUT': EntryRule(86, 20000, (10, 60), 1.2, .06, (2, 720)),
     'LIQUIDITY': EntryRule(80, 40000, (-3, 25), .85, .08, (3, 1440)),
     'ORDER_FLOW': EntryRule(80, 15000, (-5, 30), .8, .04, (2, 1e7), flow_trades=3, flow_ratio=1.2, wallets=2),
@@ -139,24 +145,35 @@ def cooldown_remaining_ms(book: dict, address: str, now: int) -> int:
         if book.get('id') == 'SCALPER':
             seconds = (SCALPER_LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0
                        else SCALPER_REENTRY_SECONDS)
+        elif book.get('id') == 'MOMENTUM_RUSH_BRAIN':
+            seconds = (RUSH_LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0
+                       else RUSH_REENTRY_SECONDS)
         else:
             seconds = LOSS_REENTRY_SECONDS if number(latest.get('pnl_usd')) < 0 else REENTRY_SECONDS
         return max(0, int(number(latest.get('closed_at'))) + seconds * 1000 - now)
     last = number((book.get('last_entry_by_address') or {}).get(address))
-    return max(0, int(last) + REENTRY_SECONDS * 1000 - now) if last else 0
+    seconds = RUSH_REENTRY_SECONDS if book.get('id') == 'MOMENTUM_RUSH_BRAIN' else REENTRY_SECONDS
+    return max(0, int(last) + seconds * 1000 - now) if last else 0
 
 
 def entry_notional_limit(strategy_id: str, balance: float, requested: float) -> float:
-    """Cap SCALPER risk at 25% of cash without exceeding its minimum size."""
+    """Cap each experimental book's entry to its own available PAPER balance."""
     balance, requested = max(0.0, number(balance)), max(0.0, number(requested))
     if strategy_id == 'SCALPER':
         capped = min(requested, balance * SCALPER_MAX_BALANCE_FRACTION)
         return capped if capped >= SCALPER_MIN_NOTIONAL_USD else 0.0
+    if strategy_id == 'MOMENTUM_RUSH_BRAIN':
+        capped = min(requested, balance * RUSH_MAX_BALANCE_FRACTION)
+        return capped if capped >= RUSH_MIN_NOTIONAL_USD else 0.0
     return min(requested, balance)
 
 
 def entry_minimum_notional(strategy_id: str) -> float:
-    return SCALPER_MIN_NOTIONAL_USD if strategy_id == 'SCALPER' else MIN_NOTIONAL_USD
+    if strategy_id == 'SCALPER':
+        return SCALPER_MIN_NOTIONAL_USD
+    if strategy_id == 'MOMENTUM_RUSH_BRAIN':
+        return RUSH_MIN_NOTIONAL_USD
+    return MIN_NOTIONAL_USD
 
 
 def usable_feed_coin(coin: dict, now: int) -> bool:
@@ -210,6 +227,10 @@ def policy_config() -> dict:
             'scalper_max_balance_fraction': SCALPER_MAX_BALANCE_FRACTION,
             'scalper_min_notional_usd': SCALPER_MIN_NOTIONAL_USD,
             'scalper_min_balance_for_entry': SCALPER_MIN_NOTIONAL_USD / SCALPER_MAX_BALANCE_FRACTION,
+            'rush_reentry_seconds': RUSH_REENTRY_SECONDS,
+            'rush_loss_reentry_seconds': RUSH_LOSS_REENTRY_SECONDS,
+            'rush_min_notional_usd': RUSH_MIN_NOTIONAL_USD,
+            'rush_max_balance_fraction': RUSH_MAX_BALANCE_FRACTION,
             'max_entry_roundtrip_cost_pct': MAX_ENTRY_COST_PCT,
             'feed_max_age_seconds': MAX_FEED_AGE_MS / 1000,
             'execution_basis': 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'}

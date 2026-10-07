@@ -71,7 +71,7 @@ export function planningCostStatus(data?: CostFeasibility) {
   const allCheckedTooExpensive = Number.isInteger(data.checked_market_candidates)
     && data.fixed_cost_infeasible_candidates === data.checked_market_candidates
     && !(data.unknown_candidates && data.unknown_candidates > 0) && minimum > maximum;
-  return `${allCheckedTooExpensive ? 'Всички проверени кандидати надхвърлят лимита в модела' : 'Моделен минимум за разходите'}: ${minimum.toFixed(2)}% · лимит ${maximum.toFixed(2)}%. Без impact, мрежа и rent; нужна е изпълнима котировка.`;
+  return `${allCheckedTooExpensive ? 'Всички проверени кандидати надхвърлят лимита в модела' : 'Моделен минимум за разходите'}: ${minimum.toFixed(2)}% · лимит ${maximum.toFixed(2)}%. Това включва оценената DEX такса при вход и изход и буфер за slippage/забавяне; не включва impact, мрежа и rent.`;
 }
 
 export type LabEntryViewDiagnostics = {
@@ -116,9 +116,11 @@ export function labEntryView(book: EntryViewBook, backendAvailable = true): Entr
   if (diagnostics.signal_candidates === 0) return { status: reasons.no_market_signal, detail: null, costLimited: false };
   if (isFundedStrategy(book) && genericWait && allMatchedCostsExceedLimit(diagnostics)) {
     const cost = diagnostics.promoted_cost_feasibility!;
+    const stopBudget = cost.maximum_roundtrip_cost_pct! * 2;
+    const stopHeadroom = stopBudget - cost.minimum_model_roundtrip_cost_pct!;
     return {
       status: `Няма вход в модела: разходи поне ${cost.minimum_model_roundtrip_cost_pct!.toFixed(2)}% > лимит ${cost.maximum_roundtrip_cost_pct!.toFixed(2)}%`,
-      detail: 'За всички текущи сигнали. Оценката изключва impact, мрежа и rent; не е изпълнена котировка.',
+      detail: `Това е прогнозната DEX такса за вход и изход плюс буфери, не само комисиона. При нетен стоп ${stopBudget.toFixed(2)}% този минимум оставя ${stopHeadroom.toFixed(2)} п.п. запас; impact, мрежа и rent са извън оценката.`,
       costLimited: true,
     };
   }

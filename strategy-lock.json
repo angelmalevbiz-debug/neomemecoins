@@ -160,13 +160,13 @@
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
     "backend/paper_training.py": "4ae55a1e525d536047f164db6fb9fb303651d75c81aea1b5326f9ac514d3afdb",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "2d9fba40d4385e450974aa56995500ecb0ebf41006d4acef5e85ec828b92c75f",
+    "backend/strategy_lab.py": "1532164c690757996a8e014d84ee5b4ea3fbfcd1df2ad1964c476568aff3cabc",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "108d4e87093f9269bd79ab5ff60aad07181f44e95f0eec94b66805b1a31a5a03",
     "backend/user_gateway.py": "6b19d33031779c1453473a536619051bcdd0eca6f2047bfb93bee3eb0f128006",
     "backend/winner_ensemble.py": "b4bbbbb000c1f818887360d92ed1d00625af940b03d372d78f57b46127efec9c",
-    "backend/promoted_entry_guard.py": "85be6e34deb30a9058ff70bc47f77bf8e56b52945bde6fefe218e51430d8ccbf",
+    "backend/promoted_entry_guard.py": "7dd94c8ace89bbc6caa4af47aa791f99db12498beaa398afa2922230ac1d37e8",
     "scripts/start_local_paper.ps1": "a0f05854fff9a68860bf31b6c2164880f68b96c8c9dedfca302a22e8dac78929",
     "scripts/local_paper_service.py": "4632195031c5ee836e70cb067bb5978ba35a1cf5422aa734cacf52802da95ac4",
     "backend/lab_strategy_lifecycle.py": "9361522a951940d9bbdb2c251fb1cff090fcb6466ee3e26d9950b8b492ea6094",
@@ -180,9 +180,10 @@
     "backend/pool_reference_proof.py": "2f6649d0198c3caf9c548c8fb6819418e1f0a0cf006f6d70c759d68dca616615",
     "backend/tape_pool_owner_proof.py": "f7b4a15a640552f91059e3bd781b0b72446cf5f29cdd2d70d04c6bae1af2ba1a",
     "backend/funded_market_candidates.py": "60f3bbc4b46199c0824709aa62f72a40215af66ae4c06577bec293c339e21d92",
-    "docs/funded-zero-trades-repair.md": "7d84080a1b7db06af88b2dba38e1868666dd442e3d9dc2e6cab2fc323e483cac",
+    "docs/funded-zero-trades-repair.md": "1f257cf13407f02c2b0d391df661c66f7227b1012bfc3ccf6dc13f5539bc7935",
     "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
-    "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4"
+    "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4",
+    "src/lib/labStrategyView.ts": "2baf8ffb6507072f1a40b1d54419bb9a32c8cc14256207c9d4c73bfdef186b20"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",
@@ -256,10 +257,13 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged.",
+  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged. Funded sizing V4 prospectively raises the per-book PAPER entry cap from 25% to 50%; the 1.5% round-trip cost gate and 3% net stop remain, so cost floors near the stop stay blocked. Larger notional increases dollar gains and losses; no return or trade-frequency guarantee.",
   "support_file_changes": {
+    "backend/strategy_lab.py": "Raise prospective funded PAPER per-book entry cap from $62.50 to $125 ($250 allocation at 50%), without resizing open positions or weakening cost, flow, price, or risk gates.",
+    "backend/promoted_entry_guard.py": "Version the funded PAPER size-cap policy as V4; preserve the 1.5% expected cost cap, 3% net stop and all admission evidence.",
+    "src/lib/labStrategyView.ts": "Explain the two-way estimated DEX fees and slippage/latency buffers, and show the remaining net-stop headroom.",
+    "docs/funded-zero-trades-repair.md": "Record the prospective larger PAPER position cap and unchanged entry cost and stop rules.",
     "backend/live_tape.py": "Retain existing exact instruction/event coverage and swap decoder; append reconciled observed fees only after successful authenticated decoding, without changing admission or execution fees.",
-    "backend/strategy_lab.py": "Apply funded V3 candidate branches with unchanged evidence/cost/capital gates and receipt-time/commit evidence checks; retain ledgers and existing exits.",
     "backend/lab_position_marks.py": "Choose the newest exact-mint/pool observation by source timestamp rather than receipt time, so a newly received stale cache row cannot mask a more recent market observation; retain freshness checks.",
     "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances.",
     "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock.",
@@ -272,7 +276,6 @@
     "backend/paper_state_reset.py": "Archive and reset recorder/quote-probe diagnostics together with PAPER history so each authorized clean session starts with truthful zeroed counters.",
     "backend/momentum_rush_brain.py": "Causal bounded observation scoring and own-ledger memory; 80 percent remains an unvalidated research target.",
     "backend/paper_lab_metrics.py": "Read-only per-book measurements, malformed/truncated history detection and descriptive sample uncertainty; no automatic promotion.",
-    "backend/promoted_entry_guard.py": "Version the prospective funded market branches as V3 independently of unchanged evidence and cost limits.",
     "scripts/start_local_paper.ps1": "Serialize manual PAPER lifecycle mutations with watchdog health/recovery decisions; keep manual startup paused until every owned worker is verified. Preserve ledgers and graceful shutdown.",
     "tests/test_tape_execution_repair.py": "Verify that the live tape prioritizes eligible moderate-activity candidates while preserving PumpSwap-only and pinned-pool behavior.",
     "scripts/local_paper_service.py": "Publish the actual worker identity, restrict handshake paths to isolated runtime and honor cancellation after slow imports.",
@@ -289,7 +292,6 @@
     "backend/lab_paired_runner.py": "Read the shared tape with native delete-sharing snapshot handles; experimental ledgers remain isolated.",
     "backend/funded_market_candidates.py": "Declare prospective physical established-liquid candidate branches for Momentum and Precision, retaining original screens without token-specific fitting or profit claims.",
     "backend/tape_pool_scheduler.py": "Observe the same declared funded mature candidate branches, preserving bounded leases, exact exit pins and final entry gates.",
-    "docs/funded-zero-trades-repair.md": "Record observed zero-trade causes, declared prospective changes, strict gates, actual validation and unproven trade/return targets.",
     "backend/pump_event_fees.py": "Decode complete supported public PumpSwap fee schemas, reconcile raw gross/net charges and reject partial or unsupported routing; observations never authorize entry or replace current execution fees.",
     "docs/paper-fee-observation.md": "Document observation-only fee evidence, unsupported schemas, preserved entry/exit models and the distinction between open positions and closed trades."
   },
@@ -311,17 +313,19 @@
     "catalog_prices_authorize_entry": false
   },
   "funded_paper_policy": {
-    "version": "PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V3",
+    "version": "PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V4",
     "candidate_policy_version": "FUNDED_MARKET_BRANCHES_V1",
     "established_branches": [
       "ESTABLISHED_LIQUID_MOMENTUM",
       "ESTABLISHED_LIQUID_PRECISION"
     ],
     "unchanged_max_roundtrip_cost_pct": 1.5,
-    "unchanged_max_position_fraction": 0.25,
+    "previous_max_position_fraction": 0.25,
+    "max_position_fraction": 0.5,
     "evidence_rechecked_before_commit": true,
     "historical_outcomes_unchanged": true,
-    "profitability_proven": false
+    "profitability_proven": false,
+    "size_change_note": "Prospective PAPER only: max per-book entry rises from $62.50 to $125; open positions are not resized. The 1.5% round-trip cost limit and 3% net stop are unchanged."
   },
   "observed_pump_fees": {
     "version": "OBSERVED_PUMP_EVENT_FEES_V1",

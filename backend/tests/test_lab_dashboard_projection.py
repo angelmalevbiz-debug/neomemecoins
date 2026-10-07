@@ -77,6 +77,22 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertEqual(state['books']['EARLY']['allocation_usd'], 250)
         self.assertEqual(state['books']['EARLY']['max_position_fraction'], .25)
 
+    def test_projects_funded_entry_blockers_and_prospective_policy(self):
+        state = compact_strategy_lab({
+            'activity_config': {'promoted_entry_policy': {
+                'version': 'PROMOTED_EVIDENCE_COST_V1', 'profitability_proven': False}},
+            'books': {'EARLY': {'portfolio_group': 'PROMOTED_PAPER', 'entry_diagnostics': {
+                'promoted_policy_version': 'PROMOTED_EVIDENCE_COST_V1',
+                'promoted_flow_rejected': 2, 'promoted_safety_rejected': 1,
+                'promoted_max_entry_roundtrip_cost_pct': 1.5,
+                'blocked_reason': 'promoted_verified_flow_unavailable'}}},
+        })
+        entry = state['books']['EARLY']['entry_diagnostics']
+        self.assertEqual(entry['promoted_flow_rejected'], 2)
+        self.assertEqual(entry['promoted_safety_rejected'], 1)
+        self.assertEqual(entry['promoted_max_entry_roundtrip_cost_pct'], 1.5)
+        self.assertFalse(state['activity_config']['promoted_entry_policy']['profitability_proven'])
+
     def test_projects_legacy_exit_book_without_internal_position_fields(self):
         state = compact_strategy_lab({'portfolio_setup': {
             'version': 'PROMOTED_PAPER_COHORT_V1',

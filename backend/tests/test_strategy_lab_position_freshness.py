@@ -17,6 +17,7 @@ class MissingMarkFeed:
 class ExactMarkFeed:
     def resolve(self, _position, _prices, _now):
         return {'address': MINT, 'pairAddress': PAIR, 'priceUsd': 0.00101,
+                'priceNative': 0.00101 / 150, 'quoteTokenAddress': lab.SOL_QUOTE_MINT,
                 'liquidityUsd': 50000, 'mark_received_at': NOW,
                 'mark_source': 'DEXSCREENER_EXACT_POOL_API'}
 

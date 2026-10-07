@@ -1488,31 +1488,43 @@ class Monitor:
             if (self.training_probe_inflight
                     or stamp-self.training_probe_last_attempt_at < TRAINING_QUOTE_PROBE_INTERVAL_MS):
                 return
+        blocked_reason = None
+        qualified_flow = False
         for coin in feed:
             mint, pair = str(coin.get('address') or ''), str(coin.get('pairAddress') or '')
             if not mint or not pair:
                 continue
             key = (mint, pair)
             if self.training_probe_retry_after.get(key, 0) > stamp:
+                blocked_reason = blocked_reason or 'preflight_retry_cooldown'
                 continue
             flow = STATE.live_flow(mint, 30, pair)
             if not training_candidate_signal(coin, flow, now=stamp):
                 continue
+            qualified_flow = True
             # These checks are cached/non-blocking. The only quote work below
             # is placed on its own thread after both independent checks pass.
             validation = price_integrity.check(coin)
             safety = rug_guard.check(coin)
-            if (validation.get('status') != 'pass' or validation.get('mint') != mint
-                    or validation.get('pair') != pair or safety.get('status') != 'pass'
-                    or safety.get('mint') != mint or safety.get('pair') != pair
-                    or safety.get('provisional_early')):
-                self.training_probe_retry_after[key] = stamp + TRAINING_PREFLIGHT_RETRY_MS
+            current = now_ms()
+            reason = self.training_probe_preflight_reason(coin, safety, validation, now=current)
+            if reason:
+                blocked_reason = blocked_reason or reason
+                self.training_probe_retry_after[key] = current + TRAINING_PREFLIGHT_RETRY_MS
+                continue
+            if not training_candidate_signal(coin, flow, now=current):
+                blocked_reason = blocked_reason or 'signal_or_flow_expired'
                 continue
             with self.training_probe_lock:
                 current = now_ms()
                 if (self.training_probe_inflight
                         or current-self.training_probe_last_attempt_at < TRAINING_QUOTE_PROBE_INTERVAL_MS):
                     return
+                reason = self.training_probe_preflight_reason(coin, safety, validation, now=current)
+                if reason or not training_candidate_signal(coin, flow, now=current):
+                    blocked_reason = blocked_reason or reason or 'signal_or_flow_expired'
+                    self.training_probe_retry_after[key] = current + TRAINING_PREFLIGHT_RETRY_MS
+                    continue
                 self.training_probe_inflight = True
                 self.training_probe_last_attempt_at = current
             training_bridge.note_quote_probe('PREFLIGHT_PASSED', attempted=True, at=current)
@@ -1528,6 +1540,41 @@ class Monitor:
                     self.training_probe_inflight = False
                 training_bridge.note_quote_probe('WORKER_START_FAILED', reason='worker_start_failed', at=now_ms())
             return
+        if blocked_reason:
+            training_bridge.note_quote_probe('WAITING_FOR_FRESH_PREFLIGHT',
+                                             reason=blocked_reason, at=now_ms())
+        elif not qualified_flow:
+            training_bridge.note_quote_probe('WAITING_FOR_QUALIFIED_FLOW', at=now_ms())
+
+    @staticmethod
+    def training_probe_preflight_reason(coin, safety, validation, *, now):
+        """Admit only proof that the read-only collector can actually use.
+
+        Risk cache passes can outlive the learner's shorter evidence window.
+        Preserve their original timestamps instead of calling an old pass a
+        successful preflight or spending a probe on known missing cost proof.
+        The collector rechecks these facts when its worker starts.
+        """
+        mint, pair = coin.get('address'), coin.get('pairAddress')
+        ttl = TRAINING_DEFAULT_CONFIG['evidence_ttl_ms']
+        if (not isinstance(safety, dict) or safety.get('status') != 'pass'
+                or safety.get('provisional_early') or safety.get('mint') != mint
+                or safety.get('pair') != pair
+                or not 0 <= now-num(safety.get('checked_at'), -1) <= ttl):
+            return 'safety_not_fresh_pass'
+        metrics = safety.get('metrics') or {}
+        if not isinstance(metrics, dict):
+            return 'rent_or_sol_cost_unknown'
+        rent = num(metrics.get('token_account_rent_lamports'), math.nan)
+        sol = num(metrics.get('sol_usd'), math.nan)
+        if not math.isfinite(rent) or rent <= 0 or not math.isfinite(sol) or sol <= 0:
+            return 'rent_or_sol_cost_unknown'
+        if (not isinstance(validation, dict) or validation.get('status') != 'pass'
+                or validation.get('mint') != mint or validation.get('pair') != pair
+                or num(validation.get('reference_price')) <= 0
+                or not 0 <= now-num(validation.get('reference_received_at'), -1) <= ttl):
+            return 'independent_price_not_fresh_pass'
+        return None
 
     def run_training_quote_probe(self, coin, flow, safety, validation) -> None:
         mint, pair = str(coin.get('address') or ''), str(coin.get('pairAddress') or '')

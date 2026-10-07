@@ -10,6 +10,7 @@ os.environ['NEO_STRATEGY_LAB_PATH']=str(Path(TMP.name)/'state.json')
 os.environ['NEO_STRATEGY_LAB_RESET_FLAG']=str(Path(TMP.name)/'reset')
 import lab_activity as a
 import strategy_lab as lab
+import promoted_entry_guard as promoted_guard
 
 ADDRESS='So11111111111111111111111111111111111111112'
 PAIR='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -18,6 +19,7 @@ NOW=1_800_000_000_000
 def coin():
     return {'address':ADDRESS,'pairAddress':PAIR,'symbol':'TEST','name':'Test',
             'priceUsd':.01,'priceNative':.00008,'marketCap':1e6,'liquidityUsd':1e6,
+            'quoteTokenAddress':lab.SOL_QUOTE_MINT,
             'dexId':'raydium','updatedAt':NOW,'score':100,'ageMinutes':50,
             'priceChange':{'m5':12,'h1':50},'volume':{'h1':1e6},
             'txns':{'m5':{'buys':60,'sells':20}}}
@@ -28,7 +30,8 @@ def flows():
 
 class ActivityTests(unittest.TestCase):
     def setUp(self):
-        guard=patch.object(lab.price_integrity,'check',return_value={'status':'pass','version':'OFFLINE_FIXTURE'})
+        guard=patch.object(lab.price_integrity,'check',side_effect=lambda c:{
+            'status':'pass','version':'OFFLINE_FIXTURE','mint':c['address'],'pair':c['pairAddress']})
         guard.start();self.addCleanup(guard.stop)
         lab.rush_brain._SAMPLE_BY_PAIR.clear()
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
@@ -71,6 +74,36 @@ class ActivityTests(unittest.TestCase):
         self.assertTrue(a.RULES['PRECISION'].matches(a.market_features(c,flows()[ADDRESS])))
         with patch.object(lab,'now_ms',return_value=NOW):lab.maybe_open([c],flows())
         self.assertIsNone(lab.STATE['books']['PRECISION']['position'])
+
+    def test_promoted_entries_require_fresh_exact_flow_and_completed_safety(self):
+        c=coin()
+        verified={'source':promoted_guard.FLOW_SOURCE,'coverage_status':'COMPLETE',
+            'window_ms':promoted_guard.FLOW_WINDOW_MS,'address':ADDRESS,'pairAddress':PAIR,
+            'window_at':NOW,'latest_event_at':NOW-100,'available_at':NOW-50,
+            'trades':4,'unique_wallets':3,'buy_usd':500,'sell_usd':100}
+        flow_map={(ADDRESS,PAIR):{**flows()[ADDRESS],'verified_flow':verified}}
+        risk={'status':'pass','mint':ADDRESS,'pair':PAIR,'checked_at':NOW}
+        with patch.object(lab,'now_ms',return_value=NOW), patch.object(lab.rug_guard,'check',return_value=risk):
+            lab.maybe_open([c],flow_map)
+        for key in lab.PROMOTED_STRATEGIES:
+            book=lab.STATE['books'][key]
+            self.assertIsNotNone(book['position'],key)
+            self.assertEqual(book['position']['entry_policy_version'],promoted_guard.VERSION)
+            self.assertEqual(book['position']['verified_entry_flow']['address'],ADDRESS)
+            self.assertGreaterEqual(book['position']['entry_roundtrip_pnl_pct'],-1.5)
+
+    def test_promoted_entries_wait_when_flow_proof_is_stale_or_absent(self):
+        c=coin()
+        stale={'source':promoted_guard.FLOW_SOURCE,'coverage_status':'COMPLETE',
+            'window_ms':promoted_guard.FLOW_WINDOW_MS,'address':ADDRESS,'pairAddress':PAIR,
+            'window_at':NOW,'latest_event_at':NOW-12_001,'available_at':NOW-12_000,
+            'trades':4,'unique_wallets':3,'buy_usd':500,'sell_usd':100}
+        with patch.object(lab,'now_ms',return_value=NOW), patch.object(lab.rug_guard,'check') as safety:
+            lab.maybe_open([c],{(ADDRESS,PAIR):{**flows()[ADDRESS],'verified_flow':stale}})
+        book=lab.STATE['books']['EARLY']
+        self.assertIsNone(book['position'])
+        self.assertGreater(book['entry_diagnostics']['promoted_flow_rejected'],0)
+        safety.assert_not_called()
 
     def test_promoted_book_pauses_after_recent_loss_streak(self):
         book=lab.STATE['books']['EARLY']
@@ -154,6 +187,16 @@ class ActivityTests(unittest.TestCase):
         self.assertLess(q['notional'],150)
         self.assertGreaterEqual(q['initial_pnl_pct'],-2.75)
 
+    def test_tighter_promoted_cost_cap_rejects_without_waiving_costs(self):
+        c=coin()
+        ordinary=a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution)
+        self.assertIsNotNone(ordinary)
+        self.assertLess(ordinary['initial_pnl_pct'],-.5)
+        self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution,
+                                             max_entry_cost_pct=.5))
+        self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution,
+                                             max_entry_cost_pct=2.76))
+
     def test_unaffordable_model_fees_rejected(self):
         c=coin();c.update(dexId='pumpswap',marketCap=10000,liquidityUsd=10000)
         self.assertIsNone(a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution))
@@ -179,7 +222,7 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(sum(book['starting_balance'] for book in promoted),1000)
         for book in promoted:
             self.assertEqual(book['portfolio_group'],'PROMOTED_PAPER')
-            self.assertLessEqual(book['position']['notional_usd'],book['starting_balance']*.25)
+            self.assertIsNone(book['position'])
 
     def test_promotion_drain_blocks_new_entries_without_disabling_position_exits(self):
         book=lab.STATE['books']['EARLY']

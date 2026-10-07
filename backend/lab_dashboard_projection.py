@@ -56,6 +56,10 @@ def compact_strategy_lab(data):
                     'price_crosscheck_pending', 'flow_missing_candidates',
                     'flow_tape_status', 'flow_tape_coverage_pct',
                     'verified_flow_events_60s', 'flow_tape_backlog', 'blocked_reason',
+                    'promoted_policy_version', 'promoted_flow_rejected',
+                    'promoted_safety_rejected', 'promoted_price_rejected',
+                    'promoted_cost_rejected', 'promoted_block_reasons',
+                    'promoted_max_entry_roundtrip_cost_pct', 'profitability_proven',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']

@@ -112,12 +112,24 @@ class PolicyTests(unittest.TestCase):
 
 
 class CostTests(unittest.TestCase):
-    def test_frozen_model_matches_legacy_ast(self):
+    def test_frozen_execution_math_matches_legacy_ast(self):
         root=Path(__file__).resolve().parents[1]
-        a=ast.parse((root/'strategy_lab.py').read_text());b=ast.parse((root/'lab_paired_costs.py').read_text())
+        a=ast.parse((root/'strategy_lab.py').read_text(encoding='utf-8'));b=ast.parse((root/'lab_paired_costs.py').read_text(encoding='utf-8'))
         funcs={n.name:ast.dump(n,include_attributes=False) for n in a.body if isinstance(n,ast.FunctionDef)}
         for node in b.body:
-            if isinstance(node,ast.FunctionDef):self.assertEqual(funcs[node.name],ast.dump(node,include_attributes=False))
+            # The active Lab now validates quote identity and refuses unknown
+            # network costs. The paired runner already admits explicit SOL only;
+            # its frozen math remains comparable for that verified universe.
+            if isinstance(node,ast.FunctionDef) and node.name not in {'sol_usd_from_coin','execution_friction'}:
+                self.assertEqual(funcs[node.name],ast.dump(node,include_attributes=False))
+    def test_verified_sol_fills_match_frozen_paired_costs(self):
+        import strategy_lab as lab
+        for dex in ('raydium','pumpswap'):
+            for size in (10,50,150):
+                c=coin();c['dexId']=dex
+                self.assertEqual(lab.entry_execution(c,size),costs.entry_execution(c,size))
+                qty=costs.entry_execution(c,size)['quantity']
+                self.assertEqual(lab.exit_execution(c,qty),costs.exit_execution(c,qty))
     def test_price_flat_loses_fees(self):
         q=costs.entry_execution(coin(),150);e=costs.exit_execution(coin(),q['quantity'])
         self.assertLess(e['net_proceeds_usd'],q['capital_committed_usd'])

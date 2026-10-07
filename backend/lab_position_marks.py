@@ -29,17 +29,30 @@ def number(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def observation_timestamps(coin: dict[str, Any]) -> list[float]:
+    """Keep the price observation age when another layer adds a receipt time."""
+    return [number(coin.get(key), math.nan)
+            for key in ('updatedAt', 'mark_received_at') if key in coin]
+
+
+def mark_observed_at(coin: dict[str, Any]) -> float:
+    stamps = observation_timestamps(coin)
+    return min(stamps) if stamps and all(math.isfinite(stamp) and stamp > 0 for stamp in stamps) else 0.0
+
+
 def fresh_exact_coin(coin: dict[str, Any] | None, mint: str, pair: str,
                      now_ms: int, max_age_ms: int = FEED_MAX_AGE_MS) -> bool:
     if not isinstance(coin, dict):
         return False
-    received = number(coin.get('mark_received_at'), number(coin.get('updatedAt')))
+    observed = mark_observed_at(coin)
+    stamps = observation_timestamps(coin)
     return (
         coin.get('address') == mint
         and coin.get('pairAddress') == pair
         and number(coin.get('priceUsd')) > 0
-        and received > 0
-        and -5_000 <= now_ms - received <= max_age_ms
+        and observed > 0
+        and all(stamp <= now_ms for stamp in stamps)
+        and 0 <= now_ms - observed <= max_age_ms
     )
 
 
@@ -97,16 +110,19 @@ class PositionMarkFeed:
             return None
         key = (mint, pair)
         from_feed = feed_prices.get(key)
-        if fresh_exact_coin(from_feed, mint, pair, now):
-            result = dict(from_feed)
-            result['mark_received_at'] = number(result.get('updatedAt'))
-            result['mark_source'] = 'SHARED_LIVE_FEED_EXACT_POOL'
-            return result
-
         with self._lock:
             cached = self._cache.get(key)
-            if cached and 0 <= now - int(cached.get('mark_received_at') or 0) <= self._cache_max_age_ms:
-                return dict(cached)
+            observations = []
+            if fresh_exact_coin(from_feed, mint, pair, now):
+                observations.append((from_feed, 'SHARED_LIVE_FEED_EXACT_POOL'))
+            if fresh_exact_coin(cached, mint, pair, now, self._cache_max_age_ms):
+                observations.append((cached, cached.get('mark_source', 'DEXSCREENER_EXACT_POOL_API')))
+            if observations:
+                coin, source = max(observations, key=lambda item: mark_observed_at(item[0]))
+                result = dict(coin)
+                result['mark_received_at'] = mark_observed_at(coin)
+                result['mark_source'] = source
+                return result
             can_schedule = (
                 key not in self._pending
                 and len(self._pending) < MAX_PENDING_PAIRS

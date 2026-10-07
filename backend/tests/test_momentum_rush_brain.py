@@ -20,6 +20,7 @@ def coin(stamp=NOW, price=1.02, **changes):
     return {
         'address': MINT, 'pairAddress': PAIR, 'symbol': 'RESEARCH',
         'name': 'Research fixture', 'priceUsd': price, 'priceNative': price / 150,
+        'quoteTokenAddress': lab.SOL_QUOTE_MINT,
         'liquidityUsd': 12_000, 'marketCap': 40_000, 'score': 86,
         'ageMinutes': 20, 'updatedAt': stamp, 'dexId': 'raydium',
         'priceChange': {'m5': 8, 'h1': 30}, 'volume': {'h1': 20_000},
@@ -309,15 +310,22 @@ class RushRunnerTests(unittest.TestCase):
         base = {'event_time': NOW - 1000, 'observed_at': NOW - 900, 'available_at': NOW - 800,
                 'confirmed_swap': True, 'quality_flags': [], 'address': MINT,
                 'pairAddress': PAIR, 'direction': 'BUY', 'wallet': 'buyer', 'usd_amount': 200}
-        tape = {'pair_coverage': {PAIR: {'status': 'COMPLETE'}, OTHER_PAIR: {'status': 'COMPLETE'}},
-                'events': [base, {**base, 'pairAddress': OTHER_PAIR, 'direction': 'SELL', 'usd_amount': 1000},
+        tape = {'updated_at': NOW,
+                'pair_coverage': {
+                    PAIR: {'status': 'COMPLETE', 'address': MINT, 'pairAddress': PAIR, 'last_poll_at': NOW},
+                    OTHER_PAIR: {'status': 'COMPLETE', 'address': MINT, 'pairAddress': OTHER_PAIR, 'last_poll_at': NOW}},
+                'events': [base, {**base, 'event_time': NOW-45_000, 'observed_at': NOW-44_900,
+                                  'available_at': NOW-44_800, 'wallet': 'older-buyer'},
+                           {**base, 'pairAddress': OTHER_PAIR, 'direction': 'SELL', 'usd_amount': 1000},
                            {**base, 'available_at': NOW + 1}, {**base, 'direction': 'UNKNOWN'}]}
         with patch.object(lab, 'load_json', return_value=tape), patch.object(lab, 'now_ms', return_value=NOW):
             flows = lab.flow_map()
         exact = lab.enrich(coin(), flows)['flow']
         other = lab.enrich(coin(pairAddress=OTHER_PAIR), flows)['flow']
-        self.assertEqual(exact['trades'], 1)
-        self.assertEqual(exact['buy_usd'], 200)
+        self.assertEqual(exact['trades'], 2)
+        self.assertEqual(exact['buy_usd'], 400)
+        self.assertEqual(exact['verified_flow']['trades'], 1)
+        self.assertEqual(exact['verified_flow']['window_ms'], 30_000)
         self.assertEqual(exact['sell_usd'], 0)
         self.assertEqual(other['buy_usd'], 0)
         self.assertEqual(other['sell_usd'], 1000)

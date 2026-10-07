@@ -10,6 +10,7 @@ $services = Join-Path $repository '.runtime/accounts/services'
 $pauseMarker = Join-Path $services 'watchdog.pause'
 $logPath = Join-Path $services 'watchdog.log'
 $mutex = [Threading.Mutex]::new($false, 'Local\NeoLocalPaperWatchdog')
+$operationMutex = [Threading.Mutex]::new($false, 'Local\NeoLocalPaperOperation')
 
 function Write-Log([string]$Message) {
     $line = "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $Message"
@@ -29,17 +30,29 @@ function Test-Listening([int]$Port) {
 
 function Invoke-Start([string]$Action) {
     Write-Log "Recovery: requesting $Action."
-    & $startScript -Action $Action -MainPort $MainPort -GatewayPort $GatewayPort | Out-Null
+    & $startScript -Action $Action -MainPort $MainPort -GatewayPort $GatewayPort -WatchdogRecovery | Out-Null
 }
 
-if (!$mutex.WaitOne(0)) { exit 0 }
+$watchdogOwned = $false
+try { $watchdogOwned = $mutex.WaitOne(0) }
+catch [Threading.AbandonedMutexException] { $watchdogOwned = $true }
+if (!$watchdogOwned) {
+    $operationMutex.Dispose()
+    $mutex.Dispose()
+    exit 0
+}
 try {
     [IO.Directory]::CreateDirectory($services) | Out-Null
     Write-Log 'Watchdog started in PAPER-only mode.'
     while ($true) {
+        $operationOwned = $false
         try {
+            # Acquire before the probe, not merely around Stop/Start: a decision
+            # made from an earlier partial manifest must never stop a new cohort.
+            try { $operationOwned = $operationMutex.WaitOne(1000) }
+            catch [Threading.AbandonedMutexException] { $operationOwned = $true }
+            if (!$operationOwned) { continue }
             if (Test-Path -LiteralPath $pauseMarker) {
-                Start-Sleep -Seconds $CheckIntervalSeconds
                 continue
             }
 
@@ -56,7 +69,6 @@ try {
             $allServices = $manifestValid -and @($required | Where-Object { !$counts[$_][0].running }).Count -eq 0
 
             if ($allServices -and $coreListening) {
-                Start-Sleep -Seconds $CheckIntervalSeconds
                 continue
             }
 
@@ -71,11 +83,16 @@ try {
             }
         } catch {
             Write-Log "Recovery check failed safely: $($_.Exception.Message)"
+        } finally {
+            if ($operationOwned) { $operationMutex.ReleaseMutex() }
+            # Finally also runs for continue, so healthy/paused loops release
+            # the operation lock before sleeping and do not poll continuously.
+            Start-Sleep -Seconds $CheckIntervalSeconds
         }
-        Start-Sleep -Seconds $CheckIntervalSeconds
     }
 } finally {
     Write-Log 'Watchdog stopped.'
     $mutex.ReleaseMutex()
     $mutex.Dispose()
+    $operationMutex.Dispose()
 }

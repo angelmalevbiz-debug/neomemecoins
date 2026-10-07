@@ -18,6 +18,9 @@ import training_bridge
 import winner_ensemble
 import promoted_entry_guard as promoted_guard
 import entry_size_backoff
+import market_discovery
+import honest_quote_transport as quote_transport
+import paper_market_feasibility as market_feasibility
 from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
 from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
@@ -102,6 +105,7 @@ GECKO_NEW_POOLS_URL = 'https://api.geckoterminal.com/api/v2/networks/solana/new_
 GECKO_NEW_POOLS_TTL_MS = 15_000
 _GECKO_NEW_POOLS_CACHE = {'ts': 0, 'pairs': []}
 _GECKO_NEW_POOLS_LOCK = threading.Lock()
+_PUMP_CATALOG = market_discovery.PoolCatalog(quote_transport.ROOT / 'pumpswap-discovery-catalog.json')
 
 def now_ms() -> int:
     return int(time.time() * 1000)
@@ -621,7 +625,7 @@ class State:
                 'source_status': self.source_status,
                 'entry_diagnostics': self.entry_diagnostics,
                 'live_tape': [],
-                'live_tape_status': {k: tape.get(k) for k in ('status','tracked_pairs','updated_at','source','error')},
+                'live_tape_status': {k: tape.get(k) for k in ('status','tracked_pairs','updated_at','source','error','entry_scheduling')},
             'strategy_lab': read_strategy_lab(),
             'strategy_learning': winner_ensemble.learning_snapshot(self.history),
                 'paper_training': training_bridge.snapshot(),
@@ -843,7 +847,8 @@ def gecko_new_pumpswap_pairs() -> list[dict[str, Any]]:
     with _GECKO_NEW_POOLS_LOCK:
         cached_at = int(_GECKO_NEW_POOLS_CACHE.get('ts') or 0)
         cached_pairs = list(_GECKO_NEW_POOLS_CACHE.get('pairs') or [])
-    if cached_pairs and 0 <= current - cached_at <= GECKO_NEW_POOLS_TTL_MS:
+        retry_after = int(_GECKO_NEW_POOLS_CACHE.get('retry_after') or 0)
+    if cached_at > 0 and (0 <= current - cached_at <= GECKO_NEW_POOLS_TTL_MS or current < retry_after):
         return cached_pairs
 
     parsed: list[dict[str, Any]] = []
@@ -914,12 +919,19 @@ def gecko_new_pumpswap_pairs() -> list[dict[str, Any]]:
                 'pairCreatedAt': created,
                 'info': {},
                 '_early_source': 'gecko-new-pools',
+                '_market_observed_at': now_ms(),
             })
-    except (requests.RequestException, ValueError, TypeError, AttributeError):
+    except (requests.RequestException, ValueError, TypeError, AttributeError) as exc:
+        # Cache failed/empty attempts too; otherwise each 3s scan hits a
+        # rate-limited provider. Old rows retain their original observation.
+        with _GECKO_NEW_POOLS_LOCK:
+            rate_limited = getattr(getattr(exc, 'response', None), 'status_code', None) == 429
+            _GECKO_NEW_POOLS_CACHE.update(ts=current, pairs=cached_pairs,
+                retry_after=current + (180_000 if rate_limited else 60_000))
         return cached_pairs
 
     with _GECKO_NEW_POOLS_LOCK:
-        _GECKO_NEW_POOLS_CACHE.update(ts=current, pairs=list(parsed))
+        _GECKO_NEW_POOLS_CACHE.update(ts=current, pairs=list(parsed), retry_after=0)
     return parsed
 
 
@@ -929,6 +941,10 @@ STATE = State(load_state=False)
 def discover() -> tuple[list[str], dict[str, dict[str, Any]]]:
     metadata: dict[str, dict[str, Any]] = {}
     order: list[str] = []
+    for address in _PUMP_CATALOG.get(api):
+        metadata[address] = {'sources': ['pumpswap-address-catalog'], 'icon': '',
+                             'header': '', 'description': '', 'links': [], 'boost_amount': 0}
+        order.append(address)
     sources = [
         ('latest', '/token-profiles/latest/v1'),
         ('boosted', '/token-boosts/top/v1'),
@@ -990,7 +1006,7 @@ def fetch_pairs(addresses: list[str]) -> list[dict[str, Any]]:
     return pairs
 
 
-def best_pairs(pairs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+def best_pairs(pairs: list[dict[str, Any]], *, prefer_pumpswap_mints=()) -> dict[str, dict[str, Any]]:
     best: dict[str, dict[str, Any]] = {}
     for pair in pairs:
         if pair.get('chainId') != 'solana':
@@ -1001,7 +1017,9 @@ def best_pairs(pairs: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         liquidity = num((pair.get('liquidity') or {}).get('usd'))
         old = best.get(address)
         old_liquidity = num((old.get('liquidity') or {}).get('usd')) if old else -1
-        if old is None or liquidity > old_liquidity:
+        preferred = address in prefer_pumpswap_mints and pair.get('dexId') == 'pumpswap'
+        old_preferred = bool(old and address in prefer_pumpswap_mints and old.get('dexId') == 'pumpswap')
+        if old is None or (preferred, liquidity) > (old_preferred, old_liquidity):
             best[address] = pair
     return best
 
@@ -1019,6 +1037,22 @@ def exact_position_pair(position: dict[str, Any], pairs: list[dict[str, Any]]) -
         if base_address == address and current_pair == pair_address:
             return pair
     return None
+
+
+def early_market_pairs(early_pairs, dex_pairs, current):
+    """Keep early pool identity without a cached price masking fresh data."""
+    fresh_dex = {(str((pair.get('baseToken') or {}).get('address') or ''),
+                  str(pair.get('pairAddress') or '')): pair for pair in dex_pairs
+                 if pair.get('chainId') == 'solana' and num(pair.get('priceUsd')) > 0}
+    markets = []
+    for pair in early_pairs:
+        identity = (str((pair.get('baseToken') or {}).get('address') or ''),
+                    str(pair.get('pairAddress') or ''))
+        if identity in fresh_dex:
+            markets.append(fresh_dex[identity])
+        elif 0 < num(pair.get('_market_observed_at')) <= current and current - num(pair.get('_market_observed_at')) <= GECKO_NEW_POOLS_TTL_MS:
+            markets.append(pair)
+    return markets
 
 
 def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
@@ -1142,7 +1176,7 @@ def make_coin(address: str, pair: dict[str, Any], meta: dict[str, Any]) -> dict[
         'websites': (info.get('websites') or [])[:3],
         'socials': (info.get('socials') or [])[:5],
         'score': score, 'riskScore': risk, 'posture': posture,
-        'signals': signals, 'updatedAt': now_ms(),
+        'signals': signals, 'updatedAt': int(pair.get('_market_observed_at') or now_ms()),
     }
 
 class Monitor:
@@ -1529,6 +1563,22 @@ class Monitor:
                   'quoted': 0, 'quote_attempts': 0, 'size_retries': 0, 'opened': 0,
                   'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS,
                   'max_quote_attempts_per_scan': entry_policy.MAX_QUOTED_CANDIDATES}
+        estimates = [market_feasibility.execution_feasibility(coin, STRICT_MAX_ROUNDTRIP_COST_PCT)
+                     for coin in feed
+                     if not entry_policy.signal_data_rejections(coin, now=report['checked_at'])
+                     and winner_ensemble.market_candidates(coin)]
+        report['market_cost_feasibility'] = {
+            'basis': 'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL', 'is_execution_quote': False,
+            'checked_market_candidates': len(estimates),
+            'fixed_cost_infeasible_candidates': sum(row['model_cost_feasible'] is False for row in estimates),
+            'unknown_candidates': sum(row['model_cost_feasible'] is None for row in estimates),
+            'maximum_roundtrip_cost_pct': STRICT_MAX_ROUNDTRIP_COST_PCT,
+            'minimum_model_roundtrip_cost_pct': min(
+                (row['minimum_model_roundtrip_cost_pct'] for row in estimates
+                 if row['minimum_model_roundtrip_cost_pct'] is not None), default=None),
+            'excluded_costs': ['price_impact', 'network_fees', 'rent'],
+            'quotes_still_required': True, 'profitability_proven': False,
+        }
         try:
             self._maybe_open_checked(feed, report)
         except Exception as exc:
@@ -1860,9 +1910,22 @@ class Monitor:
                         address, str(coin.get('pairAddress') or ''), attempt_notional
                     )
                 if not prepared:
-                    retry_cause['quote'] = True
+                    preparation_failure = paper_quotes.last_preparation_error()
+                    preparation_examples = report.setdefault('quote_preparation_failures', [])
+                    if len(preparation_examples) < 3:
+                        preparation_examples.append({
+                            'symbol': str(coin.get('symbol') or '')[:40],
+                            'notional_usd': attempt_notional,
+                            **preparation_failure,
+                        })
+                    # Another account's short entry bundle or a pending exit
+                    # is a shared-budget defer, not bad token evidence.
+                    retry_cause['quote'] = preparation_failure.get('code') not in {
+                        'ENTRY_SEQUENCE_BUSY', 'EXIT_PRIORITY_PENDING',
+                    }
                     reject(report, ['quote_inconsistent'], coin,
-                           {'notional_usd': attempt_notional, 'attempt': attempt_index + 1})
+                           {'notional_usd': attempt_notional, 'attempt': attempt_index + 1,
+                            'quote_preparation': preparation_failure})
                     return None, ['quote_inconsistent']
                 live_quote, initial_exit = prepared
                 expected_token_raw = int(live_quote['token_raw_amount'])
@@ -2140,13 +2203,16 @@ class Monitor:
                     STATE.message = 'Проверява пазарните източници.'
                 return
             dex_pairs = fetch_pairs(addresses)
-            pairs = list(early_pairs) + dex_pairs
-            chosen = best_pairs(pairs)
+            early_markets = early_market_pairs(early_pairs, dex_pairs, now_ms())
+            pairs = early_markets + dex_pairs
+            catalog_mints = {address for address, meta in metadata.items()
+                             if 'pumpswap-address-catalog' in meta.get('sources', [])}
+            chosen = best_pairs(pairs, prefer_pumpswap_mints=catalog_mints)
 
             # For the first 15 minutes, preserve the newly-created exact PumpSwap
             # pool instead of silently switching to an older/higher-liquidity pair.
             newest_early: dict[str, dict[str, Any]] = {}
-            for early_pair in early_pairs:
+            for early_pair in early_markets:
                 address = str((early_pair.get('baseToken') or {}).get('address') or '')
                 created = int(early_pair.get('pairCreatedAt') or 0)
                 if not address or not created or now_ms() - created > 15 * 60 * 1000:

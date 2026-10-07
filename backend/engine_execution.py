@@ -20,6 +20,28 @@ SIMULATED_DELAY_MS=max(0,int(os.getenv('NEO_PAPER_EXECUTION_DELAY_MS','250')))
 MAX_SIGNAL_AGE_MS=int(os.getenv('NEO_PAPER_MAX_SIGNAL_AGE_MS','8000'))
 _CACHE={}
 _LOCK=threading.Lock()
+_LOCAL=threading.local()
+
+
+def last_preparation_error():
+    """Structured, thread-local refusal evidence; no account or credential data."""
+    return dict(getattr(_LOCAL,'preparation_error',{}) or {})
+
+
+def _quote_fail(code,**details):
+    _LOCAL.quote_error={'code':code,**details}
+    return None
+
+
+def _preparation_fail(stage,error=None):
+    _LOCAL.preparation_error={'stage':stage,'at':stamp(),
+                              **(error or {'code':'QUOTE_UNAVAILABLE'})}
+    return None
+
+
+def _quote_age_ms(quote,began):
+    try:return stamp()-int(quote.get('_received_at') or began)
+    except (AttributeError,TypeError,ValueError):return None
 
 def stamp(): return int(time.time()*1000)
 def _int(v):
@@ -49,14 +71,21 @@ def same_token_pool(data,mint,pair):
     return bool(pair) and bool(legs) and all(x.get('ammKey')==pair for x in legs)
 
 def _request(a,b,amount,pair=None,token=None,purpose='entry',force=False):
+    _LOCAL.quote_error=None
     began=stamp(); q=transport.quote(a,b,int(amount),purpose=purpose,slippage_bps=SLIPPAGE_BPS,
                                    min_received_at=began if force else None)
-    if not valid(q,a,b,amount,began): return None
-    if pair and not same_token_pool(q,token,pair): return None
+    if not q:
+        failure=transport.last_error() or {'code':'QUOTE_UNAVAILABLE'}
+        return _quote_fail(**failure)
+    if not valid(q,a,b,amount,began):
+        return _quote_fail('QUOTE_RESPONSE_INVALID',quote_age_ms=_quote_age_ms(q,began))
+    if pair and not same_token_pool(q,token,pair):
+        return _quote_fail('ENTRY_POOL_MISMATCH')
     # Simulated landing delay is a declared assumption, not an on-chain fill.
     # Re-check freshness after it; a quote cannot be booked retroactively.
     if SIMULATED_DELAY_MS: time.sleep(SIMULATED_DELAY_MS/1000)
-    if not valid(q,a,b,amount,began): return None
+    if not valid(q,a,b,amount,began):
+        return _quote_fail('QUOTE_STALE_AFTER_DELAY',quote_age_ms=_quote_age_ms(q,began))
     # Timestamp the received quote; queueing time is recorded separately.
     q['_observed_at']=int(q.get('_received_at') or stamp())
     q['_simulated_fill_at']=stamp()
@@ -64,15 +93,16 @@ def _request(a,b,amount,pair=None,token=None,purpose='entry',force=False):
     return q
 
 def entry_quote(token_mint,pair_address,notional_usd):
+    _LOCAL.quote_error=None
     try:
         value=Decimal(str(notional_usd))
-        if not value.is_finite() or value<=0:return None
+        if not value.is_finite() or value<=0:return _quote_fail('INVALID_NOTIONAL')
         raw=int(value*1_000_000)
-    except (ValueError,TypeError,ArithmeticError):return None
+    except (ValueError,TypeError,ArithmeticError):return _quote_fail('INVALID_NOTIONAL')
     d=_request(USDC,token_mint,raw,pair_address,token_mint)
     if not d: return None
     expected=_int(d['outAmount']); assumed=expected*(10000-BUFFER_BPS)//10000
-    if assumed<_int(d['otherAmountThreshold']):return None
+    if assumed<_int(d['otherAmountThreshold']):return _quote_fail('ENTRY_BUFFER_BELOW_FLOOR')
     return {'input_usdc_raw':raw,'token_raw_expected':expected,'token_raw_amount':assumed,
             'token_raw_floor':_int(d['otherAmountThreshold']),
             'price_impact_pct':float(d['priceImpactPct'])*100,
@@ -84,9 +114,10 @@ def entry_quote(token_mint,pair_address,notional_usd):
             'queue_ms':d.get('_queue_ms'),'http_ms':d.get('_http_ms')}
 
 def exit_quote(token_mint,token_raw_amount,pair_address=None,purpose='exit',force=False):
+    _LOCAL.quote_error=None
     try:raw=_int(token_raw_amount)
-    except (ValueError,TypeError):return None
-    if raw<=0:return None
+    except (ValueError,TypeError):return _quote_fail('INVALID_EXIT_AMOUNT')
+    if raw<=0:return _quote_fail('INVALID_EXIT_AMOUNT')
     # Liquidate the same exact mint/quantity via Jupiter's best valid route.
     # A different exit AMM is not a different asset or a chart-price substitution.
     # Refusing a valid sale solely because it changes AMM can strand a position.
@@ -94,10 +125,10 @@ def exit_quote(token_mint,token_raw_amount,pair_address=None,purpose='exit',forc
     if not d: return None
     token_legs=[x.get('swapInfo',{}) for x in d.get('routePlan',[])
                 if x.get('swapInfo',{}).get('inputMint')==token_mint]
-    if not token_legs: return None
+    if not token_legs: return _quote_fail('EXIT_TOKEN_ROUTE_MISSING')
     expected=_int(d['outAmount'])/1_000_000
     assumed=expected*(1-BUFFER_BPS/10000)
-    if assumed<_int(d['otherAmountThreshold'])/1_000_000:return None
+    if assumed<_int(d['otherAmountThreshold'])/1_000_000:return _quote_fail('EXIT_BUFFER_BELOW_FLOOR')
     return {'expected_usdc':assumed,'provider_expected_usdc':expected,
             'floor_usdc':_int(d['otherAmountThreshold'])/1_000_000,
             'price_impact_pct':float(d['priceImpactPct'])*100,
@@ -145,21 +176,42 @@ def position_mark(position,coin,network_fee_usd,force=False):
     return result
 
 
-def consistent_preflight(first,sell,final,now=None):
+def preflight_failure(first,sell,final,now=None):
+    """Return the exact failed existing threshold, without changing admission."""
     now=stamp() if now is None else now
     try:
         old=int(first['token_raw_amount']);new=int(final['token_raw_amount'])
-        if old<=0 or new<=0:return False
-        if abs(new/old-1)>.005:return False
-        if not 0<=now-int(final['quoted_at'])<=750:return False
-        if not 0<=int(final['quoted_at'])-int(sell['quoted_at'])<=4000:return False
+        if old<=0 or new<=0:return {'code':'PREFLIGHT_INVALID'}
+        drift=new/old-1
+        if abs(drift)>.005:
+            return {'code':'PREFLIGHT_QUANTITY_DRIFT','quantity_change_pct':drift*100,
+                    'maximum_quantity_change_pct':.5}
+        final_age=now-int(final['quoted_at'])
+        if not 0<=final_age<=750:
+            return {'code':'FINAL_QUOTE_STALE','final_quote_age_ms':final_age,
+                    'maximum_final_quote_age_ms':750}
+        preview_age=int(final['quoted_at'])-int(sell['quoted_at'])
+        if not 0<=preview_age<=4000:
+            return {'code':'PREFLIGHT_PREVIEW_STALE','preview_age_ms':preview_age,
+                    'maximum_preview_age_ms':4000}
         slot1=int(first.get('context_slot') or 0);slot2=int(final.get('context_slot') or 0)
-        if slot1 and slot2 and not 0<=slot2-slot1<=25:return False
+        if slot1 and slot2 and not 0<=slot2-slot1<=25:
+            return {'code':'PREFLIGHT_SLOT_DRIFT','slot_gap':slot2-slot1,'maximum_slot_gap':25}
         # A positive preflight can be price movement, not negative trading costs.
         initial=int(first['input_usdc_raw'])/1e6
-        if float(sell['provider_expected_usdc'])>initial*1.001:return False
-        return True
-    except (KeyError,ValueError,TypeError,ZeroDivisionError):return False
+        proceeds=float(sell['provider_expected_usdc'])
+        if not math.isfinite(proceeds) or proceeds<=0 or initial<=0:
+            return {'code':'PREFLIGHT_INVALID'}
+        if proceeds>initial*1.001:
+            return {'code':'PREFLIGHT_POSITIVE_RETURN',
+                    'preview_return_pct':(proceeds/initial-1)*100}
+        return None
+    except (KeyError,ValueError,TypeError,ZeroDivisionError,OverflowError):
+        return {'code':'PREFLIGHT_INVALID'}
+
+
+def consistent_preflight(first,sell,final,now=None):
+    return preflight_failure(first,sell,final,now) is None
 
 
 def signal_fresh_at_commit(signal_at,quote,*,now=None,max_age_ms=MAX_SIGNAL_AGE_MS):
@@ -173,23 +225,32 @@ def signal_fresh_at_commit(signal_at,quote,*,now=None,max_age_ms=MAX_SIGNAL_AGE_
 
 
 def prepare_entry(mint,pair,notional,signal_at=None):
-    first=entry_quote(mint,pair,notional)
-    if not first:return None
-    sale=exit_quote(mint,first['token_raw_amount'],pair,purpose='entry')
-    if not sale:return None
-    # The simulated buy uses a newly received quote AFTER preflight, never an
-    # old cheap quote selected by observing a later favourable sell quote.
-    final=entry_quote(mint,pair,notional)
-    if not final or not consistent_preflight(first,sale,final):return None
-    if signal_at is not None and not signal_fresh_at_commit(signal_at,final):return None
-    adjustment=min(1.,final['token_raw_amount']/first['token_raw_amount'])
-    preview=dict(sale)
-    for k in ['expected_usdc','floor_usdc']:preview[k]*=adjustment
-    preview['is_preflight_estimate']=True
-    final['preflight_buy_quote']=first['raw_quote']
-    final['preflight_sell_quote']=sale['raw_quote']
-    final['preflight_quantity_adjustment']=adjustment
-    final['preflight_started_at']=first.get('quoted_at')
-    final['end_to_end_ms']=stamp()-int(signal_at if signal_at is not None else first['quoted_at'])
-    final['preflight_is_guarantee']=False
-    return final,preview
+    _LOCAL.preparation_error=None
+    with transport.entry_sequence() as admitted:
+        if not admitted:return _preparation_fail('sequence',transport.last_error())
+        _LOCAL.quote_error=None
+        first=entry_quote(mint,pair,notional)
+        if not first:return _preparation_fail('initial_buy',getattr(_LOCAL,'quote_error',None))
+        _LOCAL.quote_error=None
+        sale=exit_quote(mint,first['token_raw_amount'],pair,purpose='entry')
+        if not sale:return _preparation_fail('preview_sell',getattr(_LOCAL,'quote_error',None))
+        # The simulated buy uses a newly received quote AFTER preflight, never
+        # an old cheap quote selected by observing a later favourable sell.
+        _LOCAL.quote_error=None
+        final=entry_quote(mint,pair,notional)
+        if not final:return _preparation_fail('final_buy',getattr(_LOCAL,'quote_error',None))
+        failure=preflight_failure(first,sale,final)
+        if failure:return _preparation_fail('consistency',failure)
+        if signal_at is not None and not signal_fresh_at_commit(signal_at,final):
+            return _preparation_fail('signal',{'code':'SIGNAL_EXPIRED_AT_COMMIT'})
+        adjustment=min(1.,final['token_raw_amount']/first['token_raw_amount'])
+        preview=dict(sale)
+        for k in ['expected_usdc','floor_usdc']:preview[k]*=adjustment
+        preview['is_preflight_estimate']=True
+        final['preflight_buy_quote']=first['raw_quote']
+        final['preflight_sell_quote']=sale['raw_quote']
+        final['preflight_quantity_adjustment']=adjustment
+        final['preflight_started_at']=first.get('quoted_at')
+        final['end_to_end_ms']=stamp()-int(signal_at if signal_at is not None else first['quoted_at'])
+        final['preflight_is_guarantee']=False
+        return final,preview

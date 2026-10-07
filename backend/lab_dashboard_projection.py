@@ -12,11 +12,13 @@ def compact_strategy_lab(data):
         if isinstance(position, dict):
             position = {
                 field: position.get(field)
-                for field in ('symbol', 'address', 'pairAddress', 'strategy_id', 'opened_at', 'pnl_pct',
+                for field in ('symbol', 'address', 'pairAddress', 'dexId', 'quoteTokenAddress',
+                              'strategy_id', 'opened_at', 'pnl_pct',
                               'open_pnl_usd', 'notional_usd', 'entry_price', 'execution_entry_price',
                               'current_price', 'entry_dex_fee_usd', 'entry_network_fee_usd',
                               'estimated_exit_fee_usd', 'estimated_exit_impact_pct', 'execution_mode',
-                              'execution_source', 'updated_at', 'mark_received_at', 'mark_source',
+                              'execution_source', 'entry_policy_version', 'entry_evidence_guard_version',
+                              'entry_candidate_rule', 'updated_at', 'mark_received_at', 'mark_source',
                               'quote_status', 'quote_age_ms', 'quote_unavailable_reason')
             }
         else:
@@ -32,6 +34,7 @@ def compact_strategy_lab(data):
                               'entry_price', 'execution_entry_price', 'exit_price', 'execution_exit_price',
                               'notional_usd', 'opened_at', 'closed_at', 'score', 'pnl_pct', 'pnl_usd',
                               'balance_before', 'balance_after', 'exit_reason', 'execution_mode',
+                              'entry_policy_version', 'entry_evidence_guard_version', 'entry_candidate_rule',
                               'entry_dex_fee_usd', 'exit_dex_fee_usd', 'entry_network_fee_usd',
                               'exit_network_fee_usd', 'entry_price_impact_pct', 'exit_price_impact_pct',
                               'entry_slippage_pct', 'exit_slippage_pct')
@@ -59,9 +62,10 @@ def compact_strategy_lab(data):
                     'flow_tape_status', 'flow_tape_coverage_pct',
                     'verified_flow_events_60s', 'flow_tape_backlog', 'blocked_reason',
                     'promoted_policy_version', 'promoted_flow_rejected',
+                    'promoted_evidence_guard_version', 'promoted_candidate_policy_source',
                     'promoted_safety_rejected', 'promoted_price_rejected',
                     'promoted_cost_rejected', 'promoted_block_reasons',
-                    'promoted_max_entry_roundtrip_cost_pct', 'profitability_proven',
+                    'promoted_max_entry_roundtrip_cost_pct', 'promoted_cost_feasibility', 'profitability_proven',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']
@@ -86,7 +90,8 @@ def compact_strategy_lab(data):
         if isinstance(position, dict):
             position = {
                 field: position.get(field)
-                for field in ('symbol', 'address', 'pairAddress', 'strategy_id', 'opened_at',
+                for field in ('symbol', 'address', 'pairAddress', 'dexId', 'quoteTokenAddress',
+                              'strategy_id', 'opened_at',
                               'pnl_pct', 'open_pnl_usd', 'notional_usd', 'entry_price',
                               'execution_entry_price', 'current_price', 'execution_mode',
                               'updated_at', 'mark_received_at', 'mark_source', 'quote_status',

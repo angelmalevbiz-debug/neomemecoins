@@ -2,6 +2,7 @@
 """One isolated PAPER learner process consuming the main engine's shared stream."""
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 import compat_file_lock as fcntl
@@ -27,6 +28,12 @@ def atomic_json(path, data):
             time.sleep(.01)
 
 
+def worker_snapshot(engine):
+    # The parent's subprocess handle must own the process holding the journal
+    # lock. This diagnostic also distinguishes a restarted worker's snapshot.
+    return {**engine.snapshot(), 'worker_pid': os.getpid()}
+
+
 def follow(root, config):
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -36,7 +43,7 @@ def follow(root, config):
         offset = int(engine.state.get('recording_start_offset', 0))
         minimum_time = int(engine.state.get('recording_start_at', 0))
         source = root / 'observations.jsonl'
-        atomic_json(root / 'training_snapshot.json', engine.snapshot())
+        atomic_json(root / 'training_snapshot.json', worker_snapshot(engine))
         while True:
             request = root / 'reset.request.json'
             if request.exists():
@@ -80,7 +87,7 @@ def follow(root, config):
                 engine.state['recording_start_offset'] = offset
                 engine.save()
             if changed or not source.exists() or minimum_time:
-                atomic_json(root / 'training_snapshot.json', engine.snapshot())
+                atomic_json(root / 'training_snapshot.json', worker_snapshot(engine))
             time.sleep(.05)
 
 

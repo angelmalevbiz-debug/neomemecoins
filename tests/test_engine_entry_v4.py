@@ -107,6 +107,28 @@ class EngineEntryTests(unittest.TestCase):
         self.assertIsNone(pos['hard_stop_net_pct'])
         self.assertEqual(pos['planned_stop_net_pct'], -5)
 
+    def test_mature_liquid_candidate_opens_only_with_all_execution_checks(self):
+        self.coin.update(ageMinutes=20_000, marketCap=10_000_000,
+                         volume={'h1': 20_000}, priceChange={'m5': 3, 'h1': 5})
+        self.monitor.maybe_open([self.coin])
+        self.assertEqual(len(m.STATE.positions), 1)
+        self.assertEqual(m.STATE.positions[0]['strategy_matches'], ['COST_EFFICIENT_FLOW'])
+        self.assertEqual(m.STATE.positions[0]['entry_policy_version'], 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V4')
+
+    def test_mature_liquid_candidate_with_expensive_exit_still_cannot_open(self):
+        self.coin.update(ageMinutes=20_000, marketCap=10_000_000,
+                         volume={'h1': 20_000}, priceChange={'m5': 3, 'h1': 5})
+        def expensive_roundtrip(_address, _pair, notional):
+            return ({**self.entry, 'input_usdc_raw': int(notional*1e6),
+                     'token_raw_expected': int(notional*500_000),
+                     'token_raw_amount': int(notional*500_000)},
+                    {**self.exit, 'expected_usdc': notional*.95,
+                     'floor_usdc': notional*.94, 'provider_expected_usdc': notional*.95})
+        with patch.object(m.paper_quotes, 'prepare_entry', side_effect=expensive_roundtrip):
+            self.monitor.maybe_open([self.coin])
+        self.assertFalse(m.STATE.positions)
+        self.assertIn('roundtrip_cost', m.STATE.entry_diagnostics['rejections'])
+
     def test_no_balance_session_history_reset(self):
         m.STATE.demo_balance_usd = 975
         m.STATE.demo_session_id = 'KEEP-MY-SESSION'

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import json, math, os, sys, threading, time
 from pathlib import Path
+from dataclasses import asdict
 from typing import Any, Callable
 import requests
 from astra_lab_bridge import merge_astra_snapshot
@@ -15,6 +16,7 @@ import paper_execution_quotes as paper_quotes
 import pair_price_integrity as price_integrity
 from lab_dashboard_projection import compact_strategy_lab
 import lab_strategy_lifecycle as lifecycle
+import paper_market_feasibility as market_feasibility
 
 API_URL=os.getenv('NEO_LOCAL_API','http://127.0.0.1:8788/state')
 DEX='https://api.dexscreener.com'
@@ -389,14 +391,14 @@ def schedule_jupiter_price_probe(coin):
         return False
 
 STRATEGIES=[
- {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':lambda f: f['score']>=98 and f['liq']>=25000 and 3<=f['m5']<=18 and 1.1<=f['bs']<=3.0 and f['lmc']>=.15 and 8<=f['age']<=180},
- {'id':'PRECISION','name':'Precision','rule':lambda f: f['score']>=95 and f['liq']>=20000 and 2<=f['m5']<=22 and 1.0<=f['bs']<=3.2 and f['lmc']>=.12 and 5<=f['age']<=240},
- {'id':'MOMENTUM','name':'Momentum','rule':lambda f: f['score']>=90 and f['liq']>=15000 and 5<=f['m5']<=30 and f['bs']>=1.15 and f['lmc']>=.08 and 3<=f['age']<=300},
+ {'id':'ULTRA_PRECISION','name':'Ultra Precision','rule':activity.RULES['ULTRA_PRECISION'].matches},
+ {'id':'PRECISION','name':'Precision','rule':activity.RULES['PRECISION'].matches},
+ {'id':'MOMENTUM','name':'Momentum','rule':activity.RULES['MOMENTUM'].matches},
  {'id':'MOMENTUM_RUSH_BRAIN','name':'Momentum Rush Brain','rule':lambda f: activity.RULES['MOMENTUM_RUSH_BRAIN'].matches(f)},
  {'id':'BREAKOUT','name':'Breakout','rule':lambda f: f['score']>=90 and f['liq']>=20000 and 15<f['m5']<=55 and f['bs']>=1.4 and f['lmc']>=.08 and 3<=f['age']<=300},
  {'id':'LIQUIDITY','name':'Liquidity First','rule':lambda f: f['score']>=85 and f['liq']>=40000 and -2<=f['m5']<=20 and f['bs']>=.9 and f['lmc']>=.12 and 5<=f['age']<=720},
  {'id':'ORDER_FLOW','name':'Order Flow','rule':lambda f: f['score']>=85 and f['liq']>=15000 and -5<=f['m5']<=25 and f['flow']['trades']>=3 and f['flow']['ratio']>=1.3 and f['flow']['unique_wallets']>=1 and f['flow']['max_sell']<max(750,f['flow']['buy_usd']*.8)},
- {'id':'EARLY','name':'Early Runner','rule':lambda f: f['score']>=90 and f['liq']>=15000 and 1<=f['m5']<=20 and f['bs']>=1.05 and f['lmc']>=.10 and 2<=f['age']<=60},
+ {'id':'EARLY','name':'Early Runner','rule':activity.RULES['EARLY'].matches},
  {'id':'TREND','name':'Balanced Trend','rule':lambda f: f['score']>=88 and f['liq']>=20000 and 0<=f['m5']<=15 and 0<=f['h1']<=150 and .9<=f['bs']<=3.0 and f['lmc']>=.10 and 15<=f['age']<=480},
  {'id':'SCALPER','name':'Fast Scalper 3/10','rule':lambda f: f['score']>=80 and f['liq']>=10000 and -5<=f['m5']<=15 and f['bs']>=.90 and f['lmc']>=.05 and 2<=f['age']<=300},
  {'id':'VOLUME_SURGE','name':'Volume Surge','rule':lambda f: f['score']>=88 and f['liq']>=15000 and 2<=f['m5']<=28 and f['vol_liq']>=.35 and f['bs']>=1.1 and f['lmc']>=.08 and 3<=f['age']<=360},
@@ -427,6 +429,15 @@ STRATEGIES=[
  {'id':'CLEAN_MOMENTUM','name':'Clean Momentum','rule':lambda f: f['score']>=92 and f['liq']>=30000 and 3<=f['m5']<=18 and f['bs']>=1.2 and .20<=f['vol_liq']<=3.5 and f['flow']['ratio']>=1.5 and f['flow']['max_sell']<max(250,f['flow']['buy_usd']*.6)},
  {'id':'CONFLUENCE_MAX','name':'Confluence Max','rule':lambda f: f['score']>=95 and f['liq']>=40000 and 1<=f['m5']<=12 and f['h1']>-10 and f['bs']>=1.25 and f['lmc']>=.15 and .20<=f['vol_liq']<=4 and f['flow']['trades']>=5 and f['flow']['ratio']>=2.0 and f['flow']['unique_wallets']>=4 and f['flow']['max_sell']<max(200,f['flow']['buy_usd']*.45)},
 ]
+def promoted_candidate_config():
+    """Expose precisely the rules used at funded admission, never legacy lambdas."""
+    return {
+        strategy_id:{field:(None if isinstance(value,float) and not math.isfinite(value) else value)
+                     for field,value in asdict(activity.RULES[strategy_id]).items()}
+        for strategy_id in PROMOTED_STRATEGIES
+    }
+
+
 def empty_book(s):
     start=STRATEGY_START_BALANCES.get(s['id'],START_BALANCE)
     return {'id':s['id'],'name':s['name'],'starting_balance':start,'balance':start,
@@ -734,11 +745,13 @@ def maybe_open(feed,flows):
         promoted_price_rejected=0
         promoted_cost_rejected=0
         promoted_block_reasons={}
+        promoted_cost_examples=[]
         rule=activity.RULES[strategy['id']]
         for coin,features in candidates:
             is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
-            matched=(strategy['rule'](features) if is_promoted
-                     else rule.matches(features))
+            # One declared market screen serves funded and research books.
+            # Funded entries still require all exact-pool evidence gates below.
+            matched=rule.matches(features)
             if not matched:
                 if not is_promoted and rule.matches(features,require_flow=False):
                     flow_rejected+=1
@@ -746,6 +759,17 @@ def maybe_open(feed,flows):
                     market_rejected+=1
                 continue
             signal_candidates+=1
+            if is_promoted:
+                # This is a transparent planning estimate only. It never grants
+                # admission, replaces a price check, or assumes a future gain.
+                feasibility=market_feasibility.execution_feasibility(
+                    coin,promoted_guard.max_entry_cost_pct(STOP_LOSS),
+                    base_slippage_bps=BASE_SLIPPAGE_BPS,
+                    latency_buffer_bps=LATENCY_BUFFER_BPS,
+                    generic_dex_fee_bps=GENERIC_DEX_FEE_BPS)
+                promoted_cost_examples.append({
+                    'symbol':coin.get('symbol'),'address':coin['address'],
+                    'pairAddress':coin['pairAddress'],**feasibility})
             if sol_usd_from_coin(coin)<=0:
                 blocked_network+=1
                 continue
@@ -845,13 +869,31 @@ def maybe_open(feed,flows):
         }
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             book['entry_diagnostics'].update({
-                'promoted_policy_version':promoted_guard.VERSION,
+                'promoted_policy_version':promoted_guard.FUNDED_POLICY_VERSION,
+                'promoted_evidence_guard_version':promoted_guard.VERSION,
+                'promoted_candidate_policy_source':'LAB_ACTIVITY_RULES',
                 'promoted_flow_rejected':promoted_flow_rejected,
                 'promoted_safety_rejected':promoted_safety_rejected,
                 'promoted_price_rejected':promoted_price_rejected,
                 'promoted_cost_rejected':promoted_cost_rejected,
                 'promoted_block_reasons':promoted_block_reasons,
                 'promoted_max_entry_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
+                'promoted_cost_feasibility':{
+                    'basis':'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL',
+                    'is_execution_quote':False,'profitability_proven':False,
+                    'excluded_costs':['price_impact','network_fees','rent'],
+                    'checked_market_candidates':len(promoted_cost_examples),
+                    'fixed_cost_infeasible_candidates':sum(
+                        row['model_cost_feasible'] is False for row in promoted_cost_examples),
+                    'maximum_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
+                    'minimum_model_roundtrip_cost_pct':min(
+                        (row['minimum_model_roundtrip_cost_pct']
+                         for row in promoted_cost_examples
+                         if row['minimum_model_roundtrip_cost_pct'] is not None),default=None),
+                    'best_candidates':sorted(
+                        promoted_cost_examples,key=lambda row:
+                        num(row['minimum_model_roundtrip_cost_pct'],math.inf))[:5],
+                },
                 'profitability_proven':False,
             })
             if signal_candidates==0:
@@ -904,7 +946,9 @@ def maybe_open(feed,flows):
         position={
             'trade_no':book['trade_seq'],'strategy_id':strategy['id'],
             'symbol':coin.get('symbol'),'name':coin.get('name'),
-            'address':address,'pairAddress':coin['pairAddress'],'entry_price':price,
+            'address':address,'pairAddress':coin['pairAddress'],
+            'dexId':coin.get('dexId'),'quoteTokenAddress':quote_token_address(coin),
+            'entry_price':price,
             'execution_entry_price':round(opening['fill_price'],12),
             'current_price':price,'peak_price':price,'quantity':qty,'original_quantity':qty,
             'notional_usd':notional,'opened_at':stamp,'updated_at':stamp,
@@ -923,7 +967,7 @@ def maybe_open(feed,flows):
             'quote_status':'fresh','mark_received_at':stamp,
             'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','quote_age_ms':0,
             'price_crosscheck':validation,
-            'entry_policy_version':(promoted_guard.VERSION
+            'entry_policy_version':(promoted_guard.FUNDED_POLICY_VERSION
                                     if book.get('portfolio_group')=='PROMOTED_PAPER'
                                     else activity.POLICY_VERSION),
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
@@ -943,6 +987,8 @@ def maybe_open(feed,flows):
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             position['verified_entry_flow']=features.get('verified_flow')
             position['risk_guard']=risk
+            position['entry_evidence_guard_version']=promoted_guard.VERSION
+            position['entry_candidate_rule']=promoted_candidate_config()[strategy['id']]
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
 
@@ -968,10 +1014,10 @@ def stats(book):
             'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(p),
             'valuation_stale':valuation_stale,'mark_age_ms':mark_age_ms,
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),
-            'active_policy_trades':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.VERSION} for t in h),
-            'active_policy_wins':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.VERSION} and num(t.get('pnl_usd'))>0 for t in h),
-            'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.VERSION for t in h),
-            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.VERSION and num(t.get('pnl_usd'))>0 for t in h)}
+            'active_policy_trades':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION} for t in h),
+            'active_policy_wins':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION} and num(t.get('pnl_usd'))>0 for t in h),
+            'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION for t in h),
+            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h)}
 
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
@@ -999,7 +1045,8 @@ def persist(status='online',error=None):
                               'rush_max_memory_scan_rows':rush_brain.MAX_MEMORY_SCAN_ROWS,
                               'rush_low_cap_max_balance_fraction':rush_brain.LOW_CAP_MAX_BALANCE_FRACTION,
                               'rush_low_cap_max_notional_usd':rush_brain.LOW_CAP_MAX_NOTIONAL_USD}
-    STATE['activity_config']['promoted_entry_policy']=promoted_guard.policy_config(STOP_LOSS)
+    STATE['activity_config']['promoted_entry_policy']=promoted_guard.funded_policy_config(
+        STOP_LOSS,promoted_candidate_config())
     STATE['activity_config'].update({
         'rush_stop_loss_net_pct':STOP_LOSS,'rush_take_profit_net_pct':RUSH_TAKE_PROFIT,
         'rush_max_hold_minutes':RUSH_MAX_HOLD_MIN,'rush_trail_arm_net_pct':RUSH_TRAIL_ARM,

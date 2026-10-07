@@ -38,7 +38,7 @@ LABELS = {
     'price_tiebreak_failed': 'Jupiter не потвърди наблюдаваната цена',
     'price_unavailable': 'липсва независимо потвърждение на цената',
     'price_unavailable_needs_jupiter': 'GeckoTerminal няма цена — изисква exact-pool Jupiter потвърждение',
-    'quote_inconsistent': 'котировките се промениха по време на проверката',
+    'quote_inconsistent': 'проверката на котировките е отказана; виж точната причина',
     'price_identity_mismatch': 'несъответстващ token или pool',
     'entry_error': 'проверката на входа не е завършена',
     'token_blocklisted': 'токен в забранителния списък',

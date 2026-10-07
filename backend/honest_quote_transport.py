@@ -2,7 +2,8 @@
 Never builds/signs/submits transactions. Timestamp refers to HTTP reception,
 not time waiting for the rate limiter. Legacy clients use the same lock/stamp.
 """
-import hashlib,json,math,os,threading,time
+import hashlib,json,math,os,threading,time,uuid
+from contextlib import contextmanager
 import compat_file_lock as fcntl
 from pathlib import Path
 import requests
@@ -18,6 +19,102 @@ ADAPTER_VERSION='jupiter-swap-v1-quote/2'
 COOLDOWN=ROOT/'quote-provider-backoff.json'
 WSOL='So11111111111111111111111111111111111111112'
 USDC='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+ENTRY_SEQUENCE_LEASE_MS=15_000
+ATOMIC_REPLACE_ATTEMPTS=8
+
+
+def _entry_sequence_state():
+ """Read a short lease, never hold the HTTP lock across a multi-leg preflight."""
+ path=ROOT/'quote-entry-sequence.json'
+ try:
+  data=json.loads(path.read_text())
+ except FileNotFoundError:return None
+ if (not isinstance(data,dict) or not isinstance(data.get('token'),str)
+     or not data['token'] or type(data.get('expires_at')) is not int):
+  raise ValueError('invalid entry sequence lease')
+ return data if data['expires_at']>now_ms() else None
+
+
+def _entry_sequence_rejection(purpose):
+ # A held position's exit always outranks an entry lease. Fresh cache reads
+ # also need no HTTP budget and are checked before this function is called.
+ if purpose=='exit':return None
+ token=getattr(LOCAL,'entry_sequence_token',None)
+ if token and now_ms()>=getattr(LOCAL,'entry_sequence_expires_at',0):
+  return 'ENTRY_SEQUENCE_EXPIRED'
+ try:lease=_entry_sequence_state()
+ except (OSError,ValueError,TypeError):return 'ENTRY_SEQUENCE_STATE_UNAVAILABLE'
+ if lease and (lease['token']!=token or purpose=='background'):
+  return 'ENTRY_SEQUENCE_BUSY'
+ if token and (not lease or lease['token']!=token):
+  return 'ENTRY_SEQUENCE_EXPIRED'
+ return None
+
+
+@contextmanager
+def entry_sequence():
+ """Reserve three entry HTTP calls across processes, below all exit requests.
+
+ Unrelated callers defer without consuming the shared quota. A crashed owner
+ can hold the reservation for at most 15 seconds; no stale quote is made fresh.
+ """
+ LOCAL.error=None
+ lease=None
+ try:
+  ROOT.mkdir(parents=True,exist_ok=True)
+  with LOCK.open('a+') as handle:
+   acquired=False
+   try:
+    fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB);acquired=True
+    if _entry_sequence_state():
+     _fail('ENTRY_SEQUENCE_BUSY',queue_ms=0)
+    else:
+     priority=ROOT/'quote-exit-priority'
+     pending_exit=False
+     for marker in priority.glob('*.json'):
+      try:
+       if time.time()-marker.stat().st_mtime>5:marker.unlink(missing_ok=True)
+       else:pending_exit=True
+      except OSError:pending_exit=True
+     if pending_exit:
+      _fail('EXIT_PRIORITY_PENDING',queue_ms=0)
+     else:
+      lease={'token':uuid.uuid4().hex,'pid':os.getpid(),
+             'expires_at':now_ms()+ENTRY_SEQUENCE_LEASE_MS}
+      _write(ROOT/'quote-entry-sequence.json',lease)
+   except BlockingIOError:_fail('ENTRY_SEQUENCE_BUSY',queue_ms=0)
+   finally:
+    if acquired:fcntl.flock(handle,fcntl.LOCK_UN)
+ except (OSError,ValueError,TypeError):
+  lease=None
+  _fail('ENTRY_SEQUENCE_STATE_UNAVAILABLE',queue_ms=0)
+ if not lease:
+  yield False
+  return
+ LOCAL.entry_sequence_token=lease['token']
+ LOCAL.entry_sequence_expires_at=lease['expires_at']
+ try:
+  yield True
+ finally:
+  LOCAL.entry_sequence_token=None
+  LOCAL.entry_sequence_expires_at=0
+  # Removal cannot race a replacement lease. Keep cleanup bounded if an exit
+  # owns the HTTP lock; a leftover reservation expires automatically.
+  for attempt in range(10):
+   try:
+    with LOCK.open('a+') as handle:
+     acquired=False
+     try:
+      fcntl.flock(handle,fcntl.LOCK_EX|fcntl.LOCK_NB);acquired=True
+      current=_entry_sequence_state()
+      if current and current['token']==lease['token']:
+       (ROOT/'quote-entry-sequence.json').unlink(missing_ok=True)
+      break
+     finally:
+      if acquired:fcntl.flock(handle,fcntl.LOCK_UN)
+   except BlockingIOError:
+    if attempt<9:time.sleep(.025)
+   except (OSError,ValueError,TypeError):break
 
 def quote_asset_reference(*,max_age_ms=60000):
  try:
@@ -70,8 +167,26 @@ def _schema(data,inp,out,amount):
 
 def now_ms():return int(time.time()*1000)
 def _write(path,obj):
- tmp=path.with_name(path.name+'.'+str(os.getpid())+'.tmp')
- tmp.write_text(json.dumps(obj));tmp.replace(path)
+ """Publish a complete shared observation despite brief Windows reader locks.
+
+ No timestamp or quota is advanced here. A persistent replacement failure still
+ reaches the caller, and the previously published observation stays intact.
+ """
+ payload=json.dumps(obj,allow_nan=False)
+ tmp=path.with_name(f'.{path.name}.{os.getpid()}.{threading.get_ident()}.{uuid.uuid4().hex}.tmp')
+ try:
+  with tmp.open('x',encoding='utf-8') as handle:
+   handle.write(payload);handle.flush();os.fsync(handle.fileno())
+  for attempt in range(ATOMIC_REPLACE_ATTEMPTS):
+   try:
+    tmp.replace(path)
+    return
+   except PermissionError:
+    if attempt+1>=ATOMIC_REPLACE_ATTEMPTS:raise
+    time.sleep(min(.4,.025*(2**attempt)))
+ finally:
+  try:tmp.unlink(missing_ok=True)
+  except OSError:pass  # Preserve the original publication error if cleanup fails.
 
 def _cached(path,min_received_at=None):
  try:
@@ -93,6 +208,8 @@ def quote(inp,out,amount,*,purpose='entry',slippage_bps=100,min_received_at=None
  digest=hashlib.sha256(json.dumps({'params':params,'adapter':ADAPTER_VERSION,'url':URL},sort_keys=True).encode()).hexdigest()
  file=cache/(digest+'.json'); data=_cached(file,min_received_at)
  if data:return data
+ sequence_rejection=_entry_sequence_rejection(purpose)
+ if sequence_rejection:return _fail(sequence_rejection,queue_ms=0,purpose=purpose)
  priority=ROOT/'quote-exit-priority';priority.mkdir(exist_ok=True)
  marker=priority/(str(os.getpid())+'-'+str(threading.get_ident())+'.json')
  begin=now_ms(); is_exit=purpose=='exit'; is_background=purpose=='background'
@@ -121,6 +238,8 @@ def quote(inp,out,amount,*,purpose='entry',slippage_bps=100,min_received_at=None
         continue
       data=_cached(file,min_received_at)
       if data:return data
+      sequence_rejection=_entry_sequence_rejection(purpose)
+      if sequence_rejection:return _fail(sequence_rejection,queue_ms=now_ms()-begin,purpose=purpose)
       try:last=float(STAMP.read_text())
       except (OSError,ValueError):last=0
       try:backoff=float(json.loads(COOLDOWN.read_text()).get('until',0))

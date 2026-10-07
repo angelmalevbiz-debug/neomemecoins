@@ -50,6 +50,22 @@ class WinnerEnsembleLearningTests(unittest.TestCase):
         weak = {**self.flow, 'unique_wallets': 1, 'buy_sell_usd_ratio': 1.0}
         self.assertEqual(ensemble.matches(self.coin, weak), [])
 
+    def test_mature_liquid_market_can_be_examined_without_weakening_confirmation(self):
+        coin = {**self.coin, 'liquidityUsd': 300_000, 'marketCap': 15_000_000,
+                'ageMinutes': 20_000, 'volume': {'h1': 40_000}}
+        self.assertEqual(ensemble.market_candidates(coin), ['COST_EFFICIENT_FLOW'])
+        self.assertEqual(ensemble.matches(coin), [])
+        self.assertEqual(ensemble.matches(coin, self.flow), ['COST_EFFICIENT_FLOW'])
+        self.assertEqual(ensemble.matches(coin, {**self.flow, 'unique_wallets': 1}), [])
+        self.assertEqual(ensemble.market_candidates({**coin, 'liquidityUsd': 199_999}), [])
+        self.assertEqual(ensemble.market_candidates({**coin, 'priceChange': {'m5': 5, 'h1': -20}}), [])
+
+    def test_prior_policy_closes_remain_separate_after_candidate_universe_change(self):
+        learning = ensemble.learning_snapshot([self.closed_trade(1, 100,
+            entry_policy_version='WINNER_ENSEMBLE_VERIFIED_ENTRY_V3')])
+        self.assertEqual(learning['closed_trades'], 0)
+        self.assertEqual(learning['ignored_data'].get('other_policy'), 1)
+
     def test_small_loss_sample_is_reported_but_not_throttled(self):
         history = [self.closed_trade(index) for index in range(11)]
         matches, learning = ensemble.apply_learning(['VERIFIED_FLOW_MOMENTUM'], history)

@@ -351,9 +351,15 @@ class TapeRecorder:
                 observed INTEGER NOT NULL,metadata TEXT NOT NULL,state TEXT NOT NULL DEFAULT 'pending',
                 attempts INTEGER NOT NULL DEFAULT 0,next_retry INTEGER NOT NULL DEFAULT 0,reason TEXT,PRIMARY KEY(signature,pair));
             CREATE INDEX IF NOT EXISTS pending_idx ON signatures(state,next_retry,observed);
+            CREATE INDEX IF NOT EXISTS signature_pair_window_idx
+                ON signatures(pair,event_time,observed,state);
+            CREATE INDEX IF NOT EXISTS pending_fresh_idx
+                ON signatures(COALESCE(event_time,observed) DESC,observed DESC,slot DESC,next_retry)
+                WHERE state='pending';
             CREATE TABLE IF NOT EXISTS events(event_id TEXT PRIMARY KEY,signature TEXT NOT NULL,pair TEXT NOT NULL,
                 event_time INTEGER NOT NULL,available INTEGER NOT NULL,payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS event_time_idx ON events(event_time);
+            CREATE INDEX IF NOT EXISTS event_pair_time_idx ON events(pair,event_time);
         ''')
         self.db.commit()
 
@@ -469,13 +475,13 @@ class TapeRecorder:
         cutoff = current-WINDOW_MS
         order = 'ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC LIMIT ?'
         pending = list(self.db.execute(
-            "SELECT * FROM signatures WHERE state='pending' AND next_retry<=? "
+            "SELECT * FROM signatures INDEXED BY pending_fresh_idx WHERE state='pending' AND next_retry<=? "
             'AND COALESCE(event_time,observed)>=? '+order,
             (current,cutoff,self.tx_budget)))
         historical_budget = min(self.historical_tx_budget,max(0,self.tx_budget-len(pending)))
         if historical_budget:
             pending.extend(self.db.execute(
-                "SELECT * FROM signatures WHERE state='pending' AND next_retry<=? "
+                "SELECT * FROM signatures INDEXED BY pending_fresh_idx WHERE state='pending' AND next_retry<=? "
                 'AND COALESCE(event_time,observed)<? '+order,
                 (current,cutoff,historical_budget)))
         groups = {}
@@ -526,13 +532,19 @@ class TapeRecorder:
             # signatures remain visible in the durable tape and 5-minute chart,
             # but must not poison completeness for the current decision window.
             decision_cutoff = current - DECISION_FLOW_WINDOW_MS
-            recent_filter = '(event_time>=? OR (event_time IS NULL AND observed>=?))'
+            # These disjoint ranges use the covering pool/time index. A single
+            # OR predicate made SQLite scan the durable history of every pool
+            # on each poll; an unknown timestamp still uses observation time.
+            recent_rows = '''SELECT state,observed FROM signatures
+                WHERE pair=? AND event_time>=?
+                UNION ALL SELECT state,observed FROM signatures
+                WHERE pair=? AND event_time IS NULL AND observed>=?'''
+            recent_params = (pair,decision_cutoff,pair,decision_cutoff)
             counters = {r['state']:r['n'] for r in self.db.execute(
-                f'SELECT state,count(*) n FROM signatures WHERE pair=? AND {recent_filter} GROUP BY state',
-                (pair,decision_cutoff,decision_cutoff))}
+                f'SELECT state,count(*) n FROM ({recent_rows}) GROUP BY state',recent_params)}
             pending = self.db.execute(
-                f"SELECT count(*) n,min(observed) oldest FROM signatures WHERE pair=? AND state='pending' AND {recent_filter}",
-                (pair,decision_cutoff,decision_cutoff)).fetchone()
+                f"SELECT count(*) n,min(observed) oldest FROM ({recent_rows}) WHERE state='pending'",
+                recent_params).fetchone()
             latest = self.db.execute('SELECT max(event_time) t FROM events WHERE pair=?',(pair,)).fetchone()['t']
             reason = state['reason']
             if pending['n']:

@@ -1,25 +1,45 @@
 # Current PAPER deployment status
 
-Latest local repair on 2026-10-07: see [Momentum Rush repair](MOMENTUM_RUSH_REPAIR.md).
-The active Windows services run from `C:\Users\Chavd\neomemecoins`; the public
-Pages build uses a separate VPS API. The complete tested integration is committed
-locally on `codex/complete-momentum-rush` and the Windows PAPER runtime was updated
-with all existing histories retained. GitHub publication was repaired by selecting
-the existing `angelmalevbiz-debug` Git credential explicitly. [Draft PR #1](https://github.com/angelmalevbiz-debug/neomemecoins/pull/1)
-now contains the concurrent-main integration (`794ff55`); both GitHub regression
-runs passed. It remains unmerged. The user then selected local work only, so the
-additional compatibility/dashboard changes stay local and the VPS was not updated.
+Repair and publication configuration on 2026-10-07: see
+[Momentum Rush repair](MOMENTUM_RUSH_REPAIR.md) and
+[PR #1](https://github.com/angelmalevbiz-debug/neomemecoins/pull/1).
+The active Windows services run from `C:\Users\Chavd\neomemecoins` in PAPER mode.
+The repository variable `NEO_API_URL` was configured to the PC's authenticated
+gateway through a new HTTPS Quick Tunnel. The repaired Pages workflow reads that
+variable; a successful deployment of this source is required for the public
+site to switch from the old VPS API. The public site remains
+`https://angelmalevbiz-debug.github.io/neomemecoins/`.
+The VPS has not been updated, and its independent account histories are retained.
 
 The local dashboard is available at `http://127.0.0.1:5173`, using the local
 gateway at `http://127.0.0.1:8879`. Normal Supabase sign-in is required; private
 authenticated account viewing is not certified by the unauthenticated probes.
 Unknown custom Lab ledgers survive source upgrades with an explicit inactive
 status. Their original position policy must be restored before they can resume.
-Tape decoding recovered, but complete flow coverage and profitability remain
-unproven.
+The PC backend is accessible through the tunnel: health 200, exact Pages-origin
+CORS 204, and unauthenticated private state 401. The separate loopback shared
+backend schema passed the read-only deployment probe. Neither probe certifies a
+logged-in private account. Supabase authentication remains required on both URLs.
 
-The dated measurements below describe the prior baseline and should not be
-read as the current endpoint or strategy count.
+The tape now prioritizes current observations while limiting historical replay;
+three SQLite indexes and disjoint window queries avoid repeatedly scanning the
+durable ledger. On an offline 400,049-signature database, decision-window queries
+improved from 49.006 to 0.112 ms, current pending selection from 44.214 to 0.117 ms,
+and historical selection from 61.492 to 0.035 ms. Migration retained row
+fingerprints and results. These timings measure database work, not trading
+profitability. The i5-13600K has 20 logical threads and approximately 32 GiB RAM;
+provider quotas, unsupported transactions and evidence quality still limit
+verified flow. Shared API limits and entry protections remain active.
+
+Quick Tunnels have temporary hostnames and no uptime guarantee. Keep the PC,
+services, network and tunnel running. After a tunnel process restart, update
+`NEO_API_URL` and rebuild Pages with the new hostname. This configuration is not
+a permanent hosted backend. Complete flow coverage, an 80% win rate and positive
+net expectancy remain unproven; Momentum Rush stays an independent TEST book.
+
+Everything below is a dated 2026-10-06 baseline. Its endpoint, strategy count,
+reset and service measurements are historical and do not describe the current
+deployment. The 2026-10-07 repair preserves existing histories and performs no reset.
 
 The maintained repository is [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins). The public app is [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/).
 

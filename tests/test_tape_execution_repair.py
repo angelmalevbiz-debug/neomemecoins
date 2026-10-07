@@ -237,6 +237,104 @@ class RpcAndDurability(unittest.TestCase):
     def tearDown(self):
         self.rec.close();self.directory.cleanup()
 
+    def test_indexed_decision_window_preserves_boundaries_and_unknown_times(self):
+        self.rec.poll([META],lambda calls:[{'result':[]} for _ in calls])
+        cutoff=self.clock[0]-tape.DECISION_FLOW_WINDOW_MS
+        with self.rec.db:
+            self.rec.db.executemany('''INSERT INTO signatures(signature,pair,slot,
+                event_time,observed,metadata,state) VALUES(?,?,1,?,?,?,'pending')''',
+                ((f'historical-{i}',PAIR,cutoff-1,NOW,json.dumps(META)) for i in range(4000)))
+            for signature,pair,event_time,observed,state in (
+                    ('boundary-known',PAIR,cutoff,NOW-100,'pending'),
+                    ('boundary-unknown',PAIR,None,cutoff,'pending'),
+                    ('current-unknown',PAIR,None,NOW,'unclassified'),
+                    ('old-unknown',PAIR,None,cutoff-1,'unclassified'),
+                    ('other-pool',pubkey(20),NOW,NOW,'pending')):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,
+                    event_time,observed,metadata,state) VALUES(?,?,2,?,?,?,?)''',
+                    (signature,pair,event_time,observed,json.dumps(META),state))
+        queries=[]
+        self.rec.db.set_trace_callback(queries.append)
+        try:
+            snapshot=self.rec.snapshot([META])
+        finally:
+            self.rec.db.set_trace_callback(None)
+        coverage=snapshot['pair_coverage'][PAIR]
+        self.assertEqual(coverage['backlog'],2)
+        self.assertEqual(coverage['oldest_pending_at'],cutoff)
+        self.assertEqual(coverage['unclassified'],1)
+        self.assertEqual(coverage['status'],'DEGRADED')
+        self.assertEqual(snapshot['backlog'],4003)
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],4005)
+        windows=[query for query in queries if 'UNION ALL SELECT state,observed' in query]
+        self.assertEqual(len(windows),2)
+        for query in windows:
+            plan=' '.join(row['detail'] for row in self.rec.db.execute('EXPLAIN QUERY PLAN '+query))
+            self.assertIn('signature_pair_window_idx (pair=? AND event_time>?)',plan)
+            self.assertIn('signature_pair_window_idx (pair=? AND event_time=? AND observed>?)',plan)
+            self.assertNotIn('SCAN signatures',plan)
+            # Bound SQLite VM work, rather than wall time on the test machine.
+            ticks=[]
+            self.rec.db.set_progress_handler(lambda:ticks.append(1) or 0,100)
+            try:
+                list(self.rec.db.execute(query))
+            finally:
+                self.rec.db.set_progress_handler(None,0)
+            self.assertLess(len(ticks),10)
+
+    def test_indexed_pending_queue_keeps_fresh_priority_and_retry_deadline(self):
+        self.rec.tx_budget=2
+        with self.rec.db:
+            self.rec.db.executemany('''INSERT INTO signatures(signature,pair,slot,
+                event_time,observed,metadata,state) VALUES(?,?,1,?,?,?,'pending')''',
+                ((f'historical-{i}',PAIR,NOW-600_000,NOW,json.dumps(META)) for i in range(4000)))
+            for signature,event_time,observed,retry in (
+                    ('waiting',NOW+500,NOW+500,self.clock[0]+1),
+                    ('live-known',NOW-100,NOW,0),('live-unknown',None,NOW+100,0)):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,
+                    event_time,observed,metadata,state,next_retry) VALUES(?,?,2,?,?,?,'pending',?)''',
+                    (signature,PAIR,event_time,observed,json.dumps(META),retry))
+        queries=[];requested=[]
+        def rpc(calls):
+            requested.extend(params[0] for _,params in calls)
+            return [{'result':non_swap()} for _ in calls]
+        self.rec.db.set_trace_callback(queries.append)
+        try:
+            self.rec.process(rpc)
+        finally:
+            self.rec.db.set_trace_callback(None)
+        self.assertEqual(requested,['live-unknown','live-known'])
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='waiting'").fetchone()[0],'pending')
+        self.assertEqual(self.rec.db.execute("SELECT count(*) FROM signatures WHERE state='pending'").fetchone()[0],4001)
+        selection=next(query for query in queries if 'SELECT * FROM signatures INDEXED BY' in query)
+        plan=' '.join(row['detail'] for row in self.rec.db.execute('EXPLAIN QUERY PLAN '+selection))
+        self.assertIn('pending_fresh_idx',plan)
+        self.assertNotIn('TEMP B-TREE',plan)
+
+    def test_index_migration_preserves_existing_rows_and_is_idempotent(self):
+        self.rec.poll([META],lambda calls:[{'result':[]} for _ in calls])
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                observed,metadata,state,attempts,next_retry,reason)
+                VALUES('retained',?,42,?,?,?,'pending',7,?,'TRANSACTION_NULL')''',
+                (PAIR,NOW-600_000,NOW,json.dumps(META),NOW+5000))
+            self.rec.db.execute('INSERT INTO events VALUES(?,?,?,?,?,?)',
+                ('retained-event','retained',PAIR,NOW-600_000,NOW,'{"retained":true}'))
+            for index in ('signature_pair_window_idx','pending_fresh_idx','event_pair_time_idx'):
+                self.rec.db.execute('DROP INDEX '+index)
+        before={table:[tuple(row) for row in self.rec.db.execute('SELECT * FROM '+table)]
+                for table in ('pairs','signatures','events')}
+        for _ in range(2):
+            self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0])
+            after={table:[tuple(row) for row in self.rec.db.execute('SELECT * FROM '+table)]
+                   for table in before}
+            self.assertEqual(after,before)
+            indexes={row['name'] for row in self.rec.db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+            self.assertTrue({'signature_pair_window_idx','pending_fresh_idx','event_pair_time_idx'}<=indexes)
+        plan=' '.join(row['detail'] for row in self.rec.db.execute(
+            'EXPLAIN QUERY PLAN SELECT max(event_time) FROM events WHERE pair=?',(PAIR,)))
+        self.assertIn('event_pair_time_idx (pair=?)',plan)
+
     def test_ids_missing_shuffled_and_duplicated(self):
         calls=[('x',[])]*3
         answers=tape.align_rpc_answers(calls,[{'id':3,'result':'three'},{'id':1,'result':'one'}])

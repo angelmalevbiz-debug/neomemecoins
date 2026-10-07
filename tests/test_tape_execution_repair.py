@@ -194,6 +194,59 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(answers[0]['result'],'one');self.assertIn('error',answers[1]);self.assertEqual(answers[2]['result'],'three')
         self.assertIn('error',tape.align_rpc_answers(calls,[{'id':1,'result':1},{'id':1,'result':2}])[0])
 
+    def test_get_transaction_uses_singleton_rpc_requests_while_signatures_stay_batched(self):
+        payloads=[]
+
+        class Response:
+            def __init__(self,payload):self.payload=payload
+            def raise_for_status(self):return None
+            def json(self):
+                if isinstance(self.payload,dict):
+                    return {'id':1,'result':self.payload['params'][0]}
+                return [{'id':i+1,'result':request['params'][0]}
+                        for i,request in enumerate(self.payload)]
+
+        def post(url,json,timeout):
+            payloads.append(json)
+            return Response(json)
+
+        signatures=[f'transaction-{i}' for i in range(8)]
+        transaction_calls=[('getTransaction',[signature,{'encoding':'jsonParsed'}]) for signature in signatures]
+        with patch.object(tape.SESSION,'post',side_effect=post), patch.object(tape,'RPC_TRANSACTION_CONCURRENCY',4):
+            answers=tape.rpc_batch(transaction_calls)
+            transaction_payloads=list(payloads)
+            payloads.clear()
+            signature_calls=[('getSignaturesForAddress',[pubkey(20+i),{'limit':1}]) for i in range(8)]
+            signature_answers=tape.rpc_batch(signature_calls)
+
+        self.assertEqual(len(transaction_payloads),len(transaction_calls))
+        self.assertTrue(all(isinstance(payload,dict) and payload['method']=='getTransaction'
+                            for payload in transaction_payloads))
+        self.assertEqual([answer['result'] for answer in answers],signatures)
+        self.assertEqual(len(payloads),1)
+        self.assertEqual(len(payloads[0]),len(signature_calls))
+        self.assertEqual(len(signature_answers),len(signature_calls))
+
+    def test_one_failed_transaction_body_preserves_other_successful_answers(self):
+        class Response:
+            def __init__(self,signature):self.signature=signature
+            def raise_for_status(self):return None
+            def json(self):return {'id':1,'result':self.signature}
+
+        def post(url,json,timeout):
+            signature=json['params'][0]
+            if signature=='provider-failure':
+                raise tape.requests.Timeout('one transaction timed out')
+            return Response(signature)
+
+        calls=[('getTransaction',[signature,{}]) for signature in
+               ['first','provider-failure','third']]
+        with patch.object(tape.SESSION,'post',side_effect=post):
+            answers=tape.rpc_batch(calls)
+        self.assertEqual(answers[0]['result'],'first')
+        self.assertEqual(answers[1]['error']['code'],'TRANSACTION_RPC_UNAVAILABLE')
+        self.assertEqual(answers[2]['result'],'third')
+
     def test_over_60_signatures_never_silently_dropped_and_restart_resume(self):
         rows=[{'signature':f's{i:03}','slot':i,'blockTime':NOW//1000,'err':None} for i in range(180,0,-1)]
         requests=[]
@@ -207,14 +260,129 @@ class RpcAndDurability(unittest.TestCase):
                 stop=next((i for i,r in enumerate(rows) if r['signature']==options.get('until')),len(rows))
                 out.append({'result':rows[start:min(stop,start+options['limit'])]})
             return out
+        self.rec.tx_budget=180
         first=self.rec.poll([META],rpc)
-        self.assertEqual(first['backlog'],40);self.assertEqual(first['pair_coverage'][PAIR]['status'],'UNKNOWN')
-        self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0],page_size=100,page_budget=1,tx_budget=60)
+        self.assertEqual(first['backlog'],0);self.assertEqual(first['pair_coverage'][PAIR]['status'],'UNKNOWN')
+        self.rec.close();self.rec=tape.TapeRecorder(self.path,clock=lambda:self.clock[0],page_size=100,page_budget=1,tx_budget=180)
         self.rec.poll([META],rpc);final=self.rec.poll([META],rpc)
         self.assertEqual(final['classifications']['non_swap'],180);self.assertEqual(final['backlog'],0)
-        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s081')
+        self.assertEqual(final['pair_coverage'][PAIR]['status'],'COMPLETE');self.assertEqual(requests[1]['before'],'s091')
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
+
+    def test_stale_pagination_restarts_at_live_head_without_erasing_history(self):
+        now=self.clock[0]
+        old_times={'old-cursor':now-3*tape.WINDOW_MS,
+                   'old-page':now-2*tape.WINDOW_MS,
+                   'stale-head':now-tape.WINDOW_MS-1}
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO pairs(pair,mint,cursor,before_sig,scan_head,
+                complete_since,last_poll,reason,metadata) VALUES(?,?,?,?,?,?,?,?,?)''',
+                (PAIR,MINT,'old-cursor','old-page','stale-head',now-4*tape.WINDOW_MS,
+                 now-1000,'PAGINATION_PENDING',json.dumps(META)))
+            for index,(signature,event_time) in enumerate(old_times.items()):
+                self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                    observed,metadata,state) VALUES(?,?,?,?,?,?,'processed')''',
+                    (signature,PAIR,index+1,event_time,now-5000,json.dumps(META)))
+
+        requests=[]
+        def rpc(calls):
+            result=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    requests.append(params[1])
+                    result.append({'result':[{'signature':'fresh-head','slot':999,
+                                              'blockTime':now//1000,'err':None}]})
+                else:
+                    result.append({'result':non_swap()})
+            return result
+
+        snapshot=self.rec.poll([META],rpc)
+        state=self.rec.db.execute('SELECT * FROM pairs WHERE pair=?',(PAIR,)).fetchone()
+        coverage=snapshot['pair_coverage'][PAIR]
+        self.assertEqual(len(requests),1)
+        self.assertNotIn('before',requests[0])
+        self.assertNotIn('until',requests[0])
+        self.assertEqual(state['cursor'],'fresh-head')
+        self.assertIsNone(state['before_sig'])
+        self.assertIsNone(state['scan_head'])
+        self.assertEqual(coverage['status'],'COMPLETE')
+        self.assertGreaterEqual(coverage['complete_since_ms'],now-tape.DECISION_FLOW_WINDOW_MS)
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures WHERE pair=?',(PAIR,)).fetchone()[0],4)
+
+    def test_inactive_pair_restarts_fresh_window_even_without_pending_page(self):
+        now=self.clock[0]
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO pairs(pair,mint,cursor,before_sig,scan_head,
+                complete_since,last_poll,reason,metadata) VALUES(?,?,?,?,?,?,?,?,?)''',
+                (PAIR,MINT,'old-cursor',None,None,now-tape.WINDOW_MS,
+                 now-tape.DECISION_FLOW_WINDOW_MS-1,None,json.dumps(META)))
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,
+                observed,metadata,state) VALUES(?,?,?,?,?,?,'processed')''',
+                ('old-cursor',PAIR,1,now-tape.WINDOW_MS,now-tape.WINDOW_MS,json.dumps(META)))
+
+        requests=[]
+        def rpc(calls):
+            out=[]
+            for _,params in calls:
+                requests.append(params[1])
+                out.append({'result':[{'signature':'fresh-head','slot':2,
+                                       'blockTime':now//1000,'err':None}]})
+            return out
+
+        self.rec.discover([META],rpc)
+        self.assertNotIn('until',requests[0])
+        self.assertEqual(self.rec.db.execute('SELECT cursor FROM pairs WHERE pair=?',(PAIR,)).fetchone()[0],
+                         'fresh-head')
+        self.assertIsNone(self.rec.db.execute('SELECT before_sig FROM pairs WHERE pair=?',(PAIR,)).fetchone()[0])
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures WHERE pair=?',(PAIR,)).fetchone()[0],2)
+
+    def test_large_single_rpc_page_completes_fresh_pool_without_false_pagination(self):
+        self.rec.page_size=1000
+        self.rec.tx_budget=200
+        rows=[{'signature':f'fresh-{i:03}','slot':i,'blockTime':NOW//1000,'err':None}
+              for i in range(80,0,-1)]
+        signature_pages=[]
+
+        def rpc(calls):
+            answers=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    signature_pages.append(params[1]['limit'])
+                    answers.append({'result':rows})
+                else:
+                    answers.append({'result':non_swap()})
+            return answers
+
+        snapshot=self.rec.poll([META],rpc)
+        self.assertEqual(signature_pages,[100])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertFalse(snapshot['pair_coverage'][PAIR]['pagination_pending'])
+        self.assertEqual(snapshot['backlog'],0)
+        self.assertEqual(snapshot['classifications']['non_swap'],80)
+
+    def test_signature_discovery_budget_is_shared_across_active_pools(self):
+        self.rec.page_size=1000
+        self.rec.tx_budget=60
+        feed=[dict(META,address=pubkey(20+i),pair=pubkey(40+i)) for i in range(12)]
+        limits=[]
+
+        def rpc(calls):
+            answers=[]
+            for method,params in calls:
+                if method=='getSignaturesForAddress':
+                    limits.append(params[1]['limit'])
+                    answers.append({'result':[]})
+                else:
+                    answers.append({'result':non_swap()})
+            return answers
+
+        snapshot=self.rec.poll(feed,rpc)
+        self.assertEqual(len(limits),12)
+        self.assertEqual(set(limits),{2})
+        self.assertLessEqual(sum(limits),self.rec.tx_budget//2)
+        self.assertEqual(snapshot['tracked_pairs'],12)
+        self.assertEqual(snapshot['coverage'],1.0)
 
     def test_current_pending_signatures_are_processed_before_old_retries(self):
         self.rec.tx_budget=1
@@ -226,11 +394,12 @@ class RpcAndDurability(unittest.TestCase):
         requested=[]
 
         def rpc(calls):
-            requested.extend(params[0] for method,params in calls if method=='getTransaction')
+            requested.extend((params[0],params[1]) for method,params in calls if method=='getTransaction')
             return [{'result':non_swap()} for _ in calls]
 
         self.rec.process(rpc)
-        self.assertEqual(requested,['current'])
+        self.assertEqual([signature for signature,_ in requested],['current'])
+        self.assertEqual(requested[0][1]['maxSupportedTransactionVersion'],1)
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='old'").fetchone()[0],'pending')
         self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='current'").fetchone()[0],'non_swap')
 
@@ -253,6 +422,36 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(snapshot['current_backlog'],0)
         self.assertEqual(snapshot['stale_pending'],1)
         self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],0)
+
+    def test_unknown_trade_older_than_decision_window_does_not_poison_live_flow(self):
+        def rpc(calls):
+            return [{'result':[]} for _ in calls]
+
+        self.rec.poll([META],rpc)
+        old=self.clock[0]-tape.DECISION_FLOW_WINDOW_MS-1
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state,attempts,next_retry) VALUES('older-unknown',?,?, ?,?,?, 'unclassified',1,0)''',
+                (PAIR,1,old,old,json.dumps(META)))
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],0)
+        self.assertEqual(snapshot['status'],'online')
+
+    def test_unclassified_signature_in_decision_window_blocks_live_flow(self):
+        def rpc(calls):
+            return [{'result':[]} for _ in calls]
+
+        self.rec.poll([META],rpc)
+        current=self.clock[0]-tape.DECISION_FLOW_WINDOW_MS+1
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state,attempts,next_retry) VALUES('current-unknown',?,?, ?,?,?, 'unclassified',1,0)''',
+                (PAIR,1,current,current,json.dumps(META)))
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'DEGRADED')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['reason'],'UNCLASSIFIED_TRANSACTIONS')
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],1)
 
     def test_transaction_null_is_pending_then_success_after_restart(self):
         available=[False]

@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import PaperPortfolioHistory from '../src/components/PaperPortfolioHistory';
+import { promotedPaperPortfolio } from '../src/lib/paperPortfolioState';
 import {
   backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus,
   initialDashboardConnection, moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable,
-  readAccountStateCache, RESPONSE_MAX_AGE_MS, writeAccountStateCache,
+  readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
 } from '../src/lib/paperDashboardState';
 
 class MemoryStorage implements Storage {
@@ -112,4 +116,85 @@ test('backend destinations come only from validated build configuration and perm
   assert.equal(paperApiConfiguration('http://localhost:8789').url, '');
   assert.equal(paperApiConfiguration('http://localhost:8789', true).url, 'http://localhost:8789');
   assert.equal(paperApiConfiguration('http://paper.example.com', true).url, '');
+});
+
+function promotedFixture() {
+  const trade = (symbol: string, pnl: number, closedAt: number) => ({ symbol, address: `${symbol}-mint`, notional_usd: 50, opened_at: closedAt - 100, closed_at: closedAt, pnl_usd: pnl });
+  const book = (name: string, balance: number, history: ReturnType<typeof trade>[], position: { notional_usd: number; open_pnl_usd: number; quote_status: string } | null = null) => ({ name, balance, history, position, starting_balance: 250, portfolio_group: 'PROMOTED_PAPER' });
+  return {
+    portfolio_setup: { status: 'ACTIVE', strategies: ['a', 'b', 'c', 'd'] },
+    books: {
+      a: book('Strategy A', 260, [trade('ALPHA', 10, 400)], { notional_usd: 50, open_pnl_usd: -20, quote_status: 'fresh' }),
+      b: book('Strategy B', 240, [trade('BETA', -10, 300)]),
+      c: book('Strategy C', 260, [trade('GAMMA', 10, 500)]),
+      d: book('Strategy D', 250, []),
+      test: { ...book('Momentum Rush Brain', 900, [trade('TEST', 650, 600)]), portfolio_group: 'TEST' },
+      legacy: { ...book('Legacy exits', 500, [trade('LEGACY', 250, 700)]), portfolio_group: 'PROMOTION_DRAINING' },
+    },
+    stats: {
+      a: { equity: 240, trades: 1, wins: 1 }, b: { equity: 240, trades: 1, wins: 0 },
+      c: { equity: 260, trades: 1, wins: 1 }, d: { equity: 250, trades: 0, wins: 0 },
+      test: { equity: 900, trades: 1, wins: 1 }, legacy: { equity: 500, trades: 1, wins: 1 },
+    },
+  };
+}
+
+test('main PAPER totals and history use the same selected cohort, excluding TEST and legacy exits', () => {
+  const portfolio = promotedPaperPortfolio(promotedFixture());
+  assert.ok(portfolio);
+  assert.equal(portfolio.startingBalance, 1000);
+  assert.equal(portfolio.balance, 1010);
+  assert.equal(portfolio.equity, 990);
+  assert.equal(portfolio.available, 960);
+  assert.equal(portfolio.reserved, 50);
+  assert.equal(portfolio.realizedPnl, 10);
+  assert.equal(portfolio.unrealizedPnl, -20);
+  assert.equal(portfolio.returnPct, -1);
+  assert.equal(portfolio.trades, 3);
+  assert.equal(portfolio.wins, 2);
+  assert.equal(portfolio.openPositions, 1);
+  assert.equal(portfolio.valuationStale, false);
+  assert.deepEqual(portfolio.history.map(trade => [trade.symbol, trade.strategy_name]), [['GAMMA', 'Strategy C'], ['ALPHA', 'Strategy A'], ['BETA', 'Strategy B']]);
+});
+
+test('cohort aggregation refuses an incomplete active portfolio and does not count duplicate IDs twice', () => {
+  const lab = promotedFixture();
+  lab.portfolio_setup.strategies.push('missing');
+  assert.equal(promotedPaperPortfolio(lab), null);
+  lab.portfolio_setup.strategies = ['a', 'b', 'c', 'd', 'a'];
+  assert.equal(promotedPaperPortfolio(lab)?.startingBalance, 1000);
+  lab.books.a.balance = Number.NaN;
+  assert.equal(promotedPaperPortfolio(lab), null);
+  assert.equal(promotedPaperPortfolio(), null);
+});
+
+test('a stale open mark remains visible even when the backend omits the valuation flag', () => {
+  const lab = promotedFixture();
+  lab.books.a.position!.quote_status = 'stale';
+  assert.equal(promotedPaperPortfolio(lab)?.valuationStale, true);
+  lab.portfolio_setup.status = 'DRAINING';
+  assert.equal(promotedPaperPortfolio(lab), null);
+});
+
+test('history renders the promoted trades, execution prices and source book without invented zero data', () => {
+  const portfolio = promotedPaperPortfolio(promotedFixture())!;
+  const trades = portfolio.history.map(trade => ({ ...trade, execution_entry_price: 0.02, entry_price: 99, execution_exit_price: 0.021, exit_price: 100 }));
+  const rendered = renderToStaticMarkup(createElement(PaperPortfolioHistory, {
+    trades, total: portfolio.trades, loaded: true, promoted: true,
+    onSelectAddress: () => {}, formatPrice: value => `$${value.toFixed(4)}`, formatTime: value => String(value),
+  }));
+  assert.match(rendered, /Главен PAPER портфейл/);
+  assert.match(rendered, /GAMMA/);
+  assert.match(rendered, /Strategy C/);
+  assert.match(rendered, /\$0\.0200/);
+  assert.match(rendered, /\$0\.0210/);
+  assert.match(rendered, /\+\$10\.00/);
+  assert.doesNotMatch(rendered, /Momentum Rush Brain|LEGACY|\$99\.0000|\$100\.0000|→ \$0\.00|NaN/);
+});
+
+test('switching the selected mint cannot reuse the previous token chart or flow', () => {
+  const detail = { coin: { address: 'mint-a' }, history: [{ price: 99 }], flow: { buy_usd: 50000 } };
+  assert.equal(tokenDetailForAddress(detail, 'mint-b'), null);
+  assert.equal(tokenDetailForAddress(detail, 'mint-a'), detail);
+  assert.equal(tokenDetailForAddress(null, 'mint-a'), null);
 });

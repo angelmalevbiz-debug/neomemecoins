@@ -12,7 +12,7 @@ permissions:
   id-token: write
 
 env:
-  VITE_NEO_API_URL: https://neo-meme-api.169-58-211-177.sslip.io
+  VITE_NEO_API_URL: ${{ vars.NEO_API_URL || 'https://neo-meme-api.169-58-211-177.sslip.io' }}
 
 concurrency:
   group: github-pages

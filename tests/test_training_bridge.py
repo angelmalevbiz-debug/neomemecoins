@@ -102,6 +102,18 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertEqual(self.control(snap)["positions"][0]["entry"]["market_price"], 2)
         self.assertEqual(snap["unique_market_episodes"], 1)
 
+    def test_quote_probe_status_is_persisted_across_bridge_restart(self):
+        first = self.start()
+        first.note_quote_probe('ROUTE_EVIDENCE_RECORDED', attempted=True,
+                               success=True, at=1_800_000_000_000)
+        self.assertEqual(first.quote_probe['attempts'], 1)
+        self.assertEqual(first.quote_probe['successes'], 1)
+        self.stop()
+        second = self.start()
+        self.assertEqual(second.quote_probe['status'], 'ROUTE_EVIDENCE_RECORDED')
+        self.assertEqual(second.quote_probe['last_attempt_at'], 1_800_000_000_000)
+        self.assertEqual(second.quote_probe['successes'], 1)
+
     def test_process_restart_recovers_pending_and_durable_completed_results(self):
         self.start()
         at = int(time.time()*1000)
@@ -238,6 +250,56 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertTrue(bridge.submit({"id": "same-evidence"}))
         self.assertEqual(bridge.queue.qsize(), 0)
         self.assertEqual(bridge.coalesced, 2)
+
+    def test_repeated_snapshots_coalesce_but_new_flow_and_quotes_are_recorded(self):
+        bridge = TrainingBridge.__new__(TrainingBridge)
+        bridge.cache = {}
+        bridge.lock = threading.Lock()
+        bridge.last_observation_samples = {}
+        bridge.coalesced = 0
+        bridge.dropped = 0
+        bridge.error = None
+        bridge.closed = False
+        recorded = []
+
+        def capture(row):
+            recorded.append(row)
+            return True
+
+        coin, flow, safety, validation, quotes = inputs(10_000)
+        with patch.object(bridge, "submit", side_effect=capture):
+            self.assertTrue(bridge.observe(coin, flow, safety=safety,
+                                           validation=validation, now=10_000))
+
+            repeated_coin = copy.deepcopy(coin)
+            repeated_coin["updatedAt"] = 10_500
+            repeated_safety = copy.deepcopy(safety)
+            repeated_safety["checked_at"] = 10_500
+            repeated_validation = copy.deepcopy(validation)
+            repeated_validation["reference_received_at"] = 10_500
+            self.assertTrue(bridge.observe(repeated_coin, flow, safety=repeated_safety,
+                                           validation=repeated_validation, now=10_500))
+            self.assertEqual(len(recorded), 1)
+            self.assertEqual(bridge.coalesced, 1)
+
+            new_flow = copy.deepcopy(flow)
+            new_flow.update(latest_at=10_600, trades=11, buy_usd=110)
+            self.assertTrue(bridge.observe(repeated_coin, new_flow, safety=repeated_safety,
+                                           validation=repeated_validation, now=10_600))
+            self.assertEqual(len(recorded), 2)
+
+            new_quotes = copy.deepcopy(quotes)
+            new_quotes["entry"]["quoted_at"] = 10_700
+            new_quotes["exit"]["quoted_at"] = 10_700
+            self.assertTrue(bridge.observe(repeated_coin, new_flow, safety=repeated_safety,
+                                           validation=repeated_validation,
+                                           quotes=new_quotes, now=10_700))
+            self.assertEqual(len(recorded), 3)
+
+            self.assertTrue(bridge.observe(repeated_coin, new_flow, safety=repeated_safety,
+                                           validation=repeated_validation,
+                                           quotes=new_quotes, now=14_000))
+            self.assertEqual(len(recorded), 4)
 
     def test_recorder_batches_rows_into_one_durable_journal_sync(self):
         bridge = TrainingBridge.__new__(TrainingBridge)

@@ -91,3 +91,7 @@ export function moneyOrUnavailable(value: number | undefined, signed = false, di
 export function percentageOrUnavailable(value: number | undefined): string {
   return typeof value === 'number' && Number.isFinite(value) ? `${value >= 0 ? '+' : ''}${value.toFixed(2)}%` : '—';
 }
+
+export function tokenDetailForAddress<T extends { coin: { address: string } }>(detail: T | null, address: string): T | null {
+  return detail?.coin.address === address ? detail : null;
+}

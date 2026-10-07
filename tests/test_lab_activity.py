@@ -32,8 +32,8 @@ class ActivityTests(unittest.TestCase):
         guard.start();self.addCleanup(guard.stop)
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_33_rules_exist(self):
-        self.assertEqual(len(a.RULES),33)
+    def test_all_34_rules_exist(self):
+        self.assertEqual(len(a.RULES),34)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
 
@@ -215,7 +215,8 @@ class ActivityTests(unittest.TestCase):
                 {**base,'direction':'BUY','usd_amount':240,'wallet':'buyer'},
                 {**base,'direction':'SELL','usd_amount':40,'wallet':'seller'},
             ]}),encoding='utf-8')
-            with patch.object(lab,'LIVE_TAPE_PATH',tape_path):observed=lab.flow_map()
+            with patch.object(lab,'LIVE_TAPE_PATH',tape_path),patch.object(lab,'now_ms',return_value=stamp+250):
+                observed=lab.flow_map()
         self.assertEqual(observed[ADDRESS]['trades'],2)
         self.assertEqual(observed[ADDRESS]['ratio'],6)
         self.assertEqual(observed[ADDRESS]['unique_wallets'],2)

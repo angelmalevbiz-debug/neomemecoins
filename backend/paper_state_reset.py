@@ -103,7 +103,8 @@ def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
     training_root = root / 'training'
     training_archive = archive_files(
         training_root,
-        ['training.json', 'training_snapshot.json', 'training_events.jsonl', 'observations.jsonl'],
+        ['training.json', 'training_snapshot.json', 'training_events.jsonl', 'observations.jsonl',
+         'recorder_status.json', 'quote_probe_status.json'],
         move_names={'observations.jsonl'},
     )
     prepared = training_root / f'.reset-training-{uuid.uuid4().hex}.json'
@@ -119,6 +120,11 @@ def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
     os.replace(prepared, training_root / 'training.json')
     engine.path = training_root / 'training.json'
     atomic_json(training_root / 'training_snapshot.json', engine.snapshot())
+    atomic_json(training_root / 'recorder_status.json', {
+        'version': 1, 'dropped_total': 0, 'updated_at': stamp})
+    atomic_json(training_root / 'quote_probe_status.json', {
+        'status': 'WAITING_FOR_QUALIFIED_FLOW', 'attempts': 0, 'successes': 0,
+        'last_attempt_at': 0, 'last_updated_at': 0, 'reason': ''})
     (root / 'audit.jsonl').write_text(json.dumps({
         'schema_version': 2, 'id': sid, 'kind': 'RESET', 'ts': stamp,
         'starting_balance_usd': starting_balance, 'archive': str(archive),

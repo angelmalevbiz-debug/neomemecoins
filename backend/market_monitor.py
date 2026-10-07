@@ -408,6 +408,9 @@ def signal(kind: str, title: str, detail: str) -> dict[str, str]:
 class State:
     def __init__(self, load_state: bool = True) -> None:
         self.lock = threading.RLock()
+        # True only after the ledger was read (or legitimately absent). Shutdown
+        # paths must not persist a default account over an unread ledger.
+        self.loaded = False
         self.running = True
         self.status = 'starting'
         self.message = 'Starting NEO live market monitor.'
@@ -435,6 +438,7 @@ class State:
 
     def load(self) -> None:
         if not STATE_PATH.exists():
+            self.loaded = True
             return
         try:
             data = json.loads(STATE_PATH.read_text(encoding='utf-8'))
@@ -473,6 +477,7 @@ class State:
             raw = data.get('price_history', {})
             if isinstance(raw, dict):
                 self.price_history = {k: v[-480:] for k, v in raw.items() if isinstance(v, list)}
+            self.loaded = True
         except Exception as exc:
             # Never boot a silently reset $1000 account from an unreadable file.
             raise RuntimeError('Account state is unreadable; refusing automatic reset') from exc
@@ -908,6 +913,33 @@ def effective_config_hash():
                        'max_quoted_candidates': MAX_QUOTED_CANDIDATES,
                        'size_policy': 'FLAT_NOTIONAL_NO_BACKOFF'})
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+
+
+# Below the conviction (72) that lets a mode outlive its max hold: without live
+# flow a position keeps its entry mode but is not held past that mode's limit.
+ADAPTIVE_BLIND_CONVICTION = 71.0
+# A quote bundle plus the commit check must finish inside the 8 s signal limit.
+ADAPTIVE_QUOTE_LATENCY_MARGIN_MS = 2000
+
+
+def adaptive_exit_context(position: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Fail safe when the held pool has no COMPLETE 30 s exact-pool window.
+
+    The shared tape follows a bounded set of pools and a personal engine's held
+    pool can drop out of it. Empty windows would score as heavy selling, so the
+    flow-driven rungs (CONVICTION_EXIT, ORDERFLOW_EXIT, CONVICTION_PROFIT_LOCK)
+    are disabled and the entry hold mode is kept. Stop, trailing, the mode's max
+    hold, the absolute max hold and the safety exits still apply.
+    """
+    fast = context.get('fast_flow') or {}
+    if str(fast.get('quality') or '').upper() == 'COMPLETE':
+        return context
+    hold = position.get('adaptive_hold') or oct4.hold_mode(num(position.get('entry_conviction'), 72.0))
+    return {**context, 'conviction': ADAPTIVE_BLIND_CONVICTION, 'mode': hold['mode'],
+            'max_hold_minutes': hold['max_hold_minutes'], 'target_pct': hold['target_pct'],
+            'trail_arm_pct': hold['trail_arm_pct'], 'trail_pct': hold['trail_pct'],
+            'fast_flow': {}, 'flow_context_unavailable': True,
+            'observed_conviction': context.get('conviction')}
 
 
 def exit_policy_version() -> str:
@@ -1552,6 +1584,8 @@ class Monitor:
             hold = (now_ms()-int(position.get('opened_at',now_ms())))/60000
             policy = str(position.get('exit_policy') or 'fixed')
             context = self.market_context(coin,position) if policy == 'adaptive' else {}
+            if policy == 'adaptive':
+                context = adaptive_exit_context(position, context)
             reason = reason or exit_policy.exit_reason(position, context, net_pct=pct,peak_net_pct=peak_pct,
                 hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=policy)
             if num(quote.get('impact_pct')) >= max(EXIT_IMPACT_EMERGENCY_PCT,num(position.get('entry_price_impact_pct'))+.50):
@@ -1897,6 +1931,12 @@ class Monitor:
                 signal_rejected = oct4.signal_rejections(coin, decision_flow, context, now=now_ms(), profile=ADAPTIVE_PROFILE)
                 if signal_rejected:
                     reject(report, signal_rejected, coin, oct4.signal_metrics(coin, decision_flow, context))
+                    continue
+                signal_age = now_ms() - num(coin.get('updatedAt'))
+                if signal_age > paper_quotes.MAX_SIGNAL_AGE_MS - ADAPTIVE_QUOTE_LATENCY_MARGIN_MS:
+                    # The 15 s feed cadence means a candidate ages past the 8 s commit
+                    # limit between scans; wait for the next fresh scan instead.
+                    reject(report, ['stale_signal'], coin, {'signal_age_ms': round(signal_age)})
                     continue
                 raw_strategy_matches = strategy_matches = [oct4.STRATEGY_ID]
                 policy_learning = dict(oct4.NO_LEARNING)

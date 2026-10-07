@@ -85,6 +85,12 @@ and is unit-tested row by row; the ensemble still uses the same function.
 7. `ADAPTIVE_MAX_HOLD` — mode max hold reached and conviction < 72
 8. `ABSOLUTE_MAX_HOLD` — 120 minutes
 
+When the held pool has no COMPLETE 30 s exact-pool window (the shared tape follows
+a bounded set of pools), missing flow is not treated as selling: the position keeps
+its entry hold mode, `CONVICTION_EXIT`, `ORDERFLOW_EXIT` and `CONVICTION_PROFIT_LOCK`
+are suspended, and the mode's max hold still applies (`flow_context_unavailable`
+is recorded on the position).
+
 This is `engine_exit_policy.exit_reason(policy='adaptive')`
 (`GOLD_ADAPTIVE_NET_CANDIDATE_V1`), already present in the engine and now
 stamped on every position the profile opens. The modern safety exits
@@ -102,6 +108,9 @@ front of the ladder, exactly as for the default strategy.
   the account ledger and continues the sequence
 - smaller-size quote retries (the profile quotes the flat $200 once); the
   modern 15 s per-token quote-retry cooldown still applies afterwards
+- quoting on a feed older than 6 s: the modern commit gate rejects signals older
+  than 8 s, so with the 15 s feed cadence a candidate is quoted only in the first
+  seconds after a scan and is otherwise reported as `stale_signal` without a quote
 
 Retained from the modern engine: exact mint/pool identity, rug guard, independent
 price confirmation with Jupiter tie-break, quote evidence `QUOTE_EVIDENCE_V9`,
@@ -127,7 +136,21 @@ candidate is among the tracked pools. Those rejections are reported, not hidden.
 ## Enabling it for one account (owner action; nothing here is automatic)
 
 1. Deploy the reviewed source to the checkout that runs the gateway.
-2. Record the choice in the gateway registry (touches only that field):
+2. Wait until every engine is flat: `GET /state` on the main engine (8878) and on
+   each personal engine port must show no open positions. Exits are not managed
+   while services are stopped, and the adaptive profile checks positions every
+   2 s instead of 0.5 s.
+3. Stop the services from the runtime checkout and require a clean exit:
+
+   ```powershell
+   .\scripts\start_local_paper.ps1 -Action Stop
+   ```
+
+   Then confirm that no `python.exe` whose command line contains the runtime
+   checkout path remains (venv and system Python, including personal engines and
+   training workers) and that nothing listens on 8878, 8879 or the personal ports.
+4. Record the choice in the gateway registry while everything is stopped (touches
+   only that field):
 
    ```powershell
    .venv\Scripts\python.exe scripts\paper_runtime.py set-account-strategy --registry C:\Users\Chavd\neomemecoins\.runtime\accounts\user_accounts.json --user <account-uuid-prefix> --strategy ORDER_FLOW_ADAPTIVE
@@ -136,20 +159,20 @@ candidate is among the tracked pools. Those rejections are reported, not hidden.
    Use the registry of the checkout that runs the gateway (the output prints the
    resolved path). `--strategy default` removes the choice. Short (< 8 characters),
    ambiguous prefixes and unknown strategy names refuse to change anything. The
-   gateway merges this field from disk before every registry write, so an edit made
-   while the gateway runs is not reverted at shutdown.
-3. The gateway adopts the field on its next request, but a running engine keeps
-   its startup strategy. Apply it with the launcher's graceful cohort cycle from
-   the runtime checkout (the shared stop marker also stops personal engines):
+   gateway also merges this field from disk before every registry write, so an
+   edit made while it runs is not reverted at shutdown.
+5. Start the services:
 
    ```powershell
-   .\scripts\start_local_paper.ps1 -Action Stop
    .\scripts\start_local_paper.ps1 -Action Start
    ```
 
-   The gateway restarts the known personal engines with their registry
-   strategies; ledgers are flushed and reloaded, never reset.
-4. Verify on the account engine port (`/state`) and through the authenticated
+   The gateway restarts the known personal engines on their registered ports with
+   their registry strategies. Each engine holds an exclusive lock on its ledger, so
+   a second engine for the same account refuses to start, and a shutdown never
+   writes a ledger it did not load. Do not issue another Stop until every engine
+   answers `/health`.
+6. Verify on the account engine port (`/state`) and through the authenticated
    dashboard (`/user/state`): `config.signal_strategy = ORDER_FLOW_ADAPTIVE`,
    `entry_policy_version = ORDER_FLOW_BALANCED_V4`, `exit_policy = adaptive`,
    `exit_policy_version = GOLD_ADAPTIVE_NET_CANDIDATE_V1`, `scan_seconds = 15`,
@@ -157,9 +180,10 @@ candidate is among the tracked pools. Those rejections are reported, not hidden.
    `strict_max_roundtrip_cost_pct = 2.75`, `same_token_cooldown_seconds = 1200`,
    `paper_only = true`, `strategy_profile.restore_version = ORDER_FLOW_ADAPTIVE_OCT4_RESTORE_V1`,
    `effective_config_hash` changed, and `account_scope.strategy_matches_request = true`.
-   Confirm `stats.closed_trades`, `demo_balance_usd`, `demo_session_id` and the
-   engine port did not change, and that the shared main engine (8878) and the
-   other account still report `WINNER_ENSEMBLE_PAPER_V1`.
+   Compare `trade_seq`, history length, `demo_balance_usd` and `demo_session_id`
+   in each `state.json` with the values before the stop, and check that the shared
+   main engine (8878) and the other account still report `WINNER_ENSEMBLE_PAPER_V1`
+   with their previous `effective_config_hash`.
 
 `account_scope.strategy_matches_request = false` means the registry asks for a
 strategy the running engine was not started with — restart, do not guess.

@@ -46,8 +46,9 @@ def decision_flow(now, **overrides):
     return flow
 
 
-def context_for(conviction):
-    return {'conviction': float(conviction), 'fast_flow': {}, 'slow_flow': {}, **oct4.hold_mode(conviction)}
+def context_for(conviction, quality='COMPLETE'):
+    return {'conviction': float(conviction), 'fast_flow': {'quality': quality}, 'slow_flow': {},
+            **oct4.hold_mode(conviction)}
 
 
 class Oct4EntryTests(unittest.TestCase):
@@ -247,6 +248,14 @@ class Oct4EntryTests(unittest.TestCase):
         self.assertGreater(m.STATE.positions[0]['entry_roundtrip_pnl_pct'], -2.75)
         self.assertLess(m.STATE.positions[0]['entry_roundtrip_pnl_pct'], -1.5)
 
+    def test_stale_feed_is_not_quoted_between_scans(self):
+        self.coin['updatedAt'] = m.now_ms() - 7000
+        report = self.open_once()
+        self.assertFalse(m.STATE.positions)
+        self.assertIn('stale_signal', report['rejections'])
+        self.assertEqual(report['quote_attempts'], 0)
+        self.entry_quote.assert_not_called()
+
     def test_quote_budget_is_two_candidates_per_scan(self):
         self.assertEqual(m.MAX_QUOTED_CANDIDATES, 2)
         self.assertEqual(m.STATE.snapshot()['config']['max_quoted_candidates_per_scan'], 2)
@@ -439,6 +448,31 @@ class Oct4EngineExitTests(unittest.TestCase):
         self.assertFalse(m.STATE.history)
         self.assertAlmostEqual(m.STATE.positions[0]['pnl_pct'], 18.0)
         self.assertEqual(m.STATE.positions[0]['exit_state'], 'OPEN')
+
+    def test_missing_tape_coverage_is_not_treated_as_selling(self):
+        position = self.position()
+        position.update(entry_conviction=90.0, adaptive_hold=oct4.hold_mode(90))
+        self.quote['net_proceeds_usd'] = 197.0  # about -1.6 % net, below zero after costs
+        blind = {**context_for(25, quality='UNKNOWN'), 'fast_flow': {'quality': 'UNKNOWN', 'trades': 0,
+                                                                    'sells': 0, 'sell_usd': 0}}
+        with patch.object(m.paper_quotes, 'position_mark', return_value=self.quote), \
+             patch.object(self.monitor, 'market_context', return_value=blind):
+            self.monitor.update_positions({A: self.coin})
+        self.assertEqual(len(m.STATE.positions), 1)
+        held = m.STATE.positions[0]
+        self.assertEqual(held['exit_state'], 'OPEN')
+        self.assertTrue(held['market_context']['flow_context_unavailable'])
+        self.assertEqual(held['market_context']['mode'], 'RUNNER')
+        self.assertEqual(held['market_context']['observed_conviction'], 25.0)
+        # Without live flow the entry mode's max hold still ends the trade.
+        self.clock[0] += 61 * 60 * 1000
+        self.coin['updatedAt'] = self.clock[0]
+        self.quote['quoted_at'] = self.clock[0]
+        with patch.object(m.paper_quotes, 'position_mark', return_value=self.quote), \
+             patch.object(self.monitor, 'market_context', return_value=blind):
+            self.monitor.update_positions({A: self.coin})
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.history[0]['exit_reason'], 'ADAPTIVE_MAX_HOLD')
 
     def test_25_wrong_pool_observation_cannot_mark_the_held_position(self):
         self.position()

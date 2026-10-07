@@ -505,7 +505,7 @@ class MainPaperRepair(unittest.TestCase):
 
     def test_adaptive_candidate_controls_real_exit_path(self):
         self.position()['exit_policy']='adaptive'
-        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote),patch.object(self.monitor,'market_context',return_value={'conviction':20}):
+        with patch.object(m.paper_quotes,'position_mark',return_value=self.quote),patch.object(self.monitor,'market_context',return_value={'conviction':20,'fast_flow':{'quality':'COMPLETE'}}):
             self.monitor.update_positions({A:self.coin})
         self.assertEqual(m.STATE.history[0]['exit_reason'],'CONVICTION_EXIT')
         self.assertEqual(m.STATE.history[0]['exit_policy_version'],exit_policy.ADAPTIVE_VERSION)

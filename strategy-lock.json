@@ -178,7 +178,7 @@
     "backend/shared_snapshot_io.py": "ea4699d1ad28d1b331013d9fd2fcec316a189bd587fc1881dfa369884609b3a7",
     "backend/entry_quote_priority.py": "4c9478595e77c8d9bb16c1f8504484a800a697aff31e07e1fd79d86f5ac05ae4",
     "backend/pool_reference_proof.py": "2f6649d0198c3caf9c548c8fb6819418e1f0a0cf006f6d70c759d68dca616615",
-    "backend/tape_pool_owner_proof.py": "03d229083ecd5e2cfeaf50f3ea2d90ada758cdba74723187df95bd13fffee472"
+    "backend/tape_pool_owner_proof.py": "f7b4a15a640552f91059e3bd781b0b72446cf5f29cdd2d70d04c6bae1af2ba1a"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",

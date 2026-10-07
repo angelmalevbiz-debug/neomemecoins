@@ -74,7 +74,7 @@ def collect_pool_owner_proofs(candidates, rpc, *, clock, tx_budget,
         answers = rpc(calls)
         checked = clock()
         if (not isinstance(answers, list) or len(answers) != 1
-                or not isinstance(answers[0], dict) or answers[0].get('error')
+                or not isinstance(answers[0], dict) or 'error' in answers[0]
                 or type(checked) is not int or checked <= 0
                 or type(bodies_received_at) is not int or checked < bodies_received_at):
             return {}

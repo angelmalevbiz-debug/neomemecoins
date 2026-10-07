@@ -135,6 +135,29 @@ class TapeOwnerProofTests(unittest.TestCase):
                 self.rec.process(rpc)
                 self.assertEqual(self.state(signature)['state'], 'unclassified')
 
+    def test_error_field_with_valid_result_never_supplies_authoritative_owner_evidence(self):
+        # JSON-RPC success and error envelopes are mutually exclusive. Even a
+        # falsey malformed error must not turn an unavailable owner observation
+        # into proof that clears current coverage.
+        for index, error in enumerate(({}, None, {'code': -32016, 'message': 'unavailable'})):
+            with self.subTest(error=error):
+                tx, metadata = reference_fixture()
+                signature = f'conflicting-envelope-{index}'
+                self.seed(signature, tx, metadata)
+
+                def conflicting_result(options, error_value=error):
+                    answer = owners_result(options)
+                    answer[0]['error'] = error_value
+                    return answer
+
+                rpc, seen = self.provider({signature: tx}, owner_answer=conflicting_result)
+                self.rec.process(rpc)
+                self.assertEqual(len(seen), 2)
+                saved = self.state(signature)
+                self.assertEqual(saved['state'], 'unclassified')
+                self.assertEqual(saved['reason'], 'UNSUPPORTED_POOL_INSTRUCTION')
+                self.assertEqual(self.rec.db.execute('SELECT count(*) FROM events').fetchone()[0], 0)
+
     def test_partial_multi_account_array_cannot_shift_proofs_between_pools(self):
         transactions = {}
         for index, (pair, mint) in enumerate([(POOL, MINT), (pubkey(20), pubkey(21))]):

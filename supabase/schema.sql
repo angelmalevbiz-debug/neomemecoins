@@ -17,6 +17,17 @@ create table if not exists public.profiles (
 
 -- 2) One isolated paper account per user.
 -- The GOLD production strategy is intentionally fixed here as well.
+--
+-- Ledger-of-record note (2026-10-08): paper_accounts and paper_trades are NOT
+-- the PAPER ledger of record. Each per-user PAPER engine behind the gateway
+-- (VPS or PC) keeps its ledger in files under its runtime directory
+-- (users/<uuid>/state.json, audit JSONL, training files), and the shared main
+-- account likewise lives in state.json. The Python backend does not write these
+-- two tables; the browser holds read-only grants on them. The fixed labels below
+-- (ORDER_FLOW_ADAPTIVE, gold-2026-10-04) date from the 2026-10-04 strategy and
+-- do not match the engine's published WINNER_ENSEMBLE_PAPER_V1 /
+-- WINNER_ENSEMBLE_VERIFIED_ENTRY_V4 labels. Changing the check constraints or
+-- defaults is an owner decision; this comment only records the mismatch.
 create table if not exists public.paper_accounts (
   user_id uuid primary key references auth.users(id) on delete cascade,
   strategy_id text not null default 'ORDER_FLOW_ADAPTIVE'
@@ -31,7 +42,8 @@ create table if not exists public.paper_accounts (
 );
 
 -- 3) User-specific paper-trade journal.
--- Browser users can read only their own rows. Writes are backend/service-role only.
+-- Browser users can read only their own rows. Writes are backend/service-role only;
+-- no current backend writer exists (see the ledger-of-record note above).
 create table if not exists public.paper_trades (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

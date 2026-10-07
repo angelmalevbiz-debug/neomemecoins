@@ -31,6 +31,12 @@ class ProbeTests(unittest.TestCase):
             report = probe.check()
         return report
 
+    def test_running_and_opt_in_labels_are_declared_supported(self):
+        # The shared PAPER account publishes the strategy-lock label; the opt-in
+        # ORDER_FLOW_ADAPTIVE profile publishes ORDER_FLOW_BALANCED_V4.
+        self.assertIn('WINNER_ENSEMBLE_VERIFIED_ENTRY_V4', probe.SUPPORTED_ENTRY_POLICIES)
+        self.assertIn('ORDER_FLOW_BALANCED_V4', probe.SUPPORTED_ENTRY_POLICIES)
+
     def test_current_ensemble_and_original_validated_policy_are_supported(self):
         for version in probe.SUPPORTED_ENTRY_POLICIES:
             report = self.run_probe(version)

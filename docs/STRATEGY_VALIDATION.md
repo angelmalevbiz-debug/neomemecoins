@@ -4,7 +4,9 @@ Status: engineering correctness checked; **insufficient evidence of statistical 
 
 ## Versions and independent accounts
 
-Primary control: `ORDER_FLOW_EARLY_FIXED_PAPER_V9`, entry `ORDER_FLOW_VALIDATED_THRESHOLDS_V9`, exit `HONEST_NET_EXIT_V1`. Adaptive candidate: `GOLD_ADAPTIVE_NET_CANDIDATE_V1` preserves conviction/order-flow exits, dynamic target/trailing and holding decisions on the same net liquidation basis.
+Current primary PAPER account (`strategy-lock.json`, locked 2026-10-07): strategy `WINNER_ENSEMBLE_PAPER_V1`, entry `WINNER_ENSEMBLE_VERIFIED_ENTRY_V4` (published as `config.entry_policy_version`), exit `HONEST_NET_EXIT_V1`. The opt-in per-account `ORDER_FLOW_ADAPTIVE` profile proposed in [PR #10](https://github.com/angelmalevbiz-debug/neomemecoins/pull/10) publishes entry `ORDER_FLOW_BALANCED_V4` where it is selected. Adaptive exit candidate: `GOLD_ADAPTIVE_NET_CANDIDATE_V1` preserves conviction/order-flow exits, dynamic target/trailing and holding decisions on the same net liquidation basis.
+
+Historical: the 2026-10-05 audit's primary control was `ORDER_FLOW_EARLY_FIXED_PAPER_V9` with entry `ORDER_FLOW_VALIDATED_THRESHOLDS_V9`; the three-arm replay and the dataset rows below refer to that control. `backend/engine_entry_policy.py` still carries `POLICY_VERSION = 'ORDER_FLOW_VALIDATED_THRESHOLDS_V9'` as an internal label that the engine does not publish; renaming it requires a strategy-lock hash update and is left to the owner.
 
 The `PAPER_TRAINING_V1` worker consumes one shared immutable stream. Default books: CONTROL, EARLY, STRICT, FAST_EXIT, PROTECT, EARLY_PROTECT, STRICT_FAST, GOLD_ADAPTIVE, LEARNER. Each owns $500 and its own orders, positions, history and limits. No sum of balances is presented as one account's return. Default maximum positions is four per book, full committed capital per position 5%, total exposure 20%, daily realized-plus-conservative-open loss 5%, maximum drawdown 10%. Parameters and book capital are in the saved state; a different supplied configuration is rejected on restart.
 

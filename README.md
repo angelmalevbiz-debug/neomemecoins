@@ -12,7 +12,9 @@ The architecture intentionally avoids owner-paid runtime APIs for the core scann
 
 ## Current alpha
 
-The current `neo-meme-coins-v1` branch includes:
+The maintained `main` branch of `angelmalevbiz-debug/neomemecoins` includes the features below.
+(The `neo-meme-coins-v1` branch named by earlier versions of this file belonged to the legacy
+`angelmalev9-creator/neo-meme-trade` repository and does not exist here.)
 
 - deterministic risk engine with `SKIP / WAIT / WATCH / SETUP` posture
 - live DEX Screener market data

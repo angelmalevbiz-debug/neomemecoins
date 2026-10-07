@@ -11,6 +11,14 @@ site to switch from the old VPS API. The public site remains
 `https://angelmalevbiz-debug.github.io/neomemecoins/`.
 The VPS has not been updated, and its independent account histories are retained.
 
+Latest successful Pages deployment, verified 2026-10-08 with `gh run list`:
+workflow run [37679737562](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37679737562)
+(run #55) built `main` at `54fec89` and completed at 2026-10-07T20:10Z after starting
+at 20:08Z. Every `main` push since the 2026-10-06 baseline below has deployed
+successfully, so the baseline commit `d983b1de` / run #17 cited there is historical.
+The running services register 34 Lab books: 29 TEST books at $500, Fast Scalper
+at $100 and the four `PROMOTED_PAPER` cohort books at $250 each.
+
 The local dashboard is available at `http://127.0.0.1:5173`, using the local
 gateway at `http://127.0.0.1:8879`. Normal Supabase sign-in is required; private
 authenticated account viewing is not certified by the unauthenticated probes.
@@ -39,13 +47,21 @@ net expectancy remain unproven; Momentum Rush stays an independent TEST book.
 
 Everything below is a dated 2026-10-06 baseline. Its endpoint, strategy count,
 reset and service measurements are historical and do not describe the current
-deployment. The 2026-10-07 repair preserves existing histories and performs no reset.
+deployment. The 2026-10-07 source repair performs no reset by itself. The local
+runtime ledgers were, however, reset on 2026-10-07 at 08:40 UTC, before that day's
+deployments: the shared main account's current session is
+`PAPER-RESET-1791362408708-ce6722b7` (started 2026-10-07T08:40:08Z), both per-user
+accounts received new `PAPER-RESET` sessions at 08:40:18Z and 08:40:27Z, and the Lab
+restarted at 08:40:36Z. Checksum archives of the previous ledgers were written under
+the runtime's ignored `.runtime/accounts/archive` at the same time. Earlier wording
+here and in pull-request descriptions that said "no reset" described the code
+change, not the runtime.
 
 The maintained repository is [angelmalevbiz-debug/neomemecoins](https://github.com/angelmalevbiz-debug/neomemecoins). The public app is [GitHub Pages](https://angelmalevbiz-debug.github.io/neomemecoins/).
 
 ## Verified public site baseline
 
-The frontend baseline at source commit `d983b1de48958d0a9dabc4ae37d210d6c175c83e` was published by [Pages run #17](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376396987), which succeeded. The preceding verified-source restore [run #11](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376320288) also succeeded. The served JavaScript bundle contains the current `NEO_API_URL` Quick Tunnel host. The local Lab runtime fix in this document changes backend source and does not add a frontend feature.
+Historical, superseded by the 2026-10-07 deployments listed above: the frontend baseline at source commit `d983b1de48958d0a9dabc4ae37d210d6c175c83e` was published by [Pages run #17](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376396987), which succeeded. The preceding verified-source restore [run #11](https://github.com/angelmalevbiz-debug/neomemecoins/actions/runs/37376320288) also succeeded. The served JavaScript bundle contains the current `NEO_API_URL` Quick Tunnel host. The local Lab runtime fix in this document changes backend source and does not add a frontend feature.
 
 Read-only checks on 2026-10-06: Pages returned HTTP 200; the local gateway's `/user/health` returned HTTP 200; `OPTIONS /user/state` returned 204 with the exact `https://angelmalevbiz-debug.github.io` origin and the `Authorization` header allowed. An unauthenticated `/user/state` returns the expected 401. The Codex browser is currently at the sign-in form, so the authenticated private dashboard has not been verified here.
 

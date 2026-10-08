@@ -31,6 +31,7 @@ import heat_veto
 import lab_activity
 import lab_dashboard_projection
 import lab_forward_tests as lf
+import lab_position_marks
 import lab_strategy_lifecycle as lifecycle
 import paper_market_feasibility as feasibility
 import strategy_lab as lab
@@ -38,6 +39,9 @@ import structural_rug_guard as guard
 import tape_pool_scheduler
 
 _MODULE_PATCHES = []
+# The real probe scheduler, captured before any test patches it.
+_REAL_SCHEDULE_PROBE = lab.schedule_jupiter_price_probe
+_MISSING = object()
 
 
 def setUpModule():
@@ -63,10 +67,10 @@ DAY = 24 * HOUR
 # Frozen config hashes (sha256 of each book's canonical parameter JSON). A parameter
 # change must change these pins, strategy-lock.json and docs/STRATEGY_VALIDATION.md together.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': 'c6ccc2db34023c31671d8c001b9f755691260ebaf3953523a6062ebeb9a3447b',
-    'RND_LAB_A': '3ee45c0f1133604234470e9a98028587b1e639ed461091be266bf511f538c4bb',
-    'LAB_B_DIP_MKTDIP_GUARD': '9861b19f342fb44a08ec51fd40e2c5b94c8451e680294ceeb438ff7afd80c383',
-    'RND_LAB_B': '82bd8fba714b935724c8dfe9034f13f14bfd4e1813859ae60ec87ce92308164b',
+    'LAB_A_SURGE_EST_GUARD': '4be3a080fcee4abad0decb023bcf4bbbd6616aa211a40da18d22f542da848665',
+    'RND_LAB_A': 'c8d501ef27d8cee39b00b90b3e01a1a7e88b3aa24bef611582b34c1c43579514',
+    'LAB_B_DIP_MKTDIP_GUARD': 'da426cd42aa7a1fe7ef7719054a65522223cf819034983ed0b414db7b63c70f4',
+    'RND_LAB_B': '457858b25b0c15e98772543e384f1effcc568e09c705926a25787cb784815261',
 }
 
 
@@ -99,6 +103,29 @@ def pool(mint, pair, price, liquidity, stamp, **changes):
             'priceUsd': price, 'liquidityUsd': liquidity, 'updatedAt': stamp}
     coin.update(changes)
     return coin
+
+
+def exact_pair_mark(coin, received_at, *, liquidity=_MISSING, **changes):
+    """``coin``'s pool as the DexScreener exact-pair refresh returns it to a held position.
+
+    The payload goes through lab_position_marks.parse_pair_response, as
+    PositionMarkFeed caches it, and PositionMarkFeed.resolve's stamping. Without
+    ``liquidity`` the payload has no ``liquidity`` field at all.
+    """
+    raw = {key: value for key, value in coin.items()
+           if key not in {'address', 'liquidityUsd', 'liquidity', 'updatedAt', 'quoteTokenAddress',
+                          'name', 'symbol', 'mark_received_at', 'mark_source'}}
+    raw.update(chainId='solana', pairAddress=coin['pairAddress'],
+               baseToken={'address': coin['address'], 'name': coin.get('name') or '',
+                          'symbol': coin.get('symbol') or ''},
+               quoteToken={'address': coin.get('quoteTokenAddress') or SOL})
+    raw.update(changes)
+    if liquidity is not _MISSING:
+        raw['liquidity'] = {'usd': liquidity}
+    parsed = lab_position_marks.parse_pair_response({'pairs': [raw]}, coin['address'], coin['pairAddress'],
+                                                    int(received_at))
+    assert parsed is not None
+    return dict(parsed, mark_received_at=lab_position_marks.mark_observed_at(parsed))
 
 
 def observe(history, memory, coins):
@@ -245,6 +272,30 @@ class DefinitionTests(unittest.TestCase):
         with patch.object(lab, 'LATENCY_BUFFER_BPS', 25.0):
             self.assertEqual(lf.cost_model_mismatches(**lab.forward_cost_model()), ['latency_buffer_bps'])
         self.assertEqual(lf.cost_model_mismatches(base_slippage_bps=float('nan')), ['base_slippage_bps'])
+
+    def test_a_neo_lab_override_fails_closed_although_both_modules_agree(self):
+        """Review finding: strategy_lab and lab_paired_costs read the same NEO_LAB_* environment, so the
+        hashed-vs-resolved comparison alone never saw an override; the hashes changed silently."""
+        self.assertEqual(dataclasses.asdict(lf.PREREGISTERED_COST_MODEL), dataclasses.asdict(lf.COST_MODEL))
+        self.assertEqual(lf.cost_model_overrides(), [])
+        self.assertEqual(lf.config()['cost_model_overrides'], [])
+        self.assertEqual(lf.config()['preregistered_cost_model'], dataclasses.asdict(lf.PREREGISTERED_COST_MODEL))
+        # NEO_LAB_LATENCY_BUFFER_BPS=25 as both modules would resolve it in one process.
+        override = dataclasses.replace(lf.COST_MODEL, latency_buffer_bps=25.0)
+        self.assertEqual(lf.cost_model_overrides(override), ['latency_buffer_bps'])
+        with patch.object(lf, 'COST_MODEL', override), patch.object(lab, 'LATENCY_BUFFER_BPS', 25.0):
+            self.assertEqual(dataclasses.asdict(lf.COST_MODEL), lab.forward_cost_model(), 'both modules agree')
+            self.assertEqual(lf.cost_model_mismatches(**lab.forward_cost_model()), ['latency_buffer_bps'])
+            self.assertEqual(lf.config()['cost_model_overrides'], ['latency_buffer_bps'])
+            # The hashes of an override differ from the pinned ones (what the runbook's check compares).
+            for book_id in lf.BOOK_IDS:
+                self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+
+    def test_the_exact_pair_mark_source_is_the_one_lab_position_marks_stamps(self):
+        coin = pool(full('ExactMint'), full('ExactPair'), 0.01, 90_000.0, 1_800_000_000_000,
+                    priceNative=0.01 / 150, marketCap=5_000_000.0)
+        mark = exact_pair_mark(coin, coin['updatedAt'], liquidity=90_000.0)
+        self.assertEqual(mark['mark_source'], lf.EXACT_PAIR_MARK_SOURCE)
 
     def test_the_strategy_lock_records_the_books(self):
         lock = json.loads((Path(__file__).resolve().parents[1] / 'strategy-lock.json').read_text(encoding='utf-8'))
@@ -624,6 +675,41 @@ class CostTests(unittest.TestCase):
         unknown.pop('liquidityUsd')
         self.assertEqual(lab.calibrated_exit_execution(unknown, qty, 0.0, drain_aware=True)['impact_pct'],
                          lab.exit_execution(unknown, qty)['impact_pct'])
+
+    def test_an_exact_pair_refresh_without_liquidity_is_unknown_not_drained(self):
+        """Review finding: parse_pair_response turns a missing liquidity field into liquidityUsd 0.0,
+        which read as a drain (impact 100%, close_kind 'drained', about -$200 on a $200 entry)."""
+        coin = pool(full('Mint'), full('Pair'), 0.01, 300_000.0, 1_800_000_000_000, marketCap=10_000_000.0,
+                    priceNative=0.01 / 120)
+        missing = exact_pair_mark(coin, coin['updatedAt'])
+        self.assertNotIn('liquidity', missing)
+        self.assertEqual(missing['liquidityUsd'], 0.0, 'the shared parser is unchanged for every other book')
+        self.assertIsNone(lf.reported_liquidity_usd(missing))
+        self.assertTrue(lf.mark_liquidity_unknown(missing))
+        self.assertEqual(lf.close_kind('STOP_LOSS_5_NET', lf.reported_liquidity_usd(missing)), 'marked')
+        no_usd = exact_pair_mark(coin, coin['updatedAt'], liquidity=None)
+        self.assertTrue(lf.mark_liquidity_unknown(no_usd))
+        # A reported 0 is still a drain, on the exact-pair path and in the scan feed alike.
+        zero = exact_pair_mark(coin, coin['updatedAt'], liquidity=0)
+        self.assertEqual(lf.reported_liquidity_usd(zero), 0.0)
+        self.assertFalse(lf.mark_liquidity_unknown(zero))
+        self.assertEqual(lf.close_kind('STOP_LOSS_5_NET', lf.reported_liquidity_usd(zero)), 'drained')
+        feed_zero = dict(coin, liquidityUsd=0.0, mark_source='SHARED_LIVE_FEED_EXACT_POOL')
+        self.assertEqual(lf.reported_liquidity_usd(feed_zero), 0.0)
+        self.assertFalse(lf.mark_liquidity_unknown(feed_zero))
+        known = exact_pair_mark(coin, coin['updatedAt'], liquidity=300_000.0)
+        self.assertEqual(lf.reported_liquidity_usd(known), 300_000.0)
+        self.assertFalse(lf.mark_liquidity_unknown(known))
+        # An unknown-liquidity refresh is no research-fill observation either.
+        leg = lf.new_fill_leg(coin, coin['updatedAt'])
+        later = exact_pair_mark(dict(coin, priceUsd=0.0101), coin['updatedAt'] + 20_000)
+        self.assertFalse(lf.advance_fill_leg(leg, later, coin['updatedAt'] + 20_500,
+                                             key=(coin['address'], coin['pairAddress'])))
+        self.assertEqual((leg['status'], leg['later_observations']), (lf.FILL_PENDING, 0))
+        later = exact_pair_mark(dict(coin, priceUsd=0.0101), coin['updatedAt'] + 25_000, liquidity=290_000.0)
+        self.assertTrue(lf.advance_fill_leg(leg, later, coin['updatedAt'] + 25_500,
+                                            key=(coin['address'], coin['pairAddress'])))
+        self.assertEqual((leg['status'], leg['fill_price']), (lf.FILL_NEXT_REFRESH, 0.0101))
 
 
 # ------------------------------------------------------------------ kill rule and promotion gate
@@ -1440,6 +1526,20 @@ class LabIntegrationTests(unittest.TestCase):
                                lf.net50(expected, 200.0, 'TAKE_PROFIT_10_NET')['net50_usd'], places=6)
         self.assertLess(trade['net50_research_fill_usd'], trade['net50_usd'], 'bought higher and sold lower')
         self.assertEqual(trade['research_fill']['result']['valuation_fallbacks'], [])
+        # LAB_FORWARD_FILL_SHADOW_COMPACT_V1: once valued, the observation snapshots are dropped
+        # (review finding: they were most of a close the Lab rewrites every loop).
+        shadow = trade['research_fill']
+        self.assertEqual(shadow['storage'], lf.FILL_SHADOW_STORAGE_VERSION)
+        for side, price, lag in (('entry', entry_price * 1.004, 30_000), ('exit', entry_price * 1.11, 25_000)):
+            with self.subTest(side=side):
+                self.assertFalse(set(lf.FILL_SNAPSHOT_FIELDS) & set(shadow[side]))
+                self.assertEqual((shadow[side]['status'], shadow[side]['fill_price'], shadow[side]['fill_lag_ms']),
+                                 (lf.FILL_NEXT_REFRESH, price, lag))
+        self.assertEqual((shadow['result']['entry_fill_liquidity_usd'], shadow['result']['exit_fill_liquidity_usd']),
+                         (fill_in['liquidityUsd'], fill_out['liquidityUsd']))
+        # Measured in review: 2.8 KB of shadow in an 8.9 KB close before; 1.2 KB in 7.3 KB after.
+        self.assertLess(len(json.dumps(shadow)), 1_400)
+        self.assertLess(len(json.dumps(trade)), 7_600)
         # Only the shadow was written: booked P&L, net50 and the balance are untouched.
         self.assertEqual({key: trade[key] for key in booked}, booked)
         self.assertEqual(book['balance'], balance)
@@ -1844,6 +1944,69 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(trade['net50_pct'], -100.0, delta=0.05)
         self.assertEqual(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['drained_closes'], 1)
 
+    def poll_exact_pair(self, mark, *, at=None):
+        """One Lab loop in which the held pool is out of the shared feed and ``mark`` is its exact-pair refresh."""
+        self.clock[0] = int(mark['updatedAt'] + 500 if at is None else at)
+        alive = pool(full('OtherMint'), full('OtherPair'), 1.0, 100_000.0, self.clock[0] - 1_000)
+        with patch.object(lab.POSITION_MARK_FEED, 'resolve', side_effect=lambda position, prices, now: dict(mark)):
+            lab.update_positions({}, [alive])
+
+    def test_an_exact_pair_refresh_without_liquidity_neither_triggers_nor_books_a_drain(self):
+        """Review finding: one refresh payload without a liquidity field booked the position at about -$200."""
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        position = book['position']
+        entry_mark = dict(position['last_mark'])
+        # The pool left the feed; its refresh repeats the entry print 30 s later, without liquidity.
+        decision = points[1]
+        missing = exact_pair_mark(decision, decision['updatedAt'] + 30_000, priceUsd=decision['priceUsd'] * 1.002)
+        self.poll_exact_pair(missing)
+        self.assertIsNotNone(book['position'], 'no stop from $1 of model liquidity')
+        self.assertEqual(book['history'], [])
+        self.assertEqual(book['balance'], 500.0)
+        position = book['position']
+        self.assertEqual((position['quote_status'], position['quote_unavailable_reason']),
+                         ('unavailable', lf.LIQUIDITY_UNKNOWN_REASON))
+        self.assertEqual(position['last_mark'], entry_mark, 'an unknown-liquidity mark is not a usable last mark')
+        leg = position['research_fill']['entry']
+        self.assertEqual((leg['status'], leg['later_observations']), (lf.FILL_PENDING, 0))
+        # The next refresh reports the pool's liquidity: an ordinary mark again.
+        known = exact_pair_mark(decision, decision['updatedAt'] + 40_000, liquidity=decision['liquidityUsd'],
+                                priceUsd=decision['priceUsd'] * 1.002)
+        self.poll_exact_pair(known)
+        position = book['position']
+        self.assertIsNotNone(position)
+        self.assertEqual((position['quote_status'], position['quote_unavailable_reason'], position['mark_source']),
+                         ('fresh', None, lf.EXACT_PAIR_MARK_SOURCE))
+        self.assertEqual(position['research_fill']['entry']['status'], lf.FILL_NEXT_REFRESH)
+        self.assertGreater(position['pnl_pct'], -5.0)
+        # A refresh that reports liquidity 0 is still a drain.
+        zero = exact_pair_mark(decision, decision['updatedAt'] + 60_000, liquidity=0)
+        self.poll_exact_pair(zero)
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual((trade['exit_reason'], trade['close_kind'], trade['exit_liquidity_usd']),
+                         ('STOP_LOSS_5_NET', 'drained', 0.0))
+
+    def test_a_pool_that_only_refreshes_without_liquidity_closes_as_vanished(self):
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        opened, last_price = book['position']['opened_at'], book['position']['last_mark']['priceUsd']
+        decision = points[1]
+        for minutes in (30, 60.5, 69.9):
+            mark = exact_pair_mark(decision, opened + minutes * MINUTE - 2_000)
+            self.poll_exact_pair(mark, at=opened + minutes * MINUTE)
+            self.assertIsNotNone(book['position'], minutes)
+            self.assertEqual(book['position']['quote_unavailable_reason'], lf.LIQUIDITY_UNKNOWN_REASON)
+        self.assertTrue(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['open_unpriced_past_max_hold'],
+                        'past its max hold without a usable mark, no max-hold exit on an unknown mark')
+        self.poll_exact_pair(exact_pair_mark(decision, opened + 70.05 * MINUTE - 2_000), at=opened + 70.05 * MINUTE)
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual((trade['exit_reason'], trade['close_kind']), ('VANISHED_NO_FRESH_MARK', 'vanished'))
+        self.assertAlmostEqual(trade['exit_price'], last_price * 0.9, places=12)
+        self.assertGreater(trade['pnl_pct'], -11.5, 'the last usable mark minus 10%, not a drain')
+
     def test_a_pool_without_marks_closes_as_vanished_after_max_hold_plus_grace(self):
         points = self.open_neet()
         book = self.books[lf.LAB_A_ID]
@@ -1910,6 +2073,60 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertIsNone(book['position'])
         self.assertEqual(book['entry_diagnostics']['blocked_reason'], 'lab_forward_cost_model_mismatch')
         self.assertEqual(book['entry_diagnostics']['cost_model_mismatched_fields'], ['base_slippage_bps'])
+
+    def test_a_neo_lab_override_both_modules_read_fails_forward_entries_closed(self):
+        """NEO_LAB_BASE_SLIPPAGE_BPS=12 as the Lab process resolves it: strategy_lab and the hashed model agree."""
+        crossing = next(c for c in FIXTURES['lab_a_crossings'] if c['name'].startswith('neet'))
+        points = [feed_coin(point) for point in crossing['points']]
+        self.use_layer(points[0]['updatedAt'])
+        override = dataclasses.replace(lf.COST_MODEL, base_slippage_bps=12.0)
+        with patch.object(lab, 'BASE_SLIPPAGE_BPS', 12.0), patch.object(lf, 'COST_MODEL', override):
+            self.refresh(points[0])
+            self.refresh(points[1])
+        book = self.books[lf.LAB_A_ID]
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'], 'lab_forward_cost_model_mismatch')
+        self.assertEqual(book['entry_diagnostics']['cost_model_mismatched_fields'], ['base_slippage_bps'])
+
+    def test_forward_books_never_schedule_the_jupiter_probe(self):
+        """Review finding: the Lab scheduled its RugCheck + Jupiter probe for forward books on every pending
+        price check, contrary to the docs. Runs the real scheduler; only the thread start is recorded."""
+        started = []
+
+        class RecordingThread:
+            def __init__(self, target=None, name=None, daemon=None, **_kwargs):
+                self.name = name
+
+            def start(self):
+                started.append(self.name)
+
+        probe_threads = lambda: [name for name in started if name == 'neo-lab-jupiter-price-check']
+        crossing = next(c for c in FIXTURES['lab_a_crossings'] if c['name'].startswith('neet'))
+        points = [feed_coin(point) for point in crossing['points']]
+        self.price_script = lambda coin: 'review'
+        with patch.object(lab, 'schedule_jupiter_price_probe', _REAL_SCHEDULE_PROBE), \
+                patch.object(lab, 'LAB_PRICE_PROBE_CACHE', {}), \
+                patch.object(lab, 'LAB_PRICE_PROBE_RETRY_AFTER', {}), \
+                patch.object(lab, 'LAB_PRICE_PROBE_INFLIGHT', False), \
+                patch.object(lab.threading, 'Thread', RecordingThread):
+            self.use_layer(points[0]['updatedAt'])
+            self.refresh(points[0])
+            self.refresh(points[1])
+            book = self.books[lf.LAB_A_ID]
+            self.assertIsNone(book['position'])
+            self.assertEqual(book['entry_diagnostics']['blocked_reason'], lf.PRICE_CHECK_PENDING_REASON)
+            control = self.control_coin(lf.RND_A_ID)
+            self.use_layer(control['updatedAt'])
+            self.refresh(control, book_ids=(lf.RND_A_ID,))
+            self.assertEqual(self.books[lf.RND_A_ID]['entry_diagnostics']['blocked_reason'],
+                             lf.PRICE_CHECK_PENDING_REASON)
+            self.assertEqual(probe_threads(), [])
+            self.assertEqual(lab.LAB_PRICE_PROBE_RETRY_AFTER, {})
+            self.assertFalse(lab.LAB_PRICE_PROBE_INFLIGHT)
+            self.assertEqual(self.calls['rugcheck'], 0)
+            # The same scheduler still starts its probe for any other caller (what the check above would see).
+            self.assertTrue(lab.schedule_jupiter_price_probe(points[1]))
+            self.assertEqual(probe_threads(), ['neo-lab-jupiter-price-check'])
 
     def test_cost_cap_refuses_an_expensive_research_dip_and_never_shrinks_the_size(self):
         dip, coins = regime_inputs()
@@ -2025,10 +2242,58 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertEqual(projected['books']['X']['history'][0]['lab_config_hash'], 'h')
         self.assertEqual(projected['books']['X']['history'][0]['close_kind'], 'drained')
         self.assertEqual(projected['books']['X']['history'][0]['drain_valuation_cost_usd'], 150.0)
+        self.assertNotIn('capital_mode', projected['books']['X']['history'][0], 'absent fields stay absent')
         config = lab.STATE['activity_config']['lab_forward_tests']
         self.assertEqual(config['close_policy']['version'], lf.CLOSE_POLICY_VERSION)
         self.assertEqual(config['cash_state']['version'], lf.CASH_STATE_VERSION)
         self.assertFalse(config['tape_pin_required'])
+        self.assertEqual(config['cost_model_overrides'], [])
+
+    def test_the_projection_adds_forward_fields_only_to_rows_that_have_them(self):
+        """Review finding: 17 always-null forward fields on every history row of all 40 books grew
+        the compact projection (embedded in main's GET /state) by about 38%."""
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        mark = dict(points[1], priceUsd=book['position']['entry_price'] * 1.12, updatedAt=points[1]['updatedAt'] + 90_000)
+        self.clock[0] = mark['updatedAt'] + 100
+        lab.update_positions({}, [mark])
+        self.refresh(dict(points[0], updatedAt=mark['updatedAt'] + 400_000))
+        self.refresh(dict(points[1], updatedAt=mark['updatedAt'] + 405_000))
+        self.assertIsNotNone(book['position'])
+        other = {'id': 'TREND', 'position': {'strategy_id': 'TREND', 'symbol': 'TRND', 'opened_at': 1},
+                 'history': [{'trade_no': 1, 'strategy_id': 'TREND', 'pnl_usd': 1.0, 'closed_at': 2}]}
+        projected = lab_dashboard_projection.compact_strategy_lab({'books': {lf.LAB_A_ID: book, 'TREND': other}})
+        forward_history = set(lab_dashboard_projection.FORWARD_HISTORY_FIELDS)
+        forward_position = set(lab_dashboard_projection.FORWARD_POSITION_FIELDS)
+        plain = projected['books']['TREND']
+        self.assertFalse(forward_history & set(plain['history'][0]))
+        self.assertFalse(forward_position & set(plain['position']))
+        self.assertIsNone(plain['history'][0]['exit_reason'], 'base fields keep their nulls')
+        self.assertIsNone(plain['position']['quote_status'])
+        forward = projected['books'][lf.LAB_A_ID]
+        self.assertLessEqual(forward_history, set(forward['history'][0]))
+        self.assertLessEqual(forward_position, set(forward['position']))
+        self.assertEqual(forward['history'][0]['net50_usd'], book['history'][0]['net50_usd'])
+        self.assertEqual(forward['position']['lab_config_hash'], PINNED_CONFIG_HASHES[lf.LAB_A_ID])
+        # The tape still reads a forward position's identity from the projection.
+        self.assertFalse(lf.tape_pin_required(forward['position']))
+        self.assertTrue(lf.tape_pin_required(plain['position']))
+
+    def test_persist_publishes_the_size_and_duration_of_the_last_ledger_write(self):
+        """Review finding: the whole ledger is rewritten every loop; its growth must be visible."""
+        with patch.object(lab, 'PERSIST_METRICS', {}):
+            lab.persist('online')
+            metrics = dict(lab.PERSIST_METRICS)
+            self.assertEqual(metrics['version'], lab.PERSIST_METRICS_VERSION)
+            self.assertEqual(metrics['ledger_bytes'], lab.STATE_PATH.stat().st_size)
+            self.assertEqual(metrics['compact_bytes'], lab.COMPACT_PATH.stat().st_size)
+            self.assertGreaterEqual(metrics['write_seconds'], 0.0)
+            self.assertEqual(metrics['poll_seconds'], lab.POLL_SECONDS)
+            self.assertEqual(lab.STATE['persistence'], {}, 'the first write has no previous write to publish')
+            lab.persist('online')
+            self.assertEqual(lab.STATE['persistence'], metrics)
+            compact = json.loads(lab.COMPACT_PATH.read_text(encoding='utf-8'))
+            self.assertEqual(compact['persistence'], metrics)
 
 
 # ------------------------------------------------------------------ tape seats

@@ -67,7 +67,10 @@ x / (1 + x), x = 2 x value / liquidity, never below the shared model's capped
 impact; a reported liquidity of 0 is worth 0), and a position whose exact pool
 has given no usable mark beyond max hold plus 10 min closes as VANISHED at
 its last mark minus the research's 10% haircut. Both kinds are counted in the
-kill-rule evidence and the gate's vanished-or-unpriced share.
+kill-rule evidence and the gate's vanished-or-unpriced share. An exact-pair
+refresh that reports no liquidity is unknown, not drained
+(LAB_FORWARD_MARK_LIQUIDITY_V1): it is no usable mark, so the position stays
+unpriced until a usable one arrives or the VANISHED rule closes it.
 
 Cash state (LAB_FORWARD_CASH_STATE_V1): a book whose balance cannot fund the
 fixed $200 entry (plus a network-fee reserve) and holds no position cannot
@@ -103,7 +106,9 @@ one leg per side) that is completed once both legs are known, at most about
 net50_research_fill_usd / _pct: the same booked model re-run at the research
 fill observations, minus the same net50 stress. The kill rule is evaluated on
 both bases (met on either retires) and the gate's expectancy, CI and control
-criteria must pass on both.
+criteria must pass on both. Once valued, a shadow drops its observation
+snapshots (LAB_FORWARD_FILL_SHADOW_COMPACT_V1; the result keeps the valuation
+inputs), because the Lab rewrites its whole ledger every loop.
 
 Positions keep the exits they were opened with: exit triggers, the vanish clock
 and the unpriced-past-max-hold count read the position's own exit_parameters,
@@ -144,6 +149,16 @@ CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
 CONTROL_CONTINUITY_VERSION = 'LAB_FORWARD_CONTROL_CONTINUITY_V1'
 SIGNAL_CARRY_VERSION = 'LAB_FORWARD_SIGNAL_CARRY_V1'
 FILL_BASIS_VERSION = 'LAB_FORWARD_FILL_BASIS_V1'
+# Part of the close policy's parameters (and so of every config hash): an exact-pair
+# refresh that reports no pool liquidity is unknown, not drained.
+MARK_LIQUIDITY_VERSION = 'LAB_FORWARD_MARK_LIQUIDITY_V1'
+# Storage form of a completed research-fill shadow (valuation and booking unchanged):
+# the observation snapshots are dropped once the result is computed.
+FILL_SHADOW_STORAGE_VERSION = 'LAB_FORWARD_FILL_SHADOW_COMPACT_V1'
+# lab_position_marks.parse_pair_response's mark_source (restated: that module opens an
+# HTTP session at import; a test pins equality).
+EXACT_PAIR_MARK_SOURCE = 'DEXSCREENER_EXACT_POOL_API'
+LIQUIDITY_UNKNOWN_REASON = 'exact_pool_liquidity_unknown'
 # Every released LAB_FORWARD_TESTS version whose open positions this module still
 # books and exits (with their own stored exit parameters). Add, never remove.
 KNOWN_VERSIONS = (VERSION,)
@@ -346,7 +361,9 @@ class CostModelParameters:
 
     Part of every book's config hash: closes booked under another cost model are
     another test. strategy_lab refuses forward entries when its own resolved values
-    differ from these (fail closed, 'lab_forward_cost_model_mismatch').
+    differ from these or from the pre-registered defaults (PREREGISTERED_COST_MODEL;
+    fail closed, 'lab_forward_cost_model_mismatch'): both modules read the same
+    NEO_LAB_* environment, so only the second comparison sees an override.
     """
     execution_model: str
     generic_dex_fee_bps: float
@@ -368,6 +385,14 @@ class ClosePolicyParameters:
     vanish_confirm_seconds: int = 60            # continuous no-mark time in this Lab process
     feed_alive_max_age_ms: int = 60_000         # the shared feed must still be priced
     vanish_reason: str = 'VANISHED_NO_FRESH_MARK'
+    # LAB_FORWARD_MARK_LIQUIDITY_V1. The scan feed normalizes a missing liquidity to 0 and
+    # there 0 was always terminal (research F6); the exact-pair endpoint carries its own
+    # liquidity dict, so its absence there is unknown, not a drain.
+    unknown_liquidity: str = ('LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh (DEXSCREENER_EXACT_POOL_API) '
+                              'without liquidity.usd is not a usable mark: no exit trigger, no booked valuation, '
+                              'no research-fill observation; the position counts as unpriced '
+                              '(exact_pool_liquidity_unknown) and the VANISHED rule applies. A reported '
+                              'liquidity of 0 stays drained.')
 
 
 @dataclass(frozen=True)
@@ -420,6 +445,9 @@ class SignalCarryParameters:
                         'cooldowns, cost cap, cash and retirement are re-run')
     max_pending_per_book: int = 32
     applies_to: str = 'all four books (each hypothesis and its control see the same latency)'
+    # strategy_lab never schedules its RugCheck + Jupiter price probe for these books.
+    jupiter_probe: str = ('never requested by these books: the GeckoTerminal exact-pool reference, or a '
+                          'Jupiter tie-break another book already cached, must resolve within the carry')
 
 
 @dataclass(frozen=True)
@@ -444,7 +472,8 @@ class FillBasisParameters:
     # A leg with no observation beyond the window resolves on time this long after it.
     resolve_grace_ms: int = 30_000
     observations: str = ("the shared feed's exact-pool observations and the exact-pair refresh "
-                         '(updatedAt, as PairHistory), each counted once, in stamp order')
+                         '(updatedAt, as PairHistory), each counted once, in stamp order; an exact-pair '
+                         'refresh without liquidity.usd is no observation (LAB_FORWARD_MARK_LIQUIDITY_V1)')
     valuation: str = ('the booked model (Lab spot model + the position CALIB_V1 bps per leg, drain-aware exit) '
                       're-run at the entry and exit fill observations; net50 with the booked stress and '
                       'exit-reason extra')
@@ -475,6 +504,11 @@ COST_MODEL = CostModelParameters(
     execution_model=EXECUTION_MODEL, generic_dex_fee_bps=lab_costs.GENERIC_DEX_FEE_BPS,
     base_slippage_bps=lab_costs.BASE_SLIPPAGE_BPS, latency_buffer_bps=lab_costs.LATENCY_BUFFER_BPS,
     network_fee_sol=lab_costs.NETWORK_FEE_SOL, max_price_impact_pct=lab_costs.MAX_PRICE_IMPACT_PCT)
+# The cost model the books were pre-registered and pinned with (the Lab's defaults, no
+# NEO_LAB_* override). Literal on purpose: it must not follow the environment.
+PREREGISTERED_COST_MODEL = CostModelParameters(
+    execution_model=EXECUTION_MODEL, generic_dex_fee_bps=30.0, base_slippage_bps=10.0,
+    latency_buffer_bps=10.0, network_fee_sol=0.0001, max_price_impact_pct=20.0)
 CLOSE_POLICY = ClosePolicyParameters()
 CASH = CashParameters()
 CONTROL_CONTINUITY = ControlContinuityParameters()
@@ -500,10 +534,23 @@ COST_MODEL_MISMATCH_REASON = 'lab_forward_cost_model_mismatch'
 PRICE_CHECK_PENDING_REASON = 'lab_forward_price_check_pending'
 
 
+def cost_model_overrides(model: CostModelParameters | None = None) -> list:
+    """Names of the hashed cost-model values that differ from PREREGISTERED_COST_MODEL (a NEO_LAB_* override)."""
+    current, registered = asdict(COST_MODEL if model is None else model), asdict(PREREGISTERED_COST_MODEL)
+    return sorted(name for name, value in registered.items() if current.get(name) != value)
+
+
 def cost_model_mismatches(**resolved) -> list:
-    """Names of the Lab's resolved cost-model values that differ from the hashed COST_MODEL."""
-    frozen = asdict(COST_MODEL)
-    return sorted(name for name, value in resolved.items() if name not in frozen or frozen[name] != value)
+    """Names of the Lab's resolved cost-model values that differ from the hashed COST_MODEL or the pre-registered one.
+
+    The first comparison catches drift between strategy_lab and its frozen copy
+    lab_paired_costs (and a non-finite knob); the second an environment override,
+    which both modules read alike and which would otherwise only change the config
+    hashes silently.
+    """
+    frozen, registered = asdict(COST_MODEL), asdict(PREREGISTERED_COST_MODEL)
+    return sorted(name for name, value in resolved.items()
+                  if name not in frozen or frozen[name] != value or registered.get(name) != value)
 
 
 def admission_cost_cap_pct(book_id) -> float:
@@ -1077,15 +1124,34 @@ def reported_liquidity_usd(coin):
     """Pool liquidity as the mark reports it: a number (0 = drained) or None when it carries none.
 
     A DexScreener pair object's own ``liquidity`` dict wins (a dict without ``usd``
-    is unknown); otherwise the feed's normalized ``liquidityUsd``. In the scan
-    feed a PumpSwap liquidity of exactly 0 was always terminal (research F6).
+    is unknown). An exact-pair refresh (``mark_source`` DEXSCREENER_EXACT_POOL_API)
+    without that dict carries none: lab_position_marks.parse_pair_response turns
+    the missing field into liquidityUsd 0.0, which is not a drain
+    (LAB_FORWARD_MARK_LIQUIDITY_V1). Otherwise the feed's normalized
+    ``liquidityUsd``: in the scan feed a PumpSwap liquidity of exactly 0 was
+    always terminal (research F6).
     """
     if not isinstance(coin, dict):
         return None
     raw = coin.get('liquidity')
     if isinstance(raw, dict):
         return _finite(raw.get('usd'))
+    if coin.get('mark_source') == EXACT_PAIR_MARK_SOURCE:
+        return None
     return _finite(coin.get('liquidityUsd'))
+
+
+def mark_liquidity_unknown(coin) -> bool:
+    """LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh that reports no pool liquidity.
+
+    Such a mark is not usable for a forward position: the shared model would value
+    it at $1 of liquidity (a 20% capped impact that fires every stop) and the
+    drain-aware exit would book it at 0. The position waits for a usable mark and
+    counts as unpriced meanwhile; the VANISHED rule covers a pool that never gives
+    one. A reported liquidity of 0 (``liquidity.usd`` 0) stays a drain.
+    """
+    return (isinstance(coin, dict) and coin.get('mark_source') == EXACT_PAIR_MARK_SOURCE
+            and reported_liquidity_usd(coin) is None)
 
 
 def drain_aware_impact_pct(value_usd, liquidity, shared_impact_pct) -> float:
@@ -1264,8 +1330,10 @@ def _resolve_at_window_end(leg, now):
 def advance_fill_leg(leg, coin, now, *, key=None, params: FillBasisParameters = FILL_BASIS) -> bool:
     """Advance one pending leg with an observation of its exact pool (``coin`` None: time only).
 
-    Observations at or before the decision, of another pool, or not newer than
-    the last one used are ignored. Returns True when the leg resolved now.
+    Observations at or before the decision, of another pool, not newer than the
+    last one used, or an exact-pair refresh without liquidity
+    (LAB_FORWARD_MARK_LIQUIDITY_V1) are ignored. Returns True when the leg
+    resolved now.
     """
     if not isinstance(leg, dict) or leg.get('status') != FILL_PENDING:
         return False
@@ -1273,7 +1341,8 @@ def advance_fill_leg(leg, coin, now, *, key=None, params: FillBasisParameters = 
     current = _finite(now)
     if start is None or price0 is None:
         return _resolve_leg(leg, FILL_NO_NEXT, None, now)
-    if isinstance(coin, dict) and (key is None or _identity(coin) == key):
+    if (isinstance(coin, dict) and (key is None or _identity(coin) == key)
+            and not mark_liquidity_unknown(coin)):
         stamp, price = observation_ms(coin, now), _finite(coin.get('priceUsd'))
         last = _finite(leg.get('last_observed_at'))
         if (stamp is not None and price is not None and price > 0 and stamp > start
@@ -1357,6 +1426,9 @@ def research_fill_value(row, entry_fn, exit_fn) -> dict:
     out.update({'entry_fill_price': _finite(entry_coin.get('priceUsd')),
                 'exit_fill_price': _finite(exit_coin.get('priceUsd')),
                 'entry_fill_at': entry_coin.get('updatedAt'), 'exit_fill_at': exit_coin.get('updatedAt'),
+                # The valuation's liquidity inputs (the leg snapshots are dropped once valued).
+                'entry_fill_liquidity_usd': reported_liquidity_usd(entry_coin),
+                'exit_fill_liquidity_usd': reported_liquidity_usd(exit_coin),
                 'quantity': _finite(entry.get('quantity')),
                 'pnl_usd': round(pnl, 6), 'pnl_pct': round(pnl / notional * 100, 6) if notional else None,
                 'net50_usd': stressed['net50_usd'], 'net50_pct': stressed['net50_pct'],
@@ -1364,12 +1436,38 @@ def research_fill_value(row, entry_fn, exit_fn) -> dict:
     return out
 
 
+FILL_SNAPSHOT_FIELDS = ('decision', 'first_later', 'fill')
+
+
+def compact_fill_shadow(shadow) -> int:
+    """LAB_FORWARD_FILL_SHADOW_COMPACT_V1: drop a valued shadow's observation snapshots.
+
+    The Lab rewrites its whole ledger every loop, and the three snapshots of each
+    leg were most of a forward close's size. Once ``result`` holds the valuation
+    (prices, stamps, quantity and liquidity inputs) nothing reads them again; each
+    leg keeps its status, decision and fill prices and stamps, lag and
+    observation counts. Returns the number of snapshots dropped.
+    """
+    dropped = 0
+    for side in ('entry', 'exit'):
+        leg = shadow.get(side)
+        if not isinstance(leg, dict):
+            continue
+        for name in FILL_SNAPSHOT_FIELDS:
+            if name in leg:
+                dropped += leg.pop(name) is not None
+    shadow['storage'] = FILL_SHADOW_STORAGE_VERSION
+    return dropped
+
+
 def complete_research_fill(row, entry_fn, exit_fn) -> bool:
     """Value a close's research fills once both legs are known (completed once, in place).
 
     Only the shadow fields are written ('research_fill.result',
-    'net50_research_fill_usd', 'net50_research_fill_pct', 'research_fill_pnl_usd');
-    the booked P&L, net50 and balance of the close never change.
+    'net50_research_fill_usd', 'net50_research_fill_pct', 'research_fill_pnl_usd')
+    and the shadow's observation snapshots are then dropped
+    (LAB_FORWARD_FILL_SHADOW_COMPACT_V1); the booked P&L, net50 and balance of
+    the close never change.
     """
     shadow = row.get('research_fill') if isinstance(row, dict) else None
     if not isinstance(shadow, dict) or shadow.get('result') is not None or not fill_legs_resolved(row):
@@ -1379,6 +1477,7 @@ def complete_research_fill(row, entry_fn, exit_fn) -> bool:
     row['net50_research_fill_usd'] = result.get('net50_usd')
     row['net50_research_fill_pct'] = result.get('net50_pct')
     row['research_fill_pnl_usd'] = result.get('pnl_usd')
+    compact_fill_shadow(shadow)
     _SHADOW_REVISION[0] += 1
     return True
 
@@ -2426,6 +2525,11 @@ def config() -> dict:
             'fill_basis': asdict(FILL_BASIS), 'fill_basis_version': FILL_BASIS_VERSION,
             'known_versions': list(KNOWN_VERSIONS),
             'cost_model': _hashable(asdict(COST_MODEL)), 'tape_pin_required': TAPE_PIN_REQUIRED,
+            # A NEO_LAB_* override: the config hashes differ from the pinned ones and entries fail closed.
+            'preregistered_cost_model': asdict(PREREGISTERED_COST_MODEL),
+            'cost_model_overrides': cost_model_overrides(),
+            'mark_liquidity_version': MARK_LIQUIDITY_VERSION,
+            'fill_shadow_storage_version': FILL_SHADOW_STORAGE_VERSION,
             'universe_reasons': list(UNIVERSE_REASONS), 'signal_reasons': list(SIGNAL_REASONS),
             'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': False,
             'evidence_status': 'PRE_REGISTERED_HYPOTHESES_NEGATIVE_ABSOLUTE_RESEARCH_RESULT'}

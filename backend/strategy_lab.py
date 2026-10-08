@@ -338,23 +338,41 @@ def load_json(path,default):
     except Exception: return default
 
 def atomic_write_path(path,data):
+    """Write ``data`` as JSON atomically (fsync, then replace); returns the bytes written."""
     path.parent.mkdir(parents=True,exist_ok=True)
     tmp=path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
     with tmp.open('w',encoding='utf-8') as handle:
         json.dump(data,handle,ensure_ascii=False,allow_nan=False)
         handle.flush()
         os.fsync(handle.fileno())
+        size=os.fstat(handle.fileno()).st_size
     for attempt in range(8):
         try:
             tmp.replace(path)
-            return
+            return size
         except PermissionError:
             if attempt==7:
                 raise
             time.sleep(min(.4,.025*(2**attempt)))
 
 def atomic_write(data):
-    atomic_write_path(STATE_PATH,data)
+    return atomic_write_path(STATE_PATH,data)
+
+# LAB_PERSIST_METRICS_V1: size and duration of the last whole-ledger write (the Lab rewrites
+# and fsyncs its ledger every loop; a growing ledger slows marks, exits and entries).
+PERSIST_METRICS_VERSION='LAB_PERSIST_METRICS_V1'
+PERSIST_METRICS={}
+
+def record_persist_metrics(ledger_bytes,compact_bytes,seconds,at):
+    PERSIST_METRICS.clear()
+    PERSIST_METRICS.update({
+        'version':PERSIST_METRICS_VERSION,'measured_at':int(at),
+        'ledger_bytes':int(ledger_bytes) if isinstance(ledger_bytes,int) else None,
+        'compact_bytes':int(compact_bytes) if isinstance(compact_bytes,int) else None,
+        'write_seconds':round(max(0.0,seconds),3),'poll_seconds':POLL_SECONDS,
+        # Writes alone take a share of the loop's period; near or above 1 the loop falls behind.
+        'write_share_of_poll':round(max(0.0,seconds)/POLL_SECONDS,3) if POLL_SECONDS>0 else None,
+        'basis':'the previous write (a write cannot publish its own size)'})
 
 def flow_map():
     global FLOW_TAPE_DIAGNOSTICS
@@ -860,6 +878,15 @@ def update_positions(flows,feed):
             pos['quote_unavailable_reason']='network_price_unknown'
             if forward: close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
             continue
+        if forward and lab_forward.mark_liquidity_unknown(coin):
+            # LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh without pool liquidity is unknown,
+            # not drained ($1 of model liquidity would fire every stop and the drain-aware exit would
+            # book 0). No trigger, no valuation: the position is unpriced until a usable mark arrives.
+            pos['quote_status']='unavailable'
+            pos['quote_age_ms']=max(0,decision_at-int(num(pos.get('mark_received_at'),num(pos.get('updated_at')))))
+            pos['quote_unavailable_reason']=lab_forward.LIQUIDITY_UNKNOWN_REASON
+            close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
+            continue
         if forward:
             # A usable mark of the exact pool: reset the no-mark clock, keep it for a VANISHED valuation.
             FORWARD_UNPRICED_SINCE.pop(forward_position_key(pos),None)
@@ -1235,9 +1262,15 @@ def maybe_open(feed,flows):
                 if validation.get('status')!='pass':
                     if validation.get('status')=='review':
                         price_crosscheck_pending+=1
-                        schedule_jupiter_price_probe(coin)
-                        # LAB_FORWARD_SIGNAL_CARRY_V1: the only blocker so far; carried below.
-                        if is_forward: forward_stage[forward_key]='price_crosscheck_pending'
+                        if is_forward:
+                            # LAB_FORWARD_SIGNAL_CARRY_V1: the only blocker so far; carried below.
+                            # Forward books never request the RugCheck + Jupiter probe: their random
+                            # draws would feed arbitrary pools into the RugCheck, RPC and Jupiter
+                            # budget main uses. They use the GeckoTerminal reference (and a tie-break
+                            # another book's probe already cached) within the 60 s carry.
+                            forward_stage[forward_key]='price_crosscheck_pending'
+                        else:
+                            schedule_jupiter_price_probe(coin)
                     else:
                         blocked_price+=1
                     continue
@@ -1678,9 +1711,12 @@ def persist(status='online',error=None):
     }
     if error: STATE['error']=str(error)[:200]
     else: STATE.pop('error',None)
+    STATE['persistence']=dict(PERSIST_METRICS)
     published=merge_paired_snapshot(merge_astra_snapshot(STATE))
-    atomic_write(published)
-    atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    started=time.perf_counter()
+    ledger_bytes=atomic_write(published)
+    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    record_persist_metrics(ledger_bytes,compact_bytes,time.perf_counter()-started,now_ms())
 
 def main():
     global STATE, LOADED

@@ -106,7 +106,9 @@ Rules fixed before the run:
   therefore needs new, versioned book ids with fresh ledgers; existing books keep their
   history. The hash includes the resolved Lab cost model (the `NEO_LAB_*` cost knobs),
   and the Lab refuses forward entries when its own cost model differs from the hashed
-  one. Nothing is retuned on the forward sample.
+  one or from the pre-registered defaults (a `NEO_LAB_*` override fails closed instead
+  of silently changing the hashes; `cost_model_overrides` names it). Nothing is retuned
+  on the forward sample.
 - **Signal carry (`LAB_FORWARD_SIGNAL_CARRY_V1`, all four books).** A matched signal whose
   only blocker is the asynchronous price cross-check is retried on the pool's current
   observation for up to 60 s (the research fill window), with every other gate re-run.

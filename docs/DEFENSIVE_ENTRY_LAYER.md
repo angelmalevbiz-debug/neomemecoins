@@ -269,8 +269,10 @@ state-file environment variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STAT
   sidecar properties above) a seed merges sightings but adopts no coverage.
 
 **First deploy.** No sidecar exists yet. `scripts/build_ticker_registry_seed.py` builds
-main's sidecar offline from a copy of the main training journal
-(`.runtime/accounts/training/observations.jsonl` in the live checkout). The journal records the bounded scan feed
+main's sidecar offline from the main training journal, read in place
+(`.runtime/accounts/training/observations.jsonl` in the live checkout; the tool opens it
+read-only and nothing appends to it while the services are stopped, so it is not
+copied). The journal records the bounded scan feed
 (`MAX_FEED` = 90 coins after `entry_quote_priority.bounded_feed`; unchanged repeat polls
 within 3 s are coalesced) plus entry, probe and position rows, each with its mint, pool,
 symbol and time; the research scan log was built from it. Gecko new pools cut by the
@@ -316,8 +318,9 @@ Before this, `coverage_at_now` used the clock read before a replay of the whole 
 once the journal was about 13 days old the replay alone outlasted the 60-minute window,
 and the tool printed warming false and exited 0 while every registry would warm for 24 h.
 
-Run it on the journal as it stands after the services stopped (or a copy taken then),
-check that it exits 0 (`vouches_at_end` true), then start the services before the printed
+Run it in place on the live journal after the services stopped (do not copy it: a copy
+of a journal of tens of GB only costs disk and minutes of the 60-minute window), check
+that it exits 0 (`vouches_at_end` true), then start the services before the printed
 `start_services_before_utc`; the Lab, the tape and personal engines then seed from main's
 sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full procedure, including when a
 rerun cannot help.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a ticker registry sidecar offline from a copy of the training journal (TICKER_REGISTRY_SEED_V4).
+"""Build a ticker registry sidecar offline from the training journal, read in place (TICKER_REGISTRY_SEED_V4).
 
 PAPER only. Read-only on its input; it never contacts a service, a provider or
 a wallet. STRUCTURAL_RUG_GUARD_V1 blocks pools younger than 14 days with
@@ -49,7 +49,10 @@ registry then warms for 24 h unless a sibling vouches.
 
 Usage, from the live checkout root, only after ``.\\scripts\\start_local_paper.ps1
 -Action Stop`` has completed (it prints "All owned PAPER services stopped and
-flushed."); copy the journal after they stopped:
+flushed."). Run it in place on the live journal; do not copy it. The tool opens
+the journal read-only ('rb') and never writes it, and nothing appends to it
+while the services are stopped, so a copy (tens of GB) only costs disk and
+minutes of the 60-minute coverage window:
     .venv\\Scripts\\python.exe scripts\\build_ticker_registry_seed.py
         --journal .runtime\\accounts\\training\\observations.jsonl
         --out .runtime\\accounts\\state.ticker_registry.json
@@ -349,7 +352,8 @@ def replay_minutes_argument(value) -> float:
 
 def main(argv=None, *, clock=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--journal', required=True, type=Path, help='copy of training observations.jsonl (read only)')
+    parser.add_argument('--journal', required=True, type=Path,
+                        help='training observations.jsonl, read in place (read only; services stopped)')
     parser.add_argument('--out', required=True, type=Path, help='new sidecar path; must not exist')
     parser.add_argument('--replace-stale', action='store_true',
                         help=('replace an existing --out only when its coverage at the wall clock is not '

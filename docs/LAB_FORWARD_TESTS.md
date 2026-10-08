@@ -46,27 +46,39 @@ The frozen hashes, with the Lab's default cost model:
 
 | Book | `lab_config_hash` |
 |---|---|
-| `LAB_A_SURGE_EST_GUARD` | `c6ccc2db34023c31671d8c001b9f755691260ebaf3953523a6062ebeb9a3447b` |
-| `RND_LAB_A` | `3ee45c0f1133604234470e9a98028587b1e639ed461091be266bf511f538c4bb` |
-| `LAB_B_DIP_MKTDIP_GUARD` | `9861b19f342fb44a08ec51fd40e2c5b94c8451e680294ceeb438ff7afd80c383` |
-| `RND_LAB_B` | `82bd8fba714b935724c8dfe9034f13f14bfd4e1813859ae60ec87ce92308164b` |
+| `LAB_A_SURGE_EST_GUARD` | `4be3a080fcee4abad0decb023bcf4bbbd6616aa211a40da18d22f542da848665` |
+| `RND_LAB_A` | `c8d501ef27d8cee39b00b90b3e01a1a7e88b3aa24bef611582b34c1c43579514` |
+| `LAB_B_DIP_MKTDIP_GUARD` | `da426cd42aa7a1fe7ef7719054a65522223cf819034983ed0b414db7b63c70f4` |
+| `RND_LAB_B` | `457858b25b0c15e98772543e384f1effcc568e09c705926a25787cb784815261` |
 
 The canonical parameters of every book include the signal carry
-(`LAB_FORWARD_SIGNAL_CARRY_V1`), the hypothesis-control protocol
-(`LAB_FORWARD_CONTROL_CONTINUITY_V1`) and the research-fill basis
-(`LAB_FORWARD_FILL_BASIS_V1`, with the kill rule's two bases and its bootstrap minimum),
-described below. No close exists under the earlier hashes: the PR had not run when they
-changed.
+(`LAB_FORWARD_SIGNAL_CARRY_V1`, including that these books never request the Lab's
+Jupiter price probe), the hypothesis-control protocol
+(`LAB_FORWARD_CONTROL_CONTINUITY_V1`), the research-fill basis
+(`LAB_FORWARD_FILL_BASIS_V1`, with the kill rule's two bases and its bootstrap minimum)
+and the close policy (`LAB_FORWARD_CLOSE_POLICY_V1`, including
+`LAB_FORWARD_MARK_LIQUIDITY_V1`), described below. No close exists under the earlier
+hashes: the PR had not run when they changed.
 
 The canonical parameters include the resolved Lab cost-model knobs
 (`NEO_LAB_GENERIC_DEX_FEE_BPS`, `NEO_LAB_BASE_SLIPPAGE_BPS`, `NEO_LAB_LATENCY_BUFFER_BPS`,
 `NEO_LAB_NETWORK_FEE_SOL`, `NEO_LAB_MAX_PRICE_IMPACT_PCT`; defaults 30, 10, 10, 0.0001
 and 20), read through the Lab's frozen cost-model copy `lab_paired_costs`. Admission,
 booking, the model-net exit triggers and net50 all depend on them. Setting any of them
-therefore produces new hashes, and so a new evidence sample. As a second check, the Lab
-compares its own resolved values with the hashed ones before every forward-test entry.
-On any difference it refuses the entry (`lab_forward_cost_model_mismatch`, with
-`cost_model_mismatched_fields`).
+therefore produces new hashes. Before every forward-test entry the Lab compares its own
+resolved values with the hashed ones (drift between `strategy_lab` and
+`lab_paired_costs`, or a non-finite knob) **and** with the pre-registered defaults
+(`PREREGISTERED_COST_MODEL`, literal in the module). Both modules read the same
+environment, so only the second comparison sees an override. On any difference it
+refuses the entry (`lab_forward_cost_model_mismatch`, with
+`cost_model_mismatched_fields`; fail closed): the books were pre-registered and pinned
+with the default model, and a test under another cost model needs new, versioned book
+ids (see [Changing the test](#changing-the-test-new-book-ids-not-a-new-hash-in-the-old-ledger)).
+`activity_config.lab_forward_tests` publishes `config_hashes`, `cost_model`,
+`preregistered_cost_model` and `cost_model_overrides` (the knobs that differ; empty
+when the hashes are the pinned ones). The first-deploy checklist in
+[PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) compares the published hashes with
+`strategy-lock.json`.
 
 A parameter change produces a new hash, which starts a new evidence sample. Closes under
 an old hash never count toward the kill rule or gate of the new hash. It does **not**
@@ -97,8 +109,19 @@ The tests pin these values, and so does `strategy-lock.json` (`lab_forward_tests
 Every forward entry needs the Lab's independent price cross-check with exact mint and
 pool identity (`pair_price_integrity`, GeckoTerminal, with the cached Jupiter
 tie-break). The check is asynchronous. On a cold reference it only queues a fetch and
-answers `review`; the forward books never request the RugCheck and Jupiter probe the
-tie-break needs, so the candidate is counted as `price_crosscheck_pending`. The fetch
+answers `review`; the candidate is counted as `price_crosscheck_pending`. The forward
+books never request the RugCheck and Jupiter probe the tie-break needs: `strategy_lab`
+schedules `schedule_jupiter_price_probe` on a `review` for every other book only. That
+probe runs `rug_guard.check` (an RPC `getAccountInfo` and a RugCheck fetch when nothing
+is cached) and a background Jupiter quote, and the random controls draw one or two
+arbitrary universe pools a minute, which the carry retries for up to 60 s; scheduling it
+for them would feed a steady stream of random pools into the RugCheck, RPC and Jupiter
+budget that main also uses. A forward signal therefore passes on the GeckoTerminal
+reference, or on a tie-break another book's probe already cached
+(`signal_carry.jupiter_probe` in every config hash; a review finding of 2026-10-08 found
+that the code scheduled the probe for these books too, contrary to this text, and
+`test_forward_books_never_schedule_the_jupiter_probe` now pins it without patching the
+probe away). The fetch
 worker is single-threaded and keeps 2.1 s between requests through a lock file that
 every local service shares (`NEO_PRICE_CHECK_DIR`), including main's prewarm of up to 4
 pools per scan. Main restamps every pool on each 3 s scan, so an observation lives for
@@ -297,6 +320,19 @@ these four books only:
   - Unknown liquidity keeps the shared impact.
   - The exit **triggers** are unchanged: the uncalibrated model net still decides, and
     a drained pool trips the stop.
+- **Missing liquidity is unknown, not drained (`LAB_FORWARD_MARK_LIQUIDITY_V1`).** The
+  exact-pair refresh (`lab_position_marks`, `mark_source` `DEXSCREENER_EXACT_POOL_API`)
+  turns a response without a `liquidity` field into `liquidityUsd` 0.0, and the research
+  evidence that 0 is terminal (F6) covers only the scan feed, not that endpoint. Read as
+  0, one such payload valued the pool at $1 of model liquidity (a 20% capped impact, a
+  model net near −21% that fires the stop of both hypotheses) and the drain-aware exit at
+  0, booking about −$200 and `close_kind` `drained`. For these books an exact-pair
+  refresh without `liquidity.usd` is therefore **no usable mark**: no exit trigger, no
+  booked valuation, no research-fill observation. The position stays `unavailable`
+  (`quote_unavailable_reason` `exact_pool_liquidity_unknown`, counted as unpriced) until a
+  usable mark arrives, and the vanished rule below closes a pool that never gives one. A
+  reported `liquidity.usd` of 0 is still a drain. Every other book keeps the shared
+  handling.
 - **Vanished pool.** A position closes as `VANISHED_NO_FRESH_MARK` at its last usable
   mark minus 10% when all of these hold:
   - it is held at least max hold + 10 min (70 min);
@@ -359,7 +395,9 @@ one leg per side:
   has no exit fill (`not_applicable_vanished`): the harness values a vanished pool at its
   last price minus the haircut, as booked.
 - **Observations.** The shared feed's observations of the exact pool and the exact-pair
-  refresh (`updatedAt`, as `PairHistory` counts them), each used once, oldest first. After
+  refresh (`updatedAt`, as `PairHistory` counts them), each used once, oldest first; an
+  exact-pair refresh without `liquidity.usd` is no observation
+  (`LAB_FORWARD_MARK_LIQUIDITY_V1`). After
   a close, a pool that left the feed is refreshed through the exact-pair path for the
   window. A leg with no observation past its window resolves on time, 30 s after the
   window (`resolve_grace_ms`).
@@ -375,6 +413,22 @@ difference to the booked P&L). These are the only fields written after a close, 
 about 90 s after it; the booked P&L, `net50_usd` and the balance never change (the
 retrospective-evidence pattern of `paper_training`). Shadows left pending by a restart are
 resolved on time by the first loop of the next process, from what they recorded.
+
+**Storage (`LAB_FORWARD_FILL_SHADOW_COMPACT_V1`).** Once the result is computed, the
+shadow drops its observation snapshots (`decision`, `first_later` and `fill` of both
+legs) and records `storage`. Each leg keeps its status, decision and fill prices and
+times, lag and observation counts; the result keeps the fill prices, times, quantity and
+the liquidity each fill was valued at (`entry_fill_liquidity_usd`,
+`exit_fill_liquidity_usd`). Nothing reads the snapshots after the valuation (the
+coverage counters read only the statuses). The Lab rewrites and fsyncs its whole ledger
+every loop, and the snapshots were the largest part of a forward close (measured in
+review on a LAB_A close: 8.9 KB, of which 2.8 KB was the shadow; 7.3 KB after
+compaction, with a 1.2 KB shadow). The rest is the record every Lab close carries,
+including the 1.3 KB `defensive_entry` decision, which is kept: for these books it holds
+the log-only heat metrics and the structural guard's inputs that the heat log-only
+evaluation needs. `strategy_lab.persistence` (`LAB_PERSIST_METRICS_V1`) publishes the last
+write's `ledger_bytes`, `compact_bytes`, `write_seconds` and `write_share_of_poll`, so the
+ledger's growth is visible before it slows the loop.
 
 What uses it:
 
@@ -609,7 +663,8 @@ episode counters are persisted in the ledger.
 Research-fill legs are persisted on the position and the close. A leg still pending at a
 restart keeps what it recorded (its first later observation); the new process scans the
 whole history once and resolves such legs on time (`quiet` with that observation, else
-`no_next_observation`), then completes the shadow.
+`no_next_observation`), then completes the shadow. `strategy_lab.persistence` is empty
+until the new process's first ledger write.
 
 ## Positions keep their recorded exits
 
@@ -648,3 +703,6 @@ therefore a new test only with **new, versioned book ids** (for example
 the existing ones. The existing books keep their history and stay as they are (retired,
 cash_exhausted or still running). A ledger is never edited or reset to restart a test.
 `KillRuleTests.test_a_new_config_hash_starts_a_new_sample_not_a_new_ledger` pins this.
+A `NEO_LAB_*` override alone never starts a test on these book ids: their entries fail
+closed (`lab_forward_cost_model_mismatch`) while the resolved model differs from the
+pre-registered one, and open positions keep exiting.

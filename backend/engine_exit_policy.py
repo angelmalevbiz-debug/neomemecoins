@@ -5,14 +5,29 @@ an exit intent, never a promise of the eventual proceeds through a price gap.
 """
 VERSION = 'HONEST_NET_EXIT_V1'
 ADAPTIVE_VERSION = 'GOLD_ADAPTIVE_NET_CANDIDATE_V1'
+# Named hold limits (unchanged values). The engine passes no override; only the
+# offline replay's labelled exit variants supply max_hold_minutes explicitly.
+FIXED_MAX_HOLD_MINUTES = 60
+ADAPTIVE_DEFAULT_MAX_HOLD_MINUTES = 60
+ABSOLUTE_MAX_HOLD_MINUTES = 120
+
+def max_hold_label(limit_minutes):
+    """Fixed-policy hold exit label: MAX_HOLD_60 live, MAX_HOLD_<limit> for an override."""
+    return f'MAX_HOLD_{float(limit_minutes):g}'
 
 def exit_reason(position, context, *, net_pct, peak_net_pct, hold_minutes,
-                stop_pct=5.0, take_profit_pct=10.0, policy='fixed'):
+                stop_pct=5.0, take_profit_pct=10.0, policy='fixed', max_hold_minutes=None):
     if net_pct <= -stop_pct:
         return 'STOP_LOSS_NET_TARGET'
     if policy == 'fixed':
         if net_pct >= take_profit_pct: return 'TAKE_PROFIT_10_NET'
-        if hold_minutes >= 60: return 'MAX_HOLD_60'
+        if max_hold_minutes is None:
+            if hold_minutes >= FIXED_MAX_HOLD_MINUTES: return 'MAX_HOLD_60'
+            return None
+        # An explicit override is labelled with its own limit, so a variant
+        # exit is never reported under the live 60-minute label.
+        limit = float(max_hold_minutes)
+        if hold_minutes >= limit: return max_hold_label(limit)
         return None
     if policy != 'adaptive': raise ValueError('unknown exit policy')
     conviction = float(context.get('conviction') or 0)
@@ -28,6 +43,8 @@ def exit_reason(position, context, *, net_pct, peak_net_pct, hold_minutes,
     trail = float(context.get('trail_pct') or 4)
     # Express trailing drawdown on the same net liquidation value as stop/TP.
     if peak_net_pct >= arm and 100+net_pct <= (100+peak_net_pct)*(1-trail/100): return 'ADAPTIVE_TRAILING'
-    if hold_minutes >= float(context.get('max_hold_minutes') or 60) and conviction < 72: return 'ADAPTIVE_MAX_HOLD'
-    if hold_minutes >= 120: return 'ABSOLUTE_MAX_HOLD'
+    limit = (float(context.get('max_hold_minutes') or ADAPTIVE_DEFAULT_MAX_HOLD_MINUTES)
+             if max_hold_minutes is None else float(max_hold_minutes))
+    if hold_minutes >= limit and conviction < 72: return 'ADAPTIVE_MAX_HOLD'
+    if hold_minutes >= ABSOLUTE_MAX_HOLD_MINUTES: return 'ABSOLUTE_MAX_HOLD'
     return None

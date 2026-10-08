@@ -8,7 +8,17 @@ import math
 import re
 from typing import Any, Callable
 
-POLICY_VERSION = 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN'
+import promoted_entry_guard as promoted_guard
+
+# LAB_ACTIVE_V6: every Lab book admits a modeled round-trip cost of at most
+# half its net stop budget (promoted_guard.max_entry_cost_pct), the cap the
+# funded books already used. V5 TEST books admitted up to 2.75% against a 3%
+# net stop (median gross headroom 0.28%; 40.4% of 1,398 stops fired on moves
+# under 1%). Fewer entries are expected and are reported as cost-infeasible
+# candidates, never answered by raising the cap. Existing ledgers, balances
+# and open positions are untouched; only new closes carry this version.
+POLICY_VERSION = 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP'
+PREVIOUS_POLICY_VERSION = 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN'
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
 SCALPER_REENTRY_SECONDS = 600
@@ -20,6 +30,8 @@ RUSH_LOSS_REENTRY_SECONDS = 90
 RUSH_MIN_NOTIONAL_USD = 5.0
 RUSH_MAX_BALANCE_FRACTION = .35
 MAX_FEED_AGE_MS = 20_000
+# Absolute ceiling of the research cost model (the V5 TEST admission cap). It
+# bounds what a caller may request; admission uses admission_cost_cap_pct.
 MAX_ENTRY_COST_PCT = 2.75
 MIN_NOTIONAL_USD = 10.0
 ADDRESS = re.compile(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$')
@@ -111,6 +123,13 @@ RULES = {
     'SECOND_WAVE': EntryRule(85, 30000, (1, 18), 1.0, .06, (2, 1e7), (5, 180), (.1, 7), flow_trades=3, flow_ratio=1.4),
     'CLEAN_MOMENTUM': EntryRule(87, 30000, (1, 25), 1.05, .06, (2, 1e7), volume_liquidity=(.12, 5), flow_ratio=1.25),
     'CONFLUENCE_MAX': EntryRule(90, 40000, (0, 18), 1.1, .12, (2, 1e7), (-15, 1000), (.12, 6), flow_trades=4, flow_ratio=1.6, wallets=3),
+    # COST_FIRST_ESTABLISHED_V1 book pair (cost_first_established.BOOK_IDS). The
+    # universe is physical (PumpSwap fee tier <= 50 bps, liquidity >= $250k,
+    # modeled fee+impact round trip <= 1.2%) and is evaluated by that module in
+    # strategy_lab; these registry rules only restate the liquidity floor and
+    # supply the shared cooldown/notional policy. Score is not a gate.
+    'COST_FIRST_CONTROL': EntryRule(0, 250000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
+    'COST_FIRST_SCALED': EntryRule(0, 250000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
 }
 
 
@@ -184,6 +203,28 @@ def usable_feed_coin(coin: dict, now: int) -> bool:
             and stamp > 0 and -5000 <= now - stamp <= MAX_FEED_AGE_MS)
 
 
+def admission_cost_cap_pct(stop_loss_pct: float) -> float:
+    """Round-trip cost cap for every Lab book: 0.5 x the net stop (1.5% at a 3% stop).
+
+    Shared with the funded books through promoted_entry_guard so one stop has
+    one cap in this process. The result is also bounded by MAX_ENTRY_COST_PCT.
+    """
+    cap = number(promoted_guard.max_entry_cost_pct(stop_loss_pct))
+    return min(cap, MAX_ENTRY_COST_PCT) if cap > 0 else 0.0
+
+
+def stop_headroom_pct(stop_loss_pct: float, roundtrip_pnl_pct: float) -> float | None:
+    """Gross move the mark may fall before the net stop, after entry costs.
+
+    roundtrip_pnl_pct is the modeled net result of an immediate exit (<= 0).
+    None when either input is unknown; it is never replaced by zero.
+    """
+    stop, pnl = number(stop_loss_pct, math.nan), number(roundtrip_pnl_pct, math.nan)
+    if not math.isfinite(stop) or not math.isfinite(pnl) or stop <= 0:
+        return None
+    return round(stop + min(0.0, pnl), 6)
+
+
 def affordable_entry(coin: dict, balance: float, limit: float,
                      entry: Callable, exit: Callable,
                      minimum_notional: float = MIN_NOTIONAL_USD,
@@ -225,8 +266,10 @@ def affordable_entry(coin: dict, balance: float, limit: float,
     return None
 
 
-def policy_config() -> dict:
-    return {'version': POLICY_VERSION, 'reentry_seconds': REENTRY_SECONDS,
+def policy_config(stop_loss_pct: float | None = None) -> dict:
+    cap = admission_cost_cap_pct(stop_loss_pct) if stop_loss_pct is not None else None
+    return {'version': POLICY_VERSION, 'previous_version': PREVIOUS_POLICY_VERSION,
+            'reentry_seconds': REENTRY_SECONDS,
             'loss_reentry_seconds': LOSS_REENTRY_SECONDS,
             'scalper_reentry_seconds': SCALPER_REENTRY_SECONDS,
             'scalper_loss_reentry_seconds': SCALPER_LOSS_REENTRY_SECONDS,
@@ -237,6 +280,11 @@ def policy_config() -> dict:
             'rush_loss_reentry_seconds': RUSH_LOSS_REENTRY_SECONDS,
             'rush_min_notional_usd': RUSH_MIN_NOTIONAL_USD,
             'rush_max_balance_fraction': RUSH_MAX_BALANCE_FRACTION,
-            'max_entry_roundtrip_cost_pct': MAX_ENTRY_COST_PCT,
+            'max_entry_roundtrip_cost_pct': cap if cap is not None else MAX_ENTRY_COST_PCT,
+            'admission_cost_cap_basis': 'promoted_guard.max_entry_cost_pct(stop_loss_net_pct)',
+            'admission_cost_cap_stop_fraction': promoted_guard.MAX_STOP_BUDGET_COST_FRACTION,
+            'model_cost_ceiling_pct': MAX_ENTRY_COST_PCT,
+            'previous_test_book_cost_cap_pct': MAX_ENTRY_COST_PCT,
+            'records_stop_headroom_pct': True,
             'feed_max_age_seconds': MAX_FEED_AGE_MS / 1000,
             'execution_basis': 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'}

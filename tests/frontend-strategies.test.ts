@@ -121,6 +121,43 @@ test('cost planning cannot conceal explicit safety failures, account pauses, or 
   assert.equal(labEntryView({ ...selected, portfolio_group: 'TEST' }).costLimited, false);
 });
 
+test('LAB_ACTIVE_V6: a TEST book whose candidates all exceed the shared cost cap says so instead of idling silently', () => {
+  const view = labEntryView({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 3, matched_candidates: 3, cost_rejected: 3, cost_infeasible_candidates: 3,
+    affordable_candidates: 0, max_entry_roundtrip_cost_pct: 1.5, stop_loss_net_pct: 3,
+    blocked_reason: 'modeled_roundtrip_cost_limit',
+  } });
+  assert.equal(view.costLimited, true);
+  assert.match(view.status, /Няма вход: 3 от 3 кандидата над лимита на разходите 1\.50%/);
+  assert.match(view.detail!, /0\.5 × нетен стоп 3\.00%/);
+  assert.match(view.detail!, /не са скрити/);
+  assert.match(view.detail!, /не се сваля/i);
+  assert.doesNotMatch(view.status, /печал|80%/);
+  // Without a positive rejected count the reason falls back to the plain label.
+  assert.equal(labEntryStatus({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 1, blocked_reason: 'modeled_roundtrip_cost_limit',
+  } }), 'Няма вход: моделираните разходи надхвърлят лимита');
+});
+
+test('LAB_ACTIVE_V6: the fee-and-buffer floor explains a TEST book too, but the funded-only summary never leaks to TEST books', () => {
+  const diagnostics = { signal_candidates: 2, affordable_candidates: 0,
+    cost_feasibility: { checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2,
+      minimum_model_roundtrip_cost_pct: 2.3, maximum_roundtrip_cost_pct: 1.5,
+      best_candidates: [{ model_cost_feasible: false }] } };
+  const view = labEntryView({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: diagnostics });
+  assert.equal(view.costLimited, true);
+  assert.match(view.status, /2\.30% > лимит 1\.50%/);
+  const funded = labEntryView({ ...book('EARLY', 250, 250, 'PROMOTED_PAPER'), entry_diagnostics: {
+    ...diagnostics, blocked_reason: 'promoted_verified_flow_unavailable',
+  } });
+  assert.equal(funded.costLimited, true);
+  const legacyOnly = labEntryView({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 2, affordable_candidates: 0, promoted_cost_feasibility: diagnostics.cost_feasibility,
+  } });
+  assert.equal(legacyOnly.costLimited, false);
+  assert.equal(legacyOnly.status, 'Проверява сигнал, цена и разходи');
+});
+
 test('a disconnected or stale backend is distinguished from a loaded strategy without entry opportunities', () => {
   const view = labEntryView(costlyBook(), false);
   assert.equal(view.status, 'Изчаква актуални данни от backend');

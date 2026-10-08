@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json, math, os, sys, threading, time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Callable
 import requests
@@ -8,6 +9,7 @@ from lab_paired_bridge import merge_paired_snapshot
 from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
 import promoted_entry_guard as promoted_guard
+import cost_first_established as cost_first
 import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -38,6 +40,7 @@ PROMOTED_ROLLING_WINDOW=8
 STRATEGY_START_BALANCES={
     'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100')),
     **{strategy_id:PROMOTED_ALLOCATION for strategy_id in PROMOTED_STRATEGIES},
+    **{strategy_id:cost_first.START_BALANCE_USD for strategy_id in cost_first.BOOK_IDS},
 }
 TRADE_NOTIONAL=float(os.getenv('NEO_LAB_TRADE_NOTIONAL','150'))
 POLL_SECONDS=float(os.getenv('NEO_LAB_POLL_SECONDS','2'))
@@ -53,6 +56,17 @@ RUSH_TRAIL_DRAWDOWN=2.5
 RUSH_LIQ_MIN_FRACTION=.65
 RUSH_FLOW_MAX_AGE_MS=12_000
 REENTRY_COOLDOWN_MIN=activity.REENTRY_SECONDS/60.0
+
+def lab_cost_cap_pct():
+    """LAB_ACTIVE_V6: one admission cap (0.5 x net stop) for every Lab book."""
+    return activity.admission_cost_cap_pct(STOP_LOSS)
+
+def cost_first_exit_reason(exits,net_pct,hold_minutes):
+    """Net-basis exits of one COST_FIRST book; gaps below the stop are not clamped."""
+    if net_pct<=-exits.stop_loss_net_pct: return exits.stop_reason
+    if net_pct>=exits.take_profit_net_pct: return exits.take_profit_reason
+    if hold_minutes>=exits.max_hold_minutes: return exits.max_hold_reason
+    return None
 
 # Realistic paper execution costs for Strategy Lab. These are applied equally to
 # every strategy so comparisons stay fair. The main engine remains untouched.
@@ -431,6 +445,12 @@ STRATEGIES=[
  {'id':'SECOND_WAVE','name':'Second Wave','rule':lambda f: f['score']>=90 and f['liq']>=30000 and 2<=f['m5']<=12 and 10<=f['h1']<=120 and f['flow']['ratio']>=1.7 and f['flow']['trades']>=4 and .15<=f['vol_liq']<=5},
  {'id':'CLEAN_MOMENTUM','name':'Clean Momentum','rule':lambda f: f['score']>=92 and f['liq']>=30000 and 3<=f['m5']<=18 and f['bs']>=1.2 and .20<=f['vol_liq']<=3.5 and f['flow']['ratio']>=1.5 and f['flow']['max_sell']<max(250,f['flow']['buy_usd']*.6)},
  {'id':'CONFLUENCE_MAX','name':'Confluence Max','rule':lambda f: f['score']>=95 and f['liq']>=40000 and 1<=f['m5']<=12 and f['h1']>-10 and f['bs']>=1.25 and f['lmc']>=.15 and .20<=f['vol_liq']<=4 and f['flow']['trades']>=5 and f['flow']['ratio']>=2.0 and f['flow']['unique_wallets']>=4 and f['flow']['max_sell']<max(200,f['flow']['buy_usd']*.45)},
+
+ # COST_FIRST_ESTABLISHED_V1: one isolated TEST book pair on a cost-defined
+ # universe (cost_first_established.py). Same universe, same evidence gates,
+ # different exits; never promoted automatically, no outcome is assumed.
+ {'id':cost_first.CONTROL_BOOK_ID,'name':cost_first.BOOK_NAMES[cost_first.CONTROL_BOOK_ID],'rule':activity.RULES[cost_first.CONTROL_BOOK_ID].matches},
+ {'id':cost_first.SCALED_BOOK_ID,'name':cost_first.BOOK_NAMES[cost_first.SCALED_BOOK_ID],'rule':activity.RULES[cost_first.SCALED_BOOK_ID].matches},
 ]
 def promoted_candidate_config():
     """Expose precisely the rules used at funded admission, never legacy lambdas."""
@@ -637,7 +657,10 @@ def update_positions(flows,feed):
         peak_net=max(num(pos.get('peak_net_pct'),total_live_pct),total_live_pct)
         entry_liq=num(pos.get('entry_liquidity_usd'))
         current_liq=num(coin.get('liquidityUsd'),num((coin.get('liquidity') or {}).get('usd'),math.nan))
-        if total_live_pct<=-STOP_LOSS:
+        cost_first_exits=cost_first.EXITS.get(pos.get('strategy_id',book.get('id')))
+        if cost_first_exits is not None:
+            reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)
+        elif total_live_pct<=-STOP_LOSS:
             reason='STOP_LOSS_3_NET'
         elif is_rush and entry_liq>0 and math.isfinite(current_liq) and 0<=current_liq<entry_liq*RUSH_LIQ_MIN_FRACTION:
             reason='RUSH_LIQUIDITY_COLLAPSE'
@@ -668,8 +691,24 @@ def update_positions(flows,feed):
                     'quote_age_ms':quote_age,'quote_unavailable_reason':None})
         if is_rush: pos['peak_net_pct']=peak_net
         if reason: close_position(book,pos,coin,reason)
+def cost_feasibility_summary(rows,cap):
+    """Fee-and-buffer planning floor of the matched candidates; never an admission."""
+    return {
+        'basis':'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL',
+        'is_execution_quote':False,'profitability_proven':False,
+        'excluded_costs':['price_impact','network_fees','rent'],
+        'checked_market_candidates':len(rows),
+        'fixed_cost_infeasible_candidates':sum(row['model_cost_feasible'] is False for row in rows),
+        'maximum_roundtrip_cost_pct':cap,
+        'minimum_model_roundtrip_cost_pct':min(
+            (row['minimum_model_roundtrip_cost_pct'] for row in rows
+             if row['minimum_model_roundtrip_cost_pct'] is not None),default=None),
+        'best_candidates':sorted(rows,key=lambda row:num(row['minimum_model_roundtrip_cost_pct'],math.inf))[:5],
+    }
+
 def maybe_open(feed,flows):
     now=now_ms()
+    cost_cap=lab_cost_cap_pct()
     STATE['strategy_lifecycle']=review_strategy_lifecycle(STATE['books'])
     by_pair={}
     for c in feed:
@@ -749,40 +788,53 @@ def maybe_open(feed,flows):
         promoted_price_rejected=0
         promoted_cost_rejected=0
         promoted_block_reasons={}
-        promoted_cost_examples=[]
+        cost_examples=[]
         promoted_candidate_branches={}
+        cost_first_rejections={}
+        cost_first_universe=0
         rule=activity.RULES[strategy['id']]
+        is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
+        is_cost_first=strategy['id'] in cost_first.BOOK_IDS
         for coin,features in candidates:
-            is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
-            matched=bool(branches) if is_promoted else rule.matches(features)
+            if is_cost_first:
+                # Physical cost universe. Confirmed flow, fresh safety, price
+                # identity and the Lab cost cap are still required below.
+                universe_rejections=cost_first.rejections(
+                    coin,cap_usd=entry_limit,minimum_notional_usd=min_notional)
+                matched=not universe_rejections
+                for reason in universe_rejections:
+                    cost_first_rejections[reason]=cost_first_rejections.get(reason,0)+1
+                cost_first_universe+=int(matched)
+            else:
+                matched=bool(branches) if is_promoted else rule.matches(features)
             if not matched:
-                if not is_promoted and rule.matches(features,require_flow=False):
+                if not is_promoted and not is_cost_first and rule.matches(features,require_flow=False):
                     flow_rejected+=1
                 else:
                     market_rejected+=1
                 continue
             signal_candidates+=1
+            # Transparent planning estimate for every book. It never grants
+            # admission, replaces a price check, or assumes a future gain.
+            feasibility=market_feasibility.execution_feasibility(
+                coin,cost_cap,
+                base_slippage_bps=BASE_SLIPPAGE_BPS,
+                latency_buffer_bps=LATENCY_BUFFER_BPS,
+                generic_dex_fee_bps=GENERIC_DEX_FEE_BPS)
+            cost_examples.append({
+                'symbol':coin.get('symbol'),'address':coin['address'],
+                'pairAddress':coin['pairAddress'],**feasibility})
             if is_promoted:
                 features={**features,'funded_candidate_branches':branches}
                 for branch in branches:
                     promoted_candidate_branches[branch]=promoted_candidate_branches.get(branch,0)+1
-                # This is a transparent planning estimate only. It never grants
-                # admission, replaces a price check, or assumes a future gain.
-                feasibility=market_feasibility.execution_feasibility(
-                    coin,promoted_guard.max_entry_cost_pct(STOP_LOSS),
-                    base_slippage_bps=BASE_SLIPPAGE_BPS,
-                    latency_buffer_bps=LATENCY_BUFFER_BPS,
-                    generic_dex_fee_bps=GENERIC_DEX_FEE_BPS)
-                promoted_cost_examples.append({
-                    'symbol':coin.get('symbol'),'address':coin['address'],
-                    'pairAddress':coin['pairAddress'],**feasibility})
             if sol_usd_from_coin(coin)<=0:
                 blocked_network+=1
                 continue
             risk=None
-            if is_promoted:
+            if is_promoted or is_cost_first:
                 flow_gate=promoted_guard.flow_admission(coin,features,now_ms())
                 if not flow_gate['allow']:
                     promoted_flow_rejected+=1
@@ -818,6 +870,12 @@ def maybe_open(feed,flows):
                 if candidate_limit<min_notional:
                     candidate_risk_rejected+=1
                     continue
+            if is_cost_first:
+                # Liquidity-scaled size only shrinks the Lab's own entry limit.
+                candidate_limit=cost_first.size_for(pair_liquidity_usd(coin),entry_limit)
+                if candidate_limit<min_notional:
+                    candidate_risk_rejected+=1
+                    continue
             validation=price_integrity.check(coin)
             if validation.get('status')=='review':
                 validation=cached_jupiter_tiebreak(validation,coin,now=now)
@@ -829,11 +887,11 @@ def maybe_open(feed,flows):
                         blocked_price+=1
                     continue
             if (validation.get('status')!='pass'
-                    or (is_promoted and (validation.get('mint')!=coin['address']
+                    or ((is_promoted or is_cost_first) and (validation.get('mint')!=coin['address']
                                          or validation.get('pair')!=coin['pairAddress']))
                     or (brain and (validation.get('mint')!=coin['address']
                                    or validation.get('pair')!=coin['pairAddress']))):
-                if is_promoted:
+                if is_promoted or is_cost_first:
                     promoted_price_rejected+=1
                     promoted_block_reasons['promoted_price_identity_unverified']=promoted_block_reasons.get('promoted_price_identity_unverified',0)+1
                 blocked_price+=1; continue
@@ -845,8 +903,7 @@ def maybe_open(feed,flows):
             proposed=activity.affordable_entry(
                 coin,balance,candidate_limit,entry_execution,exit_execution,
                 minimum_notional=min_notional,
-                max_entry_cost_pct=(promoted_guard.max_entry_cost_pct(STOP_LOSS)
-                                    if is_promoted else activity.MAX_ENTRY_COST_PCT),
+                max_entry_cost_pct=cost_cap,
             )
             if proposed is None:
                 blocked_cost+=1
@@ -854,7 +911,7 @@ def maybe_open(feed,flows):
                     promoted_cost_rejected+=1
                     promoted_block_reasons['promoted_cost_headroom_insufficient']=promoted_block_reasons.get('promoted_cost_headroom_insufficient',0)+1
                 continue
-            if is_promoted:
+            if is_promoted or is_cost_first:
                 cost_gate=promoted_guard.cost_admission(proposed['initial_pnl_pct'],STOP_LOSS)
                 if not cost_gate['allow']:
                     blocked_cost+=1
@@ -874,7 +931,37 @@ def maybe_open(feed,flows):
             'price_crosscheck_pending':price_crosscheck_pending,
             'flow_missing_candidates':flow_rejected,
             'risk_limited_notional_usd':round(entry_limit,4),
+            'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
+                                    else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
+                                    else activity.POLICY_VERSION),
+            'max_entry_roundtrip_cost_pct':cost_cap,
+            'stop_loss_net_pct':(cost_first.EXITS[strategy['id']].stop_loss_net_pct
+                                 if is_cost_first else STOP_LOSS),
+            'cost_infeasible_candidates':blocked_cost,
+            'cost_feasibility':cost_feasibility_summary(cost_examples,cost_cap),
         }
+        if is_cost_first:
+            book['entry_diagnostics'].update({
+                'cost_first':{
+                    'version':cost_first.VERSION,
+                    'universe_version':cost_first.UNIVERSE_VERSION,
+                    'universe_candidates':cost_first_universe,
+                    'universe_rejections':cost_first_rejections,
+                    'flow_rejected':promoted_flow_rejected,
+                    'safety_rejected':promoted_safety_rejected,
+                    'price_rejected':promoted_price_rejected,
+                    'size_rejected':candidate_risk_rejected,
+                    'block_reasons':promoted_block_reasons,
+                    'exits':asdict(cost_first.EXITS[strategy['id']]),
+                    'automatic_promotion':cost_first.AUTOMATIC_PROMOTION,
+                    'profitability_proven':False,
+                },
+                'evidence_guard_version':promoted_guard.VERSION,
+            })
+            if signal_candidates==0:
+                book['entry_diagnostics']['blocked_reason']='no_market_signal'
+            elif not eligible and promoted_block_reasons:
+                book['entry_diagnostics']['blocked_reason']=next(iter(promoted_block_reasons))
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             book['entry_diagnostics'].update({
                 'promoted_policy_version':promoted_guard.FUNDED_POLICY_VERSION,
@@ -888,22 +975,8 @@ def maybe_open(feed,flows):
                 'promoted_cost_rejected':promoted_cost_rejected,
                 'promoted_block_reasons':promoted_block_reasons,
                 'promoted_max_entry_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
-                'promoted_cost_feasibility':{
-                    'basis':'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL',
-                    'is_execution_quote':False,'profitability_proven':False,
-                    'excluded_costs':['price_impact','network_fees','rent'],
-                    'checked_market_candidates':len(promoted_cost_examples),
-                    'fixed_cost_infeasible_candidates':sum(
-                        row['model_cost_feasible'] is False for row in promoted_cost_examples),
-                    'maximum_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
-                    'minimum_model_roundtrip_cost_pct':min(
-                        (row['minimum_model_roundtrip_cost_pct']
-                         for row in promoted_cost_examples
-                         if row['minimum_model_roundtrip_cost_pct'] is not None),default=None),
-                    'best_candidates':sorted(
-                        promoted_cost_examples,key=lambda row:
-                        num(row['minimum_model_roundtrip_cost_pct'],math.inf))[:5],
-                },
+                'promoted_cost_feasibility':cost_feasibility_summary(
+                    cost_examples,promoted_guard.max_entry_cost_pct(STOP_LOSS)),
                 'profitability_proven':False,
             })
             if signal_candidates==0:
@@ -942,10 +1015,15 @@ def maybe_open(feed,flows):
         if not eligible:
             if blocked_network:
                 book['entry_diagnostics']['blocked_reason']='network_price_unknown'
+            elif (not book['entry_diagnostics'].get('blocked_reason')
+                    and checked>0 and blocked_cost==checked):
+                # LAB_ACTIVE_V6: every checked candidate exceeded the cost cap.
+                # This is reported, never hidden and never answered by a looser cap.
+                book['entry_diagnostics']['blocked_reason']='modeled_roundtrip_cost_limit'
             continue
         rank=(lambda item:(num((item[6] or {}).get('final_score')),item[0],item[1])) if strategy['id']==rush_brain.STRATEGY_ID else (lambda item:(item[0],item[1]))
         _,_,coin,features,proposed,validation,brain,risk,candidate_limit=max(eligible,key=rank)
-        if book.get('portfolio_group')=='PROMOTED_PAPER':
+        if is_promoted or is_cost_first:
             # Provider work may outlast the short evidence window. Its clock
             # cannot make a new safety receipt future-dated or revive old flow.
             commit_now=now_ms()
@@ -961,6 +1039,7 @@ def maybe_open(feed,flows):
             book['entry_diagnostics']['risk_limited_notional_usd']=round(candidate_limit,4)
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
+        position_stop=cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first else STOP_LOSS
         qty=num(opening['quantity'])
         capital_basis=num(opening['capital_committed_usd'])
         book['trade_seq']=int(book.get('trade_seq',0))+1
@@ -989,10 +1068,15 @@ def maybe_open(feed,flows):
             'quote_status':'fresh','mark_received_at':stamp,
             'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','quote_age_ms':0,
             'price_crosscheck':validation,
-            'entry_policy_version':(promoted_guard.FUNDED_POLICY_VERSION
-                                    if book.get('portfolio_group')=='PROMOTED_PAPER'
+            'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
+                                    else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
+            # LAB_ACTIVE_V6 records: the cap this entry had to satisfy and the
+            # gross move left before the net stop after modeled entry costs.
+            'entry_cost_cap_pct':cost_cap,
+            'stop_loss_net_pct':position_stop,
+            'stop_headroom_pct':activity.stop_headroom_pct(position_stop,proposed['initial_pnl_pct']),
             'entry_size_reduced':notional+0.02<candidate_limit,
             'pnl_pct':round(proposed['initial_pnl_pct'],3),
             'open_pnl_usd':round(proposed['initial_pnl_usd'],4),
@@ -1012,9 +1096,24 @@ def maybe_open(feed,flows):
             position['entry_evidence_guard_version']=promoted_guard.VERSION
             position['entry_candidate_rule']=promoted_candidate_config()[strategy['id']]
             position['entry_matched_candidate_branches']=features['funded_candidate_branches']
+        if is_cost_first:
+            exits=cost_first.EXITS[strategy['id']]
+            position.update({
+                'verified_entry_flow':features.get('verified_flow'),'risk_guard':risk,
+                'entry_evidence_guard_version':promoted_guard.VERSION,
+                'promotion_eligible':False,
+                'entry_universe_version':cost_first.UNIVERSE_VERSION,
+                'entry_universe':cost_first.describe(coin,cap_usd=entry_limit,minimum_notional_usd=min_notional),
+                'entry_size_rule':cost_first.config()['size_rule'],
+                'entry_liquidity_usd':pair_liquidity_usd(coin),
+                'exit_policy_label':exits.label,'exit_parameters':asdict(exits),
+            })
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
 
+
+ACTIVE_POLICY_VERSIONS=frozenset({activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION,
+                                  cost_first.ENTRY_POLICY_VERSION})
 
 def stats(book):
     start=num(book.get('starting_balance'),START_BALANCE)
@@ -1037,8 +1136,8 @@ def stats(book):
             'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(p),
             'valuation_stale':valuation_stale,'mark_age_ms':mark_age_ms,
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),
-            'active_policy_trades':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION} for t in h),
-            'active_policy_wins':sum(t.get('entry_policy_version') in {activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION} and num(t.get('pnl_usd'))>0 for t in h),
+            'active_policy_trades':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS for t in h),
+            'active_policy_wins':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS and num(t.get('pnl_usd'))>0 for t in h),
             'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION for t in h),
             'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h)}
 
@@ -1059,7 +1158,7 @@ def persist(status='online',error=None):
     STATE['data_integrity_note']='Историята съдържа непотвърдени цени, включително XFUN. Не е доказателство за реална доходност. Новите входове минават независима проверка.'
     STATE['execution_basis']=EXECUTION_MODEL_VERSION
     STATE['execution_note']='DEX exact-pool spot marks with modeled fees, impact, slippage and latency; paper estimate only, no transaction is built, signed, or sent.'
-    STATE['activity_config']={**activity.policy_config(),'stop_loss_net_pct':STOP_LOSS,
+    STATE['activity_config']={**activity.policy_config(STOP_LOSS),'stop_loss_net_pct':STOP_LOSS,
                               'take_profit_net_pct':TAKE_PROFIT,'trade_limit_usd':TRADE_NOTIONAL,
                               'rush_brain_version':rush_brain.VERSION,
                               'rush_research_target_win_rate_pct':rush_brain.TARGET_WIN_RATE_PCT,
@@ -1070,6 +1169,7 @@ def persist(status='online',error=None):
                               'rush_low_cap_max_notional_usd':rush_brain.LOW_CAP_MAX_NOTIONAL_USD}
     STATE['activity_config']['promoted_entry_policy']=promoted_guard.funded_policy_config(
         STOP_LOSS,promoted_candidate_config())
+    STATE['activity_config']['cost_first_established']=cost_first.config()
     STATE['activity_config'].update({
         'rush_stop_loss_net_pct':STOP_LOSS,'rush_take_profit_net_pct':RUSH_TAKE_PROFIT,
         'rush_max_hold_minutes':RUSH_MAX_HOLD_MIN,'rush_trail_arm_net_pct':RUSH_TRAIL_ARM,

@@ -1,0 +1,67 @@
+{
+ "exit_variants": {
+  "disable_exit_impact_emergency=1": {
+   "closed_trades": 0,
+   "final_valuation_status": "unavailable",
+   "note": "no recorded marks exist after the live exit; the held position cannot be valued past it and stays unknown risk",
+   "open_positions": 1
+  },
+  "max_hold_minutes=0.2": {
+   "closed_at": 1791410015000,
+   "closed_trades": 1,
+   "exit_reason": "MAX_HOLD_60",
+   "pnl_usd": -6.2214
+  },
+  "stop_pct=3": {
+   "closed_at": 1791410015000,
+   "closed_trades": 1,
+   "exit_reason": "STOP_LOSS_NET_TARGET",
+   "pnl_usd": -6.2214
+  },
+  "take_profit_pct=1": {
+   "closed_at": 1791410002200,
+   "closed_trades": 1,
+   "exit_reason": "TAKE_PROFIT_10_NET",
+   "pnl_usd": 2.7786
+  }
+ },
+ "live_ledger": {
+  "closed_trades": [
+   {
+    "closed_at": 1791410030000,
+    "entry_cost_usd": 0.2214,
+    "exit_net_proceeds_usd": 197.5,
+    "exit_reason": "EXIT_IMPACT_EMERGENCY",
+    "jupiter_token_raw_amount": 9368622000,
+    "label": "mark_3_live_exit",
+    "notional_usd": 200.0,
+    "opened_at": 1791410000000,
+    "pnl_usd": -2.7214
+   }
+  ],
+  "open_positions": 0,
+  "wait_rows": {
+   "0de192db15eb0a6d9ba9b5e0dfa51e53232eb677733265f1cc8da54136f690cc": [
+    "cooldown"
+   ],
+   "9202d6be8651d33527b19dc0f5141e9eafdb73a0b349f62e7474cf6fb39b85dc": [
+    "promoted_verified_flow_stale"
+   ],
+   "d0f75ae77ed480622f1e53333f620fa7f813d1546260599cf92c9c203403793b": [
+    "promoted_buy_pressure_unconfirmed"
+   ],
+   "e6c80e9e43e2c63b5296a832c59055960361509b80cf89aa987cb52254c273a8": [
+    "risk_check_pending"
+   ]
+  }
+ },
+ "recorded_timing": {
+  "candidate_signal_age_ms_at_row": 8300,
+  "commit_feed_signal_age_ms": 3000,
+  "final_buy_age_ms_at_row": 255,
+  "preflight_buy_age_ms_at_row": 4650,
+  "preview_sale_age_ms_at_row": 2450,
+  "safety_age_ms_at_row": 47000
+ },
+ "version": "REPLAY_IDENTITY_V1"
+}

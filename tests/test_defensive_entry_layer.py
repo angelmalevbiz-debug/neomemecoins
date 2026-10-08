@@ -253,18 +253,46 @@ class StructuralRugGuardRuleTests(unittest.TestCase):
         cases = [{'liquidityUsd': None}, {'liquidityUsd': float('nan')}, {'liquidityUsd': 0},
                  {'marketCap': None, 'fdv': None}, {'marketCap': 0, 'fdv': 0}, {'marketCap': -1, 'fdv': None},
                  {'pairCreatedAt': None}, {'pairCreatedAt': self.NOW}, {'pairCreatedAt': self.NOW + 1},
-                 {'pairCreatedAt': 'x'}, {'symbol': None}, {'symbol': '\U0001f438\U0001f438'}, {'address': ''},
-                 {'pairAddress': None}, {'liquidityUsd': True},
-                 # The feed's placeholder for a missing symbol is a missing ticker.
-                 {'symbol': 'TOKEN'}, {'symbol': 'Token!'}]
+                 {'pairCreatedAt': 'x'}, {'address': ''},
+                 {'pairAddress': None}, {'liquidityUsd': True}]
         for change in cases:
             with self.subTest(change=change):
                 result = guard.check(self.coin(**change), self.NOW, registry)
                 self.assertTrue(result['blocked'])
                 self.assertEqual(result['reasons'], ['rug_input_unknown'])
+        # A pool under 14 days needs its ticker (rules 5 and 6); the feed's placeholder
+        # for a missing symbol is a missing ticker.
+        for symbol in (None, '\U0001f438\U0001f438', 'TOKEN', 'Token!', '$', ''):
+            with self.subTest(symbol=symbol):
+                result = guard.check(self.coin(symbol=symbol, pairCreatedAt=self.NOW - 3 * DAY), self.NOW, registry)
+                self.assertEqual(result['reasons'], ['rug_input_unknown'])
         # A missing ticker registry is an unknown input too.
         self.assertEqual(guard.check(self.coin(), self.NOW, None)['reasons'], ['rug_input_unknown'])
         self.assertFalse(guard.check(self.coin(), self.NOW, registry)['blocked'])
+
+    def test_an_established_pool_is_judged_without_a_usable_ticker(self):
+        # The reviewed case: a 30-day-old pool ($3M liquidity, $31M market cap) on a covered
+        # registry passed as 'TROLL' and was rug_input_unknown as 'TOKEN', an emoji, '$' or None.
+        registry = covered_registry(self.NOW)
+        sane = dict(liquidityUsd=3_000_000, marketCap=31_000_000, pairCreatedAt=self.NOW - 30 * DAY)
+        self.assertEqual(guard.check(self.coin(symbol='TROLL', **sane), self.NOW, registry)['reasons'], [])
+        for symbol in ('TOKEN', 'Token', '\U0001f438', '$', None, ''):
+            with self.subTest(symbol=symbol):
+                result = guard.check(self.coin(symbol=symbol, **sane), self.NOW, registry)
+                self.assertEqual((result['reasons'], result['blocked'], result['ticker']), ([], False, None))
+                # Rules 2-4 still apply without a ticker.
+                lp = guard.check(self.coin(symbol=symbol, **dict(sane, liquidityUsd=31_000_000)), self.NOW, registry)
+                self.assertEqual(lp['reasons'], ['rug_lp_pullable'])
+        # Boundary: from exactly 14 days no ticker is read; one millisecond younger needs one.
+        self.assertEqual(guard.check(self.coin(symbol='TOKEN', pairCreatedAt=self.NOW - 14 * DAY), self.NOW,
+                                     registry)['reasons'], [])
+        self.assertEqual(guard.check(self.coin(symbol='TOKEN', pairCreatedAt=self.NOW - 14 * DAY + 1), self.NOW,
+                                     registry)['reasons'], ['rug_input_unknown'])
+        # Placeholders and empty tickers are still never registered.
+        self.assertFalse(registry.observe_coin(self.coin(symbol='TOKEN', **sane), self.NOW))
+        self.assertFalse(registry.observe_coin(self.coin(symbol='\U0001f438', **sane), self.NOW))
+        self.assertEqual(len(registry), 0)
+        self.assertIn('pair age < 14 days', guard.config()['ticker_input_rule'])
 
     def test_market_cap_falls_back_to_fdv_and_liquidity_to_the_dex_shape(self):
         registry = guard.TickerRegistry()
@@ -516,6 +544,53 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
                                                              'corrupt.ticker_registry.json': 'CORRUPT'}})
         self.assertEqual(len(other), 0)
 
+    def test_a_short_current_sidecar_left_before_the_seed_still_adopts_a_sibling(self):
+        # The services ran 40 min before the first-deploy seed, then were stopped and main's
+        # sidecar was rebuilt: the Lab's own sidecar is current but only 40 min long, so at its
+        # restart it still merges main's and adopts its 30 h, instead of warming for 24 h.
+        main_sidecar = Path(self.tmp.name) / 'state.ticker_registry.json'
+        lab_sidecar = Path(self.tmp.name) / 'strategy_lab.ticker_registry.json'
+        seeded = guard.TickerRegistry(main_sidecar, clock=lambda: self.clock)
+        seeded.observe_coin(self.coin(OTHER_MINT, OTHER_PAIR, 'DOTF'), self.clock - 20 * 60 * MINUTE)
+        cover(seeded, self.clock - 30 * 60 * MINUTE, self.clock - 10 * MINUTE)
+        self.assertTrue(seeded.flush())
+        short = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock)
+        short.observe_coin(self.coin('Q' * 44, 'R' * 44, 'OWN'), self.clock - 30 * MINUTE)
+        cover(short, self.clock - 45 * MINUTE, self.clock - 5 * MINUTE)
+        self.assertTrue(short.flush())
+        lab = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock, seed_paths=(main_sidecar,))
+        status = lab.status()
+        self.assertEqual(status['seed']['sources'], {'state.ticker_registry.json': 'SEEDED'})
+        self.assertEqual((status['coverage']['covered_since'], status['coverage']['observed_until']),
+                         (self.clock - 30 * 60 * MINUTE, self.clock - 5 * MINUTE))
+        self.assertEqual(status['coverage']['adopted_from'], 'state.ticker_registry.json')
+        self.assertFalse(status['coverage']['warming'])
+        self.assertEqual(len(lab), 2)
+        # Without a current sibling the short sidecar keeps its own span; a lapsed sibling
+        # still adds its sightings.
+        lab_sidecar.unlink()
+        short = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock)
+        cover(short, self.clock - 45 * MINUTE, self.clock - 5 * MINUTE)
+        self.assertTrue(short.flush())
+        lapsed = Path(self.tmp.name) / 'live_tape.ticker_registry.json'
+        lapsed_registry = guard.TickerRegistry(lapsed, clock=lambda: self.clock)
+        lapsed_registry.observe_coin(self.coin(OTHER_MINT, 'S' * 44, 'DOTF'), self.clock - 5 * 60 * MINUTE)
+        cover(lapsed_registry, self.clock - 30 * 60 * MINUTE, self.clock - 3 * 60 * MINUTE)
+        self.assertTrue(lapsed_registry.flush())
+        lab = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock, seed_paths=(lapsed,))
+        coverage = lab.status()['coverage']
+        self.assertEqual((coverage['covered_since'], coverage['observed_until'], coverage['adopted_from']),
+                         (self.clock - 45 * MINUTE, self.clock - 5 * MINUTE, None))
+        self.assertTrue(coverage['warming'])
+        self.assertEqual(len(lab), 1, 'the lapsed sibling still adds its sighting')
+        # A sidecar that already vouches (current, >= 24 h) is not seeded.
+        lab_sidecar.unlink()
+        vouching = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock)
+        cover(vouching, self.clock - 25 * 60 * MINUTE, self.clock)
+        self.assertTrue(vouching.flush())
+        loaded = guard.TickerRegistry(lab_sidecar, clock=lambda: self.clock, seed_paths=(main_sidecar, lapsed))
+        self.assertEqual(loaded.status()['seed']['sources'], {})
+
     def test_every_service_seeds_from_the_other_services_sidecars(self):
         root = Path(self.tmp.name)
         env = {'NEO_MARKET_STATE_PATH': str(root / 'users' / 'u1' / 'state.json'),
@@ -633,6 +708,96 @@ class TickerRegistryCoverageTests(unittest.TestCase):
         self.assertEqual(guard.observation_time({'updatedAt': self.NOW + 4_000}, self.NOW), self.NOW)
         self.assertEqual(guard.observation_time({}, self.NOW), self.NOW)
 
+    def test_a_held_only_feed_does_not_extend_coverage(self):
+        # The reviewed probe: discovery down, the pairs endpoint up, one position open. A
+        # registry that saw only the held coin every minute for 30 h reported 30 h of coverage.
+        registry = guard.TickerRegistry()
+        held = dict(self.young(symbol='HELD'), sources=['open-position'])
+        pinned = dict(held, sources=['open-position-pinned-pair'])
+        start = self.NOW - 30 * self.HOUR
+        scans = 0
+        for minute in range(0, 30 * 60 + 1, 5):
+            stamp = start + minute * MINUTE
+            registry.observe([dict(held, updatedAt=stamp), dict(pinned, updatedAt=stamp)], stamp)
+            scans += 1
+        coverage = registry.coverage_status(self.NOW)
+        self.assertEqual((coverage['covered_since'], coverage['observed_until'], coverage['coverage_hours']),
+                         (None, None, 0.0))
+        self.assertTrue(coverage['warming'])
+        self.assertEqual((coverage['held_only_scans'], coverage['basis']), (scans, 'DISCOVERED_MARKET_ROWS_V2'))
+        # The held coin is still a real sighting.
+        self.assertEqual(len(registry), 1)
+        sibling = self.young(symbol='SIBL', address=OTHER_MINT, pairAddress=OTHER_PAIR)
+        self.assertEqual(guard.check(sibling, self.NOW, registry)['reasons'], ['rug_ticker_registry_warming'])
+        # A discovered row marks coverage at its own time; held rows in the same scan never set it.
+        market = dict(self.young(symbol='MKT', address='H' * 44, pairAddress='J' * 44),
+                      sources=['latest'], updatedAt=self.NOW - MINUTE)
+        registry.observe([market, dict(held, updatedAt=self.NOW)], self.NOW)
+        self.assertEqual(registry.coverage_status(self.NOW)['observed_until'], self.NOW - MINUTE)
+        # A held coin that discovery also returned carries a discovery source and counts.
+        registry.observe([dict(held, sources=['open-position', 'gecko-new-pools'], updatedAt=self.NOW + MINUTE)],
+                         self.NOW + MINUTE)
+        self.assertEqual(registry.coverage_status(self.NOW)['observed_until'], self.NOW + MINUTE)
+        # The Lab and the tape observe through the layer with the same rule.
+        layer = entry_defense.DefensiveEntryLayer(registry=guard.TickerRegistry())
+        for minute in range(0, 120, 5):
+            layer.observe([dict(held, updatedAt=start + minute * MINUTE)], start + minute * MINUTE)
+        self.assertIsNone(layer.status()['ticker_registry']['coverage']['observed_until'])
+        self.assertEqual(layer.status()['ticker_registry']['coverage']['held_only_scans'], 24)
+        # Rows without a source list (no production row) count as market rows.
+        for sources, expected in ((None, True), ([], True), (['latest'], True), ('open-position', False),
+                                  (['open-position'], False), (['open-position-pinned-pair', 'open-position'], False),
+                                  (['open-position', 'pumpswap-address-catalog'], True)):
+            with self.subTest(sources=sources):
+                coin = {'symbol': 'X'} if sources is None else {'symbol': 'X', 'sources': sources}
+                self.assertIs(guard.market_observation(coin), expected)
+        config = guard.config()['registry']['coverage']
+        self.assertEqual((config['basis_version'], config['held_position_sources']),
+                         ('DISCOVERED_MARKET_ROWS_V2', ['open-position', 'open-position-pinned-pair']))
+
+    def test_a_main_scan_that_only_refreshes_a_held_position_never_extends_coverage(self):
+        # scan_once with the discovery lists down (no addresses after the cache expired) and
+        # the pairs endpoint answering for the one open position.
+        assert_temporary(m.STATE_PATH)
+        m.STATE_PATH.unlink(missing_ok=True)
+        m.STATE = m.State()
+        monitor = m.Monitor()
+        self.addCleanup(monitor.stop)
+        registry = guard.TickerRegistry()
+        monitor._entry_defense = entry_defense.DefensiveEntryLayer(registry=registry)
+        now = m.now_ms()
+        m.STATE.positions = [{'id': 'held', 'address': MINT, 'pairAddress': PAIR, 'symbol': 'HELD'}]
+
+        def pair(mint, pool, symbol):
+            return {'chainId': 'solana', 'dexId': 'pumpswap', 'pairAddress': pool,
+                    'baseToken': {'address': mint, 'symbol': symbol}, 'quoteToken': {'address': SOL},
+                    'priceUsd': '0.04', 'priceNative': '0.0003', 'liquidity': {'usd': 500_000},
+                    'marketCap': 5_000_000, 'pairCreatedAt': now - 3 * DAY}
+        held_pair, other_pair = pair(MINT, PAIR, 'HELD'), pair(OTHER_MINT, OTHER_PAIR, 'OTHR')
+        common = (patch.object(m, 'gecko_new_pumpswap_pairs', return_value=[]),
+                  patch.object(monitor, 'maybe_open'), patch.object(monitor, 'prewarm_entry_checks'),
+                  patch.object(m.training_bridge, 'enabled', return_value=False))
+        for p in common:
+            p.start()
+            self.addCleanup(p.stop)
+        with patch.object(monitor.discovery, 'get', return_value=([], {})), \
+                patch.object(m, 'fetch_pairs', return_value=[held_pair]):
+            monitor.scan_once()
+        self.assertEqual(m.STATE.status, 'monitoring')
+        self.assertEqual([coin['sources'] for coin in m.STATE.feed], [['open-position']])
+        coverage = registry.coverage_status(now)
+        self.assertIsNone(coverage['observed_until'])
+        self.assertEqual((coverage['held_only_scans'], len(registry)), (1, 1))
+        # Discovery back: a discovered market row marks coverage again.
+        meta = {OTHER_MINT: {'sources': ['latest'], 'icon': '', 'header': '', 'description': '',
+                             'links': [], 'boost_amount': 0}}
+        with patch.object(monitor.discovery, 'get', return_value=([OTHER_MINT], meta)), \
+                patch.object(m, 'fetch_pairs', return_value=[held_pair, other_pair]):
+            monitor.scan_once()
+        self.assertEqual(m.STATE.status, 'monitoring')
+        self.assertIsNotNone(registry.coverage_status(m.now_ms())['observed_until'])
+        self.assertEqual(len(registry), 2)
+
     def test_coverage_survives_a_restart_and_a_cap_eviction_moves_its_start(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'state.ticker_registry.json'
@@ -655,11 +820,13 @@ class TickerRegistryCoverageTests(unittest.TestCase):
     def test_the_missing_symbol_placeholder_is_a_missing_ticker(self):
         made = m.make_coin(MINT, {'pairAddress': PAIR, 'priceUsd': 1, 'baseToken': {},
                                   'liquidity': {'usd': 500_000}, 'marketCap': 5_000_000,
-                                  'pairCreatedAt': self.NOW - 30 * DAY}, {})
+                                  'pairCreatedAt': self.NOW - 3 * DAY}, {})
         self.assertEqual(made['symbol'], 'TOKEN')
         registry = covered_registry(self.NOW)
         self.assertEqual(guard.check(made, self.NOW, registry)['reasons'], ['rug_input_unknown'])
         self.assertEqual(guard.check(self.young(symbol=None), self.NOW, registry)['reasons'], ['rug_input_unknown'])
+        # An established pool (>= 14 days) is never judged by tickers, so it needs none.
+        self.assertEqual(guard.check(dict(made, pairCreatedAt=self.NOW - 30 * DAY), self.NOW, registry)['reasons'], [])
         # Placeholders are never registered, so two unnamed mints are not each other's reuse.
         self.assertFalse(registry.observe_coin(made, self.NOW))
         self.assertEqual(len(registry), 0)
@@ -699,13 +866,111 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
         self.journal.write_text('\n'.join(lines) + '\n', encoding='utf-8')
         return self.journal.read_bytes()
 
-    def run_tool(self):
+    def run_tool(self, *flags, clock=None):
         from contextlib import redirect_stderr, redirect_stdout
         import io
         buffer = io.StringIO()
         with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
-            code = self.tool.main(['--journal', str(self.journal), '--out', str(self.out)])
+            code = self.tool.main(['--journal', str(self.journal), '--out', str(self.out), *flags], clock=clock)
         return code, json.loads(buffer.getvalue())
+
+    def held_rows(self, start, end, *, step=10 * MINUTE):
+        """Rows of one held coin only (discovery down): scan rows and position-mark rows."""
+        rows = []
+        stamp = start
+        while stamp <= end:
+            coin = {'address': MINT, 'pairAddress': PAIR, 'symbol': 'HELD', 'updatedAt': stamp,
+                    'sources': ['open-position']}
+            rows.append(json.dumps({'observed_at': stamp, 'coin': coin}))
+            rows.append(json.dumps({'observed_at': stamp, 'rejection_reasons': ['exit_quote'],
+                                    'coin': dict(coin, sources=['open-position-pinned-pair'])}))
+            # A valid mark of a held coin whose snapshot still carries its discovery source.
+            rows.append(json.dumps({'observed_at': stamp, 'rejection_reasons': [],
+                                    'source': {'execution_evidence': {'mark': {'quoted_at': stamp}}},
+                                    'coin': dict(coin, sources=['latest'])}))
+            stamp += step
+        return rows
+
+    def old_sidecar(self, *, covered_since, observed_until, pools=(('Q' * 44, 'R' * 44, 'OLDT'),)):
+        """A sidecar left by an earlier attempt (main ran before the seed, or a rolled-back deploy)."""
+        registry = guard.TickerRegistry(self.out, clock=lambda: observed_until)
+        for mint, pool, symbol in pools:
+            registry.observe_coin({'address': mint, 'pairAddress': pool, 'symbol': symbol}, covered_since)
+        cover(registry, covered_since, observed_until)
+        self.assertTrue(registry.flush())
+        return self.out.read_bytes()
+
+    def test_held_position_rows_never_extend_the_seed_coverage(self):
+        # The journal's market rows end; for 3 h only the held coin is journalled
+        # (scan rows under 'open-position' and its position-mark rows).
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
+        last_market = stamps[-1]
+        held = self.held_rows(last_market + 10 * MINUTE, last_market + 3 * guard.HOUR_MS)
+        self.write_journal(stamps, extra=held)
+        code, summary = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertEqual((summary['market_rows'], summary['held_position_rows']), (len(stamps) + 1, len(held)))
+        self.assertEqual(summary['coverage']['observed_until'], last_market)
+        self.assertEqual(summary['last_observed_at'], last_market + 3 * guard.HOUR_MS)
+        # At the journal's end the market coverage lapsed (3 h > 60 min): no 24 h vouching.
+        self.assertEqual(summary['coverage']['coverage_hours'], 0.0)
+        self.assertTrue(summary['coverage']['warming'])
+        self.assertEqual(summary['coverage_basis'], 'DISCOVERED_MARKET_ROWS_V2')
+        loaded = guard.TickerRegistry(self.out, clock=lambda: summary['last_observed_at'])
+        self.assertEqual(len(loaded), 7, 'the held coin is still a sighting')
+        self.assertEqual(loaded.coverage_ms(summary['last_observed_at']), 0.0)
+
+    def test_replace_stale_recovers_a_sidecar_left_by_an_earlier_attempt(self):
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
+        self.write_journal(stamps)
+        last = stamps[-1]
+        now = last + 20 * MINUTE
+        # The services ran 40 min before the seed: main's sidecar is current but only 40 min long.
+        old = self.old_sidecar(covered_since=last - 30 * MINUTE, observed_until=last + 10 * MINUTE)
+        with self.assertRaises(SystemExit):
+            self.run_tool(clock=lambda: now)
+        self.assertEqual(self.out.read_bytes(), old)
+        code, summary = self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual(code, 0)
+        replaced = summary['replaced']
+        self.assertEqual((replaced['status'], replaced['coverage_current'], replaced['merged_new_pools']),
+                         ('OK', True, 1))
+        backup = Path(replaced['backup'])
+        self.assertEqual(backup.name, f'state.ticker_registry.json.replaced-{now}')
+        self.assertEqual(backup.read_bytes(), old, 'the old sidecar is kept')
+        loaded = guard.TickerRegistry(self.out, clock=lambda: now)
+        self.assertEqual(len(loaded), 7, 'the old sightings are merged')
+        self.assertEqual(loaded.coverage_status(now)['covered_since'], self.T0)
+        self.assertFalse(summary['coverage_at_now']['warming'])
+        # Now the sidecar vouches (current, >= 24 h): it is never replaced.
+        written = self.out.read_bytes()
+        with self.assertRaises(SystemExit):
+            self.run_tool('--replace-stale', clock=lambda: now + MINUTE)
+        self.assertEqual(self.out.read_bytes(), written)
+
+    def test_replace_stale_accepts_a_lapsed_or_corrupt_sidecar_only(self):
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]
+        self.write_journal(stamps)
+        last = stamps[-1]
+        now = last + 30 * MINUTE
+        # 30 h of coverage that ended 61 min ago: not current, so it may be replaced.
+        self.old_sidecar(covered_since=now - 31 * guard.HOUR_MS, observed_until=now - 61 * MINUTE)
+        self.assertTrue(self.tool.existing_sidecar(self.out, now)['replaceable'])
+        code, summary = self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual((code, summary['replaced']['coverage_current']), (0, False))
+        for path in Path(self.tmp.name).glob('*.replaced-*'):
+            path.unlink()
+        # A corrupt sidecar is replaceable; its backup is kept byte for byte.
+        self.out.write_text('{broken', encoding='utf-8')
+        code, summary = self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual((code, summary['replaced']['status'], summary['replaced']['merged_new_pools']),
+                         (0, 'CORRUPT', 0))
+        self.assertEqual(Path(summary['replaced']['backup']).read_text(encoding='utf-8'), '{broken')
+        # A current sidecar of exactly 24 h vouches and is kept.
+        self.out.unlink()
+        self.old_sidecar(covered_since=now - 24 * guard.HOUR_MS, observed_until=now - 60 * MINUTE)
+        self.assertFalse(self.tool.existing_sidecar(self.out, now)['replaceable'])
+        self.assertTrue(self.tool.existing_sidecar(self.out, now + 1)['replaceable'])
 
     def test_a_continuous_journal_gives_a_covered_sidecar_and_the_journal_is_untouched(self):
         stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
@@ -2177,6 +2442,31 @@ class VersionAndReplayTests(unittest.TestCase):
         self.assertEqual((seats['rule'], seats['heat_veto_mode']), (tape_scheduler.SEAT_RULE, tape_scheduler.HEAT_SEAT_MODE))
         self.assertEqual(lock['learning']['score_version'], training.LEARNER_SCORE_VERSION)
         self.assertIn('scripts/build_ticker_registry_seed.py', lock['support_files_sha256'])
+        coverage = structural['registry_coverage']
+        self.assertEqual((coverage['basis_version'], coverage['held_position_sources']),
+                         (guard.REGISTRY_COVERAGE_BASIS, sorted(guard.HELD_POSITION_SOURCES)))
+        self.assertIn('pair age < 14 days', structural['ticker_input_rule'])
+
+    def test_owner_decision_on_loss_memory_at_seats_is_recorded_as_accepted(self):
+        # Owner decision (1), taken 2026-10-08 by the operator under the owner's delegation:
+        # POOL_LOSS_MEMORY_V1 is enforced per ledger at entry, not at shared tape seats.
+        import re
+        root = Path(__file__).resolve().parents[1]
+        lock_text = (root / 'strategy-lock.json').read_text(encoding='utf-8')
+        doc_text = (root / 'docs' / 'DEFENSIVE_ENTRY_LAYER.md').read_text(encoding='utf-8')
+        accepted = "ACCEPTED 2026-10-08 by the operator under the owner's delegation"
+        lock = json.loads(lock_text)
+        self.assertTrue(lock['tape_seat_policy']['defensive_entry_seats']['pool_loss_memory_owner_signoff']
+                        .startswith(accepted + ': one seat serves every ledger'))
+        self.assertIn(accepted, lock['defensive_entry']['pool_loss_memory']['tape_scheduler_scope'])
+        pending = re.compile(r"pending (the )?owner|needs the owner|owner'?s sign-off|\"PENDING\"", re.IGNORECASE)
+        for name, text in (('strategy-lock.json', lock_text), ('docs/DEFENSIVE_ENTRY_LAYER.md', doc_text)):
+            with self.subTest(file=name):
+                self.assertIsNone(pending.search(text), name)
+                self.assertIn(accepted, text)
+        # The behaviour matches the decision: the tape applies no ledger's loss memory.
+        self.assertEqual(lock['tape_seat_policy']['defensive_entry_seats']['pool_loss_memory_scope'],
+                         'NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY')
 
     def test_replay_labels_the_recorded_policy_and_refuses_unknown_modes(self):
         from main_replay import MainReplay

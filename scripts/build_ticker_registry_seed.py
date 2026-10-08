@@ -9,30 +9,49 @@ service registry starts empty, so without a seed every engine and Lab book
 would wait 24 h before entering any pool younger than 14 days.
 
 The main engine's training journal (``<runtime>/training/observations.jsonl``)
-records every scan coin with its mint, pool, symbol and observation time,
-which is what the research scan log (obs.sqlite3) was built from. This tool
-replays it through ``structural_rug_guard.TickerRegistry`` (same
-normalization, placeholder handling, 14-day pruning, 40,000-entry bound and
-60-minute coverage gap rule as the live registry) and writes a
-TICKER_REGISTRY_V2_COVERAGE sidecar. Coverage is the journal's continuous
-span ending at its last row, so the services must start within 60 minutes of
-that row for it to carry over (otherwise the sightings still count and
-coverage starts again).
+records the bounded scan feed (market_monitor.MAX_FEED = 90 coins after
+entry_quote_priority.bounded_feed; unchanged repeat polls within 3 s are
+coalesced) plus entry, probe and position rows, each with its mint, pool,
+symbol and observation time. Gecko new pools cut by the bound are not
+journalled, although main's live registry sees them in the untrimmed feed, so
+the seed is a Lab/tape-grade memory: the same trimmed view the Lab, the tape
+and the research scan log (obs.sqlite3, built from this journal) have.
 
-Usage (services stopped, as for every deploy):
+This tool replays the journal through ``structural_rug_guard.TickerRegistry``
+(same normalization, placeholder handling, 14-day pruning, 40,000-entry bound
+and 60-minute coverage gap rule as the live registry) and writes a
+TICKER_REGISTRY_V2_COVERAGE sidecar. Every valid row registers its sighting;
+coverage comes only from market rows (REGISTRY_COVERAGE_BASIS): a row whose
+coin sources name only a held position, or a position-mark row (rejection
+reason 'exit_quote' or a 'mark' quote), observes no market and never extends
+coverage. Coverage is the journal's continuous market span, so the services
+must start within 60 minutes of the printed ``coverage.observed_until`` for it
+to carry over (otherwise the sightings still count and coverage starts again).
+
+Usage (services stopped, as for every deploy; copy the journal after they stopped):
     python scripts/build_ticker_registry_seed.py \
-        --journal <runtime>/training/observations.jsonl \
+        --journal <copy of runtime/training/observations.jsonl> \
         --out <runtime>/state.ticker_registry.json
 
-The output must not exist (an existing sidecar is never replaced). The Lab and
-the tape seed from main's sidecar at their start, and personal engines through
-NEO_MAIN_MARKET_STATE_PATH.
+The output must not exist. An earlier attempt (services started before the
+seed, a rolled-back deploy, a failed first try) can leave a sidecar that does
+not vouch for anything yet; ``--replace-stale`` replaces an existing sidecar
+only when it is unreadable, carries no coverage, or its coverage at the
+wall clock is not current (last observation more than 60 min ago) or shorter
+than 24 h. A sidecar with current coverage of 24 h or more is never replaced.
+Before replacing, the old file is copied to ``<out>.replaced-<ms>`` (no
+service reads that name) and its readable sightings are merged into the new
+sidecar (a ticker registry is market memory, so a merge can only block more).
+The Lab and the tape seed from main's sidecar at their start, and personal
+engines through NEO_MAIN_MARKET_STATE_PATH.
 """
 import argparse
 import json
 import math
 import os
+import shutil
 import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +61,7 @@ import structural_rug_guard as guard  # noqa: E402
 
 VERSION = guard.REGISTRY_SEED_VERSION
 SOURCE_KIND = 'TRAINING_OBSERVATIONS_JOURNAL'
+MIN_COVERAGE_MS = guard.PARAMS.ticker_registry_min_coverage_minutes * 60_000
 
 
 def _stamp(value):
@@ -54,6 +74,15 @@ def _stamp(value):
     return result if math.isfinite(result) and result > 0 else None
 
 
+def position_mark_row(row: dict) -> bool:
+    """A held position's mark row (market_monitor.update_positions): no market observation."""
+    reasons = row.get('rejection_reasons')
+    if isinstance(reasons, (list, tuple)) and 'exit_quote' in reasons:
+        return True
+    evidence = (row.get('source') or {}).get('execution_evidence') if isinstance(row.get('source'), dict) else None
+    return isinstance(evidence, dict) and 'mark' in evidence
+
+
 def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS) -> tuple:
     """Replay one journal into an in-memory registry; returns (registry, summary). Never writes."""
     clock = {'now': 0}
@@ -61,7 +90,7 @@ def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS) -> tuple:
     # forced prune applies the 14-day retention and the entry cap exactly.
     registry = guard.TickerRegistry(None, clock=lambda: clock['now'], max_gap_ms=max_gap_ms,
                                     prune_interval_ms=guard.HOUR_MS)
-    rows = invalid = registered = 0
+    rows = invalid = registered = market_rows = held_rows = 0
     first = last = None
     with journal.open('r', encoding='utf-8', errors='replace') as handle:
         for line in handle:
@@ -81,7 +110,11 @@ def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS) -> tuple:
             stamp = guard.observation_time(coin, observed)
             clock['now'] = max(clock['now'], observed)
             registered += int(registry.observe_coin(coin, stamp))
-            registry.mark_observed(stamp)
+            if guard.market_observation(coin) and not position_mark_row(row):
+                registry.mark_observed(stamp)
+                market_rows += 1
+            else:
+                held_rows += 1
             registry.prune(observed)
             first = observed if first is None else min(first, observed)
             last = observed if last is None else max(last, observed)
@@ -89,32 +122,78 @@ def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS) -> tuple:
         registry.prune(last, force=True)
     coverage = registry.coverage_status(last)
     summary = {'version': VERSION, 'registry_version': guard.REGISTRY_VERSION, 'source_kind': SOURCE_KIND,
+               'coverage_basis': guard.REGISTRY_COVERAGE_BASIS,
                'journal': journal.name, 'journal_bytes': journal.stat().st_size, 'rows': rows,
-               'invalid_rows': invalid, 'new_pools_registered': registered, 'entries': len(registry),
+               'invalid_rows': invalid, 'market_rows': market_rows, 'held_position_rows': held_rows,
+               'new_pools_registered': registered, 'entries': len(registry),
                'first_observed_at': first, 'last_observed_at': last, 'coverage': coverage,
                'paper_only': True, 'is_entry_authorization': False}
     return registry, summary
 
 
-def main(argv=None) -> int:
+def existing_sidecar(path: Path, now) -> dict:
+    """Read-only verdict on an existing sidecar at ``now``: may it be replaced, and its rows."""
+    status, rows, coverage = guard.TickerRegistry.read_sidecar(path)
+    since = until = None
+    if coverage is not None:
+        _version, since, until, _resets = coverage
+    current = since is not None and until is not None and now - until <= guard.REGISTRY_MAX_GAP_MS
+    covered_ms = max(0.0, now - since) if current else 0.0
+    return {'status': status, 'rows': rows, 'covered_since': since, 'observed_until': until,
+            'coverage_current': current, 'coverage_hours': round(covered_ms / guard.HOUR_MS, 2),
+            # Only a sidecar that already vouches (current coverage of 24 h or more) is kept.
+            'replaceable': not (status == 'OK' and current and covered_ms >= MIN_COVERAGE_MS)}
+
+
+def main(argv=None, *, clock=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--journal', required=True, type=Path, help='copy of training observations.jsonl (read only)')
     parser.add_argument('--out', required=True, type=Path, help='new sidecar path; must not exist')
+    parser.add_argument('--replace-stale', action='store_true',
+                        help=('replace an existing --out only when its coverage at the wall clock is not '
+                              'current or under 24 h (or it is unreadable); a copy is kept as '
+                              '<out>.replaced-<ms> and its sightings are merged'))
     args = parser.parse_args(argv)
     journal, out = args.journal, args.out
+    now = (clock or (lambda: int(time.time() * 1000)))()
     if not journal.is_file():
         parser.error(f'journal not found: {journal}')
-    if out.exists():
-        parser.error(f'refusing to replace an existing file: {out}')
     if os.path.normcase(os.path.abspath(out)) == os.path.normcase(os.path.abspath(journal)):
         parser.error('the output cannot be the journal')
+    previous = None
+    if out.exists():
+        if not args.replace_stale:
+            parser.error(f'refusing to replace an existing file: {out} (an earlier attempt left it? '
+                         'see --replace-stale and docs/PAPER_RUNBOOK.md)')
+        if not out.is_file():
+            parser.error(f'refusing to replace a non-file: {out}')
+        previous = existing_sidecar(out, now)
+        if not previous['replaceable']:
+            parser.error(f'refusing to replace {out}: its coverage is current and '
+                         f'{previous["coverage_hours"]} h long (it already vouches)')
     registry, summary = build(journal)
     if summary['last_observed_at'] is None:
         print(json.dumps({**summary, 'written': False, 'reason': 'no valid journal rows'}, indent=2))
         return 1
+    replaced = None
+    if previous is not None:
+        backup = out.with_name(f'{out.name}.replaced-{int(now)}')
+        if backup.exists():
+            parser.error(f'refusing to overwrite an earlier backup: {backup}')
+        shutil.copy2(out, backup)
+        merged, skipped = registry.merge_rows(previous['rows'])
+        registry.prune(summary['last_observed_at'], force=True)
+        summary['entries'] = len(registry)
+        summary['coverage'] = registry.coverage_status(summary['last_observed_at'])
+        replaced = {'backup': str(backup), 'status': previous['status'],
+                    'covered_since': previous['covered_since'], 'observed_until': previous['observed_until'],
+                    'coverage_current': previous['coverage_current'],
+                    'coverage_hours': previous['coverage_hours'],
+                    'merged_new_pools': merged, 'skipped_rows': skipped}
     registry.path = out
     written = registry.save(summary['last_observed_at'])
-    print(json.dumps({**summary, 'out': str(out), 'written': written,
+    print(json.dumps({**summary, 'out': str(out), 'written': written, 'replaced': replaced,
+                      'coverage_at_now': registry.coverage_status(now),
                       'save_error': registry.status()['save_error']}, indent=2))
     return 0 if written else 1
 

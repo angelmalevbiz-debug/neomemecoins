@@ -77,14 +77,16 @@ TOKENS_PER_USD = 1_000_000  # fixture route: 1 token (6 decimals) per quoted USD
 DEFAULT_HASH_AT_69BE225 = 'fe08e29c142e0675cfbde9c6d4728a0a4429a64797fdec4ef7532ca6a183e62c'
 ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c200156fdefaeae4f3666ecdc4'
 # effective_config_hash of the three engine strategies with DEFENSIVE_ENTRY_LAYER_V1
-# (PR #23 after its third review: heat window coverage, 40,000-entry registry with
-# 24-hour coverage and TICKER_REGISTRY_SEED_V2; code defaults, no NEO_* overrides). Positions record this hash as
+# (PR #23 after its fourth review: heat window coverage, 40,000-entry registry with
+# 24-hour coverage from discovered market rows only (DISCOVERED_MARKET_ROWS_V2),
+# TICKER_REGISTRY_SEED_V2, a ticker required only under 14 days; code defaults, no
+# NEO_* overrides). Positions record this hash as
 # their audit identity, so an engine default, a profile field or a layer threshold may
 # only change together with these pins (and docs/DEFENSIVE_ENTRY_LAYER.md).
-DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '8651943d32eabfbc1cee77a7779507ceda52e95b2477e05c4da44188a1511f2d'
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'ab77b8b3caac19aca43e987d6d9c7c1952fe55cfb01a23f6bb6618fd9f7773bf'
 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
-    'c2ccd104269f1719ebe6c1f43f1f44efccd1e7421c026471194662f263d8f185')
-COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'a9c39b2609db177fa9b58256a9b4574c4f0c904b98b792094f0c5b11f1c48807'
+    '106f91c5f69252c030beaf1242d48d035551f36ae3459d98746201014ac3dcc0')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '8c2cd6eb8916f0a3b116ecfd0333a217373f2d2a7552c0b9dd131f630e7c70c2'
 
 
 def universe_coin(now, **overrides):

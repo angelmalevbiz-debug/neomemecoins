@@ -24,11 +24,12 @@ Evidence (research 2026-10-08 on 22.8 h of the engine's own scan log, PAPER):
 
 Rules, evaluated in this order (every rule that applies is recorded):
 1. ``rug_input_unknown``: liquidity, market cap (marketCap, else fdv), pair age
-   (pairCreatedAt at ``now``), mint, pool, normalized ticker or the ticker
-   registry is missing, non-finite or <= 0. The feed's placeholder for a
-   missing symbol ('TOKEN', see market_monitor.make_coin and the Gecko early
-   pools) is a missing ticker too, and is never registered. Evaluation stops
-   here.
+   (pairCreatedAt at ``now``), mint, pool or the ticker registry is missing,
+   non-finite or <= 0, or the pool is younger than 14 days and its normalized
+   ticker is missing (only rules 5 and 6 read the ticker, so an established
+   pool is judged without one). The feed's placeholder for a missing symbol
+   ('TOKEN', see market_monitor.make_coin and the Gecko early pools) is a
+   missing ticker too, and is never registered. Evaluation stops here.
 2. ``rug_lp_pullable``: liquidity / market cap >= 1.0 (the pool holds most of
    the supply; the creator controls the LP).
 3. ``rug_young_pool``: pair age < 720 min.
@@ -54,7 +55,11 @@ missing file starts empty and never stops the engine).
 Coverage (TICKER_REGISTRY_V2_COVERAGE): the sidecar keeps ``covered_since``
 (start of the current continuous observation) and ``observed_until`` (the
 newest market observation, from the feed's updatedAt, so a stale published
-feed does not extend it). A gap longer than 60 min restarts coverage: in the
+feed does not extend it). Only discovered market rows count
+(REGISTRY_COVERAGE_BASIS): a row whose sources name only a held position
+('open-position', 'open-position-pinned-pair') is registered but observes no
+market, so a discovery outage with a position open cannot keep coverage
+current. A gap longer than 60 min restarts coverage: in the
 research log the median other-mint sibling of a reused ticker was visible for
 about 1 min, and 82% of the reuse candidates had every sibling visible for
 less than 60 min, so a long gap can hide a whole relaunch. A cap eviction
@@ -65,12 +70,14 @@ Bounds: at most 40,000 entries. The research scan log saw about 2,150 pairs a
 day, so 14 days need about 30,000; when the cap still evicts, the effective
 horizon (the newest evicted sighting) is published in ``status()``.
 
-Seeding (TICKER_REGISTRY_SEED_V2): a registry whose own coverage is not
-current after loading its sidecar (new, empty, legacy V1, or last observation
-more than 60 min ago) merges the sidecars of the other PAPER services on the
-host read-only (``seed_paths``: the main engine, the Lab, the tape; a personal
-engine also reads main's through NEO_MAIN_MARKET_STATE_PATH) and adopts the
-earliest ``covered_since`` of a sibling whose coverage is current. A ticker
+Seeding (TICKER_REGISTRY_SEED_V2): a registry whose own coverage does not
+vouch after loading its sidecar (new, empty, legacy V1, last observation more
+than 60 min ago, or current but shorter than 24 h, e.g. services started
+before the first-deploy seed) merges the sidecars of the other PAPER services
+on the host read-only (``seed_paths``: the main engine, the Lab, the tape; a
+personal engine also reads main's through NEO_MAIN_MARKET_STATE_PATH) and
+adopts the earliest ``covered_since`` of a sibling whose coverage is current
+(its own current span is kept when it starts earlier). A ticker
 registry is market memory, not account memory, so a seed only adds sightings
 (it can only block more); a seed file is never written. For the first deploy,
 scripts/build_ticker_registry_seed.py builds main's sidecar offline from a
@@ -107,6 +114,13 @@ OBSERVATION_CLOCK_SKEW_MS = 5_000
 # Normalized placeholders the feed uses for a missing symbol (market_monitor.make_coin
 # and the Gecko early pools write 'TOKEN'): a missing ticker, never a registered one.
 PLACEHOLDER_TICKERS = frozenset({'token'})
+# Feed sources that only name a held position: market_monitor.scan_once adds a held
+# coin under these when discovery did not return it. Such a row is a real sighting
+# but no market observation, so it never extends the registry's coverage.
+HELD_POSITION_SOURCES = frozenset({'open-position', 'open-position-pinned-pair'})
+# What marks coverage: V1 counted every non-empty feed; V2 counts discovered market rows only.
+REGISTRY_COVERAGE_BASIS = 'DISCOVERED_MARKET_ROWS_V2'
+PREVIOUS_REGISTRY_COVERAGE_BASIS = 'ANY_FEED_ROW_V1'
 
 
 @dataclass(frozen=True)
@@ -165,6 +179,24 @@ def observation_time(coin: dict, now):
     return current
 
 
+def market_observation(coin: dict) -> bool:
+    """True unless the row's ``sources`` name only a held position (REGISTRY_COVERAGE_BASIS).
+
+    A held coin that discovery did not return reaches the feed under
+    HELD_POSITION_SOURCES only (market_monitor.scan_once); such a row says
+    nothing about the rest of the market. Rows without a source list (every
+    production row has one) count as market rows.
+    """
+    if not isinstance(coin, dict):
+        return False
+    sources = coin.get('sources')
+    if isinstance(sources, str):
+        sources = [sources]
+    if not isinstance(sources, (list, tuple)) or not sources:
+        return True
+    return not all(isinstance(source, str) and source in HELD_POSITION_SOURCES for source in sources)
+
+
 def liquidity_usd(coin: dict):
     value = _positive(coin.get('liquidityUsd'))
     if value is None and isinstance(coin.get('liquidity'), dict):
@@ -207,11 +239,13 @@ class TickerRegistry:
     (least recently seen evicted first), so memory and the sidecar stay
     bounded. All methods are thread-safe and never raise on persistence
     problems; a failed save is reported in ``status()``. A registry whose own
-    coverage is not current after loading its sidecar is seeded from
-    ``seed_paths``.
+    coverage after loading its sidecar is not current or shorter than 24 h is
+    seeded from ``seed_paths``.
 
     Coverage: ``mark_observed(at)`` records one market observation (``observe``
-    calls it with the newest observation time of a non-empty feed).
+    calls it with the newest observation time of the feed's discovered market
+    rows; a feed of held-position rows only marks nothing, see
+    ``market_observation``).
     ``coverage_ms(now)`` is how long the registry has observed the market
     without a gap longer than ``max_gap_ms``; 0 while it never observed, or
     when its last observation is more than ``max_gap_ms`` before ``now``.
@@ -253,13 +287,19 @@ class TickerRegistry:
         self._observed_until = None
         self.coverage_resets = 0
         self._last_gap_ms = None
+        # Non-empty scans whose rows named only held positions (no coverage marked; not persisted).
+        self.held_only_scans = 0
         self.loaded_version = None
         self.seed_status = {}
         self.seeded_entries = 0
         self.coverage_adopted_from = None
         if self.path is not None:
             self._load()
-        if self.seed_paths and not self.coverage_current(self.clock()):
+        # Seeded unless its own coverage already vouches (current and >= 24 h): a sidecar
+        # left by a short earlier run (services started before the first-deploy seed)
+        # still adopts a current sibling's longer coverage.
+        if (self.seed_paths and self.coverage_ms(self.clock())
+                < PARAMS.ticker_registry_min_coverage_minutes * 60_000):
             self._seed()
 
     # ----------------------------------------------------------- mutation --
@@ -305,20 +345,30 @@ class TickerRegistry:
     def observe(self, feed, now) -> int:
         """Register a whole scan; prunes and saves at most once per interval.
 
-        A non-empty feed also marks coverage at its newest observation time
-        (``observation_time``), so an empty scan or a stale published feed
-        never extends the registry's coverage.
+        Every row is registered. Coverage is marked at the newest observation
+        time (``observation_time``) of the feed's discovered market rows
+        (``market_observation``), so an empty scan, a stale published feed or a
+        feed holding only held positions (a discovery outage with a position
+        open) never extends the registry's coverage.
         """
         added = 0
         newest = None
+        held_only = False
         for coin in feed or ():
             added += int(self.observe_coin(coin, now))
-            if isinstance(coin, dict):
-                observed = observation_time(coin, now)
-                if observed is not None and (newest is None or observed > newest):
-                    newest = observed
+            if not isinstance(coin, dict):
+                continue
+            if not market_observation(coin):
+                held_only = True
+                continue
+            observed = observation_time(coin, now)
+            if observed is not None and (newest is None or observed > newest):
+                newest = observed
         if newest is not None:
             self.mark_observed(newest)
+        elif held_only:
+            with self._lock:
+                self.held_only_scans += 1
         stamp = _finite(now)
         if stamp is not None:
             self.prune(stamp)
@@ -422,7 +472,8 @@ class TickerRegistry:
                     'warming': coverage < PARAMS.ticker_registry_min_coverage_minutes * 60_000,
                     'max_gap_minutes': self.max_gap_ms / 60_000, 'resets': self.coverage_resets,
                     'last_gap_minutes': None if last_gap is None else round(last_gap / 60_000, 1),
-                    'adopted_from': self.coverage_adopted_from}
+                    'adopted_from': self.coverage_adopted_from, 'basis': REGISTRY_COVERAGE_BASIS,
+                    'held_only_scans': self.held_only_scans}
 
     def status(self) -> dict:
         coverage = self.coverage_status()
@@ -479,6 +530,21 @@ class TickerRegistry:
         except Exception:
             return 'CORRUPT', [], None
 
+    @staticmethod
+    def read_sidecar(path):
+        """Public read-only form of ``_read_sidecar`` (the offline seed builder)."""
+        return TickerRegistry._read_sidecar(Path(path))
+
+    def merge_rows(self, rows) -> tuple:
+        """Add valid sidecar rows (sightings only, never coverage); returns (new pools, skipped rows)."""
+        with self._lock:
+            before = len(self._entries)
+            skipped = self._merge_rows(rows)
+            added = len(self._entries) - before
+            if added:
+                self._dirty = True
+        return added, skipped
+
     def _merge_rows(self, rows) -> int:
         """Add valid sidecar rows (caller holds the lock); returns the number skipped."""
         skipped = 0
@@ -519,12 +585,18 @@ class TickerRegistry:
         self.prune(self.clock(), force=True)
 
     def _seed(self):
-        """Merge sibling sidecars into a registry without current coverage (read-only; never raises).
+        """Merge sibling sidecars into a registry whose coverage does not vouch yet (read-only; never raises).
 
         Adopts the earliest ``covered_since`` of the siblings whose own coverage
-        is current at the registry clock (their merged sightings cover it).
+        is current at the registry clock (their merged sightings cover it). When
+        the registry's own coverage is current too (a short earlier run), both
+        spans end within the gap of the clock, so their union is continuous and
+        the earliest start of the two is kept.
         """
         reference = _finite(self.clock())
+        own_current = self.coverage_current(reference)
+        with self._lock:
+            own = ((self._covered_since, self._observed_until, None) if own_current else None)
         current = []    # (covered_since, observed_until, name) of siblings with current coverage
         for path in self.seed_paths:
             status, rows, coverage = self._read_sidecar(path, shared=True)
@@ -541,10 +613,13 @@ class TickerRegistry:
             self.seed_status[path.name] = 'SEEDED' if status == 'OK' else status
             self.seeded_entries += added
         if current:
+            earliest = min(current)
+            spans = current + ([own] if own is not None else [])
             with self._lock:
-                self._covered_since = min(row[0] for row in current)
-                self._observed_until = max(row[1] for row in current)
-                self.coverage_adopted_from = min(current)[2]
+                self._covered_since = min(row[0] for row in spans)
+                self._observed_until = max(row[1] for row in spans)
+                if own is None or earliest[0] < own[0]:
+                    self.coverage_adopted_from = earliest[2]
                 self._dirty = True
         if self.seeded_entries:
             with self._lock:
@@ -640,8 +715,11 @@ def check(coin: dict, now, registry, *, params: GuardParameters = PARAMS) -> dic
               'age_min': age, 'mcap': cap, 'liquidity_usd': liquidity, 'ticker': ticker or None,
               'ticker_reused_by': 0, 'registry_version': REGISTRY_VERSION,
               'registry_coverage_h': round(coverage / HOUR_MS, 2) if registry is not None else None}
-    if (liquidity is None or cap is None or age is None or not mint or not pair or not ticker
-            or registry is None):
+    # Only rules 5 and 6 (pools under 14 days) read the ticker: an established pool
+    # whose symbol normalizes to nothing or to the placeholder is judged without it.
+    needs_ticker = age is not None and age < params.ticker_reuse_max_age_minutes
+    if (liquidity is None or cap is None or age is None or not mint or not pair
+            or (needs_ticker and not ticker) or registry is None):
         result['reasons'] = ['rug_input_unknown']
         return result
     ratio = liquidity / cap
@@ -687,6 +765,8 @@ def config(params: GuardParameters = PARAMS) -> dict:
             'market_cap_basis': 'marketCap, else fdv', 'age_basis': 'pairCreatedAt at decision time',
             'ticker_normalization': 'alphanumerics only, casefolded',
             'unknown_ticker_placeholders': sorted(PLACEHOLDER_TICKERS),
+            'ticker_input_rule': ('a missing ticker (empty after normalization, or a placeholder) is '
+                                  'rug_input_unknown only when pair age < 14 days; rules 5 and 6 alone read it'),
             'ticker_reuse_rule': 'another pool with a DIFFERENT mint registered at or before now',
             'ticker_registry_warming_rule': ('pair age < 14 days, no reuse found and less than 24 h of '
                                              'continuous registry coverage at now'),
@@ -698,16 +778,23 @@ def config(params: GuardParameters = PARAMS) -> dict:
                                           'published and coverage restarts at the newest evicted sighting'),
                          'coverage': {'min_hours': params.ticker_registry_min_coverage_minutes / 60,
                                       'max_gap_minutes': REGISTRY_MAX_GAP_MS // 60_000,
-                                      'observation_basis': ('newest updatedAt of a non-empty feed (at most 5 s '
-                                                            'after the scan clock), else the scan clock'),
+                                      'basis_version': REGISTRY_COVERAGE_BASIS,
+                                      'previous_basis_version': PREVIOUS_REGISTRY_COVERAGE_BASIS,
+                                      'observation_basis': ('newest updatedAt of the feed\'s discovered market '
+                                                            'rows (at most 5 s after the scan clock), else the '
+                                                            'scan clock; rows whose sources name only a held '
+                                                            'position are registered but never mark coverage'),
+                                      'held_position_sources': sorted(HELD_POSITION_SOURCES),
                                       'persisted': True},
                          'seed_version': REGISTRY_SEED_VERSION,
-                         'seed_rule': ('a registry without current coverage after loading its sidecar merges '
-                                       'the sibling services\' sidecars read-only (main engine, Lab, tape; '
-                                       'NEO_MAIN_MARKET_STATE_PATH for personal engines), adopts the earliest '
-                                       'coverage of a sibling whose coverage is current; seeds only add '
-                                       'sightings'),
-                         'first_deploy_seed': 'scripts/build_ticker_registry_seed.py (offline, training journal copy)'},
+                         'seed_rule': ('a registry whose coverage after loading its sidecar is not current or '
+                                       'shorter than 24 h merges the sibling services\' sidecars read-only (main '
+                                       'engine, Lab, tape; NEO_MAIN_MARKET_STATE_PATH for personal engines), adopts '
+                                       'the earliest coverage of a sibling whose coverage is current (its own '
+                                       'current span kept when earlier); seeds only add sightings'),
+                         'first_deploy_seed': ('scripts/build_ticker_registry_seed.py (offline, training journal '
+                                               'copy, market rows mark coverage; --replace-stale replaces only a '
+                                               'sidecar that does not vouch, keeping a copy)')},
             'fail_closed': True, 'distinct_from': 'engine_rug_guard.RUG_GUARD_V2 (unchanged)',
             'fake_market_cap_threshold_note': '2% liquidity/market cap is holdout-informed (research froze 1%); conservative, not validated',
             'is_entry_authorization': False, 'profitability_proven': False}

@@ -105,7 +105,7 @@ Reasons are evaluated in this order, and every reason that applies is recorded:
 
 | Reason | Rule |
 | --- | --- |
-| `rug_input_unknown` | Any input is missing, non-finite or ≤ 0: liquidity (`liquidityUsd`, else `liquidity.usd`), market cap (`marketCap`, else `fdv`), pair age (`pairCreatedAt` at `now`), mint, pool, normalized ticker, or the ticker registry itself. The feed's placeholder for a missing symbol (`TOKEN`, written by `make_coin` and the Gecko early pools) is a missing ticker, and it is never registered. Evaluation stops here. |
+| `rug_input_unknown` | Any input is missing, non-finite or ≤ 0: liquidity (`liquidityUsd`, else `liquidity.usd`), market cap (`marketCap`, else `fdv`), pair age (`pairCreatedAt` at `now`), mint, pool, or the ticker registry itself; or the pool is younger than 14 days and its normalized ticker is missing. Only the two ticker rules read the ticker, and they apply only under 14 days, so an established pool whose symbol normalizes to nothing (an emoji, `$`) or to the placeholder is judged by the other rules without one. The feed's placeholder for a missing symbol (`TOKEN`, written by `make_coin` and the Gecko early pools) is a missing ticker, and it is never registered. Evaluation stops here. |
 | `rug_lp_pullable` | liquidity / market cap ≥ 1.0 |
 | `rug_young_pool` | pair age < 720 min |
 | `rug_fake_market_cap` | market cap ≥ $20M, liquidity / market cap < 0.02, and age < 14 days |
@@ -150,9 +150,18 @@ or after the cap evicted sightings. The rule now fails closed instead:
 
 - The sidecar keeps `covered_since`, the start of the current continuous observation,
   and `observed_until`, the newest market observation. Both survive restarts.
-- An observation is a non-empty scan. Its time is the feed's newest `updatedAt` (at most
-  5 s after the scan clock), so a stale published feed or an empty scan never extends
-  coverage.
+- An observation is a scan with at least one discovered market row
+  (`DISCOVERED_MARKET_ROWS_V2`). Its time is the newest `updatedAt` of those rows (at
+  most 5 s after the scan clock), so a stale published feed or an empty scan never
+  extends coverage. A row whose `sources` name only a held position (`open-position`,
+  `open-position-pinned-pair`: `scan_once` adds a held coin under these when discovery
+  did not return it) is registered as a sighting but observes no market. When the
+  discovery lists fail and only the pairs endpoint answers, main's feed holds just the
+  open positions (plus Gecko new pools, if Gecko answers, which are discovered rows);
+  before this rule such a feed kept coverage current for as long as a position was open,
+  while relaunch siblings went unseen. `coverage.held_only_scans` counts those scans.
+  The Lab and the tape read main's published feed with the same `sources`, and personal
+  engines run the same scan, so every registry applies the rule.
 - A gap longer than 60 min restarts coverage (`coverage.resets`, `last_gap_minutes`). In
   the research log the median other-mint sibling of a reused ticker was visible for
   about 1 min, and 82% of the reuse candidates (liquidity ≥ $20k, 561 cases) had every
@@ -168,7 +177,7 @@ or after the cap evicted sightings. The rule now fails closed instead:
 
 `check()` publishes `registry_coverage_h`; `status()` publishes `coverage` with
 `covered_since`, `observed_until`, `coverage_hours`, `warming`, `resets`,
-`last_gap_minutes` and `adopted_from`.
+`last_gap_minutes`, `adopted_from`, `basis` and `held_only_scans`.
 
 The cost: on the first deploy, every engine and Lab book enters no pool younger than
 14 days for 24 h unless the registries are seeded (below), and again after any outage
@@ -177,9 +186,10 @@ longer than 60 min.
 #### Seeding (TICKER_REGISTRY_SEED_V2)
 
 A ticker registry is market memory, not account memory: every service sees the same
-market. A registry whose own coverage is not current after loading its sidecar (new,
-empty, legacy, or last observation more than 60 min ago) therefore merges the sidecars
-of the other services read-only. They are named by their state-file environment
+market. A registry whose own coverage does not vouch after loading its sidecar (new,
+empty, legacy, last observation more than 60 min ago, or current but shorter than 24 h,
+as after services that ran briefly before the first-deploy seed) therefore merges the
+sidecars of the other services read-only. They are named by their state-file environment
 variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STATE_PATH`,
 `NEO_STRATEGY_LAB_PATH`, `NEO_LIVE_TAPE_PATH`):
 
@@ -191,20 +201,47 @@ variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STATE_PATH`,
   published feed.
 - The Lab seeds from main's and the tape's; the tape from main's and the Lab's.
 - It adopts the earliest `covered_since` of a sibling whose own coverage is current (last
-  observation at most 60 min ago), because the merged sightings cover that span.
+  observation at most 60 min ago), because the merged sightings cover that span. When its
+  own short coverage is current too, both spans end within 60 min of now, so their union
+  is continuous and the earlier start is kept.
 - A seed only adds sightings, so it can only block more. Seed files are read with delete
   sharing and never written. A missing or corrupt seed is skipped (`seed.sources` in
   `status()` records `SEEDED`, `MISSING` or `CORRUPT` per file).
 
 **First deploy.** No sidecar exists yet. `scripts/build_ticker_registry_seed.py` builds
 main's sidecar offline from a copy of the main training journal
-(`<runtime>/training/observations.jsonl`, which records every scan coin with its mint,
-pool, symbol and time; the research scan log was built from it). It replays the journal
-through the same registry code (normalization, placeholders, pruning, cap, 60-min gap
-rule), writes a `TICKER_REGISTRY_V2_COVERAGE` sidecar to a path that must not exist, and
-never writes the journal. Run it with the services stopped, then start them within
-60 min of the journal's last row; the Lab, the tape and personal engines then seed from
-main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md).
+(`<runtime>/training/observations.jsonl`). The journal records the bounded scan feed
+(`MAX_FEED` = 90 coins after `entry_quote_priority.bounded_feed`; unchanged repeat polls
+within 3 s are coalesced) plus entry, probe and position rows, each with its mint, pool,
+symbol and time; the research scan log was built from it. Gecko new pools cut by the
+bound are not journalled, although main's live registry sees them in the untrimmed
+feed, so the seed is a Lab/tape-grade memory: the same trimmed view the Lab, the tape and
+the research had. For up to 14 days after the deploy, a relaunch whose earlier sibling
+appeared only among the trimmed Gecko pools before the deploy can pass
+`rug_ticker_reuse`; the research reuse figures came from the same trimmed log.
+
+The tool replays the journal through the same registry code (normalization,
+placeholders, pruning, cap, 60-min gap rule). Every valid row registers its sighting;
+coverage comes only from market rows, so held-position rows (`open-position` sources)
+and position-mark rows (`exit_quote` or a `mark` quote) never extend it. It writes a
+`TICKER_REGISTRY_V2_COVERAGE` sidecar to a path that must not exist, and never writes the
+journal. Run it with the services stopped, on the journal as it stands after they stopped
+(or a copy taken then), check that the printed `coverage_at_now` is not warming, then
+start them within 60 min of the printed `coverage.observed_until`; the Lab, the tape and
+personal engines then seed from main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md).
+
+An earlier attempt can leave main's sidecar behind: the services were started before the
+seed (main writes its sidecar on its first scan), a guarded deploy rolled back after the
+new main ran, or a first try failed. Such a sidecar does not vouch yet, and the Lab and
+tape sidecars are no better, so every engine and Lab book would block pools under
+14 days for 24 h. `--replace-stale` replaces an existing sidecar only when it is
+unreadable, carries no coverage, or its coverage at the wall clock is not current
+(last observation more than 60 min ago) or shorter than 24 h; a sidecar with current
+coverage of 24 h or more is never replaced. The old file is first copied to
+`<out>.replaced-<ms>` (no service reads that name) and its readable sightings are merged
+into the new sidecar. Moving the old file aside by hand (services stopped) is equally
+safe: it is market memory, not ledger data. The Lab, tape and personal sidecars need no
+action because they seed from main's.
 
 ### HEAT_VETO_STACK_V1
 
@@ -339,8 +376,11 @@ that no seat be spent on a pool that every entry path blocks:
 - **Loss memory is per ledger.** Two losses in one Lab book (or in main) say nothing
   about another account. A withheld seat would leave every engine, including accounts
   with no losses there, without a COMPLETE window for up to 6 h. Each entry path applies
-  its own ledger's memory before quoting, so the seat adds nothing. This part of spec
-  item 4 is a documented deviation that needs the owner's sign-off.
+  its own ledger's memory before quoting, so the seat adds nothing. This deviation from
+  spec item 4 was ACCEPTED 2026-10-08 by the operator under the owner's delegation: one
+  tape seat serves every ledger, so a per-ledger loss cooldown at seats would starve
+  accounts without losses of a COMPLETE window; loss memory is enforced per ledger at
+  entry, never at shared seats.
 
 Consequences, all visible in diagnostics:
 
@@ -442,7 +482,8 @@ change must not do.
 | Market score | (unversioned V1) | `NEO_MARKET_SCORE_V2_LIQ_MC_BAND` |
 | Lab retirement review | `LAB_STRATEGY_LIFECYCLE_V1` | `LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE` |
 | Engine RugCheck prewarm | (unversioned: `ageMinutes` ≤ 360) | `PREWARM_V2_DEFENSIVE_POPULATION` |
-| Ticker registry seeding | — | `TICKER_REGISTRY_SEED_V2` (seeds a registry without current coverage, adopts a sibling's current coverage, main's sidecar for personal engines, offline first-deploy builder) |
+| Ticker registry seeding | — | `TICKER_REGISTRY_SEED_V2` (seeds a registry whose coverage is not current or under 24 h, adopts a sibling's current coverage, main's sidecar for personal engines, offline first-deploy builder with `--replace-stale`) |
+| Ticker registry coverage basis | `ANY_FEED_ROW_V1` (any non-empty feed; never released) | `DISCOVERED_MARKET_ROWS_V2` (held-position rows never mark coverage) |
 | Training learners' score basis | (implicit V1) | `NEO_MARKET_SCORE_V1` (`paper_training.LEARNER_SCORE_VERSION`; `PAPER_TRAINING_V1` unchanged) |
 
 `STRUCTURAL_RUG_GUARD_V1` and the other layer names are unreleased (PR #23 is not
@@ -457,9 +498,9 @@ value in `tests/test_cost_first_engine_profile.py`:
 
 | Strategy | `effective_config_hash` |
 | --- | --- |
-| `WINNER_ENSEMBLE_PAPER_V1` (default) | `8651943d32eabfbc1cee77a7779507ceda52e95b2477e05c4da44188a1511f2d` |
-| `ORDER_FLOW_ADAPTIVE` | `c2ccd104269f1719ebe6c1f43f1f44efccd1e7421c026471194662f263d8f185` |
-| `COST_FIRST_ESTABLISHED_PAPER_V1` | `a9c39b2609db177fa9b58256a9b4574c4f0c904b98b792094f0c5b11f1c48807` |
+| `WINNER_ENSEMBLE_PAPER_V1` (default) | `ab77b8b3caac19aca43e987d6d9c7c1952fe55cfb01a23f6bb6618fd9f7773bf` |
+| `ORDER_FLOW_ADAPTIVE` | `106f91c5f69252c030beaf1242d48d035551f36ae3459d98746201014ac3dcc0` |
+| `COST_FIRST_ESTABLISHED_PAPER_V1` | `8c2cd6eb8916f0a3b116ecfd0333a217373f2d2a7552c0b9dd131f630e7c70c2` |
 
 The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 
@@ -567,19 +608,27 @@ series for heat warm-up, and one paid-profile observation.
 
 `tests/test_defensive_entry_layer.py` covers:
 
-- every rule, its boundaries and the reason order
+- every rule, its boundaries and the reason order; a missing ticker blocks only a pool
+  under 14 days (an established pool named `TOKEN`, an emoji, `$` or nothing passes, with
+  the 14-day boundary)
 - registry persistence: restart, atomic replace, corrupt file, a legacy V1 sidecar,
   pruning, bounds, failed replace, the engine and tape sidecars surviving a restart, the
   tape's clean-stop flush, the 40,000-entry bound and its published horizon, and seeding
-  from sibling sidecars (read-only, coverage adopted only from a current sibling, missing
-  or corrupt seeds skipped, main's sidecar for personal engines)
+  from sibling sidecars (read-only, coverage adopted only from a current sibling, a short
+  current sidecar left before the seed still adopting it, a vouching one not seeded,
+  missing or corrupt seeds skipped, main's sidecar for personal engines)
 - registry coverage: the USDF/DOTF relaunches blocked on an empty or 23.98 h registry
   and judged after 24 h, a 61-minute gap restarting coverage, a lapsed coverage at
-  decision time, a stale published feed or an empty scan never extending it, coverage
+  decision time, a stale published feed or an empty scan never extending it, a feed of
+  held positions only never extending it (30 h of one held coin, through the layer, and
+  through `scan_once` with the discovery lists down), coverage
   surviving a restart, a cap eviction moving its start, the engine and the Lab's
   `COST_FIRST` books blocking a pool under 14 days before any quote on a fresh registry;
   the missing-symbol placeholder `TOKEN`; the offline seed builder on a synthetic journal
-  (covered sidecar, journal untouched, existing output refused, a journal gap)
+  (covered sidecar, journal untouched, existing output refused, a journal gap,
+  held-position and mark rows never extending coverage, `--replace-stale` recovering a
+  sidecar left by an earlier attempt with a backup and merged sightings, and refusing one
+  that already vouches)
 - the training learners' V1 basis: the recorded `GOLD_ADAPTIVE` context and its exit at
   liquidity/MC 0.7 and 1.1, the learners' `min_score` and probe signal, the probe's
   recorded context
@@ -602,6 +651,8 @@ series for heat warm-up, and one paid-profile observation.
   lease is kept until it expires, the tape's own warm-up and another ledger's losses
   never withhold a seat, up to 6 examples
 - the Lab dashboard labels every defensive reason code
+- the strategy lock and this document record owner decision (1) (loss memory per ledger
+  at entry, not at shared seats) as ACCEPTED, with no pending sign-off left
 
 `backend/tests/test_lab_strategy_lifecycle.py` covers the carried V6 and
 `COST_FIRST_ESTABLISHED_V1` evidence; `tests/test_cost_first_established.py` covers the
@@ -618,9 +669,14 @@ The cost-first universe's structural guard is not patched in those tests.
   automatically) are not gated here. They simulate from the observations they receive,
   on the V1 score basis. The route-quote probe that feeds them executable evidence is
   gated.
-- The scheduler applies no loss memory at its seats (pending the owner's sign-off on
-  that deviation) and does not wait for its own heat warm-up; each engine, personal
-  engines included, applies its own loss memory and heat at entry.
+- The scheduler applies no loss memory at its seats (ACCEPTED 2026-10-08 by the operator
+  under the owner's delegation: one tape seat serves every ledger, so loss memory is
+  enforced per ledger at entry, never at shared seats) and does not wait for its own heat
+  warm-up; each engine, personal engines included, applies its own loss memory and heat
+  at entry.
+- The first-deploy seed is built from the bounded, journalled feed, so it lacks the
+  Gecko new pools main's live registry sees beyond `MAX_FEED`; journalling the identities
+  of trimmed-out coins would give it main's parity, and is not implemented.
 - Heat history is per process and starts empty after a restart, which costs an engine or
   the Lab 15 min without entries, and 60 min for pools at a fee tier ≥ 100 bps (the tape
   seats do not wait). Only the ticker registry persists, with its coverage.

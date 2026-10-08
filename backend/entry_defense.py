@@ -24,9 +24,10 @@ these rules measurably cut losses, they do not create profit.
 
 One layer instance belongs to one process (engine, Lab, tape). It owns that
 process's ticker registry (persisted next to its state file with its
-continuous coverage; one without current coverage is seeded read-only from
-the other services' sidecars, and until it has observed the market for 24 h
-pools under 14 days are blocked with rug_ticker_registry_warming) and its
+continuous coverage; one whose coverage is not current or shorter than 24 h
+is seeded read-only from the other services' sidecars, and until it has
+observed the market for 24 h pools under 14 days are blocked with
+rug_ticker_registry_warming) and its
 pair history; the caller feeds both with every scan's feed via ``observe``.
 Neither ``observe`` nor ``evaluate`` raises: an unexpected error blocks the
 candidate with ``defensive_entry_error`` (fail closed) and is counted.

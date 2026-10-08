@@ -58,9 +58,18 @@ EXIT_IMPACT_EMERGENCY_FORENSICS_VERSION = 'EXIT_IMPACT_EMERGENCY_FORENSICS_V1'
 # A cross-process entry-lease or exit-priority defer is not a quote: it neither
 # consumes the per-scan quote budget nor arms the per-token retry cooldown.
 QUOTE_PREPARATION_DEFER_CODES = frozenset({'ENTRY_SEQUENCE_BUSY', 'EXIT_PRIORITY_PENDING'})
-QUOTE_PREPARATION_ROLLING_SCANS = 200   # scans with at least one preparation failure
+QUOTE_PREPARATION_ROLLING_WINDOW_MS = 60 * 60_000  # rolling histogram covers the last 60 minutes
+QUOTE_PREPARATION_ROLLING_MAX_SCANS = 4096          # memory bound on scans kept inside that window
 QUOTE_PREPARATION_MAX_CODES = 32        # distinct codes per histogram; extras fold into OTHER
-QUOTE_PREPARATION_AUDIT_PER_SCAN = 12   # audit rows per scan; the histogram stays complete
+# Per-failure rows are diagnostics, not ledger evidence: they go to a size-capped
+# sidecar next to AUDIT_PATH (plain append, no fsync, never under STATE.lock), at
+# most one row per (pair, code) per QUOTE_RETRY_COOLDOWN_MS and a few per scan.
+# audit.jsonl receives no per-failure rows; the in-memory histograms stay complete.
+QUOTE_PREPARATION_LOG_NAME = 'quote_preparation.jsonl'
+QUOTE_PREPARATION_LOG_MAX_BYTES = 5 * 1024 * 1024
+QUOTE_PREPARATION_LOG_PER_SCAN = 12
+QUOTE_PREPARATION_LOG_RATE_KEYS = 4096
+QUOTE_PREPARATION_LOG_LOCK = threading.Lock()
 TAKE_PROFIT_PCT = 10.0
 TRAILING_PCT = 4.0
 MAX_HOLD_MINUTES = 60
@@ -950,6 +959,51 @@ def append_audit(event: str, payload: dict[str, Any]) -> None:
         handle.flush(); os.fsync(handle.fileno())
 
 
+def quote_preparation_log_path() -> Path:
+    return AUDIT_PATH.with_name(QUOTE_PREPARATION_LOG_NAME)
+
+
+def _compact_quote_preparation_log(path: Path, keep_bytes: int) -> None:
+    """Keep only the newest whole rows within keep_bytes (atomic replace)."""
+    with path.open('rb') as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        start = max(0, size - max(0, keep_bytes))
+        handle.seek(start)
+        tail = handle.read()
+    if start > 0:
+        newline = tail.find(b'\n')
+        tail = tail[newline + 1:] if newline >= 0 else b''
+    temp = path.with_name(path.name + '.tmp')
+    temp.write_bytes(tail)
+    os.replace(temp, path)
+
+
+def append_quote_preparation_log(payload: dict[str, Any]) -> bool:
+    """Append one diagnostics row to the capped sidecar; returns False when dropped.
+
+    Deliberately not durable: no fsync, no event_id dedupe and no STATE.lock, so a
+    burst of failed quote preparations never slows ledger commits."""
+    record = {'schema_version': 1, 'ts': now_ms(), 'event': 'QUOTE_PREPARATION_FAILED',
+              'session_id': STATE.demo_session_id, **payload}
+    line = (json.dumps(record, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8')
+    cap = int(QUOTE_PREPARATION_LOG_MAX_BYTES)
+    if len(line) > cap // 2:
+        return False
+    path = quote_preparation_log_path()
+    with QUOTE_PREPARATION_LOG_LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            size = 0
+        if size + len(line) > cap:
+            _compact_quote_preparation_log(path, cap // 2)
+        with path.open('ab') as handle:
+            handle.write(line)
+    return True
+
+
 def trade_metrics(trades):
     known = [t for t in trades if isinstance(t.get('pnl_usd'), (int, float)) and math.isfinite(t['pnl_usd'])]
     wins = sum(t['pnl_usd'] > 0 for t in known)
@@ -1447,11 +1501,12 @@ class Monitor:
         self.position_poll_lock = threading.Lock()
         self.entry_lock = threading.Lock()
         self.entry_quote_retry_after: dict[str, int] = {}
-        # Quote-preparation failure codes: lifetime since this engine started and
-        # a bounded rolling window of scans; entry_diagnostics is not persisted.
+        # Quote-preparation failure codes: since this engine started (not
+        # persisted; the ledger schema is unchanged) and a rolling time window.
         self.quote_preparation_codes_lifetime: dict[str, int] = {}
         self.quote_preparation_lifetime_since = now_ms()
-        self.quote_preparation_recent: deque = deque(maxlen=QUOTE_PREPARATION_ROLLING_SCANS)
+        self.quote_preparation_recent: deque = deque(maxlen=QUOTE_PREPARATION_ROLLING_MAX_SCANS)
+        self.quote_preparation_log_after: dict[tuple[str, str], int] = {}
         self.training_probe_lock = threading.Lock()
         self.training_probe_inflight = False
         self.training_probe_last_attempt_at = 0
@@ -1467,17 +1522,27 @@ class Monitor:
     def _record_quote_preparation_failure(self, report: dict[str, Any], coin: dict[str, Any], notional: float,
                                           attempt_index: int, failure: dict[str, Any], code: str,
                                           deferred: bool, latency_ms: int, dex_id: str) -> None:
-        """Histogram, bounded examples and one audit row per failed quote preparation."""
+        """Complete histogram, bounded examples and a rate-limited sidecar row."""
         self._bounded_code_add(report.setdefault('quote_preparation_codes', {}), code)
         examples = report.setdefault('quote_preparation_failures', [])
         if len(examples) < 3:
             examples.append({'symbol': str(coin.get('symbol') or '')[:40], 'notional_usd': notional,
                              'counted_as_quote_attempt': not deferred, 'latency_ms': latency_ms, **failure})
-        audited = int(report.get('quote_preparation_audit_events') or 0)
-        if audited >= QUOTE_PREPARATION_AUDIT_PER_SCAN:
-            report['quote_preparation_audit_skipped'] = int(report.get('quote_preparation_audit_skipped') or 0) + 1
-            return
         pair, mint = str(coin.get('pairAddress') or ''), str(coin.get('address') or '')
+        now = now_ms()
+        key = (pair, code)
+        if self.quote_preparation_log_after.get(key, 0) > now:
+            report['quote_preparation_log_rate_limited'] = int(report.get('quote_preparation_log_rate_limited') or 0) + 1
+            return
+        logged = int(report.get('quote_preparation_log_events') or 0)
+        if logged >= QUOTE_PREPARATION_LOG_PER_SCAN:
+            report['quote_preparation_log_skipped'] = int(report.get('quote_preparation_log_skipped') or 0) + 1
+            return
+        if len(self.quote_preparation_log_after) >= QUOTE_PREPARATION_LOG_RATE_KEYS:
+            self.quote_preparation_log_after = {k: v for k, v in self.quote_preparation_log_after.items() if v > now}
+            while len(self.quote_preparation_log_after) >= QUOTE_PREPARATION_LOG_RATE_KEYS:
+                self.quote_preparation_log_after.pop(next(iter(self.quote_preparation_log_after)))
+        self.quote_preparation_log_after[key] = now + entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS
         payload = {'code': code, 'stage': failure.get('stage'), 'pool': abbreviate_address(pair),
                    'pair_address': pair, 'mint': mint, 'symbol': str(coin.get('symbol') or '')[:40],
                    'dex_id': dex_id, 'notional_usd': round(float(notional), 8), 'attempt': attempt_index + 1,
@@ -1487,19 +1552,23 @@ class Monitor:
                    'counted_as_quote_attempt': not deferred, 'scan_count': STATE.scan_count,
                    'checked_at': report.get('checked_at')}
         try:
-            with STATE.lock:
-                append_audit('QUOTE_PREPARATION_FAILED', payload)
-            report['quote_preparation_audit_events'] = audited + 1
+            if append_quote_preparation_log(payload):
+                report['quote_preparation_log_events'] = logged + 1
         except Exception as exc:
-            report['quote_preparation_audit_error'] = type(exc).__name__
+            report['quote_preparation_log_error'] = type(exc).__name__
 
     def _finish_quote_preparation_histograms(self, report: dict[str, Any]) -> dict[str, Any]:
-        """Attach the bounded rolling and lifetime code histograms to one scan report."""
+        """Attach the rolling (time window) and since-engine-start code histograms."""
         scan_codes = dict(report.get('quote_preparation_codes') or {})
+        checked_at = report.get('checked_at')
+        checked_at = int(checked_at) if isinstance(checked_at, (int, float)) else now_ms()
         if scan_codes:
-            self.quote_preparation_recent.append((report.get('checked_at'), scan_codes))
+            self.quote_preparation_recent.append((checked_at, scan_codes))
             for code, count in scan_codes.items():
                 self._bounded_code_add(self.quote_preparation_codes_lifetime, code, count)
+        horizon = max(checked_at, now_ms()) - QUOTE_PREPARATION_ROLLING_WINDOW_MS
+        while self.quote_preparation_recent and self.quote_preparation_recent[0][0] < horizon:
+            self.quote_preparation_recent.popleft()
         rolling: dict[str, int] = {}
         for _at, codes in self.quote_preparation_recent:
             for code, count in codes.items():
@@ -1507,10 +1576,12 @@ class Monitor:
         report['quote_preparation_codes'] = scan_codes
         report['quote_preparation_codes_rolling'] = rolling
         report['quote_preparation_rolling_scans'] = len(self.quote_preparation_recent)
+        report['quote_preparation_rolling_window_minutes'] = QUOTE_PREPARATION_ROLLING_WINDOW_MS // 60_000
         report['quote_preparation_rolling_since'] = (self.quote_preparation_recent[0][0]
                                                      if self.quote_preparation_recent else None)
         report['quote_preparation_codes_lifetime'] = dict(self.quote_preparation_codes_lifetime)
         report['quote_preparation_lifetime_since'] = self.quote_preparation_lifetime_since
+        report['quote_preparation_lifetime_scope'] = 'SINCE_ENGINE_START'
         report['quote_preparation_defer_codes'] = sorted(QUOTE_PREPARATION_DEFER_CODES)
         return report
 

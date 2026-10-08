@@ -7,7 +7,7 @@ import { promotedPaperPortfolio } from '../src/lib/paperPortfolioState';
 import {
   backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus,
   initialDashboardConnection, moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable,
-  readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
+  quotePreparationSummary, readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
 } from '../src/lib/paperDashboardState';
 
 class MemoryStorage implements Storage {
@@ -231,4 +231,23 @@ test('history shows the recorded EXIT_IMPACT_EMERGENCY evidence and invents noth
   assert.doesNotMatch(withoutRecord, /тригер impact|праг|exit-impact-emergency/);
   assert.equal(exitImpactEmergencySummary(null), '');
   assert.match(exitImpactEmergencySummary({ threshold_pct: 0.75, trigger_quote: { impact_pct: 0.9 }, confirming_quote: { impact_pct: 0.6 }, confirming_quote_meets_threshold: false }), /0\.60% \(под прага\)/);
+});
+
+test('quote preparation summary labels the rolling window length and the since-engine-start scope', () => {
+  const text = quotePreparationSummary({
+    quote_attempts: 4, quote_defers: 9,
+    quote_preparation_codes: { ENTRY_SEQUENCE_BUSY: 2 },
+    quote_preparation_codes_rolling: { ENTRY_SEQUENCE_BUSY: 30, TIMEOUT: 3 },
+    quote_preparation_rolling_scans: 25, quote_preparation_rolling_window_minutes: 60,
+    quote_preparation_codes_lifetime: { TIMEOUT: 5, ENTRY_SEQUENCE_BUSY: 70 },
+    quote_preparation_lifetime_scope: 'SINCE_ENGINE_START',
+  });
+  assert.match(text, /от старта на engine-а, без запазване при рестарт/);
+  assert.match(text, /това сканиране \/ последните 60 мин, 25 сканирания с откази/);
+  assert.match(text, /ENTRY_SEQUENCE_BUSY 70 \(2 \/ 30\) · TIMEOUT 5 \(0 \/ 3\)/);
+  assert.match(text, /Отложени заради чужд entry lease или чакащ изход: 9 \(не се броят към бюджета от 4 проверки\)/);
+  assert.doesNotMatch(text, /undefined|NaN/);
+  assert.equal(quotePreparationSummary({}), '');
+  assert.equal(quotePreparationSummary(null), '');
+  assert.match(quotePreparationSummary({ quote_preparation_codes_lifetime: { TIMEOUT: 1 } }), /последния прозорец, 0 сканирания/);
 });

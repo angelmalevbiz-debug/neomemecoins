@@ -8,6 +8,7 @@ import copy
 import json
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -28,6 +29,13 @@ def audit_events():
     if not m.AUDIT_PATH.exists():
         return []
     return [json.loads(line) for line in m.AUDIT_PATH.read_text(encoding='utf-8').splitlines() if line.strip()]
+
+
+def sidecar_rows():
+    path = m.quote_preparation_log_path()
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines() if line.strip()]
 
 
 class FunnelFixture(unittest.TestCase):
@@ -74,6 +82,12 @@ class FunnelFixture(unittest.TestCase):
                       'quoted_at': self.clock[0], 'from_cache': False, 'execution_source': 'OFFLINE_FIXTURE',
                       'route': [{'ammKey': B, 'label': 'PumpSwap'}], 'route_matches_entry_pool': True,
                       'context_slot': 500, 'quote_age_ms': 10, 'raw_quote': {'fixture': True}}
+
+    def fresh(self, coin=None, **overrides):
+        """The coin and its verified flow observed at the current fixture clock."""
+        now = self.clock[0]
+        self.flow['verified_flow'].update(window_at=now, latest_event_at=now - 100, available_at=now - 50)
+        return dict(coin or self.coin, updatedAt=now, **overrides)
 
     def position(self, **overrides):
         m.STATE.positions = [dict(copy.deepcopy(self.pos), **overrides)]
@@ -204,13 +218,17 @@ class QuoteDeferAccountingTests(FunnelFixture):
         self.assertEqual((report['quote_attempts'], report['quote_defers'], report['opened']), (1, 0, 1))
         self.assertEqual(report['quote_preparation_codes'], {})
 
-    def test_each_failure_is_an_audit_event_with_code_pool_notional_and_latency(self):
+    def test_failure_row_goes_to_the_sidecar_with_code_pool_notional_and_latency(self):
         self.entry_patches()
         self.failing_preparation(self.TIMEOUT)
         self.monitor.maybe_open([self.coin])
-        rows = [row for row in audit_events() if row['event'] == 'QUOTE_PREPARATION_FAILED']
+        self.assertEqual(m.quote_preparation_log_path().parent, m.AUDIT_PATH.parent)
+        self.assertEqual(m.quote_preparation_log_path().name, 'quote_preparation.jsonl')
+        self.assertFalse([row for row in audit_events() if row['event'] == 'QUOTE_PREPARATION_FAILED'])
+        rows = sidecar_rows()
         self.assertEqual(len(rows), 1)
         row = rows[0]
+        self.assertEqual(row['event'], 'QUOTE_PREPARATION_FAILED')
         self.assertEqual(row['code'], 'TIMEOUT')
         self.assertEqual(row['stage'], 'initial_buy')
         self.assertEqual(row['pool'], m.abbreviate_address(B))
@@ -220,20 +238,121 @@ class QuoteDeferAccountingTests(FunnelFixture):
         self.assertEqual((row['latency_ms'], row['queue_ms'], row['http_ms']), (0, 12, 2500))
         self.assertEqual((row['deferred'], row['counted_as_quote_attempt']), (False, True))
         self.assertEqual(row['session_id'], m.STATE.demo_session_id)
-        self.assertEqual(m.STATE.entry_diagnostics['quote_preparation_audit_events'], 1)
+        self.assertEqual(m.STATE.entry_diagnostics['quote_preparation_log_events'], 1)
 
-    def test_defer_audit_rows_are_bounded_per_scan_while_the_histogram_is_complete(self):
+    def test_sidecar_append_takes_no_state_lock_and_no_fsync(self):
+        self.entry_patches()
+        self.failing_preparation(self.TIMEOUT)
+        with patch.object(m.os, 'fsync', side_effect=AssertionError('fsync on a diagnostics row')), \
+             patch.object(m, 'append_audit', side_effect=AssertionError('audit row per failure')):
+            original = m.append_quote_preparation_log
+
+            def guarded(payload):
+                # STATE.lock is re-entrant, so probe it from another thread: a free
+                # lock there proves the caller does not hold it during the append.
+                probe = []
+
+                def try_lock():
+                    acquired = m.STATE.lock.acquire(blocking=False)
+                    probe.append(acquired)
+                    if acquired:
+                        m.STATE.lock.release()
+                worker = threading.Thread(target=try_lock)
+                worker.start()
+                worker.join(5)
+                self.assertEqual(probe, [True], 'sidecar append ran under STATE.lock')
+                return original(payload)
+            with patch.object(m, 'append_quote_preparation_log', side_effect=guarded) as appended:
+                self.monitor.maybe_open([self.coin])
+        self.assertEqual(appended.call_count, 1)
+        self.assertNotIn('quote_preparation_log_error', m.STATE.entry_diagnostics)
+        self.assertEqual(len(sidecar_rows()), 1)
+
+    def test_n_failures_never_grow_audit_and_the_sidecar_stays_capped(self):
+        self.entry_patches()
+        self.failing_preparation(self.BUSY)
+        m.AUDIT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        m.AUDIT_PATH.write_text('{"event": "SEED", "event_id": "seed"}\n', encoding='utf-8')
+        audit_before = m.AUDIT_PATH.read_bytes()
+        cap = 4096
+        scans = 60
+        letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'  # base58: no I or O
+        with patch.object(m, 'QUOTE_PREPARATION_LOG_MAX_BYTES', cap):
+            for scan in range(scans):
+                # A distinct pool each scan defeats the (pair, code) rate limit so the cap is exercised.
+                coin = self.fresh(address=letters[scan % len(letters)] * 44,
+                                  pairAddress=letters[scan % len(letters)] * 42 + letters[scan // len(letters)] + 'z')
+                self.monitor.maybe_open([coin])
+                self.clock[0] += 3000
+                self.assertLessEqual(m.quote_preparation_log_path().stat().st_size, cap)
+        self.assertEqual(m.AUDIT_PATH.read_bytes(), audit_before)
+        rows = sidecar_rows()  # every remaining row is whole JSON, newest kept
+        self.assertTrue(rows)
+        self.assertLess(len(rows), scans)
+        self.assertEqual(rows[-1]['checked_at'], self.clock[0] - 3000)
+        self.assertFalse(m.quote_preparation_log_path().with_name('quote_preparation.jsonl.tmp').exists())
+        report = m.STATE.entry_diagnostics
+        self.assertEqual(report['quote_preparation_codes_lifetime'], {'ENTRY_SEQUENCE_BUSY': scans})
+        self.assertEqual(report['quote_preparation_codes_rolling'], {'ENTRY_SEQUENCE_BUSY': scans})
+
+    def test_one_row_per_pair_and_code_per_cooldown_while_histograms_count_every_failure(self):
+        self.entry_patches()
+        self.failing_preparation(self.BUSY)
+        failures = 25
+        for _ in range(failures):
+            self.monitor.maybe_open([self.fresh()])
+            self.clock[0] += 1000
+        self.assertLess(failures * 1000, entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS * 2)
+        expected_rows = 1 + (failures - 1) * 1000 // entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS
+        self.assertEqual(len(sidecar_rows()), expected_rows)
+        self.assertFalse(audit_events())
+        report = m.STATE.entry_diagnostics
+        self.assertEqual(report['quote_preparation_codes_lifetime'], {'ENTRY_SEQUENCE_BUSY': failures})
+        self.assertEqual(report['quote_preparation_codes_rolling'], {'ENTRY_SEQUENCE_BUSY': failures})
+        self.assertEqual(report['quote_preparation_rolling_scans'], failures)
+
+        # A different code on the same pool is a different key and is logged at once.
+        m.paper_quotes.last_preparation_error.return_value = dict(self.EXIT_PRIORITY)
+        self.monitor.maybe_open([self.fresh()])
+        self.assertEqual(sidecar_rows()[-1]['code'], 'EXIT_PRIORITY_PENDING')
+        self.assertEqual(len(sidecar_rows()), expected_rows + 1)
+
+        # After the cooldown the same (pair, code) is logged again.
+        m.paper_quotes.last_preparation_error.return_value = dict(self.BUSY)
+        self.clock[0] += entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS
+        self.monitor.maybe_open([self.fresh()])
+        self.assertEqual(len(sidecar_rows()), expected_rows + 2)
+
+    def test_sidecar_rows_are_bounded_per_scan_while_the_histogram_is_complete(self):
         letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ'  # base58: no I or O
         coins = [dict(self.coin, address=letters[i] * 44, pairAddress=letters[i] * 43 + 'z', symbol=f'C{i}')
-                 for i in range(m.QUOTE_PREPARATION_AUDIT_PER_SCAN + 3)]
+                 for i in range(m.QUOTE_PREPARATION_LOG_PER_SCAN + 3)]
         self.entry_patches()
         self.failing_preparation(self.BUSY)
         self.monitor.maybe_open(coins)
-        rows = [row for row in audit_events() if row['event'] == 'QUOTE_PREPARATION_FAILED']
-        self.assertEqual(len(rows), m.QUOTE_PREPARATION_AUDIT_PER_SCAN)
+        self.assertEqual(len(sidecar_rows()), m.QUOTE_PREPARATION_LOG_PER_SCAN)
+        self.assertFalse(audit_events())
         report = m.STATE.entry_diagnostics
-        self.assertEqual(report['quote_preparation_audit_skipped'], 3)
+        self.assertEqual(report['quote_preparation_log_skipped'], 3)
         self.assertEqual(report['quote_preparation_codes'], {'ENTRY_SEQUENCE_BUSY': len(coins)})
+
+    def test_rolling_histogram_is_a_time_window(self):
+        self.entry_patches()
+        self.failing_preparation(self.BUSY)
+        self.monitor.maybe_open([self.coin])
+        self.clock[0] += m.QUOTE_PREPARATION_ROLLING_WINDOW_MS - 1000
+        m.paper_quotes.last_preparation_error.return_value = dict(self.TIMEOUT)
+        self.monitor.maybe_open([self.fresh(address=C, pairAddress='D' * 44)])
+        report = m.STATE.entry_diagnostics
+        self.assertEqual(report['quote_preparation_codes_rolling'], {'ENTRY_SEQUENCE_BUSY': 1, 'TIMEOUT': 1})
+        self.assertEqual(report['quote_preparation_rolling_window_minutes'], 60)
+        self.clock[0] += 2000  # the first failure is now older than 60 minutes
+        self.monitor.maybe_open([])
+        report = m.STATE.entry_diagnostics
+        self.assertEqual(report['quote_preparation_codes_rolling'], {'TIMEOUT': 1})
+        self.assertEqual(report['quote_preparation_rolling_scans'], 1)
+        self.assertEqual(report['quote_preparation_codes_lifetime'], {'ENTRY_SEQUENCE_BUSY': 1, 'TIMEOUT': 1})
+        self.assertEqual(report['quote_preparation_lifetime_scope'], 'SINCE_ENGINE_START')
 
     def test_lifetime_and_rolling_histograms_accumulate_across_scans(self):
         self.entry_patches()
@@ -250,6 +369,7 @@ class QuoteDeferAccountingTests(FunnelFixture):
         self.assertEqual(report['quote_preparation_codes'], {})
         self.assertEqual(report['quote_preparation_codes_rolling'], {'ENTRY_SEQUENCE_BUSY': 1, 'TIMEOUT': 1})
         self.assertEqual(report['quote_preparation_rolling_scans'], 2)
+        self.assertEqual(report['quote_preparation_rolling_window_minutes'], 60)
         self.assertEqual(report['quote_preparation_codes_lifetime'], {'ENTRY_SEQUENCE_BUSY': 1, 'TIMEOUT': 1})
         self.assertEqual(report['quote_preparation_lifetime_since'], 1_000_000)
         self.assertEqual(report['quote_preparation_defer_codes'], ['ENTRY_SEQUENCE_BUSY', 'EXIT_PRIORITY_PENDING'])

@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import time
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -741,6 +742,57 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name])
         self.assertTrue(registry.flush())
         self.assertIn('new', self.path.read_text(encoding='utf-8'))
+
+    def test_temporaries_abandoned_by_a_hard_stop_are_reclaimed(self):
+        """Final review r2: a TerminateProcess inside save() skips its finally and leaves the mkstemp
+        temporary; nothing reclaimed it. Only this sidecar's own stale temporaries go."""
+        folder = self.path.parent
+        registry = self.registry()
+        registry.observe([self.coin(MINT, PAIR, 'KEEP')], self.NOW)
+        old = time.time() - guard.SIDECAR_TEMP_STALE_SECONDS - 60
+
+        def leave(name, *, stale=True):
+            path = folder / name
+            self.assertIn(Path(self.tmp.name).resolve(), path.resolve().parents)
+            path.write_text('{"partial', encoding='utf-8')
+            if stale:
+                os.utime(path, (old, old))
+            return path
+
+        abandoned = leave(f'.{self.path.name}.ab3_x9zq.tmp')
+        writing = leave(f'.{self.path.name}.kq81zz0a.tmp', stale=False)          # a save still in progress
+        others = [leave('.strategy_lab.ticker_registry.json.ab3_x9zq.tmp'),     # another service's sidecar
+                  leave(f'.{self.path.name}.TOOLONG123.tmp'), leave(f'{self.path.name}.ab3_x9zq.tmp'),
+                  leave(f'.{self.path.name}.ab3_x9zq.bak'), leave('state.json'), leave('observations.jsonl')]
+        (folder / f'.{self.path.name}.dir12345.tmp').mkdir()
+        restarted = self.registry()
+        self.assertFalse(abandoned.exists(), 'reclaimed when the registry starts')
+        self.assertTrue(writing.exists(), 'a temporary younger than 10 min may belong to a live write')
+        self.assertTrue(all(path.exists() for path in others))
+        self.assertTrue((folder / f'.{self.path.name}.dir12345.tmp').is_dir())
+        self.assertEqual(restarted.status()['stale_temps'],
+                         {'version': guard.SIDECAR_TEMP_SWEEP_VERSION, 'removed': 1})
+        self.assertEqual(restarted.status()['load_status'], 'LOADED')
+        # The temporary the restart's own kill left is too young at start; a later save reclaims it
+        # once it is 10 min old (at most one sweep per 10 min), and the save still succeeds.
+        os.utime(writing, (old, old))
+        restarted.observe_coin(self.coin(OTHER_MINT, OTHER_PAIR, 'NEW'), self.NOW + 1)
+        self.assertTrue(restarted.save(self.NOW + 2))
+        self.assertTrue(writing.exists(), 'the next sweep is not due yet')
+        restarted._next_temp_sweep = 0.0
+        restarted.observe_coin(self.coin(OTHER_MINT, OTHER_PAIR, 'NEWER'), self.NOW + 3)
+        self.assertTrue(restarted.save(self.NOW + 4))
+        self.assertFalse(writing.exists())
+        self.assertEqual(restarted.status()['stale_temps']['removed'], 2)
+        self.assertIn('newer', self.path.read_text(encoding='utf-8'))
+        self.assertTrue(all(path.exists() for path in others))
+        # A missing folder or an unlink that fails never raises.
+        self.assertEqual(guard.remove_stale_sidecar_temps(folder / 'missing' / self.path.name), [])
+        stale = leave(f'.{self.path.name}.zzzzzzzz.tmp')
+        with patch.object(guard.os, 'unlink', side_effect=PermissionError('held')):
+            self.assertEqual(guard.remove_stale_sidecar_temps(self.path), [])
+        self.assertTrue(stale.exists())
+        self.assertEqual(guard.remove_stale_sidecar_temps(None), [])
 
     def test_saves_are_throttled(self):
         registry = self.registry(save_interval_ms=60_000)
@@ -2006,6 +2058,27 @@ class ScoreBandTests(unittest.TestCase):
         self.assertEqual(made['scoreVersion'], m.SCORE_VERSION)
 
 
+class OmittedLiquidityNormalizationTests(unittest.TestCase):
+    def test_main_feed_and_exact_pair_refresh_report_an_omitted_liquidity_alike(self):
+        """LAB_FORWARD_MARK_LIQUIDITY_V2: the research scan log came through make_coin, which turns an
+        omitted DexScreener liquidity into 0.0 (research F6: every such 0 was terminal); the forward
+        books read the exact-pair refresh of the same payload the same way."""
+        import lab_position_marks
+        forward = lab.lab_forward
+        for label, extra in (('omitted', {}), ('usd_missing', {'liquidity': {}}), ('zero', {'liquidity': {'usd': 0}}),
+                             ('known', {'liquidity': {'usd': 250_000}})):
+            with self.subTest(label):
+                pair = {'chainId': 'solana', 'pairAddress': PAIR, 'priceUsd': '0.01', 'priceNative': '0.0001',
+                        'baseToken': {'address': MINT, 'symbol': 'X'}, 'quoteToken': {'address': SOL}, **extra}
+                feed = m.make_coin(MINT, dict(pair), {})
+                refresh = lab_position_marks.parse_pair_response({'pairs': [dict(pair)]}, MINT, PAIR, 1)
+                expected = 250_000.0 if label == 'known' else 0.0
+                self.assertEqual(feed['liquidityUsd'], expected)
+                self.assertEqual(refresh['liquidityUsd'], expected)
+                self.assertEqual(forward.reported_liquidity_usd(feed), expected)
+                self.assertEqual(forward.reported_liquidity_usd(refresh), expected)
+
+
 class ExitContextScoreTests(unittest.TestCase):
     """NEO_MARKET_SCORE_V2 is an entry change only: held ORDER_FLOW_ADAPTIVE positions keep
     the exit context (conviction, hold mode, max hold, target, trail) of the V1 score."""
@@ -2771,7 +2844,9 @@ class TapeSchedulerPathTests(unittest.TestCase):
         selected, report = scheduler.select(dict(state, positions=[]), now=self.NOW, max_tracked=4)
         self.assertEqual(sorted(row['symbol'] for row in selected), ['Lost', 'Safe'])
         self.assertEqual(report['defensive_entry']['blocked_pools_in_feed'], 2)
-        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        # V6 (LAB_FORWARD_TESTS_V1: no pins for flow-free Lab books) keeps every V5 defensive seat rule.
+        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
         self.assertTrue(defensive['pinned_exit_pools_exempt'])
         # The fake-cap pool sits in the 30 bps tier but never reaches the cost-first seat group.
         self.assertEqual(cost_first.fee_tier_bps(fake), 30.0)
@@ -2923,7 +2998,10 @@ class VersionAndReplayTests(unittest.TestCase):
         self.assertEqual(cost_first.ENTRY_POLICY_VERSION, 'COST_FIRST_ESTABLISHED_V2')
         self.assertEqual(lab.activity.POLICY_VERSION, 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY')
         self.assertEqual(promoted_guard.FUNDED_POLICY_VERSION, 'PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5')
-        self.assertEqual(tape_scheduler.POLICY_VERSION, 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        # The defensive seat screen arrived in V5; V6 (LAB_FORWARD_TESTS_V1) keeps it unchanged.
+        self.assertEqual(tape_scheduler.PREVIOUS_POLICY_VERSION, 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        self.assertEqual(tape_scheduler.POLICY_VERSION,
+                         'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
         self.assertEqual(m.SCORE_VERSION, 'NEO_MARKET_SCORE_V2_LIQ_MC_BAND')
 
     def test_v4_learning_evidence_still_holds_a_throttled_rule(self):

@@ -65,6 +65,10 @@ in `docs/DEFENSIVE_ENTRY_LAYER.md`.
 
 All three are expected to fail. They are forward tests, not strategies.
 
+LAB_A and LAB_B now run with their random controls as PAPER Strategy Lab books
+(`LAB_FORWARD_TESTS_V1`, see `docs/LAB_FORWARD_TESTS.md`). LAB_C is not implemented: it
+needs tape seats.
+
 **Promotion gate (all must hold on trades entered after the Lab start):**
 - at least 150 closes, at least 25 pairs and at least 3 days covering every UTC hour;
 - net50 mean > 0, with the pair-bootstrap CI95 lower bound of mean $ per trade > 0;
@@ -93,6 +97,18 @@ python research/edge_study_2026_10_08/rescore_lab_hypotheses.py
   Multi-step backups restart forever while the tape writes.
 - `rescore_lab_hypotheses.py` runs the frozen hypotheses and their random controls under
   `leaderboard/harness_final.py`.
+- `lab_forward_parity.py` replays the scan-log points through the Lab's `LAB_FORWARD_TESTS_V1`
+  implementation and compares every LAB_A, LAB_B and random-control signal point, and the
+  per-minute regime, with the frozen research functions. Rug screens are excluded on both
+  sides because the Lab applies them in its defensive layer. On 2026-10-08, over 21 hours
+  (780,718 points), it found:
+  - the regime equal in all 1,191 minutes;
+  - both random controls identical;
+  - LAB_A 130 of 132 signal points matched;
+  - LAB_B 3,286 of 3,290 signal points matched.
+
+  The 6 research-only points needed an observation older than the Lab's 61-minute pair
+  history.
 - `leaderboard/run_all.py` rebuilds the full leaderboard. It is slow.
 
 Use the repo virtualenv's Python. The research code uses only the standard library and

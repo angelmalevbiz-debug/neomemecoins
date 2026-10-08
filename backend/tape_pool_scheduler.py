@@ -45,6 +45,13 @@ withhold one: a loss cooldown in one account or Lab book says nothing about
 the others, and a withheld seat would leave every engine without the
 COMPLETE exact-pool window it needs. Each entry path applies its own
 ledger's memory before quoting.
+
+Flow-free Lab positions (V6): a Lab book whose exits never read tape flow
+(LAB_FORWARD_TESTS_V1: no flow gate at entry, no flow exit; marks come from
+the shared feed or the DexScreener exact-pair refresh) does not pin its held
+pool. A pin there would take an entry seat from main, the personal engines
+and the flow-gated Lab books without serving any exit. A pool that main or a
+personal engine also holds is still pinned by that holder.
 """
 import json
 import math
@@ -54,6 +61,7 @@ import time
 from pathlib import Path
 
 import lab_activity
+import lab_forward_tests
 import cost_first_established as cost_first
 import entry_defense
 import funded_market_candidates
@@ -64,8 +72,9 @@ import winner_ensemble
 
 FUNDED_RULES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 LEASE_MS = 60_000
-POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY'
-PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS'
+POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS'
+PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY'
+LAB_PIN_RULE = 'LAB_POSITIONS_PINNED_UNLESS_THEIR_BOOK_NEVER_READS_FLOW'
 DEFENSIVE_EXAMPLE_LIMIT = 6
 SEAT_RULE = 'NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL'
 HEAT_SEAT_MODE = 'NEW_SEATS_WITHHELD_RUNNING_LEASES_KEPT_WARMING_LOG_ONLY'
@@ -148,11 +157,31 @@ def _opened_at(position):
     return value if math.isfinite(value) else math.inf
 
 
+def lab_pin_positions(state):
+    """(Lab positions that need an exit pin, number of flow-free Lab positions left unpinned).
+
+    A LAB_FORWARD_TESTS_V1 position never reads tape flow (lab_forward_tests.tape_pin_required),
+    so it takes no seat; every other Lab position is pinned exactly as before.
+    """
+    books = (state.get('strategy_lab') or {}).get('books') or {}
+    rows = books.values() if isinstance(books, dict) else books
+    pinned, unpinned = [], 0
+    for book in rows:
+        if not isinstance(book, dict) or not isinstance(book.get('position'), dict):
+            continue
+        if lab_forward_tests.tape_pin_required(book['position']):
+            pinned.append(book['position'])
+        else:
+            unpinned += 1
+    return pinned, unpinned
+
+
 def _held_coins(state, market, extra_positions=(), extra_limit=None):
     """Main and Lab held pools, then other engines' held pools not already pinned.
 
     Main/Lab rows keep their exact previous order and values and are never
-    capped. A pool held by a personal engine as well as by main or another
+    capped; Lab rows of books that never read flow are left out (V6,
+    lab_pin_positions). A pool held by a personal engine as well as by main or another
     engine is pinned once. Supported pools held only by personal engines
     follow, in PERSONAL_PIN_ORDER, at most ``extra_limit`` of them (None: no
     cap); the rest are reported, not pinned. Returns the held coins, the
@@ -160,10 +189,8 @@ def _held_coins(state, market, extra_positions=(), extra_limit=None):
     the admitted personal-only identities and an operator report.
     """
     positions = list(state.get('positions') or [])
-    books = (state.get('strategy_lab') or {}).get('books') or {}
-    rows = books.values() if isinstance(books, dict) else books
-    positions += [book['position'] for book in rows
-                  if isinstance(book, dict) and isinstance(book.get('position'), dict)]
+    # V6: Lab positions of books that never read tape flow take no pin (lab_pin_positions).
+    positions += lab_pin_positions(state)[0]
     held = {}
     for position in positions:
         identity, coin = _held_coin(position, market)
@@ -688,6 +715,9 @@ class TapePoolScheduler:
                        'cost_estimates_are_planning_hints': True,
                        'profitability_proven': False, 'lease_ms': self.lease_ms,
                        'entry_capacity': entry_capacity, 'pinned_exit_pools': len(pins),
+                       # V6: held Lab positions of books that never read flow (no seat taken).
+                       'lab_pin_rule': LAB_PIN_RULE,
+                       'unpinned_flow_free_lab_positions': lab_pin_positions(state)[1],
                        'unsupported_held_pools': len(unsupported_pins),
                        'supported_candidate_pools': len(candidates),
                        'shed_policy': {'reason': SHED_REASON, 'min_bodies': self.shed_min_bodies,

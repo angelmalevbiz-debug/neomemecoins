@@ -62,6 +62,9 @@ _USER_SESSION_RE = re.compile(r'^USER-([0-9a-fA-F]{8})-')
 RUNTIME_MARKER_FILE = 'user_accounts.json'
 RUNTIME_DIR_NAME = '.runtime'
 LAB_BALANCE_TOLERANCE_USD = 0.01
+# LAB_FORWARD_CONTROL_CONTINUITY_V1 close of a random control past its funding: counted per trade,
+# never in net P&L or the equity path (it did not move the book's balance).
+ZERO_CAPITAL_MODE = 'zero_capital_control'
 
 
 def finite(value: Any, default: float | None = None) -> float | None:
@@ -237,6 +240,7 @@ def _engine_trade(row: dict[str, Any], account: str, source: str) -> dict[str, A
         'mint': str(row.get('address') or 'UNKNOWN'), 'pool': str(row.get('pairAddress') or 'UNKNOWN'),
         'opened_at': opened, 'closed_at': closed, 'hold_s': (closed - opened) / 1000,
         'notional_usd': notional, 'pnl_usd': pnl, 'pnl_pct': pct,
+        'zero_capital': False, 'balance_effect_usd': pnl,
         'gross_mark_usd': gross_mark_usd,
         'entry_roundtrip_pct': entry_rt_pct,
         'entry_roundtrip_cost_usd': (-entry_rt_pct / 100 * notional) if entry_rt_pct is not None and notional else None,
@@ -295,6 +299,11 @@ def _lab_trade(row: dict[str, Any], book_id: str, group: str, source: str) -> di
     exit_leg_usd = None
     if quantity and exit_mark and basis is not None and final_leg is not None:
         exit_leg_usd = quantity * exit_mark - (basis + final_leg)
+    # LAB_FORWARD_CONTROL_CONTINUITY_V1: a random control's close past its funding is a per-trade
+    # measurement that never moved the book's balance (balance_effect_usd 0).
+    zero_capital = row.get('capital_mode') == ZERO_CAPITAL_MODE
+    effect = finite(row.get('balance_effect_usd'))
+    balance_effect = 0.0 if zero_capital else (pnl if effect is None else effect)
     return {
         'family': 'LAB', 'account': f'LAB:{group}', 'source': source, 'id': trade_id,
         'book': book_id, 'session': 'LAB',
@@ -305,6 +314,7 @@ def _lab_trade(row: dict[str, Any], book_id: str, group: str, source: str) -> di
         'mint': mint, 'pool': pool,
         'opened_at': opened, 'closed_at': closed, 'hold_s': (closed - opened) / 1000,
         'notional_usd': notional, 'pnl_usd': pnl, 'pnl_pct': pct,
+        'zero_capital': zero_capital, 'balance_effect_usd': balance_effect,
         'gross_mark_usd': gross_mark_usd,
         'entry_roundtrip_pct': entry_rt_pct,
         'entry_roundtrip_cost_usd': (-entry_rt_pct / 100 * notional) if entry_rt_pct is not None and notional else None,
@@ -561,7 +571,9 @@ def assign_segments(trades: list[dict[str, Any]], collector: 'LedgerCollector') 
         previous: dict[str, Any] | None = None
         start: float | None = None
         for trade in rows:
-            implied_before = (trade['balance_after'] - trade['pnl_usd']) if trade.get('balance_after') is not None else None
+            # What the close did to the balance (0 for a zero-capital control close).
+            implied_before = ((trade['balance_after'] - trade.get('balance_effect_usd', trade['pnl_usd']))
+                              if trade.get('balance_after') is not None else None)
             restart = previous is None
             if previous is not None:
                 # Books that hold several positions close out of trade_no order, so only a
@@ -587,7 +599,7 @@ def _segment_drawdown(rows: list[dict[str, Any]], start: float | None) -> tuple[
     worst = 0.0
     worst_pct = 0.0 if start and start > 0 else None
     for trade in rows:  # already sorted by closed_at
-        equity += trade['pnl_usd']
+        equity += trade.get('balance_effect_usd', trade['pnl_usd'])
         peak = max(peak, equity)
         worst = max(worst, peak - equity)
         if worst_pct is not None and start + peak > 0:
@@ -682,6 +694,11 @@ def measure(trades: list[dict[str, Any]], *, starting_balance: float | None, ite
     books = sorted({str(trade['book']) for trade in trades if trade.get('book') is not None})
 
     stress_usd = [trade['pnl_usd'] - trade['notional_usd'] * STRESS_BPS_PER_LEG * STRESS_LEGS / 10_000 for trade in trades]
+    # Net P&L sums only what moved a balance; zero-capital control closes are counted per trade
+    # (wins, expectancy) and reported separately (LAB_FORWARD_CONTROL_CONTINUITY_V1).
+    zero_capital = [trade for trade in trades if trade.get('zero_capital')]
+    balance_pnl = [trade.get('balance_effect_usd', trade['pnl_usd']) for trade in trades]
+    stress_balance = [value for value, trade in zip(stress_usd, trades) if not trade.get('zero_capital')]
     stress_pct = [pct - STRESS_BPS_PER_LEG * STRESS_LEGS / 100 for pct in pcts]
 
     missing = []
@@ -698,7 +715,10 @@ def measure(trades: list[dict[str, Any]], *, starting_balance: float | None, ite
         'wins': len(wins), 'losses': len(losses), 'breakeven': count - len(wins) - len(losses),
         'basis': 'net after all modeled costs (pnl_usd / pnl_pct as recorded)',
         'win_rate_pct': _round(len(wins) / count * 100) if count else None,
-        'net_pnl_usd': round(sum(pnls), 6),
+        'net_pnl_usd': round(sum(balance_pnl), 6),
+        'net_pnl_basis': 'what each close did to its balance; zero-capital control closes excluded',
+        'zero_capital_closes': len(zero_capital),
+        'zero_capital_pnl_usd': round(sum(trade['pnl_usd'] for trade in zero_capital), 6),
         'avg_net_win_usd': _round(_mean(trade['pnl_usd'] for trade in wins)),
         'avg_net_win_pct': _round(_mean(trade['pnl_pct'] for trade in wins if trade['pnl_pct'] is not None)),
         'avg_net_loss_usd': _round(_mean(trade['pnl_usd'] for trade in losses)),
@@ -710,7 +730,7 @@ def measure(trades: list[dict[str, Any]], *, starting_balance: float | None, ite
         'cost_stress_plus_50bps_per_leg': {
             'expectancy_usd_per_trade': _round(_mean(stress_usd)),
             'expectancy_pct_per_trade': _round(_mean(stress_pct)),
-            'net_pnl_usd': _round(sum(stress_usd)),
+            'net_pnl_usd': _round(sum(stress_balance)),
             'basis': f'{STRESS_BPS_PER_LEG} bps on entry notional per leg, {STRESS_LEGS} legs, subtracted from each recorded net result',
         },
         'profit_factor': profit_factor, 'profit_factor_status': pf_status,

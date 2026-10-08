@@ -13,6 +13,7 @@ import cost_first_established as cost_first
 import entry_defense
 import heat_veto
 import pool_loss_memory
+import lab_forward_tests as lab_forward
 import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -44,6 +45,7 @@ STRATEGY_START_BALANCES={
     'SCALPER':float(os.getenv('NEO_LAB_SCALPER_START_BALANCE','100')),
     **{strategy_id:PROMOTED_ALLOCATION for strategy_id in PROMOTED_STRATEGIES},
     **{strategy_id:cost_first.START_BALANCE_USD for strategy_id in cost_first.BOOK_IDS},
+    **{strategy_id:lab_forward.START_BALANCE_USD for strategy_id in lab_forward.BOOK_IDS},
 }
 TRADE_NOTIONAL=float(os.getenv('NEO_LAB_TRADE_NOTIONAL','150'))
 POLL_SECONDS=float(os.getenv('NEO_LAB_POLL_SECONDS','2'))
@@ -83,6 +85,37 @@ def defensive_entry_decision(coin,now,*,blocked_pools,heat_log_only=False):
     """Structural rug guard, the book's pool loss memory and the heat veto (log-only for
     the reserved surge/dip hypothesis arms); asked before flow, safety, price probes and fills."""
     return entry_defense_layer().evaluate(coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only)
+
+def heat_log_only_book(book_id):
+    """HEAT_VETO_STACK_V1 records flags without blocking: heat_veto's reserved surge/dip
+    hypothesis arms and, for LAB_FORWARD_TESTS_V1, their random controls (same universe)."""
+    return book_id in heat_veto.LOG_ONLY_BOOK_IDS or book_id in lab_forward.HEAT_LOG_ONLY_BOOK_IDS
+
+# LAB_FORWARD_TESTS_V1 memory of this Lab process: the LAB_A surge state of each
+# pool's last two observations and its liquidity samples (prices, segments and
+# gaps come from the defensive layer's PairHistory). Fed with every entry refresh.
+FORWARD_MEMORY=lab_forward.ForwardFeedMemory()
+
+def lab_forward_memory():
+    return FORWARD_MEMORY
+
+# LAB_FORWARD_SIGNAL_CARRY_V2: matched forward-test signals whose only blocker is the
+# asynchronous price cross-check, retried on later refreshes (in memory, bounded).
+FORWARD_SIGNAL_CARRY=lab_forward.SignalCarry()
+
+def lab_forward_signal_carry():
+    return FORWARD_SIGNAL_CARRY
+
+def forward_cost_model():
+    """This process's resolved Lab cost model, compared with the one in the forward books' config hash."""
+    return {'execution_model':EXECUTION_MODEL_VERSION,'generic_dex_fee_bps':GENERIC_DEX_FEE_BPS,
+            'base_slippage_bps':BASE_SLIPPAGE_BPS,'latency_buffer_bps':LATENCY_BUFFER_BPS,
+            'network_fee_sol':NETWORK_FEE_SOL,'max_price_impact_pct':MAX_PRICE_IMPACT_PCT}
+
+def forward_cooldown_remaining_ms(book,coin,now):
+    """A forward book's re-entry wait on this pool: the Lab's per-token pause or the research 300 s pool cooldown."""
+    return max(activity.cooldown_remaining_ms(book,coin['address'],now),
+               lab_forward.pool_cooldown_remaining_ms(book,coin,now))
 
 def cost_first_exit_reason(exits,net_pct,hold_minutes):
     """Net-basis exits of one COST_FIRST book; gaps below the stop are not clamped."""
@@ -211,28 +244,143 @@ def exit_execution(c,qty):
     return {**f,'market_price':market,'fill_price':fill,'market_value_usd':market_value,
             'gross_proceeds_usd':gross,'dex_fee_usd':dex_fee,'net_proceeds_usd':net}
 
+# LAB_FORWARD_TESTS_V1 booking: the shared model above (unchanged, frozen against
+# lab_paired_costs.py) with a declared extra price penalty per leg (CALIB_V1),
+# added to the model's impact + slippage + latency penalty exactly as the
+# research harness adds extra_bps. extra_bps 0 returns the shared model's result.
+def calibrated_entry_execution(c,notional,extra_bps):
+    out=dict(entry_execution(c,notional))
+    if not extra_bps:
+        return out
+    penalty=(out['impact_pct']+out['slippage_pct']+out['latency_pct']+extra_bps/100.0)/100.0
+    out['fill_price']=out['market_price']*(1+penalty)
+    out['quantity']=max(0.0,notional-out['dex_fee_usd'])/max(out['fill_price'],1e-18)
+    out['calibration_extra_pct']=extra_bps/100.0
+    return out
+
+def calibrated_exit_execution(c,qty,extra_bps,drain_aware=False):
+    """drain_aware (LAB_FORWARD_CLOSE_POLICY_V1): the impact is never below the constant-product
+    x/(1+x) of the reported liquidity, and a reported liquidity of 0 sells for nothing."""
+    out=dict(exit_execution(c,qty))
+    impact=out['impact_pct']
+    if drain_aware:
+        impact=lab_forward.drain_aware_impact_pct(out['market_value_usd'],lab_forward.reported_liquidity_usd(c),impact)
+    if not extra_bps and impact==out['impact_pct']:
+        return out
+    penalty=(impact+out['slippage_pct']+out['latency_pct']+extra_bps/100.0)/100.0
+    fill=max(0.0,out['market_price']*(1-penalty))
+    gross=max(0.0,qty*fill)
+    dex_fee=gross*out['dex_fee_bps']/10000.0
+    out.update({'impact_pct':impact,'fill_price':fill,'gross_proceeds_usd':gross,'dex_fee_usd':dex_fee,
+                'net_proceeds_usd':max(0.0,gross-dex_fee-out['network_fee_usd']),
+                'calibration_extra_pct':extra_bps/100.0})
+    if drain_aware:
+        out['exit_impact_model']=lab_forward.CLOSE_POLICY_VERSION
+    return out
+
+def forward_exit_execution(c,pos,qty=None):
+    """Booked exit of a LAB_FORWARD_TESTS_V1 position: CALIB_V1 plus the drain-aware impact."""
+    return calibrated_exit_execution(c,num(pos.get('quantity')) if qty is None else qty,
+                                     lab_forward.position_calib_bps(pos),drain_aware=True)
+
+# LAB_FORWARD_FILL_BASIS_V4: the booked model, re-run at the research fills of a close.
+def research_fill_entry_execution(c,notional,extra_bps):
+    return calibrated_entry_execution(c,notional,extra_bps)
+
+def research_fill_exit_execution(c,qty,extra_bps):
+    return calibrated_exit_execution(c,qty,extra_bps,drain_aware=True)
+
+def complete_forward_research_fill(row):
+    """Value a forward close's research-fill shadow once both legs are known (shadow fields only)."""
+    return lab_forward.complete_research_fill(row,research_fill_entry_execution,research_fill_exit_execution)
+
+def forward_fill_observations(key,prices,now,extra=()):
+    """Observations of one exact pool this loop (shared feed, exact-pair refresh), oldest first."""
+    coins=[coin for coin in (prices.get(key),*extra) if isinstance(coin,dict)]
+    return sorted(coins,key=lambda coin:num(lab_forward.observation_ms(coin,now)))
+
+def advance_forward_fill_legs(record,coins,now):
+    """Advance the pending research-fill legs of a forward position or close with this loop's observations."""
+    shadow=record.get('research_fill') if isinstance(record,dict) else None
+    if not isinstance(shadow,dict):
+        return False
+    key=(record.get('address'),record.get('pairAddress'))
+    changed=False
+    for side in ('entry','exit'):
+        leg=shadow.get(side)
+        for coin in coins:
+            changed=lab_forward.advance_fill_leg(leg,coin,now,key=key) or changed
+        changed=lab_forward.advance_fill_leg(leg,None,now,key=key) or changed
+    return changed
+
+# Forward books whose whole history was scanned for research-fill shadows left
+# pending (for example by a restart) in this process; later loops scan recent closes.
+FORWARD_FILL_FULL_SCAN=set()
+
+def advance_forward_research_fills(prices,now):
+    """LAB_FORWARD_FILL_BASIS_V4: resolve and value the research fills of recent forward closes.
+
+    Observations: the pool in the shared feed, else the exact-pair refresh (which
+    this schedules for a closed pool that left the feed). Only shadow fields change.
+    """
+    for book_id in lab_forward.BOOK_IDS:
+        book=STATE['books'].get(book_id)
+        if not isinstance(book,dict):
+            continue
+        full=book_id not in FORWARD_FILL_FULL_SCAN
+        rows=lab_forward.pending_fill_rows(book,now,full_scan=full)
+        FORWARD_FILL_FULL_SCAN.add(book_id)
+        for row in rows:
+            key=(row.get('address'),row.get('pairAddress'))
+            extra=()
+            if key not in prices and not lab_forward.fill_legs_resolved(row):
+                extra=(POSITION_MARK_FEED.resolve(row,prices,now),)
+            advance_forward_fill_legs(row,forward_fill_observations(key,prices,now,extra),now)
+            complete_forward_research_fill(row)
+
 def load_json(path,default):
     try: return json.loads(read_shared_text(path,encoding='utf-8'))
     except Exception: return default
 
 def atomic_write_path(path,data):
+    """Write ``data`` as JSON atomically (fsync, then replace); returns the bytes written."""
     path.parent.mkdir(parents=True,exist_ok=True)
     tmp=path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    # json.dumps runs the C encoder (json.dump streams through the pure-Python one): the
+    # same bytes, several times faster on a large ledger rewritten every loop.
+    text=json.dumps(data,ensure_ascii=False,allow_nan=False)
     with tmp.open('w',encoding='utf-8') as handle:
-        json.dump(data,handle,ensure_ascii=False,allow_nan=False)
+        handle.write(text)
         handle.flush()
         os.fsync(handle.fileno())
+        size=os.fstat(handle.fileno()).st_size
     for attempt in range(8):
         try:
             tmp.replace(path)
-            return
+            return size
         except PermissionError:
             if attempt==7:
                 raise
             time.sleep(min(.4,.025*(2**attempt)))
 
 def atomic_write(data):
-    atomic_write_path(STATE_PATH,data)
+    return atomic_write_path(STATE_PATH,data)
+
+# LAB_PERSIST_METRICS_V1: size and duration of the last whole-ledger write (the Lab rewrites
+# and fsyncs its ledger every loop; a growing ledger slows marks, exits and entries).
+PERSIST_METRICS_VERSION='LAB_PERSIST_METRICS_V1'
+PERSIST_METRICS={}
+
+def record_persist_metrics(ledger_bytes,compact_bytes,seconds,at):
+    PERSIST_METRICS.clear()
+    PERSIST_METRICS.update({
+        'version':PERSIST_METRICS_VERSION,'measured_at':int(at),
+        'ledger_bytes':int(ledger_bytes) if isinstance(ledger_bytes,int) else None,
+        'compact_bytes':int(compact_bytes) if isinstance(compact_bytes,int) else None,
+        'write_seconds':round(max(0.0,seconds),3),'poll_seconds':POLL_SECONDS,
+        # Writes alone take a share of the loop's period; near or above 1 the loop falls behind.
+        'write_share_of_poll':round(max(0.0,seconds)/POLL_SECONDS,3) if POLL_SECONDS>0 else None,
+        'basis':'the previous write (a write cannot publish its own size)'})
 
 def flow_map():
     global FLOW_TAPE_DIAGNOSTICS
@@ -474,6 +622,12 @@ STRATEGIES=[
  # different exits; never promoted automatically, no outcome is assumed.
  {'id':cost_first.CONTROL_BOOK_ID,'name':cost_first.BOOK_NAMES[cost_first.CONTROL_BOOK_ID],'rule':activity.RULES[cost_first.CONTROL_BOOK_ID].matches},
  {'id':cost_first.SCALED_BOOK_ID,'name':cost_first.BOOK_NAMES[cost_first.SCALED_BOOK_ID],'rule':activity.RULES[cost_first.SCALED_BOOK_ID].matches},
+
+ # LAB_FORWARD_TESTS_V1: two pre-registered research hypotheses and their random
+ # controls (lab_forward_tests.py). Universe and signal are evaluated by that
+ # module on each observation; heat is log-only; never promoted automatically.
+ *({'id':book_id,'name':lab_forward.BOOK_NAMES[book_id],'rule':activity.RULES[book_id].matches}
+   for book_id in lab_forward.BOOK_IDS),
 ]
 def promoted_candidate_config():
     """Expose precisely the rules used at funded admission, never legacy lambdas."""
@@ -527,11 +681,18 @@ def lifecycle_activity_versions():
     return {book_id:cost_first.LIFECYCLE_EVIDENCE_VERSIONS for book_id in cost_first.BOOK_IDS}
 
 def review_strategy_lifecycle(books):
-    return lifecycle.apply_lifecycle(
-        books,registered_ids={s['id'] for s in STRATEGIES},
+    now=now_ms()
+    registered={s['id'] for s in STRATEGIES}
+    # The four LAB_FORWARD_TESTS_V1 books are judged only by their pre-registered
+    # kill rule (>= 50 closes, mean net50 < 0 and CI95 upper < 0), never by the
+    # shared 12-close heuristic, which would stop a negative-expectancy control
+    # before the comparison it exists for.
+    review=lifecycle.apply_lifecycle(
+        books,registered_ids=registered-set(lab_forward.BOOK_IDS),
         promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.LIFECYCLE_EVIDENCE_VERSIONS,
         activity_versions=lifecycle_activity_versions(),
-        execution_version=EXECUTION_MODEL_VERSION,now=now_ms())
+        execution_version=EXECUTION_MODEL_VERSION,now=now)
+    return lab_forward.apply_kill_rules(books,review,registered_ids=registered,now=now)
 
 def load_state():
     reset_requested=RESET_FLAG_PATH.exists()
@@ -592,14 +753,21 @@ assert set(activity.RULES)=={s['id'] for s in STRATEGIES}, 'Every Lab strategy n
 
 def close_position(book,pos,coin,reason):
     market_price=num(coin.get('priceUsd')); qty=num(pos.get('quantity'))
-    quote=exit_execution(coin,qty)
+    # LAB_FORWARD_TESTS_V1 books book the exit leg with CALIB_V1 and the drain-aware
+    # impact of LAB_FORWARD_CLOSE_POLICY_V1; every other book keeps the shared model.
+    forward=lab_forward.is_forward_position(pos)
+    quote=forward_exit_execution(coin,pos,qty) if forward else exit_execution(coin,qty)
     cost_basis=num(pos.get('remaining_cost_basis_usd'),num(pos.get('notional_usd'))+num(pos.get('entry_network_fee_usd')))
     final_pnl=quote['net_proceeds_usd']-cost_basis
     partial_pnl=num(pos.get('partial_realized_pnl'))
     total_pnl=partial_pnl+final_pnl
     original_notional=num(pos.get('notional_usd'))
     pct=total_pnl/max(original_notional,1e-18)*100
-    book['balance']=round(num(book['balance'])+final_pnl,8)
+    # LAB_FORWARD_CONTROL_CONTINUITY_V1: a control's zero-capital measurement records its
+    # P&L like any close but never moves the balance (it was entered past the funding).
+    zero_capital=lab_forward.is_zero_capital_position(pos)
+    if not zero_capital:
+        book['balance']=round(num(book['balance'])+final_pnl,8)
     trade={**pos,'exit_price':market_price,'execution_exit_price':round(quote['fill_price'],12),
            'closed_at':now_ms(),'exit_reason':reason,'final_leg_pnl_usd':round(final_pnl,4),
            'pnl_usd':round(total_pnl,4),'pnl_pct':round(pct,3),'balance_after':round(book['balance'],4),
@@ -608,6 +776,19 @@ def close_position(book,pos,coin,reason):
            'exit_slippage_pct':round(quote['slippage_pct']+quote['latency_pct'],4),
            'execution_mode':EXECUTION_MODEL_VERSION,
            'execution_source':'DEX_SPOT_WITH_MODELED_FRICTION'}
+    if forward:
+        # Uncalibrated model result, the calibration and drain costs, net50 (booked minus the
+        # research stress) and the close kind (marked, drained or vanished).
+        model=exit_execution(coin,num(pos.get('model_quantity')))
+        capped=calibrated_exit_execution(coin,qty,lab_forward.position_calib_bps(pos))
+        trade.update(lab_forward.close_record(pos,trade,model_net_proceeds_usd=model['net_proceeds_usd'],
+                                              reason=reason,capped_net_proceeds_usd=capped['net_proceeds_usd'],
+                                              booked_net_proceeds_usd=quote['net_proceeds_usd'],
+                                              exit_liquidity_usd=lab_forward.reported_liquidity_usd(coin),
+                                              exit_coin=coin,exit_at=trade['closed_at']))
+        trade['balance_effect_usd']=0.0 if zero_capital else round(final_pnl,4)
+        # LAB_FORWARD_FILL_BASIS_V4: a VANISHED close has no exit fill, so its shadow may be complete now.
+        complete_forward_research_fill(trade)
     book['history'].insert(0,trade); book['position']=None
 
 def realize_partial(book,pos,coin,fraction,label):
@@ -632,6 +813,32 @@ def realize_partial(book,pos,coin,fraction,label):
                   'move_pct':round((market_price-num(pos.get('entry_price')))/max(num(pos.get('entry_price')),1e-18)*100,3)})
     return pnl
 
+# LAB_FORWARD_CLOSE_POLICY_V1: when this Lab process first failed to get a usable
+# mark of a held forward-test pool (in memory: a restart first retries the exact-pair
+# refresh for the confirm window). At most one entry per forward book.
+FORWARD_UNPRICED_SINCE={}
+
+def forward_position_key(pos):
+    return (pos.get('strategy_id'),pos.get('trade_no'),pos.get('opened_at'))
+
+def close_vanished_forward_position(book,pos,now,feed_alive):
+    """Close a forward-test position whose exact pool gave no usable mark beyond max hold + 10 min
+    at its last mark minus the research's 10% VANISH haircut (drain-aware booked exit)."""
+    key=forward_position_key(pos)
+    for stale in [k for k in FORWARD_UNPRICED_SINCE if k[0]==key[0] and k!=key]:
+        FORWARD_UNPRICED_SINCE.pop(stale,None)
+    since=FORWARD_UNPRICED_SINCE.setdefault(key,now)
+    if not lab_forward.vanish_due(pos,now,since,feed_alive):
+        return False
+    coin=lab_forward.vanished_coin(pos)
+    if coin is None or sol_usd_from_coin(coin)<=0:
+        # No valuable last mark: keep the position open; the gate counts it as unpriced.
+        pos['quote_unavailable_reason']='vanished_without_valuable_last_mark'
+        return False
+    FORWARD_UNPRICED_SINCE.pop(key,None)
+    close_position(book,pos,coin,lab_forward.CLOSE_POLICY.vanish_reason)
+    return True
+
 def update_positions(flows,feed):
     # Use the shared discovery feed when it contains the exact held pool. If
     # the pool rotated out, refresh it independently without blocking this loop.
@@ -644,12 +851,21 @@ def update_positions(flows,feed):
     exit_only_books=(portfolio_setup.get('legacy_draining_books') or {}).values()
     registered={s['id'] for s in STRATEGIES}
     managed_books=[book for key,book in STATE['books'].items() if key in registered]
+    # LAB_FORWARD_CLOSE_POLICY_V1: a held pool may be declared vanished only while
+    # the shared feed itself is alive (a feed outage is not a vanished pool).
+    forward_feed_alive=lab_forward.feed_alive(feed,now_ms())
     for book in [*managed_books, *exit_only_books]:
         pos=book.get('position')
         if not pos: continue
         decision_at=now_ms()
         is_rush=pos.get('strategy_id',book.get('id'))==rush_brain.STRATEGY_ID
+        forward=lab_forward.is_forward_position(pos)
         coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
+        if forward:
+            # LAB_FORWARD_FILL_BASIS_V4: this loop's observations of the held pool decide where the
+            # research would have filled the entry (shadow only; booking and exits are unchanged).
+            advance_forward_fill_legs(pos,forward_fill_observations(
+                (pos.get('address'),pos.get('pairAddress')),prices,decision_at,(coin,)),decision_at)
         mark_stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
         rush_mark_fresh=(coin and coin.get('address')==pos.get('address')
                          and coin.get('pairAddress')==pos.get('pairAddress')
@@ -660,6 +876,7 @@ def update_positions(flows,feed):
             pos['quote_status']='stale' if age>POSITION_STALE_AFTER_MS else 'refreshing'
             pos['quote_age_ms']=age
             pos['quote_unavailable_reason']='exact_pool_not_in_recent_entry_feed'
+            if forward: close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
             continue
         if sol_usd_from_coin(coin)<=0:
             # Keep the complete held position and its last valuation while the
@@ -667,7 +884,16 @@ def update_positions(flows,feed):
             pos['quote_status']='unavailable'
             pos['quote_age_ms']=max(0,decision_at-int(num(pos.get('mark_received_at'),num(pos.get('updated_at')))))
             pos['quote_unavailable_reason']='network_price_unknown'
+            if forward: close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
             continue
+        if forward:
+            # A usable mark of the exact pool: reset the no-mark clock, keep it for a VANISHED valuation.
+            # LAB_FORWARD_MARK_LIQUIDITY_V2: a mark that omits the pool liquidity is a reported 0 (the
+            # shared feed and the exact-pair refresh normalize it alike): its price triggers the exits
+            # and the drain-aware exit books the sale at 0, as for an explicit 0.
+            FORWARD_UNPRICED_SINCE.pop(forward_position_key(pos),None)
+            pos['last_mark']=lab_forward.mark_snapshot(coin,num(coin.get('mark_received_at'),decision_at),
+                                                       pos.get('last_mark'))
         price=num(coin.get('priceUsd'))
         entry=num(pos['entry_price']); peak=max(num(pos.get('peak_price'),entry),price)
         pct=(price-entry)/entry*100; hold=(now_ms()-int(pos['opened_at']))/60000
@@ -681,11 +907,18 @@ def update_positions(flows,feed):
         reason=None
 
         remaining_qty=num(pos.get('quantity'))
-        live_quote=exit_execution(coin,remaining_qty)
+        live_quote=(forward_exit_execution(coin,pos,remaining_qty) if forward
+                    else exit_execution(coin,remaining_qty))
         remaining_basis=num(pos.get('remaining_cost_basis_usd'),num(pos.get('notional_usd'))+num(pos.get('entry_network_fee_usd')))
         open_pnl=live_quote['net_proceeds_usd']-remaining_basis
         total_live_pnl=num(pos.get('partial_realized_pnl'))+open_pnl
         total_live_pct=total_live_pnl/max(num(pos.get('notional_usd')),1e-18)*100
+        # LAB_FORWARD_TESTS_V1: booked marks carry CALIB_V1 (and the drain-aware impact);
+        # exits trigger on the uncalibrated model net of the model quantity, as the research's did.
+        model_live_pct=None
+        if forward:
+            model_quote=exit_execution(coin,num(pos.get('model_quantity')))
+            model_live_pct=(model_quote['net_proceeds_usd']-remaining_basis)/max(num(pos.get('notional_usd')),1e-18)*100
 
         # Rush's faster TEST exits use the same net cost model and 3% stop.
         # Standard books retain their 3/10/60 framework.
@@ -693,7 +926,10 @@ def update_positions(flows,feed):
         entry_liq=num(pos.get('entry_liquidity_usd'))
         current_liq=num(coin.get('liquidityUsd'),num((coin.get('liquidity') or {}).get('usd'),math.nan))
         cost_first_exits=cost_first.EXITS.get(pos.get('strategy_id',book.get('id')))
-        if cost_first_exits is not None:
+        if forward:
+            # The exits this position was opened with (its stored exit_parameters).
+            reason=lab_forward.exit_reason(pos,model_live_pct,hold)
+        elif cost_first_exits is not None:
             reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)
         elif total_live_pct<=-STOP_LOSS:
             reason='STOP_LOSS_3_NET'
@@ -725,7 +961,11 @@ def update_positions(flows,feed):
                     'quote_status':'fresh' if quote_age<=POSITION_STALE_AFTER_MS else 'stale',
                     'quote_age_ms':quote_age,'quote_unavailable_reason':None})
         if is_rush: pos['peak_net_pct']=peak_net
+        if forward: pos['model_pnl_pct']=round(model_live_pct,3)
         if reason: close_position(book,pos,coin,reason)
+    # LAB_FORWARD_FILL_BASIS_V4: research fills of recent forward closes (their exit legs
+    # resolve after the close); booked results are never changed.
+    advance_forward_research_fills(prices,now_ms())
 def cost_feasibility_summary(rows,cap):
     """Fee-and-buffer planning floor of the matched candidates; never an admission."""
     return {
@@ -756,6 +996,11 @@ def maybe_open(feed,flows):
     # history (idempotent for an already observed coin snapshot).
     defense=entry_defense_layer()
     defense.observe(feed,now)
+    # LAB_FORWARD_TESTS_V1: the same refresh feeds the surge/liquidity memory, and
+    # the LAB_B market regime of the current minute is computed (cached per minute).
+    forward_memory=lab_forward_memory()
+    forward_memory.observe(feed,now)
+    forward_regime=forward_memory.regime(now,defense.history)
     # Continue gathering causal observations while the Rush book has a position;
     # another strategy's outcomes or number of polls do not affect this memory.
     rush_observations={
@@ -764,9 +1009,17 @@ def maybe_open(feed,flows):
     }
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
+        is_forward=strategy['id'] in lab_forward.BOOK_IDS
+        forward_carry=lab_forward_signal_carry() if is_forward else None
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V2: an episode more than 60 s past its run's first signal
+            # was lost to a pending price check (a newer match never extends the window).
+            forward_carry.expire(book,now)
         if not lifecycle.entry_enabled(book):
+            if is_forward: forward_carry.clear(book,'book_stopped')
             book['entry_diagnostics']={
-                'at':now,'blocked_reason':'strategy_retired_observed_losses',
+                'at':now,'blocked_reason':(lab_forward.RETIRED_REASON if is_forward
+                                           else 'strategy_retired_observed_losses'),
                 'balance_usd':round(num(book.get('balance')),4),
             }
             continue
@@ -798,6 +1051,48 @@ def maybe_open(feed,flows):
         if strategy['id'] in PROMOTED_STRATEGIES:
             entry_limit=min(entry_limit,balance*PROMOTED_MAX_POSITION_FRACTION)
         min_notional=activity.entry_minimum_notional(strategy['id'])
+        # Admission cap: the Lab's one rule, 0.5 x net stop (<= 2.75%). A forward-test book
+        # applies it to its own pre-registered stop and buys a fixed $200, never a smaller size.
+        admission_cap=lab_forward.admission_cost_cap_pct(strategy['id']) if is_forward else cost_cap
+        # The balance an entry must fit (the book's own, except a zero-capital control entry).
+        funding_balance=balance
+        capital_mode=lab_forward.FUNDED
+        if is_forward:
+            entry_limit=min(lab_forward.NOTIONAL_USD,max(0.0,balance))
+            min_notional=lab_forward.NOTIONAL_USD
+            # The config hash covers the resolved cost model: fail closed if this process's
+            # model differs from the hashed one (closes would pool across two cost models).
+            mismatched=lab_forward.cost_model_mismatches(**forward_cost_model())
+            if mismatched:
+                forward_carry.clear(book,'book_stopped')
+                book['entry_diagnostics']={
+                    'at':now,'blocked_reason':lab_forward.COST_MODEL_MISMATCH_REASON,
+                    'cost_model_mismatched_fields':mismatched,'balance_usd':round(balance,4),
+                    'entry_policy_version':lab_forward.ENTRY_POLICY_VERSION,
+                }
+                continue
+            if (balance<lab_forward.CASH.min_entry_balance_usd
+                    and lab_forward.zero_capital_entry_allowed(strategy['id'],STATE['books'],
+                                                               {s['id'] for s in STRATEGIES})):
+                # LAB_FORWARD_CONTROL_CONTINUITY_V1: a control keeps measuring while its hypothesis
+                # can enter; the fixed $200 is a zero-capital entry whose close never moves the balance.
+                capital_mode=lab_forward.ZERO_CAPITAL
+                funding_balance=lab_forward.CASH.min_entry_balance_usd
+                entry_limit=lab_forward.NOTIONAL_USD
+            elif balance<lab_forward.CASH.min_entry_balance_usd:
+                # LAB_FORWARD_CASH_STATE_V1: the fixed $200 entry plus its network fee cannot be
+                # funded; with no open position this book can never trade again.
+                forward_carry.clear(book,'book_stopped')
+                book['entry_diagnostics']={
+                    'at':now,'matched_candidates':0,'cost_rejected':0,
+                    'cooldown_rejected':0,'affordable_candidates':0,
+                    'price_verification_rejected':0,
+                    'blocked_reason':lab_forward.CASH_EXHAUSTED_REASON,
+                    'balance_usd':round(balance,4),'risk_limited_notional_usd':round(entry_limit,4),
+                    'min_entry_balance_usd':lab_forward.CASH.min_entry_balance_usd,
+                    'entry_policy_version':lab_forward.ENTRY_POLICY_VERSION,
+                }
+                continue
         if entry_limit<min_notional:
             book['entry_diagnostics']={
                 'at':now,'matched_candidates':0,'cost_rejected':0,
@@ -837,15 +1132,56 @@ def maybe_open(feed,flows):
         is_cost_first=strategy['id'] in cost_first.BOOK_IDS
         # POOL_LOSS_MEMORY_V1 from this book's own closed history (read-only).
         blocked_pools=pool_loss_memory.index(book.get('history') or [],now)
-        heat_log_only=strategy['id'] in heat_veto.LOG_ONLY_BOOK_IDS
+        heat_log_only=heat_log_only_book(strategy['id'])
         defensive_summary=entry_defense.new_summary()
         defensive_summary['pool_loss_cooldown_pools']=len(blocked_pools)
         defensive_summary['heat_log_only']=heat_log_only
         defensive_rejected=0
+        forward_diagnostics=lab_forward.new_diagnostics(strategy['id']) if is_forward else None
+        forward_evaluations={}
+        # LAB_FORWARD_SIGNAL_CARRY_V2: the last gate each matched forward signal reached,
+        # and the observation it reached it on (LAB_FORWARD_FILL_BASIS_V4: the research-fill
+        # entry leg of a signal run is decided at the run's first held observation).
+        forward_stage={}
+        forward_coins={}
         for coin,features in candidates:
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
-            if is_cost_first:
+            if is_forward:
+                # Research universe (PumpSwap/SOL, liquidity, fee tier) and the book's
+                # signal at this observation; STRUCTURAL_RUG_GUARD_V1 and the loss memory
+                # follow in the defensive layer, price identity and the cost cap below.
+                forward_key=(coin['address'],coin['pairAddress'])
+                evaluation=lab_forward.evaluate(strategy['id'],coin,now,forward_memory,defense.history)
+                lab_forward.record_evaluation(forward_diagnostics,evaluation)
+                matched=evaluation['matched']
+                if matched:
+                    # LAB_FORWARD_FILL_BASIS_V4: a fresh match of a pool whose signal is still held
+                    # continues that signal run; the harness entered at the run's first signal,
+                    # so the research-fill leg decided there is kept (and advanced by this
+                    # observation) whether the run enters now or is held again. A run lives at
+                    # most 60 s after its first signal (LAB_FORWARD_SIGNAL_CARRY_V2), so a match
+                    # after that is the first signal of a new run.
+                    continued=forward_carry.continued_evaluation(strategy['id'],forward_key,evaluation,now,
+                                                                 coin=coin)
+                    if continued is not evaluation:
+                        evaluation=continued
+                        forward_diagnostics['rematched_carried_signals']+=int(bool(continued['carry']['rematched']))
+                elif not evaluation['universe_rejections']:
+                    # A signal of this pool that waited only on the price cross-check is retried
+                    # on its current observation, through every gate below; that observation
+                    # also advances the research-fill leg decided at the run's first signal.
+                    carried=forward_carry.carried_evaluation(strategy['id'],forward_key,now,coin=coin)
+                    if carried is not None:
+                        evaluation,matched=carried,True
+                        forward_diagnostics['carried_signals_retried']+=1
+                if matched:
+                    forward_evaluations[forward_key]=evaluation
+                    forward_coins[forward_key]=coin
+                    forward_stage[forward_key]='defensive_entry'
+                elif evaluation['universe_rejections']:
+                    forward_carry.resolve(book,forward_key,'dropped_by_gate',evaluation['universe_rejections'][0])
+            elif is_cost_first:
                 # Physical cost universe plus STRUCTURAL_RUG_GUARD_V1. Confirmed
                 # flow, fresh safety, price identity and the Lab cost cap are
                 # still required below.
@@ -861,7 +1197,8 @@ def maybe_open(feed,flows):
             else:
                 matched=bool(branches) if is_promoted else rule.matches(features)
             if not matched:
-                if not is_promoted and not is_cost_first and rule.matches(features,require_flow=False):
+                if (not is_promoted and not is_cost_first and not is_forward
+                        and rule.matches(features,require_flow=False)):
                     flow_rejected+=1
                 else:
                     market_rejected+=1
@@ -875,11 +1212,12 @@ def maybe_open(feed,flows):
             entry_defense.record(defensive_summary,defensive,coin,example_limit=2)
             if not defensive['allowed']:
                 defensive_rejected+=1
+                if is_forward: forward_stage[forward_key]=(defensive.get('reasons') or ['defensive_entry'])[0]
                 continue
             # Transparent planning estimate for every book. It never grants
             # admission, replaces a price check, or assumes a future gain.
             feasibility=market_feasibility.execution_feasibility(
-                coin,cost_cap,
+                coin,admission_cap,
                 base_slippage_bps=BASE_SLIPPAGE_BPS,
                 latency_buffer_bps=LATENCY_BUFFER_BPS,
                 generic_dex_fee_bps=GENERIC_DEX_FEE_BPS)
@@ -890,6 +1228,7 @@ def maybe_open(feed,flows):
                 features={**features,'funded_candidate_branches':branches}
                 for branch in branches:
                     promoted_candidate_branches[branch]=promoted_candidate_branches.get(branch,0)+1
+            if is_forward: forward_stage[forward_key]='network_price_unknown'
             if sol_usd_from_coin(coin)<=0:
                 blocked_network+=1
                 continue
@@ -936,19 +1275,37 @@ def maybe_open(feed,flows):
                 if candidate_limit<min_notional:
                     candidate_risk_rejected+=1
                     continue
+            if is_forward: forward_stage[forward_key]='price_verification'
             validation=price_integrity.check(coin)
             if validation.get('status')=='review':
                 validation=cached_jupiter_tiebreak(validation,coin,now=now)
                 if validation.get('status')!='pass':
+                    if is_forward and validation.get('status')=='review' and forward_cooldown_remaining_ms(book,coin,now)>0:
+                        # LAB_FORWARD_SIGNAL_CARRY_V2: the cooldown (checked below) blocks this signal
+                        # too, so it is not waiting only on the price check and is not carried. The
+                        # research harness skips signal points inside its pool cooldown, so a held
+                        # signal would also anchor the research fill (V3) where it never entered.
+                        forward_stage[forward_key]='reentry_cooldown'
+                        blocked_cooldown+=1
+                        continue
                     if validation.get('status')=='review':
                         price_crosscheck_pending+=1
-                        schedule_jupiter_price_probe(coin)
+                        if is_forward:
+                            # LAB_FORWARD_SIGNAL_CARRY_V2: the only blocker so far; carried below.
+                            # Forward books never request the RugCheck + Jupiter probe: their random
+                            # draws would feed arbitrary pools into the RugCheck, RPC and Jupiter
+                            # budget main uses. They use the GeckoTerminal reference (and a tie-break
+                            # another book's probe already cached) within the 60 s carry.
+                            forward_stage[forward_key]='price_crosscheck_pending'
+                        else:
+                            schedule_jupiter_price_probe(coin)
                     else:
                         blocked_price+=1
                     continue
             if (validation.get('status')!='pass'
-                    or ((is_promoted or is_cost_first) and (validation.get('mint')!=coin['address']
-                                         or validation.get('pair')!=coin['pairAddress']))
+                    or ((is_promoted or is_cost_first or is_forward)
+                        and (validation.get('mint')!=coin['address']
+                             or validation.get('pair')!=coin['pairAddress']))
                     or (brain and (validation.get('mint')!=coin['address']
                                    or validation.get('pair')!=coin['pairAddress']))):
                 if is_promoted or is_cost_first:
@@ -956,14 +1313,20 @@ def maybe_open(feed,flows):
                     promoted_block_reasons['promoted_price_identity_unverified']=promoted_block_reasons.get('promoted_price_identity_unverified',0)+1
                 blocked_price+=1; continue
             address=coin['address']
-            if activity.cooldown_remaining_ms(book,address,now)>0:
+            cooldown_ms=activity.cooldown_remaining_ms(book,address,now)
+            if is_forward:
+                # Research cooldown: 300 s after the book's last close on this pool.
+                cooldown_ms=forward_cooldown_remaining_ms(book,coin,now)
+                forward_stage[forward_key]='reentry_cooldown'
+            if cooldown_ms>0:
                 blocked_cooldown+=1
                 continue
             checked+=1
+            if is_forward: forward_stage[forward_key]='modeled_roundtrip_cost_limit'
             proposed=activity.affordable_entry(
-                coin,balance,candidate_limit,entry_execution,exit_execution,
+                coin,funding_balance,candidate_limit,entry_execution,exit_execution,
                 minimum_notional=min_notional,
-                max_entry_cost_pct=cost_cap,
+                max_entry_cost_pct=admission_cap,
             )
             if proposed is None:
                 blocked_cost+=1
@@ -981,6 +1344,19 @@ def maybe_open(feed,flows):
                     continue
             eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
                              coin,features,proposed,validation,brain,risk,candidate_limit,defensive))
+            if is_forward: forward_stage[forward_key]='eligible'
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V2: a signal whose only blocker was the pending price
+            # cross-check (outside its cooldowns) is kept for a later refresh, a newer match
+            # continuing its run; one refused by any other gate ends its episode; an
+            # eligible one waits for the commit below.
+            for forward_key,stage in forward_stage.items():
+                if stage=='price_crosscheck_pending':
+                    forward_carry.hold(book,forward_key,forward_evaluations[forward_key],now,
+                                       coin=forward_coins.get(forward_key))
+                    forward_diagnostics['price_crosscheck_pending_signals']+=1
+                elif stage!='eligible':
+                    forward_carry.resolve(book,forward_key,'dropped_by_gate',stage)
         book['entry_diagnostics']={
             'at':now,'signal_candidates':signal_candidates,
             'defensive_rejected':defensive_rejected,'defensive_entry':defensive_summary,
@@ -993,14 +1369,37 @@ def maybe_open(feed,flows):
             'flow_missing_candidates':flow_rejected,
             'risk_limited_notional_usd':round(entry_limit,4),
             'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
+                                    else lab_forward.ENTRY_POLICY_VERSION if is_forward
                                     else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
-            'max_entry_roundtrip_cost_pct':cost_cap,
-            'stop_loss_net_pct':(cost_first.EXITS[strategy['id']].stop_loss_net_pct
-                                 if is_cost_first else STOP_LOSS),
+            'max_entry_roundtrip_cost_pct':admission_cap,
+            # The cap is min(0.5 x net stop, this ceiling): the dashboard names the ceiling when it binds.
+            'max_entry_roundtrip_cost_ceiling_pct':activity.MAX_ENTRY_COST_PCT,
+            'stop_loss_net_pct':(cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first
+                                 else lab_forward.EXITS[strategy['id']].stop_loss_net_pct if is_forward
+                                 else STOP_LOSS),
             'cost_infeasible_candidates':blocked_cost,
-            'cost_feasibility':cost_feasibility_summary(cost_examples,cost_cap),
+            'cost_feasibility':cost_feasibility_summary(cost_examples,admission_cap),
         }
+        if is_forward:
+            # One fixed size is checked against the cap; it is never reduced to fit.
+            book['entry_diagnostics'].update({'entry_size_rule':'FIXED_NOTIONAL_NO_BACKOFF',
+                                              'fixed_notional_usd':lab_forward.NOTIONAL_USD})
+            if strategy['id']==lab_forward.LAB_B_ID:
+                forward_diagnostics['regime']=forward_regime
+            forward_diagnostics.update({
+                'capital_mode':capital_mode,
+                'signal_carry':{**lab_forward.signal_carry_counters(book,strategy['id']),
+                                'pending_now':forward_carry.pending_count(strategy['id'])}})
+            book['entry_diagnostics']['lab_forward']=forward_diagnostics
+            if signal_candidates==0:
+                book['entry_diagnostics']['blocked_reason']='no_market_signal'
+            elif not eligible and blocked_cooldown and blocked_cooldown+defensive_rejected==signal_candidates:
+                # Every signal the defensive layer allowed was in its pool or token cooldown.
+                book['entry_diagnostics']['blocked_reason']='reentry_cooldown'
+            elif not eligible and price_crosscheck_pending:
+                # The signal is carried to the next refresh (LAB_FORWARD_SIGNAL_CARRY_V2).
+                book['entry_diagnostics']['blocked_reason']=lab_forward.PRICE_CHECK_PENDING_REASON
         if is_cost_first:
             book['entry_diagnostics'].update({
                 'cost_first':{
@@ -1121,13 +1520,16 @@ def maybe_open(feed,flows):
             defensive_summary['commit_recheck_blocked']=int(defensive_summary.get('commit_recheck_blocked') or 0)+1
             book['entry_diagnostics']['blocked_reason']=(final_defensive['reasons'] or ['defensive_entry'])[0]
             book['entry_diagnostics']['commit_recheck_rejected']=1
+            if is_forward:
+                forward_carry.resolve(book,(coin['address'],coin['pairAddress']),'dropped_by_gate','commit_recheck')
             continue
         defensive=final_defensive
         if brain:
             book['entry_diagnostics']['risk_limited_notional_usd']=round(candidate_limit,4)
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
-        position_stop=cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first else STOP_LOSS
+        position_stop=(cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first
+                       else lab_forward.EXITS[strategy['id']].stop_loss_net_pct if is_forward else STOP_LOSS)
         qty=num(opening['quantity'])
         capital_basis=num(opening['capital_committed_usd'])
         book['trade_seq']=int(book.get('trade_seq',0))+1
@@ -1157,12 +1559,13 @@ def maybe_open(feed,flows):
             'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','quote_age_ms':0,
             'price_crosscheck':validation,
             'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
+                                    else lab_forward.ENTRY_POLICY_VERSION if is_forward
                                     else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
             # LAB_ACTIVE_V6 records: the cap this entry had to satisfy and the
             # gross move left before the net stop after modeled entry costs.
-            'entry_cost_cap_pct':cost_cap,
+            'entry_cost_cap_pct':admission_cap,
             'stop_loss_net_pct':position_stop,
             'stop_headroom_pct':activity.stop_headroom_pct(position_stop,proposed['initial_pnl_pct']),
             'entry_size_reduced':notional+0.02<candidate_limit,
@@ -1199,12 +1602,45 @@ def maybe_open(feed,flows):
                 'entry_liquidity_usd':pair_liquidity_usd(coin),
                 'exit_policy_label':exits.label,'exit_parameters':asdict(exits),
             })
+        if is_forward:
+            # The model leg (above) passed the cap; the booked leg adds CALIB_V1 per leg,
+            # so the book holds fewer tokens and every mark sells with the same extra.
+            calib=lab_forward.calib_extra_bps_per_leg(opening['dex_fee_bps'],pair_liquidity_usd(coin),notional)
+            booked=calibrated_entry_execution(coin,notional,calib['total_bps'])
+            booked_qty=num(booked['quantity'])
+            booked_mark=calibrated_exit_execution(coin,booked_qty,calib['total_bps'],drain_aware=True)
+            booked_pnl=booked_mark['net_proceeds_usd']-num(booked['capital_committed_usd'])
+            position.update({
+                'quantity':booked_qty,'original_quantity':booked_qty,
+                'execution_entry_price':round(booked['fill_price'],12),
+                'execution_exit_price':round(booked_mark['fill_price'],12),
+                'remaining_cost_basis_usd':num(booked['capital_committed_usd']),
+                'booked_entry_roundtrip_pnl_pct':round(booked_pnl/max(notional,1e-18)*100,6),
+                'pnl_pct':round(booked_pnl/max(notional,1e-18)*100,3),
+                'open_pnl_usd':round(booked_pnl,4),
+                'model_pnl_pct':round(proposed['initial_pnl_pct'],3),
+                'entry_liquidity_usd':pair_liquidity_usd(coin),
+                'entry_fee_tier_bps':round(opening['dex_fee_bps'],4),
+                **lab_forward.position_record(
+                    strategy['id'],evaluation=forward_evaluations.get((address,coin['pairAddress'])) or {},
+                    calib=calib,model_entry=opening,model_mark=proposed['initial_pnl_pct'],
+                    defensive_flags=defensive.get('log_only_flags'),entry_coin=coin,entry_at=stamp,
+                    capital_mode=capital_mode),
+            })
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V2: this pool's episode entered; the book's other pending
+            # signals are superseded (one position at a time, as in the research).
+            forward_carry.resolve(book,(address,coin['pairAddress']),'entered')
+            forward_carry.clear(book,'superseded')
+            book['entry_diagnostics']['lab_forward']['signal_carry']={
+                **lab_forward.signal_carry_counters(book,strategy['id']),
+                'pending_now':forward_carry.pending_count(strategy['id'])}
 
 
 ACTIVE_POLICY_VERSIONS=frozenset({activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION,
-                                  cost_first.ENTRY_POLICY_VERSION})
+                                  cost_first.ENTRY_POLICY_VERSION,lab_forward.ENTRY_POLICY_VERSION})
 
 def stats(book):
     start=num(book.get('starting_balance'),START_BALANCE)
@@ -1212,7 +1648,9 @@ def stats(book):
     gp=sum(max(0,num(t.get('pnl_usd'))) for t in h); gl=-sum(min(0,num(t.get('pnl_usd'))) for t in h)
     unreal=0.0
     p=book.get('position')
-    if p: unreal=num(p.get('open_pnl_usd'))
+    # A zero-capital control position (LAB_FORWARD_CONTROL_CONTINUITY_V1) never moves equity.
+    if p and not lab_forward.is_zero_capital_position(p): unreal=num(p.get('open_pnl_usd'))
+    zero_capital=[t for t in h if t.get('capital_mode')==lab_forward.ZERO_CAPITAL]
     marked_at=num((p or {}).get('mark_received_at'),num((p or {}).get('updated_at')))
     mark_age_ms=max(0,now_ms()-int(marked_at)) if p else 0
     valuation_stale=bool(p and (mark_age_ms>POSITION_STALE_AFTER_MS or p.get('quote_status') in {'stale','unavailable'}))
@@ -1230,7 +1668,10 @@ def stats(book):
             'active_policy_trades':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS for t in h),
             'active_policy_wins':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS and num(t.get('pnl_usd'))>0 for t in h),
             'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION for t in h),
-            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h)}
+            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h),
+            # Closes counted in trades/wins but not in the balance (control measurement past its funding).
+            'zero_capital_trades':len(zero_capital),
+            'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}
 
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
@@ -1262,6 +1703,9 @@ def persist(status='online',error=None):
         STOP_LOSS,promoted_candidate_config())
     STATE['activity_config']['cost_first_established']=cost_first.config()
     STATE['activity_config']['defensive_entry']=entry_defense.config()
+    STATE['activity_config']['lab_forward_tests']=lab_forward.config()
+    STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),
+                                                         'signal_carry':FORWARD_SIGNAL_CARRY.status()}
     if DEFENSE is not None:
         STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
         if status=='stopped':
@@ -1297,9 +1741,12 @@ def persist(status='online',error=None):
     }
     if error: STATE['error']=str(error)[:200]
     else: STATE.pop('error',None)
+    STATE['persistence']=dict(PERSIST_METRICS)
     published=merge_paired_snapshot(merge_astra_snapshot(STATE))
-    atomic_write(published)
-    atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    started=time.perf_counter()
+    ledger_bytes=atomic_write(published)
+    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    record_persist_metrics(ledger_bytes,compact_bytes,time.perf_counter()-started,now_ms())
 
 def main():
     global STATE, LOADED

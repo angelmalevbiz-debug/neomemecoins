@@ -155,7 +155,8 @@ class CostFirstSeatTests(unittest.TestCase):
         selected, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
         self.assertEqual([row['symbol'] for row in selected], ['cheap'])
         self.assertEqual(report['policy_version'], scheduler_module.POLICY_VERSION)
-        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS')
+        # V4 cost-first seats survive V5 (defensive seats) and V6 (no pins for flow-free Lab books).
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
         self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (1, 0))
         self.assertEqual(report['cost_first']['candidate_pools'], 1)
         self.assertEqual(report['estimated_fixed_cost_over_budget'], 1)

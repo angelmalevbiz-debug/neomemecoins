@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a ticker registry sidecar offline from a copy of the training journal (TICKER_REGISTRY_SEED_V4).
+"""Build a ticker registry sidecar offline from the training journal, read in place (TICKER_REGISTRY_SEED_V4).
 
 PAPER only. Read-only on its input; it never contacts a service, a provider or
 a wallet. STRUCTURAL_RUG_GUARD_V1 blocks pools younger than 14 days with
@@ -47,23 +47,52 @@ clock read AFTER the replay: when it has lapsed or is under 24 h the tool
 still writes the sidecar (its sightings count) but exits 2, and every
 registry then warms for 24 h unless a sibling vouches.
 
-Usage, from the live checkout root, only after ``.\\scripts\\start_local_paper.ps1
--Action Stop`` has completed (it prints "All owned PAPER services stopped and
-flushed."); copy the journal after they stopped:
+Usage (docs/PAPER_RUNBOOK.md, first deploy), from the live checkout root, on
+the live journal in place; do not copy it: the tool opens the journal
+read-only ('rb', with read/write sharing) and never writes it, and a copy (tens
+of GB) only costs disk and minutes of the 60-minute coverage window. Two modes:
+
+- Seed before Stop (first deploy only; recommended), while no
+  ``.runtime\\accounts\\state.ticker_registry.json`` exists (the pre-release
+  services have no ticker registry and never write it): with the services
+  running (main keeps appending), run the release checkout's copy of this tool
+  with ``--out`` in a scratch folder outside ``.runtime``, copy the sidecar
+  into ``.runtime\\accounts`` after Stop and start within the printed window.
+  The replay is then not part of the outage:
+    .venv\\Scripts\\python.exe <release checkout>\\scripts\\build_ticker_registry_seed.py
+        --journal .runtime\\accounts\\training\\observations.jsonl
+        --out <scratch folder outside .runtime>\\state.ticker_registry.json
+- Seed after Stop, in place: when that sidecar already exists and for every
+  ``--replace-stale`` rerun, only after ``.\\scripts\\start_local_paper.ps1
+  -Action Stop`` has completed (it prints "All owned PAPER services stopped
+  and flushed."); nothing appends to the journal while the services are
+  stopped, and the replay runs inside the outage:
     .venv\\Scripts\\python.exe scripts\\build_ticker_registry_seed.py
         --journal .runtime\\accounts\\training\\observations.jsonl
         --out .runtime\\accounts\\state.ticker_registry.json
 
-The services must be stopped for every run, the first one and
-``--replace-stale`` alike: a running main keeps its own registry in memory and
-rewrites its sidecar at its next periodic save (within 5 min), and the Lab,
-the tape and the personal engines seed only when their registry starts, so a
-seed written under running services is silently lost. The tool therefore
-refuses to write into a runtime directory (the output's folder or any parent)
-whose ``services/processes.json`` exists without ``services/stop.request``
-(Stop writes that marker, Start removes it). The marker proves that Stop ran,
-not that every process exited: when Stop reported that services are still
-flushing, wait until ``-Action Status`` shows none running first.
+A later deploy needs no seed, and after an outage over 60 minutes no seed can
+help: when main scans again within 60 minutes of its last scan before Stop the
+sidecars carry the coverage (the tool refuses a sidecar that still vouches);
+after a longer outage the journal holds the same gap (nothing journals while
+the services are stopped), so the replay's coverage ends at the last scan
+before Stop, the tool exits 2 and every registry warms for 24 h. A seed helps
+on a later deploy only when the sidecars themselves are lost and the outage
+stays under 60 minutes.
+
+The services must be stopped whenever a seed is written into the runtime
+folder, the first one and ``--replace-stale`` alike: a running main keeps its
+own registry in memory and rewrites its sidecar at its next periodic save
+(within 5 min), and the Lab, the tape and the personal engines seed only when
+their registry starts, so a seed written under running services is silently
+lost. The tool therefore refuses to write into a runtime directory (the
+output's folder or any parent) whose ``services/processes.json`` exists
+without ``services/stop.request`` (Stop writes that marker, Start removes it).
+The marker proves that Stop ran, not that every process exited: when Stop
+reported that services are still flushing, wait until ``-Action Status`` shows
+none running first. A scratch folder outside ``.runtime`` has no services
+manifest, so the before-Stop seed of the first deploy is written there while
+the services run and reaches ``.runtime\\accounts`` only by the copy after Stop.
 
 The output must not exist. An earlier attempt (services started before the
 seed, a rolled-back deploy, a failed first try) can leave a sidecar that does
@@ -349,7 +378,9 @@ def replay_minutes_argument(value) -> float:
 
 def main(argv=None, *, clock=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument('--journal', required=True, type=Path, help='copy of training observations.jsonl (read only)')
+    parser.add_argument('--journal', required=True, type=Path,
+                        help=('training observations.jsonl, read in place (read only); services stopped, or on '
+                              'the first deploy running with --out outside .runtime'))
     parser.add_argument('--out', required=True, type=Path, help='new sidecar path; must not exist')
     parser.add_argument('--replace-stale', action='store_true',
                         help=('replace an existing --out only when its coverage at the wall clock is not '

@@ -10,6 +10,17 @@ VERSION = 'PAPER_LAB_MEASUREMENTS_V1'
 MIN_TRADES = 100
 MIN_DAYS = 5
 EPISODE_MS = 30 * 60 * 1000
+# LAB_FORWARD_CONTROL_CONTINUITY_V1: a random control's close past its funding.
+# It is a per-trade measurement whose P&L never moved the book's balance.
+ZERO_CAPITAL_MODE = 'zero_capital_control'
+
+
+def balance_effect(row, pnl):
+    """What a close did to the book's balance: 0 for a zero-capital control close, else its P&L."""
+    if row.get('capital_mode') == ZERO_CAPITAL_MODE:
+        return 0.0
+    effect = finite(row.get('balance_effect_usd'))
+    return pnl if effect is None else effect
 
 
 def finite(value):
@@ -102,8 +113,12 @@ def measure_book(book, *, started_at, as_of, advertised_count=None, target=80.0)
     capital = finite(book.get('starting_balance'))
     equity = peak = capital if capital is not None and capital > 0 else 0
     drawdown = 0.0
-    for pnl in pnls:
-        equity += pnl
+    # The ledger's equity path moves only by what each close did to the balance: a
+    # zero-capital control close (LAB_FORWARD_CONTROL_CONTINUITY_V1) never moved it.
+    effects = [balance_effect(row, pnl) for _, _, pnl, row in trades]
+    zero_capital = [pnl for _, _, pnl, row in trades if row.get('capital_mode') == ZERO_CAPITAL_MODE]
+    for effect in effects:
+        equity += effect
         peak = max(peak, equity)
         if peak > 0:
             drawdown = max(drawdown, (peak - equity) / peak * 100)
@@ -126,8 +141,15 @@ def measure_book(book, *, started_at, as_of, advertised_count=None, target=80.0)
         'target_win_rate_pct': target,
         'target_observed_in_sample': target_observed,
         'win_rate_interval_lower_meets_target': bool(sufficient and interval and interval[0] >= target),
-        'realized_net_pnl_usd': round(sum(pnls), 6),
+        # Balance-moving P&L only; zero-capital control closes are reported separately below.
+        'realized_net_pnl_usd': round(sum(effects), 6),
+        'realized_net_pnl_basis': 'balance effect of each close (zero-capital control closes excluded)',
+        'funded_closed_trades': count - len(zero_capital),
+        'zero_capital_closes': len(zero_capital),
+        'zero_capital_pnl_usd': round(sum(zero_capital), 6),
+        # Per-trade measurement: every close, including zero-capital control closes.
         'net_expectancy_usd_per_close': round(sum(pnls) / count, 6) if count else None,
+        'net_expectancy_basis': 'every close, including zero-capital control measurements',
         'profit_factor': round(gross_profit / gross_loss, 6) if gross_loss > 0 else None,
         'profit_factor_status': ('finite' if gross_loss > 0 else
                                  'no_losses' if gross_profit > 0 else 'no_results'),
@@ -169,6 +191,8 @@ def evaluate_lab(state, *, target=80.0):
             'PAPER executions are modeled; this report does not certify real fills or profitability.',
             'Wilson intervals assume independent outcomes; shared tokens and market days can correlate.',
             'Closed-ledger drawdown excludes open-position and intratrade losses.',
+            ('Zero-capital control closes count in per-trade statistics (trades, wins, expectancy) but never '
+             'in realized P&L or the equity path: they did not move the balance.'),
             'Hourly and 24h normalized rates describe the supplied window, not expected future activity.',
             'An observed target is descriptive, not a promotion gate or a guarantee.',
             'Independent books are measured separately; their capital and trades are never pooled.',

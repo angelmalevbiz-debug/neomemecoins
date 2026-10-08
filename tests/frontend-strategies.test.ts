@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabEntryStatus from '../src/components/LabEntryStatus';
-import { isArchivedStrategy, labEntryStatus, labEntryView, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { costCapRule, forwardCapitalNote, forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, isForwardZeroCapital, labEntryStatus, labEntryView, labForwardGateStatus, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -228,4 +228,145 @@ test('DEFENSIVE_ENTRY_LAYER_V1: every defensive block reason is named in Bulgari
   assert.equal(statuses.size, codes.length, 'each reason has its own label');
   assert.equal(labEntryStatus({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
     signal_candidates: 1, blocked_reason: 'rug_young_pool' } }), 'Pool-ът е по-млад от 12 часа');
+});
+
+test('LAB_FORWARD_TESTS_V1: the four forward-test books are described, report their kill rule and never auto-promote', () => {
+  for (const id of ['LAB_A_SURGE_EST_GUARD', 'RND_LAB_A', 'LAB_B_DIP_MKTDIP_GUARD', 'RND_LAB_B']) {
+    assert.ok(labForwardNote(id), id);
+    assert.equal(isForwardTestBook(book(id, 500, 500)), true, id);
+  }
+  assert.equal(labForwardNote('TREND'), null);
+  assert.equal(labForwardSummary(book('TREND', 500, 500)), null);
+  const active = { ...book('LAB_A_SURGE_EST_GUARD', 480, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', entry_enabled: true,
+    evidence: { closed_trades: 12, min_closes: 50, mean_net50_usd: -3.5, ci95_mean_net50_usd: [-6.1, -0.9] },
+    promotion_gate: { all_evaluable_pass: false, automatic_promotion: false } } };
+  const summary = labForwardSummary(active) ?? '';
+  assert.match(summary, /Затворени 12\/50/);
+  assert.match(summary, /−\$3\.50/);
+  assert.match(summary, /CI95 \[−\$6\.10, −\$0\.90\]/);
+  assert.match(summary, /гейтът за промоция не е изпълнен/);
+  assert.equal(partitionLabStrategies([active]).research.length, 1);
+  const retired = { ...active, strategy_lifecycle: { ...active.strategy_lifecycle, status: 'retired', entry_enabled: false,
+    reason: 'pre_registered_kill_rule' } };
+  assert.deepEqual(partitionLabStrategies([retired]).archived.map(row => row.id), ['LAB_A_SURGE_EST_GUARD']);
+  assert.match(labForwardSummary(retired) ?? '', /спряна: средно net50 < 0/);
+  const passing = { ...active, strategy_lifecycle: { ...active.strategy_lifecycle,
+    promotion_gate: { all_evaluable_pass: true, automatic_promotion: false } } };
+  assert.match(labForwardSummary(passing) ?? '', /без автоматична промоция/);
+  const view = labEntryView({ ...book('RND_LAB_A', 500, 500), entry_diagnostics: { signal_candidates: 1,
+    blocked_reason: 'lab_forward_kill_rule_retired' } });
+  assert.doesNotMatch(view.status, /Входът изчаква/);
+  assert.match(view.status, /предварително регистрираното правило/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /labForwardSummary\(book\)/);
+  assert.match(source, /trade\.net50_usd != null/);
+});
+
+test('LAB_FORWARD_CASH_STATE_V1 and CLOSE_POLICY_V1: a stalled book is not shown as active, control coverage and drains are named', () => {
+  const stalled = { ...book('RND_LAB_A', 160, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'cash_exhausted', reason: 'balance_below_fixed_notional',
+    entry_enabled: false, kill_rule_evaluable: false, cash: { exhausted: true, balance_usd: 160, min_entry_balance_usd: 200.1 },
+    evidence: { closed_trades: 40, min_closes: 50, mean_net50_usd: -8, vanished_closes: 1, drained_closes: 2 } } };
+  assert.equal(isForwardCashExhausted(stalled), true);
+  assert.equal(isForwardCashExhausted(book('TREND', 100, 500)), false);
+  const summary = labForwardSummary(stalled) ?? '';
+  assert.match(summary, /без капитал \(\$160\.00\)/);
+  assert.match(summary, /правилото за спиране не може да се оцени/);
+  assert.match(summary, /изчезнали\/източени pool-ове 3/);
+  assert.doesNotMatch(summary, /спряна: средно net50/);
+  // Not archived: its history stays among the research books, with the reason named.
+  assert.equal(partitionLabStrategies([stalled]).research.length, 1);
+  assert.equal(labEntryView({ ...stalled, entry_diagnostics: { blocked_reason: 'lab_forward_cash_exhausted' } }).status,
+    'Без капитал: балансът не покрива фиксирания вход от $200');
+  assert.match(labEntryStatus({ ...book('LAB_A_SURGE_EST_GUARD', 500, 500), entry_diagnostics: {
+    blocked_reason: 'lab_forward_cost_model_mismatch' } }), /замразения/);
+  const hypothesis = { ...book('LAB_A_SURGE_EST_GUARD', 520, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', evidence: { closed_trades: 160, min_closes: 50 },
+    promotion_gate: { all_evaluable_pass: false, automatic_promotion: false,
+      control_window: { control_entry_end_reason: 'cash_exhausted' },
+      criteria: { control_coverage: { value: 0.19, threshold: '>= 0.9', pass: false } } } } };
+  assert.match(labForwardSummary(hypothesis) ?? '', /контролата е можела да влиза само в 19% от периода \(cash_exhausted\)/);
+  assert.equal(forwardCloseNote('vanished'), 'изчезнал pool: оценен на последната цена −10%');
+  assert.equal(forwardCloseNote('drained'), 'източен pool (ликвидност 0): оценен на 0');
+  assert.equal(forwardCloseNote('marked'), null);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /isForwardCashExhausted\(book\)/);
+  assert.match(source, /forwardCloseNote\(trade\.close_kind\)/);
+});
+
+test('LAB_FORWARD_CONTROL_CONTINUITY_V1 and SIGNAL_CARRY_V2: a control keeps measuring for its hypothesis, lost signals are named', () => {
+  const control = { ...book('RND_LAB_B', 185, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', reason: 'control_kill_rule_deferred', entry_enabled: true,
+    capital_mode: 'zero_capital_control',
+    control_continuity: { hypothesis: 'LAB_B_DIP_MKTDIP_GUARD', hypothesis_can_enter: true, kill_rule_deferred: true, zero_capital_entries: true },
+    cash: { exhausted: true, balance_usd: 185, min_entry_balance_usd: 200.1 },
+    signal_carry: { pending_signals: 6, entered: 4, lost_price_pending: 2 },
+    evidence: { closed_trades: 55, min_closes: 50, mean_net50_usd: -9, kill_rule_met: true, zero_capital_closes: 20 } } };
+  assert.equal(isForwardZeroCapital(control), true);
+  assert.equal(isForwardCashExhausted(control), false, 'not shown as unable to trade');
+  assert.equal(isForwardZeroCapital(book('TREND', 100, 500)), false);
+  const summary = labForwardSummary(control) ?? '';
+  assert.match(summary, /контролата продължава, докато хипотезата може да влиза/);
+  assert.match(summary, /продължава с нулев капитал/);
+  assert.match(summary, /сделки с нулев капитал 20/);
+  assert.match(summary, /изгубени сигнали при чакаща проверка на цената 2/);
+  assert.equal(partitionLabStrategies([control]).research.length, 1, 'an active control is not archived');
+  assert.equal(forwardCapitalNote('zero_capital_control'), 'нулев капитал: не променя баланса');
+  assert.equal(forwardCapitalNote('funded'), null);
+  assert.equal(labEntryView({ ...book('RND_LAB_A', 500, 500), entry_diagnostics: { signal_candidates: 1,
+    blocked_reason: 'lab_forward_price_check_pending' } }).status,
+    'Сигналът чака независимата проверка на цената (пази се до 60 сек.)');
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /isForwardZeroCapital\(book\)/);
+  assert.match(source, /forwardCapitalNote\(trade\.capital_mode\)/);
+});
+
+test('LAB_FORWARD review: a gate is met only when every criterion was evaluated; research fills are shown', () => {
+  const gate = { all_evaluable_pass: true, gate_met: false, gate_status: 'evaluable_criteria_pass_replay_pending',
+    not_evaluated: ['max_drawdown_pct_3slot_1000'], automatic_promotion: false };
+  const pending = { ...book('LAB_A_SURGE_EST_GUARD', 520, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', evidence: { closed_trades: 160, min_closes: 50,
+      research_fill: { closed_trades: 158, pending: 2, mean_net50_usd: 1.25, ci95_mean_net50_usd: [0.3, 2.2] } },
+    promotion_gate: gate } };
+  const summary = labForwardSummary(pending) ?? '';
+  assert.doesNotMatch(summary, /гейтът за промоция е изпълнен/);
+  assert.match(summary, /чака офлайн проверка на спада при 3 слота и \$1000 \(≤ 20%\), затова гейтът още не е изпълнен/);
+  assert.match(summary, /research\): 158 сделки, средно net50 \$1\.25\/сделка, CI95 \[\$0\.30, \$2\.20\]/);
+  assert.match(labForwardGateStatus({ ...gate, gate_met: true, not_evaluated: [] }), /гейтът за промоция е изпълнен/);
+  // A backend without gate_met never shows a met gate.
+  assert.doesNotMatch(labForwardGateStatus({ all_evaluable_pass: true }), /гейтът за промоция е изпълнен/);
+  assert.match(labForwardGateStatus({ all_evaluable_pass: false }), /не е изпълнен/);
+  const retired = { ...pending, strategy_lifecycle: { ...pending.strategy_lifecycle, status: 'retired',
+    evidence: { ...pending.strategy_lifecycle.evidence, kill_rule_met_bases: ['research_fill'] } } };
+  assert.match(labForwardSummary(retired) ?? '', /спряна: средно net50 < 0 и горна граница на CI95 < 0 \(при research изпълнение\)/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /trade\.net50_research_fill_usd != null/);
+});
+
+test('LAB_FORWARD review: the cost cap names its ceiling for a 15% stop and a fixed $200 entry', () => {
+  const diagnostics = { signal_candidates: 1, cost_rejected: 1, cost_infeasible_candidates: 1, affordable_candidates: 0,
+    max_entry_roundtrip_cost_pct: 2.75, max_entry_roundtrip_cost_ceiling_pct: 2.75, stop_loss_net_pct: 15,
+    entry_size_rule: 'FIXED_NOTIONAL_NO_BACKOFF', fixed_notional_usd: 200, blocked_reason: 'modeled_roundtrip_cost_limit' };
+  const view = labEntryView({ ...book('LAB_B_DIP_MKTDIP_GUARD', 500, 500), entry_diagnostics: diagnostics });
+  assert.equal(view.costLimited, true);
+  assert.match(view.detail!, /лимита 2\.75% = min\(0\.5 × нетен стоп 15\.00%, таван 2\.75%\)/);
+  assert.doesNotMatch(view.detail!, /= 0\.5 × нетен стоп 15/, 'never the false 2.75% = 0.5 × 15%');
+  assert.match(view.detail!, /при фиксирания вход \$200 \(размерът не се намалява\)/);
+  assert.doesNotMatch(view.detail!, /при всеки проверен размер/);
+  assert.equal(costCapRule(1.5, 3), '0.5 × нетен стоп 3.00%');
+  assert.equal(costCapRule(2.5, 5, 2.75), '0.5 × нетен стоп 5.00%');
+  assert.equal(costCapRule(2.75, 15), 'min(0.5 × нетен стоп 15.00%, таван 2.75%)', 'the cap itself is the ceiling');
+  assert.equal(costCapRule(2.0, 3), null, 'no equation the numbers do not satisfy');
+  assert.equal(costCapRule(1.5, undefined), null);
+  // The fee-and-buffer floor uses the book's own stop for the headroom, not 2 × the cap.
+  const floor = labEntryView({ ...book('LAB_B_DIP_MKTDIP_GUARD', 500, 500), entry_diagnostics: {
+    signal_candidates: 2, affordable_candidates: 0, stop_loss_net_pct: 15, max_entry_roundtrip_cost_pct: 2.75,
+    cost_feasibility: { checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2,
+      minimum_model_roundtrip_cost_pct: 3.18, maximum_roundtrip_cost_pct: 2.75,
+      best_candidates: [{ model_cost_feasible: false }] } } });
+  assert.match(floor.detail!, /При нетен стоп 15\.00% този минимум оставя 11\.82 п\.п\. запас/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\(0\.5 × стоп \$\{/);
+  assert.match(source, /costCapRule\(diagnostics\.max_entry_roundtrip_cost_pct, diagnostics\.stop_loss_net_pct, diagnostics\.max_entry_roundtrip_cost_ceiling_pct\)/);
 });

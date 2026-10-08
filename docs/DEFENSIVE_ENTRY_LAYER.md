@@ -125,6 +125,12 @@ The sidecar has these properties:
 - It is written atomically (temp file, fsync, replace, Windows retry), on the first
   observation, then at most once every 5 minutes, and again on a clean shutdown (main
   engine, Lab and tape). A crash loses at most 5 minutes of ticker memory.
+- A hard stop (TerminateProcess, `taskkill /F`) during a save skips its cleanup and
+  leaves the temporary (`.<sidecar>.<8 characters>.tmp`, up to several MB) beside the
+  sidecar. The registry deletes its own such files once they are at least 10 minutes old,
+  when it starts and at most every 10 minutes after that, before a save
+  (`TICKER_REGISTRY_TEMP_SWEEP_V1`, `status().stale_temps.removed`). Only that exact name
+  pattern next to its own sidecar is a candidate; no other file is touched.
 - Entries unseen for 14 days are pruned. At most 40,000 entries are kept; the least
   recently seen are evicted first. The research scan log saw 2,042 pairs in 22.8 h
   (about 2,150 a day), so 14 days need about 30,000 entries. The earlier 20,000 cap
@@ -269,8 +275,10 @@ state-file environment variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STAT
   sidecar properties above) a seed merges sightings but adopts no coverage.
 
 **First deploy.** No sidecar exists yet. `scripts/build_ticker_registry_seed.py` builds
-main's sidecar offline from a copy of the main training journal
-(`.runtime/accounts/training/observations.jsonl` in the live checkout). The journal records the bounded scan feed
+main's sidecar offline from the main training journal, read in place
+(`.runtime/accounts/training/observations.jsonl` in the live checkout; the tool opens it
+read-only and nothing appends to it while the services are stopped, so it is not
+copied). The journal records the bounded scan feed
 (`MAX_FEED` = 90 coins after `entry_quote_priority.bounded_feed`; unchanged repeat polls
 within 3 s are coalesced) plus entry, probe and position rows, each with its mint, pool,
 symbol and time; the research scan log was built from it. Gecko new pools cut by the
@@ -316,14 +324,25 @@ Before this, `coverage_at_now` used the clock read before a replay of the whole 
 once the journal was about 13 days old the replay alone outlasted the 60-minute window,
 and the tool printed warming false and exited 0 while every registry would warm for 24 h.
 
-Run it on the journal as it stands after the services stopped (or a copy taken then),
-check that it exits 0 (`vouches_at_end` true), then start the services before the printed
-`start_services_before_utc`; the Lab, the tape and personal engines then seed from main's
-sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full procedure, including when a
-rerun cannot help.
+Run it in place on the live journal after the services stopped (do not copy it: a copy
+of a journal of tens of GB only costs disk and minutes of the 60-minute window), check
+that it exits 0 (`vouches_at_end` true), then start the services at least 5 minutes
+before the printed `start_services_before_utc`; the Lab, the tape and personal engines
+then seed from main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full
+procedure, including when a rerun cannot help.
 
-The services must be stopped for every run of the tool, the first one and
-`--replace-stale` alike. A running main keeps its registry in memory and rewrites
+On the first deploy only, while no `state.ticker_registry.json` exists, the replay can
+run before Stop instead, so that it is not part of the outage: the pre-release services
+have no ticker registry and never write that file, and the tool opens the journal
+read-only (`'rb'`, read/write sharing), so main keeps appending. The release checkout's
+copy of the tool writes the sidecar to a scratch folder outside `.runtime`, and the
+operator copies it into `.runtime\accounts` after Stop; the 60-minute window then starts
+at the end of the replay, and the outage is only stop, backup, copy, sync, lock check and
+start. Main and the personal engines must hold no position before Stop either way
+(PAPER_RUNBOOK.md, first deploy).
+
+The services must be stopped whenever a seed is written into the runtime folder, the
+first one and `--replace-stale` alike. A running main keeps its registry in memory and rewrites
 `state.ticker_registry.json` at its next periodic save (within 5 min), and the Lab, the
 tape and the personal engines read a seed only when their registry starts or restarts its
 coverage. A seed written under running services is therefore overwritten: in a review
@@ -431,9 +450,11 @@ wait; it is not implemented.
 
 In `log_only` mode a book receives the same flags with `vetoed` false. This mode is for a
 pre-registered surge or dip hypothesis arm. `heat_veto.LOG_ONLY_BOOK_IDS` reserves the
-research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, which are not
-registered yet. Every registered Lab book, every engine account and the training probe
-enforce the veto. The tape scheduler withholds new seats on every heat rule except its
+research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, registered as Lab
+books by `LAB_FORWARD_TESTS_V1` (`backend/lab_forward_tests.py`), which also runs their
+random controls `RND_LAB_A` and `RND_LAB_B` log-only (`strategy_lab.heat_log_only_book`);
+the reserved set itself, and so every engine's effective config hash, is unchanged. Every
+other Lab book, every engine account and the training probe enforce the veto. The tape scheduler withholds new seats on every heat rule except its
 own warm-up (see below).
 
 ### Errors fail closed
@@ -621,7 +642,7 @@ the bounded feed's remainder by `scoreV1` would bring the population closer, but
 | Cost-first universe / Lab pair | `COST_FIRST_UNIVERSE_V1` / `COST_FIRST_ESTABLISHED_V1` | `COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD` / `COST_FIRST_ESTABLISHED_V2` |
 | Lab TEST books | `LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP` | `LAB_ACTIVE_V7_DEFENSIVE_ENTRY` |
 | Lab funded books | `PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V4` | `PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5` |
-| Tape seats | `STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS` | `STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY` |
+| Tape seats | `STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS` | `STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY` (since superseded by V6 from `LAB_FORWARD_TESTS_V1`, which keeps every V5 seat rule and only stops pinning positions of Lab books that never read flow) |
 | Market score | (unversioned V1) | `NEO_MARKET_SCORE_V2_LIQ_MC_BAND` |
 | Lab retirement review | `LAB_STRATEGY_LIFECYCLE_V1` | `LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE` |
 | Engine RugCheck prewarm | (unversioned: `ageMinutes` ≤ 360) | `PREWARM_V2_DEFENSIVE_POPULATION` |
@@ -645,9 +666,9 @@ value in `tests/test_cost_first_engine_profile.py`:
 
 | Strategy | `effective_config_hash` |
 | --- | --- |
-| `WINNER_ENSEMBLE_PAPER_V1` (default) | `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9` |
-| `ORDER_FLOW_ADAPTIVE` | `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890` |
-| `COST_FIRST_ESTABLISHED_PAPER_V1` | `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba` |
+| `WINNER_ENSEMBLE_PAPER_V1` (default) | `580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7` |
+| `ORDER_FLOW_ADAPTIVE` | `fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba` |
+| `COST_FIRST_ESTABLISHED_PAPER_V1` | `4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10` |
 
 The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 

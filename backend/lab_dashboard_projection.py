@@ -16,6 +16,38 @@ def compact_cost_feasibility(summary, *, keep_candidates):
     return {field: summary[field] for field in COST_FEASIBILITY_SCALAR_FIELDS if field in summary}
 
 
+# LAB_FORWARD_TESTS_V1 fields of a position and of a close. Projected only when the row
+# has them: every other book's rows would otherwise carry them as nulls (30 history rows
+# x 40 books), and main embeds this projection in every GET /state.
+FORWARD_POSITION_FIELDS = (
+    # Frozen config identity, log-only heat flags, the uncalibrated model mark and the
+    # CALIB_V1 extra per leg.
+    'lab_forward_version', 'lab_config_hash', 'heat_log_only_flags',
+    'model_pnl_pct', 'calib_bps_per_leg', 'booked_entry_roundtrip_pnl_pct',
+    'close_policy_version',
+    # LAB_FORWARD_CONTROL_CONTINUITY_V1: 'funded' or 'zero_capital_control'.
+    'capital_mode',
+)
+FORWARD_HISTORY_FIELDS = (
+    # net50 (booked minus the research stress), the model result and the frozen config identity.
+    'net50_usd', 'net50_pct', 'model_pnl_usd', 'model_pnl_pct',
+    'calibration_cost_usd', 'lab_forward_version', 'lab_config_hash',
+    'heat_log_only_flags',
+    # LAB_FORWARD_CLOSE_POLICY_V1: marked, drained or vanished.
+    'close_policy_version', 'close_kind', 'drain_valuation_cost_usd',
+    'exit_liquidity_usd',
+    # LAB_FORWARD_CONTROL_CONTINUITY_V1: a zero-capital close moves no balance.
+    'capital_mode', 'balance_effect_usd',
+    # LAB_FORWARD_FILL_BASIS_V4: net50 re-priced at the research fills.
+    'fill_basis_version', 'net50_research_fill_usd', 'net50_research_fill_pct',
+)
+
+
+def _with_present(row, raw, fields):
+    row.update({field: raw[field] for field in fields if field in raw})
+    return row
+
+
 def compact_strategy_lab(data):
     if not isinstance(data, dict):
         return {'status': 'offline', 'books': {}, 'stats': {}}
@@ -26,7 +58,7 @@ def compact_strategy_lab(data):
             continue
         position = raw.get('position')
         if isinstance(position, dict):
-            position = {
+            position = _with_present({
                 field: position.get(field)
                 for field in ('symbol', 'address', 'pairAddress', 'dexId', 'quoteTokenAddress',
                               'strategy_id', 'opened_at', 'pnl_pct',
@@ -39,7 +71,7 @@ def compact_strategy_lab(data):
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
                               'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label',
                               'exit_parameters')
-            }
+            }, position, FORWARD_POSITION_FIELDS)
         else:
             position = None
         history = []
@@ -47,7 +79,7 @@ def compact_strategy_lab(data):
         for trade in (raw.get('history') or [])[:30]:
             if not isinstance(trade, dict):
                 continue
-            history.append({
+            history.append(_with_present({
                 field: trade.get(field)
                 for field in ('trade_no', 'strategy_id', 'symbol', 'name', 'address', 'pairAddress',
                               'entry_price', 'execution_entry_price', 'exit_price', 'execution_exit_price',
@@ -59,7 +91,7 @@ def compact_strategy_lab(data):
                               'entry_slippage_pct', 'exit_slippage_pct',
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
                               'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label')
-            })
+            }, trade, FORWARD_HISTORY_FIELDS))
         books[key] = {
             'id': raw.get('id', key),
             'name': raw.get('name', key),
@@ -90,8 +122,12 @@ def compact_strategy_lab(data):
                     # LAB_ACTIVE_V6: every book publishes its cap and cost-infeasible count.
                     'entry_policy_version', 'max_entry_roundtrip_cost_pct', 'stop_loss_net_pct',
                     'cost_infeasible_candidates', 'cost_feasibility', 'cost_first', 'evidence_guard_version',
+                    # The cap's model ceiling, and a fixed entry size (LAB_FORWARD_TESTS_V1 books).
+                    'max_entry_roundtrip_cost_ceiling_pct', 'entry_size_rule', 'fixed_notional_usd',
                     # DEFENSIVE_ENTRY_LAYER_V1: counts only (examples stay in the full ledger).
                     'defensive_rejected', 'defensive_entry',
+                    # LAB_FORWARD_TESTS_V1: universe/signal counts and the LAB_B regime.
+                    'lab_forward',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']
@@ -169,6 +205,9 @@ def compact_strategy_lab(data):
         'registry_compatibility': data.get('registry_compatibility') or {},
         'strategy_lifecycle': data.get('strategy_lifecycle') or {},
     }
+    # LAB_PERSIST_METRICS_V1: the last whole-ledger write (bytes, seconds, share of the poll).
+    if isinstance(data.get('persistence'), dict):
+        result['persistence'] = data['persistence']
 
     astra = data.get('astra')
     if isinstance(astra, dict):

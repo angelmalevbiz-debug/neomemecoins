@@ -504,6 +504,34 @@ class SegmentedDrawdownTests(unittest.TestCase):
                 self.assertLessEqual(dd['max_drawdown_pct_of_peak_any_segment'], 100.0)
                 self.assertIn('(90.00%, 2 seg)', edge.render_markdown(report))
 
+    def test_zero_capital_control_closes_never_enter_net_pnl_or_the_equity_path(self):
+        """LAB_FORWARD_CONTROL_CONTINUITY_V1: closes past the funding are counted per trade only."""
+        rows = []
+        balance = 500.0
+        for n in range(1, 9):
+            balance -= 45.0
+            row = lab_trade('RND_LAB_B', n, -45.0, notional=200.0, opened=START + n * HOUR)
+            row.update(balance_after=balance, capital_mode='funded', balance_effect_usd=-45.0)
+            rows.append(row)
+        for n in range(9, 21):
+            row = lab_trade('RND_LAB_B', n, -12.0, notional=200.0, opened=START + n * HOUR)
+            row.update(balance_after=balance, capital_mode='zero_capital_control', balance_effect_usd=0.0)
+            rows.append(row)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = write(Path(tmp) / 'strategy_lab.json', lab_state({'RND_LAB_B': ('TEST', rows)}))
+            collector = edge.LedgerCollector()
+            collector.add_lab_ledger(path)
+            book = edge.build_report(collector, iterations=10, seed=1)['lab']['by_book']['RND_LAB_B']
+        self.assertEqual(book['closed_trades'], 20)
+        self.assertEqual(book['net_pnl_usd'], -360.0, 'the balance fell $360, not $504')
+        self.assertEqual((book['zero_capital_closes'], book['zero_capital_pnl_usd']), (12, -144.0))
+        self.assertEqual(book['expectancy_usd_per_trade'], round(-504.0 / 20, 6), 'per trade, every close counts')
+        self.assertEqual(book['cost_stress_plus_50bps_per_leg']['net_pnl_usd'], round(-360.0 - 8 * 2.0, 6))
+        dd = book['drawdown']
+        self.assertEqual(dd['segments'], 1, 'a zero-capital close is not a reset')
+        self.assertEqual(dd['max_drawdown_usd'], 360.0)
+        self.assertEqual(dd['max_drawdown_pct_of_peak'], 72.0)
+
     def test_lab_window_gap_does_not_split_a_segment(self):
         with tempfile.TemporaryDirectory() as tmp:
             rows = self.lab_rows()[:3]

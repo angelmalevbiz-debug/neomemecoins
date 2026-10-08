@@ -81,14 +81,17 @@ ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c20
 # 24-hour coverage from discovered market rows only (DISCOVERED_MARKET_ROWS_V2),
 # TICKER_COVERAGE_CLOCK_V1 (coverage stamped ahead of the clock never vouches),
 # TICKER_REGISTRY_SEED_V4 (running seeds, sibling sightings while vouching),
-# TICKER_REGISTRY_SIDECAR_READ_V1, a ticker required only under 14 days; code defaults,
-# no NEO_* overrides). Positions record this hash as their audit identity, so an engine
+# TICKER_REGISTRY_SIDECAR_READ_V1, a ticker required only under 14 days; the published
+# first-deploy seed procedure as in docs/PAPER_RUNBOOK.md (PR #24 final review r4: journal
+# read in place, the before-Stop seed, no seed across an outage over 60 min); code
+# defaults, no NEO_* overrides; no position has run under these values yet). Positions
+# record this hash as their audit identity, so an engine
 # default, a profile field or a layer threshold may only change together with these pins
 # (and docs/DEFENSIVE_ENTRY_LAYER.md).
-DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9'
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7'
 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
-    '8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890')
-COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba'
+    'fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10'
 
 
 def universe_coin(now, **overrides):

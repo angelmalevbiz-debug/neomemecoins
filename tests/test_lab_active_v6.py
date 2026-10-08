@@ -132,7 +132,11 @@ class CapConsistencyTests(unittest.TestCase):
         for book in lab.STATE['books'].values():
             self.assertIsNone(book['position'], book['id'])
             diagnostics = book['entry_diagnostics']
-            self.assertEqual(diagnostics['max_entry_roundtrip_cost_pct'], 1.5, book['id'])
+            # LAB_FORWARD_TESTS_V1 books apply the same rule (0.5 x net stop, <= 2.75%) to their
+            # own pre-registered stops (-5% and -15%); no forward-test signal fires on this coin.
+            expected_cap = (lab.lab_forward.admission_cost_cap_pct(book['id'])
+                            if book['id'] in lab.lab_forward.BOOK_IDS else 1.5)
+            self.assertEqual(diagnostics['max_entry_roundtrip_cost_pct'], expected_cap, book['id'])
             if diagnostics.get('signal_candidates'):
                 signalled += 1
                 if diagnostics.get('matched_candidates'):

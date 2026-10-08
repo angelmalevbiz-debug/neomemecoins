@@ -11,20 +11,26 @@ evidence recorded just before the quote sequence. No network, no profit claim.
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 import engine_execution as execution
 import engine_exit_policy as exit_policy
+import pair_price_integrity as price_integrity
 import promoted_entry_guard as promoted_guard
-from main_replay import MainReplay, parse_exit_variant
+from main_replay import COMMIT_STAGE_REJECTIONS, PRICE_TIEBREAK_REJECTIONS, MainReplay, parse_exit_variant
 
 FIXTURE_VERSION = 'REPLAY_IDENTITY_V1'
 FIXTURES = Path(__file__).resolve().parent/'fixtures'
 ROWS_PATH = FIXTURES/'replay_identity_v1.jsonl'
 EXPECTED_PATH = FIXTURES/'replay_identity_v1.expected.json'
+SCRIPT_PATH = Path(__file__).resolve().parents[1]/'scripts'/'replay_main.py'
 MINT, POOL = 'A'*44, 'B'*44
 USDC = execution.USDC
 T0 = 1_791_410_000_000
@@ -36,6 +42,7 @@ RENT_USD = RENT_LAMPORTS/1e9*SOL_USD
 SAFETY_CHECKED_AT = T0-47_000          # cached risk pass, older than the old 30 s literal
 CANDIDATE_UPDATED_AT = T0-8_300        # candidate snapshot older than MAX_SIGNAL_AGE_MS
 FIRST_BUY_AT, SALE_AT, FINAL_AT = T0-4_650, T0-2_450, T0-255
+RECORDING_LAG_MS = 600                 # evidence row written 600 ms after the final quote landed
 
 
 def coin(updated_at, liquidity=200_000):
@@ -201,13 +208,20 @@ def build_fixture():
             'preflight_buy_age_ms_at_row': T0-FIRST_BUY_AT, 'preview_sale_age_ms_at_row': T0-SALE_AT,
             'final_buy_age_ms_at_row': T0-FINAL_AT, 'safety_age_ms_at_row': T0-SAFETY_CHECKED_AT,
             'candidate_signal_age_ms_at_row': T0-CANDIDATE_UPDATED_AT, 'commit_feed_signal_age_ms': 3_000,
+            # The same entry recorded 600 ms late (recording lag after the
+            # final quote landed): 855 ms at the row, 255 ms at the prepare clock.
+            'recording_lag_ms': RECORDING_LAG_MS,
+            'final_buy_age_ms_at_lagged_row': T0+RECORDING_LAG_MS-FINAL_AT,
+            'final_buy_age_ms_at_prepare_clock': T0-FINAL_AT,
         },
+        'recording_lag_entry': {'opened_at': T0+RECORDING_LAG_MS, 'exit_reason': 'EXIT_IMPACT_EMERGENCY',
+                                'closed_at': T0+30_000, 'pnl_usd': round(197.5-200.0-entry_cost, 8)},
         'exit_variants': {
             'stop_pct=3': {'closed_trades': 1, 'exit_reason': 'STOP_LOSS_NET_TARGET', 'closed_at': T0+15_000,
                            'pnl_usd': round(194.0-200.0-entry_cost, 8)},
             'take_profit_pct=1': {'closed_trades': 1, 'exit_reason': 'TAKE_PROFIT_10_NET', 'closed_at': T0+2_200,
                                   'pnl_usd': round(203.0-200.0-entry_cost, 8)},
-            'max_hold_minutes=0.2': {'closed_trades': 1, 'exit_reason': 'MAX_HOLD_60', 'closed_at': T0+15_000,
+            'max_hold_minutes=0.2': {'closed_trades': 1, 'exit_reason': 'MAX_HOLD_0.2', 'closed_at': T0+15_000,
                                      'pnl_usd': round(194.0-200.0-entry_cost, 8)},
             'disable_exit_impact_emergency=1': {'closed_trades': 0, 'open_positions': 1,
                                                 'final_valuation_status': 'unavailable',
@@ -297,6 +311,82 @@ class ReplayIdentityTests(unittest.TestCase):
                          execution.PREFLIGHT_PREVIEW_MAX_AGE_MS+execution.FINAL_QUOTE_MAX_AGE_MS)
         self.assertIsNone(windows['windows']['preflight_buy_ms'])
         self.assertNotIn('frozen', windows['basis']['preview_sell_ms'])
+        self.assertEqual(set(windows['clock_basis']), {'entry_stage', 'preflight_consistency', 'commit'})
+        self.assertIn('_simulated_fill_at', windows['clock_basis']['preflight_consistency'])
+
+    def lagged_entry_rows(self, lag_ms=RECORDING_LAG_MS):
+        """The fixture with its entry row recorded lag_ms after the final quote landed."""
+        entry = self.by_label['entry']
+        lagged = row(T0+lag_ms, entry['coin'], entry['flow'], entry['safety'], entry['source']['price_evidence'],
+                     evidence=entry['source']['execution_evidence'], label='entry_recording_lag')
+        return [r for r in self.rows if r['fixture_label'] != 'entry']+[lagged], lagged
+
+    def test_recording_lag_after_final_quote_still_reproduces_the_entry(self):
+        rows, lagged = self.lagged_entry_rows()
+        timing, booked = self.expected['recorded_timing'], self.expected['recording_lag_entry']
+        evidence = lagged['source']['execution_evidence']['entry']
+        landed = int(evidence['raw_quote']['_simulated_fill_at'])
+        self.assertEqual(lagged['available_at']-landed, timing['recording_lag_ms'])
+        # At the row the final quote is older than the preflight bound; at the
+        # recorded prepare clock (the final quote's landing) it is not.
+        self.assertGreater(timing['final_buy_age_ms_at_lagged_row'], execution.FINAL_QUOTE_MAX_AGE_MS)
+        self.assertLessEqual(timing['final_buy_age_ms_at_prepare_clock'], execution.FINAL_QUOTE_MAX_AGE_MS)
+        with tempfile.TemporaryDirectory() as tmp:
+            with MainReplay(Path(tmp)) as replay:
+                result = replay.replay(copy.deepcopy(rows))
+                decision = next(d for d in replay.decisions if d['id'] == lagged['id'])
+        self.assertTrue(decision['opened'], decision)
+        self.assertEqual(result['stats']['closed_trades'], 1)
+        trade = result['history'][0]
+        self.assertEqual(trade['opened_at'], booked['opened_at'])
+        self.assertEqual(trade['closed_at'], booked['closed_at'])
+        self.assertEqual(trade['exit_reason'], booked['exit_reason'])
+        self.assertLess(abs(trade['pnl_usd']-booked['pnl_usd']), .01)
+        # Evaluating the preflight chain at the recording time instead (the
+        # previous adapter behaviour) rejects the genuine live entry.
+        with tempfile.TemporaryDirectory() as tmp:
+            with MainReplay(Path(tmp)) as replay:
+                with patch.object(replay, 'prepare_clock', side_effect=lambda: replay.row_at):
+                    stale = replay.replay(copy.deepcopy(rows))
+                    decision = next(d for d in replay.decisions if d['id'] == lagged['id'])
+        self.assertEqual(stale['stats']['closed_trades'], 0)
+        self.assertIn('quote_inconsistent', decision['rejections'])
+
+    def test_recorded_price_tiebreak_rejection_is_the_same_live_decision(self):
+        # The live engine ran the Jupiter tiebreak on the bundle's fill price
+        # after the quote sequence and recorded 'price_tiebreak_failed' 12 ms
+        # after the bundle, linked by the verified quote times.
+        entry_row = self.by_label['entry']
+        evidence = entry_row['source']['execution_evidence']
+        verified = (int(evidence['entry']['quoted_at']), int(evidence['exit']['quoted_at']))
+        review = {'status': 'review', 'reason': 'price_unavailable_needs_jupiter', 'observed_price': .0213,
+                  'reference_price': None, 'reference_received_at': T0-14_000, 'mint': MINT, 'pair': POOL,
+                  'source': 'FIXTURE'}
+        reviewed_entry = row(T0, entry_row['coin'], entry_row['flow'], entry_row['safety'], review,
+                             evidence=evidence, label='entry_price_review')
+        tiebreak = row(T0+12, coin(CANDIDATE_UPDATED_AT), flow(T0+10), safety(SAFETY_CHECKED_AT), review,
+                       reasons=['price_tiebreak_failed'], label='tiebreak_rejection', verified=verified)
+        self.assertLessEqual(set(tiebreak['rejection_reasons']), COMMIT_STAGE_REJECTIONS)
+        # Every name the engine's post-quote tiebreak can emit is commit-stage.
+        self.assertLessEqual(PRICE_TIEBREAK_REJECTIONS, COMMIT_STAGE_REJECTIONS)
+        for reason in sorted(PRICE_TIEBREAK_REJECTIONS-{'price_tiebreak_failed'}):
+            for jupiter in (0., 1.5):
+                outcome = price_integrity.jupiter_tiebreak({'status': 'review', 'reason': reason, 'observed_price': 1.}, jupiter)
+                self.assertEqual(outcome['status'], 'blocked')
+                self.assertIn(outcome['reason'], PRICE_TIEBREAK_REJECTIONS)
+        rows = [r for r in self.rows if r['fixture_label'] != 'entry' and not r['fixture_label'].startswith('mark_')]
+        rows += [reviewed_entry, tiebreak]
+        linked = MainReplay.link_commit_outcomes(sorted(rows, key=lambda r: r['available_at']))
+        self.assertEqual([r['fixture_label'] for r in linked.values()], ['tiebreak_rejection'])
+        with tempfile.TemporaryDirectory() as tmp:
+            with MainReplay(Path(tmp)) as replay:
+                result = replay.replay(copy.deepcopy(rows))
+                entry = next(d for d in replay.decisions if d['id'] == reviewed_entry['id'])
+        self.assertEqual(result['stats']['closed_trades'], 0)
+        self.assertEqual(result['positions'], [])
+        self.assertTrue(entry['commit_outcome_linked'])
+        self.assertEqual(set(entry['rejections']), {'price_tiebreak_failed'})
+        self.assertEqual(result['decision_summary']['commit_outcome_rows_linked'], 1)
 
     def test_signal_stage_row_without_evidence_never_arms_quote_cooldown(self):
         result, decisions = self.replay()
@@ -405,12 +495,84 @@ class ReplayIdentityTests(unittest.TestCase):
         self.assertEqual(exit_policy.ABSOLUTE_MAX_HOLD_MINUTES, 120)
         self.assertIsNone(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=59.9))
         self.assertEqual(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=60), 'MAX_HOLD_60')
-        self.assertEqual(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=30, max_hold_minutes=30), 'MAX_HOLD_60')
+        # An explicit override is labelled with its own limit; the live label
+        # (no override) stays MAX_HOLD_60.
+        self.assertIsNone(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=29.9, max_hold_minutes=30))
+        self.assertEqual(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=30, max_hold_minutes=30), 'MAX_HOLD_30')
+        self.assertEqual(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=1, max_hold_minutes=.2), 'MAX_HOLD_0.2')
+        self.assertEqual(exit_policy.exit_reason({}, {}, net_pct=0, peak_net_pct=0, hold_minutes=90, max_hold_minutes=90.0), 'MAX_HOLD_90')
+        self.assertEqual(exit_policy.max_hold_label(exit_policy.FIXED_MAX_HOLD_MINUTES), 'MAX_HOLD_60')
         self.assertIsNone(exit_policy.exit_reason({}, {'conviction': 80}, net_pct=0, peak_net_pct=0, hold_minutes=119, policy='adaptive'))
         self.assertEqual(exit_policy.exit_reason({}, {'conviction': 80}, net_pct=0, peak_net_pct=0, hold_minutes=120, policy='adaptive'), 'ABSOLUTE_MAX_HOLD')
         self.assertEqual(execution.FINAL_QUOTE_MAX_AGE_MS, 750)
         self.assertEqual(execution.PREFLIGHT_PREVIEW_MAX_AGE_MS, 4_000)
         self.assertEqual(execution.PREFLIGHT_MAX_SLOT_GAP, 25)
+
+
+def load_replay_main_script():
+    spec = importlib.util.spec_from_file_location('replay_main_script', SCRIPT_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class ReplayMainOutputTests(unittest.TestCase):
+    """scripts/replay_main.py never overwrites an existing report silently."""
+
+    def test_output_refusal_rules(self):
+        script = load_replay_main_script()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'report.json'
+            for kind in ('BASELINE', 'EXIT_VARIANT'):
+                self.assertIsNone(script.output_refusal(path, kind, False))
+                self.assertIsNone(script.output_refusal(path, kind, True))
+            for existing in ('BASELINE', 'EXIT_VARIANT'):
+                path.write_text(json.dumps({'report_kind': existing}), encoding='utf-8')
+                for kind in ('BASELINE', 'EXIT_VARIANT'):
+                    with self.subTest(existing=existing, kind=kind):
+                        # Without --overwrite every existing report is kept.
+                        self.assertIsNotNone(script.output_refusal(path, kind, False))
+                        refusal = script.output_refusal(path, kind, True)
+                        if kind == existing:
+                            self.assertIsNone(refusal)
+                        else:
+                            self.assertIn(existing, refusal)
+            for content in ('not json', json.dumps(['BASELINE']), json.dumps({'kind': 'BASELINE'})):
+                path.write_text(content, encoding='utf-8')
+                self.assertIsNotNone(script.output_refusal(path, 'BASELINE', True))
+
+    def run_script(self, *args):
+        env = dict(os.environ, PYTHONUTF8='1')
+        return subprocess.run([sys.executable, str(SCRIPT_PATH), '--input', str(ROWS_PATH), *args],
+                              cwd=SCRIPT_PATH.parents[1], env=env, capture_output=True, text=True, timeout=300)
+
+    def test_cli_keeps_existing_reports_unless_same_kind_overwrite(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            output = tmp/'baseline.json'
+            original = json.dumps({'report_kind': 'BASELINE', 'marker': 'kept'})
+            output.write_text(original, encoding='utf-8')
+            refused = self.run_script('--output', str(output), '--state-dir', str(tmp/'state-1'))
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('--overwrite', refused.stderr)
+            self.assertEqual(output.read_text(encoding='utf-8'), original)
+            variant = self.run_script('--output', str(output), '--state-dir', str(tmp/'state-2'),
+                                      '--exit-variant', 'stop_pct=3', '--overwrite')
+            self.assertNotEqual(variant.returncode, 0)
+            self.assertIn('BASELINE', variant.stderr)
+            self.assertEqual(output.read_text(encoding='utf-8'), original)
+            replaced = self.run_script('--output', str(output), '--state-dir', str(tmp/'state-3'), '--overwrite')
+            self.assertEqual(replaced.returncode, 0, replaced.stderr)
+            report = json.loads(output.read_text(encoding='utf-8'))
+            self.assertEqual(report['report_kind'], 'BASELINE')
+            self.assertEqual(report['stats']['closed_trades'], 1)
+            # A baseline never replaces an existing variant report either.
+            variant_path = tmp/'variant.json'
+            variant_original = json.dumps({'report_kind': 'EXIT_VARIANT', 'marker': 'kept'})
+            variant_path.write_text(variant_original, encoding='utf-8')
+            baseline = self.run_script('--output', str(variant_path), '--state-dir', str(tmp/'state-4'), '--overwrite')
+            self.assertNotEqual(baseline.returncode, 0)
+            self.assertEqual(variant_path.read_text(encoding='utf-8'), variant_original)
 
 
 if __name__ == '__main__':

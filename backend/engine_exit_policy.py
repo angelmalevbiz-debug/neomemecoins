@@ -11,14 +11,23 @@ FIXED_MAX_HOLD_MINUTES = 60
 ADAPTIVE_DEFAULT_MAX_HOLD_MINUTES = 60
 ABSOLUTE_MAX_HOLD_MINUTES = 120
 
+def max_hold_label(limit_minutes):
+    """Fixed-policy hold exit label: MAX_HOLD_60 live, MAX_HOLD_<limit> for an override."""
+    return f'MAX_HOLD_{float(limit_minutes):g}'
+
 def exit_reason(position, context, *, net_pct, peak_net_pct, hold_minutes,
                 stop_pct=5.0, take_profit_pct=10.0, policy='fixed', max_hold_minutes=None):
     if net_pct <= -stop_pct:
         return 'STOP_LOSS_NET_TARGET'
     if policy == 'fixed':
         if net_pct >= take_profit_pct: return 'TAKE_PROFIT_10_NET'
-        limit = FIXED_MAX_HOLD_MINUTES if max_hold_minutes is None else float(max_hold_minutes)
-        if hold_minutes >= limit: return 'MAX_HOLD_60'
+        if max_hold_minutes is None:
+            if hold_minutes >= FIXED_MAX_HOLD_MINUTES: return 'MAX_HOLD_60'
+            return None
+        # An explicit override is labelled with its own limit, so a variant
+        # exit is never reported under the live 60-minute label.
+        limit = float(max_hold_minutes)
+        if hold_minutes >= limit: return max_hold_label(limit)
         return None
     if policy != 'adaptive': raise ValueError('unknown exit policy')
     conviction = float(context.get('conviction') or 0)

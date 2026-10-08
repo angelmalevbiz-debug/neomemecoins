@@ -37,11 +37,29 @@ LIVE_QUOTE_STAGE_REJECTIONS = frozenset({'quote_inconsistent', 'invalid_quote', 
 # bundle was recorded. The live engine records such a rejection milliseconds
 # after the evidence row, linked to the same bundle by execution.buy_verified_at;
 # the evidence row and that row are one live decision (see link_commit_outcomes).
+# The Jupiter price tiebreak runs after the quote bundle (market_monitor:
+# price_integrity.jupiter_tiebreak on the bundle's fill price) and rejects with
+# 'price_tiebreak_failed' or the unresolved review reason. These names occur
+# only post-quote, so a linked row carrying one is that bundle's outcome.
+PRICE_TIEBREAK_REJECTIONS = frozenset({
+    'price_tiebreak_failed', 'price_source_disagreement_needs_jupiter', 'price_unavailable_needs_jupiter',
+    'price_crosscheck_pending_needs_jupiter'})
 COMMIT_STAGE_REJECTIONS = frozenset({
     'audit_pending', 'liquidation_unavailable', 'drawdown_limit', 'invalid_pair', 'invalid_price',
     'stale_feed', 'promoted_verified_flow_unavailable', 'promoted_verified_flow_stale',
     'promoted_buy_pressure_unconfirmed', 'winner_signal', 'loss_learning_hold', 'winner_flow_signal',
-    'promoted_safety_unavailable', 'balance', 'risk_budget_unavailable', 'quote_age', 'stale_signal'})
+    'promoted_safety_unavailable', 'balance', 'risk_budget_unavailable', 'quote_age', 'stale_signal'}
+    | PRICE_TIEBREAK_REJECTIONS)
+# The clock each stage of a recorded decision is evaluated at (reported with
+# the freshness windows so every age in a report has a stated reference time).
+CLOCK_BASIS = {
+    'entry_stage': 'entry.preflight_started_at (first preflight buy quote) for an entry-evidence row, '
+                   'otherwise the row available_at',
+    'preflight_consistency': 'min(row available_at, final buy raw_quote _simulated_fill_at or _received_at): '
+                             'the engine runs preflight_failure right after the final buy quote lands, so a '
+                             'recording lag after it is not quote age',
+    'commit': 'row available_at, or the linked commit-outcome row available_at when the engine recorded one',
+}
 
 
 class ReplayClock:
@@ -169,7 +187,7 @@ class MainReplay:
         self.monitor = market.Monitor()
         self._patch(market.STATE, 'live_flow', self.flow)
         self._patch(market.price_integrity, 'check', self.price)
-        self._patch(market.price_integrity, 'jupiter_tiebreak', lambda *args:self.price(None))
+        self._patch(market.price_integrity, 'jupiter_tiebreak', self.tiebreak)
         self._patch(market.rug_guard, 'check', self.safety)
         self._patch(market.paper_quotes, 'prepare_entry', self.prepare)
         self._patch(market.paper_quotes, 'position_mark', self.mark)
@@ -327,6 +345,20 @@ class MainReplay:
             return {'status':'unavailable','reason':'recorded_price_provenance_missing'}
         return proof
 
+    def tiebreak(self, validation, *_args, **_kwargs):
+        """Jupiter tiebreak after the quote bundle.
+
+        When the engine recorded this bundle's tiebreak rejection (a linked
+        commit-outcome row), that recorded outcome is the live decision.
+        Otherwise only the recorded price evidence is available.
+        """
+        recorded = sorted(set((self.commit_facts or {}).get('reasons') or []) & PRICE_TIEBREAK_REJECTIONS)
+        if recorded:
+            outcome = copy.deepcopy(validation) if isinstance(validation, dict) else {}
+            outcome.update(status='blocked', reason=recorded[0], recorded_commit_outcome=True)
+            return outcome
+        return self.price(None)
+
     def raw_quote_valid(self, raw, input_mint, output_mint, amount, *, max_age_ms):
         """Recorded raw quote identity, quantity and chronology.
 
@@ -357,14 +389,35 @@ class MainReplay:
         except (ValueError, TypeError, OverflowError):
             return False
 
+    def prepare_clock(self):
+        """Recorded time of the live preflight consistency check.
+
+        The engine evaluates preflight_failure right after the final buy quote
+        landed (its _simulated_fill_at); the evidence row is written later. The
+        chain is therefore checked at min(row, final landing), never at the
+        recording time, so a recording lag cannot turn into quote age.
+        """
+        entry = self.evidence().get('entry') or {}
+        raw = entry.get('raw_quote') if isinstance(entry, dict) else None
+        if not isinstance(raw, dict):
+            return self.row_at
+        try:
+            received = int(raw.get('_received_at') or raw.get('available_at') or 0)
+            landed = int(raw.get('_simulated_fill_at') or received)
+        except (TypeError, ValueError, OverflowError):
+            return self.row_at
+        return min(self.row_at, landed) if landed > 0 else self.row_at
+
     def prepare(self, mint, pair, notional, *_args, **_kwargs):
         # The live quote sequence consumed the time between the entry-stage
-        # checks and the recorded row; the replay clock advances the same way.
-        self.now = max(self.now, self.row_at)
+        # checks and the final quote landing; the preflight chain is checked
+        # at that recorded clock and the commit at the recorded row.
+        self.now = max(self.now, self.prepare_clock())
         try:
             prepared = self._prepare_checked(mint,pair,notional)
         except (ValueError,TypeError,KeyError,OverflowError,ZeroDivisionError):
             prepared = None
+        self.now = max(self.now, self.row_at)
         if prepared is not None:
             self.stage = 'commit'
             if self.commit_facts:
@@ -629,7 +682,8 @@ class MainReplay:
         self.commit_facts = None
         if commit_outcome is not None:
             self.commit_facts = {'flow': copy.deepcopy(commit_outcome.get('flow') or {}),
-                                 'available_at': commit_outcome.get('available_at')}
+                                 'available_at': commit_outcome.get('available_at'),
+                                 'reasons': list(commit_outcome.get('rejection_reasons') or [])}
             self.commit_linked_rows += 1
         coin = copy.deepcopy(row.get('coin') or {})
         if not coin.get('address') or not coin.get('pairAddress'):
@@ -711,7 +765,8 @@ class MainReplay:
                 'rules': dict(self.exit_variant), 'baseline_exit_rules': dict(self.baseline_exit_rules),
                 'effective_exit_rules': effective,
                 'scope': 'exit decisions only; entry admission, sizing, planned_stop_net_pct and '
-                         'planned_risk_usd keep the baseline rules, and historical exit labels are unchanged',
+                         'planned_risk_usd keep the baseline rules; a max_hold_minutes override labels its '
+                         'fixed-policy hold exit MAX_HOLD_<limit>, all other exit labels are unchanged',
                 'profitability_proven': False}
 
     def finalize_open_positions(self):
@@ -767,7 +822,7 @@ class MainReplay:
                 'exit_policy':'adaptive' if self.adaptive else 'fixed',
                 'exit_variant':variant,
                 'freshness_windows':{'version':FRESHNESS_WINDOWS_VERSION,'windows':dict(self.windows),
-                                     'basis':dict(self.window_basis)},
+                                     'basis':dict(self.window_basis),'clock_basis':dict(CLOCK_BASIS)},
                 'records':self.replayed,'invalid_records':self.unusable,
                 'decision_summary':self.decision_summary(),
                 'coverage_note':'Only recorded exact-quantity raw quotes are executable; sparse snapshots cannot reconstruct missing history',

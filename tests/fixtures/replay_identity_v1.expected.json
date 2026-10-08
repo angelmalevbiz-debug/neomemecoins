@@ -9,7 +9,7 @@
   "max_hold_minutes=0.2": {
    "closed_at": 1791410015000,
    "closed_trades": 1,
-   "exit_reason": "MAX_HOLD_60",
+   "exit_reason": "MAX_HOLD_0.2",
    "pnl_usd": -6.2214
   },
   "stop_pct=3": {
@@ -58,10 +58,19 @@
  "recorded_timing": {
   "candidate_signal_age_ms_at_row": 8300,
   "commit_feed_signal_age_ms": 3000,
+  "final_buy_age_ms_at_lagged_row": 855,
+  "final_buy_age_ms_at_prepare_clock": 255,
   "final_buy_age_ms_at_row": 255,
   "preflight_buy_age_ms_at_row": 4650,
   "preview_sale_age_ms_at_row": 2450,
+  "recording_lag_ms": 600,
   "safety_age_ms_at_row": 47000
+ },
+ "recording_lag_entry": {
+  "closed_at": 1791410030000,
+  "exit_reason": "EXIT_IMPACT_EMERGENCY",
+  "opened_at": 1791410000600,
+  "pnl_usd": -2.7214
  },
  "version": "REPLAY_IDENTITY_V1"
 }

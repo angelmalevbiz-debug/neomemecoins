@@ -1,0 +1,16 @@
+=== script ../smoke3.py under v1
+== no guard total n 212 trades <= -50%: 9
+   train {'n': 83, 'pairs': 23, 'win_rate': 41.0, 'mean_pct': -3.68, 'median_pct': -0.117, 'sum_usd': -610.9, 'pf': 0.278, 'ci95_mean_usd': [-16.147, 0.219], 'exits': {'HOLD': 71, 'STOP': 8, 'TP': 3, 'OPEN_AT_END/VANISHED': 1}}
+   holdout {'n': 129, 'pairs': 28, 'win_rate': 21.7, 'mean_pct': -5.968, 'median_pct': -1.187, 'sum_usd': -1539.82, 'pf': 0.075, 'ci95_mean_usd': [-19.477, -5.79], 'exits': {'HOLD': 92, 'STOP': 15, 'OPEN_AT_END/VANISHED': 3, 'TP': 4, 'OPEN_AT_END/END': 15}}
+== interim rug guard total n 70 trades <= -50%: 1
+   train {'n': 27, 'pairs': 5, 'win_rate': 14.8, 'mean_pct': -4.782, 'median_pct': -2.484, 'sum_usd': -258.2, 'pf': 0.333, 'ci95_mean_usd': [-23.571, 4.873], 'exits': {'HOLD': 18, 'STOP': 6, 'TP': 3}}
+   holdout {'n': 43, 'pairs': 5, 'win_rate': 11.6, 'mean_pct': -3.299, 'median_pct': -2.775, 'sum_usd': -283.73, 'pf': 0.177, 'ci95_mean_usd': [-10.445, -3.846], 'exits': {'HOLD': 27, 'STOP': 9, 'TP': 3, 'OPEN_AT_END/END': 4}}
+=== 3.0s
+=== script ../smoke3.py under v2
+== no guard total n 210 trades <= -50%: 7
+   train {'n': 84, 'pairs': 23, 'win_rate': 31.0, 'mean_pct': -3.323, 'median_pct': -0.909, 'sum_usd': -558.34, 'pf': 0.114, 'ci95_mean_usd': [-14.111, -1.469], 'exits': {'HOLD': 52, 'STOP': 9, 'TP': 1, 'FEED_GAP/GAP': 21, 'OPEN_AT_END/VANISHED': 1}}
+   holdout {'n': 126, 'pairs': 28, 'win_rate': 16.7, 'mean_pct': -5.591, 'median_pct': -1.222, 'sum_usd': -1408.92, 'pf': 0.061, 'ci95_mean_usd': [-18.826, -5.302], 'exits': {'FEED_GAP/GAP': 13, 'STOP': 12, 'OPEN_AT_END/VANISHED': 2, 'HOLD': 81, 'TP': 3, 'OPEN_AT_END/END': 15}}
+== interim rug guard total n 68 trades <= -50%: 0
+   train {'n': 28, 'pairs': 5, 'win_rate': 10.7, 'mean_pct': -2.239, 'median_pct': -2.237, 'sum_usd': -125.39, 'pf': 0.149, 'ci95_mean_usd': [-6.695, -1.883], 'exits': {'HOLD': 14, 'STOP': 7, 'TP': 1, 'FEED_GAP/GAP': 6}}
+   holdout {'n': 40, 'pairs': 5, 'win_rate': 12.5, 'mean_pct': -2.978, 'median_pct': -2.81, 'sum_usd': -238.26, 'pf': 0.229, 'ci95_mean_usd': [-10.168, -2.414], 'exits': {'FEED_GAP/GAP': 3, 'HOLD': 23, 'STOP': 7, 'TP': 3, 'OPEN_AT_END/END': 4}}
+=== 4.3s

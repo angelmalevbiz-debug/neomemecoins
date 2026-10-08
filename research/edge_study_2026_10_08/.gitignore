@@ -1,0 +1,5 @@
+# Research data is regenerated locally (see README.md); never commit it.
+*.sqlite3
+*.sqlite3-*
+*.pkl
+__pycache__/

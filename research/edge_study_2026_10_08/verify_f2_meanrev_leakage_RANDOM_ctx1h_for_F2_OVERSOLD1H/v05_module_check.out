@@ -1,0 +1,18 @@
+== VERIFY_REIMPL_RANDOM_ctx1h_f2r1
+   train  n 30 mean $ -7.518 mean % -3.759
+   holdout n 21 pairs 13 clusters 20 win 52.4 mean $ 7.443 mean % 3.721 median % 0.989 PF 1.778 sum $ 156.3 CI95 [-6.852, 22.755] CI95pair [-2.163, 19.339] top 0.19 tph 2.31 exits {'FEED_GAP/GAP': 2, 'HOLD': 8, 'TP': 7, 'STOP': 1, 'OPEN_AT_END/END': 3}
+   holdout model mean % 5.267   portfolio(holdout, 3 slots) {'taken': 14, 'final_balance': 1052.07, 'max_drawdown_pct': 6.74, 'skipped_no_cash': 0}
+   identical to leaderboard trades: True 51 51
+== VERIFY_POPULATION_ctx1h_every_eligible_point
+   train  n 67 mean $ -11.442 mean % -5.721
+   holdout n 34 pairs 16 clusters 32 win 35.3 mean $ -8.437 mean % -4.219 median % -4.029 PF 0.487 sum $ -286.87 CI95 [-19.267, 2.511] CI95pair [-17.319, -0.45] top 0.147 tph 3.73 exits {'FEED_GAP/GAP': 3, 'HOLD': 17, 'STOP': 4, 'TP': 5, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 4}
+   holdout model mean % -2.688   portfolio(holdout, 3 slots) {'taken': 17, 'final_balance': 804.97, 'max_drawdown_pct': 19.5, 'skipped_no_cash': 0}
+== VERIFY_RANDOM_ctx1h_salt_v000
+   train  n 31 mean $ -3.909 mean % -1.954
+   holdout n 18 pairs 13 clusters 17 win 38.9 mean $ -5.235 mean % -2.617 median % -2.293 PF 0.63 sum $ -94.22 CI95 [-19.31, 9.244] CI95pair [-16.302, 4.967] top 0.167 tph 1.98 exits {'STOP': 2, 'HOLD': 12, 'TP': 1, 'FEED_GAP/GAP': 1, 'OPEN_AT_END/END': 2}
+   holdout model mean % -1.042   portfolio(holdout, 3 slots) {'taken': 14, 'final_balance': 916.41, 'max_drawdown_pct': 12.52, 'skipped_no_cash': 0}
+== VERIFY_RANDOM_ctx1h_salt_v001
+   train  n 35 mean $ -5.759 mean % -2.88
+   holdout n 17 pairs 12 clusters 16 win 35.3 mean $ -4.162 mean % -2.081 median % -2.249 PF 0.721 sum $ -70.76 CI95 [-20.123, 11.909] CI95pair [-17.341, 10.955] top 0.176 tph 1.87 exits {'FEED_GAP/GAP': 2, 'HOLD': 8, 'STOP': 2, 'TP': 4, 'OPEN_AT_END/END': 1}
+   holdout model mean % -0.482   portfolio(holdout, 3 slots) {'taken': 13, 'final_balance': 959.77, 'max_drawdown_pct': 9.57, 'skipped_no_cash': 0}
+secs 9.2

@@ -1,0 +1,61 @@
+trade {'sym': 'LOADED', 'entry_t': 1791419068779.0, 'exit_t': 1791419134054.0, 'reason': 'TP', 'flag': '', 'net0': 37.4178, 'net50': 34.5054, 'usd0': 18.5641, 'usd50': 17.1192, 'size': 49.6131, 'mfe': 24.2271, 'mae': -3.6032, 'hold_s': 65.275, 'fee_bps': 120.0, 'liq': 24383.69, 'rt_cost': 3.6032, 'tag': '', 'decision_t': 1791419056364.0, 'trigger_t': 1791419101486.0, 'entry_px': 0.0001, 'exit_px': 0.0001, 'net50_v2': 36.0527, 'usd50_v2': 17.8869, 'netcal': 35.8552, 'usdcal': 17.7889, 'calib_bps_leg': 57.2723, 'calib_exit_bps': 0.0, 'calib': 'CALIB_V1_2026-10-08'}
+
+DexScreener series points (rel s to decision, price USD, pnative, liq, b5, s5, pc5):
+    -397.3  0.0000745300  6.4110e-07  liq=    22828 b5=73.0 s5=265.0 pc5=-44.99
+    -389.7  0.0000795600  6.8430e-07  liq=    23655 b5=79.0 s5=266.0 pc5=-41.27
+    -358.4  0.0000836400  7.1950e-07  liq=    24307 b5=84.0 s5=267.0 pc5=-38.26
+    -328.1  0.0000841800  7.2410e-07  liq=    24392 b5=70.0 s5=284.0 pc5=-38.7
+    -297.7  0.0000926100  7.9670e-07  liq=    25686 b5=74.0 s5=326.0 pc5=-32.56
+    -266.3  0.0000966900  8.3170e-07  liq=    26294 b5=71.0 s5=311.0 pc5=-18.82
+    -235.1  0.0000984400  8.4550e-07  liq=    26568 b5=45.0 s5=190.0 pc5=27.56
+    -204.2  0.0001008000  8.6650e-07  liq=    26923 b5=48.0 s5=190.0 pc5=30.73
+    -173.7  0.0001122000  9.6410e-07  liq=    28512 b5=48.0 s5=83.0 pc5=50.62
+    -169.6  0.0001112000  9.5580e-07  liq=    28380 b5=47.0 s5=83.0 pc5=49.32
+    -138.3  0.0001374000  1.1800e-06  liq=    31771 b5=56.0 s5=85.0 pc5=84.42
+    -107.3  0.0001319000  1.1330e-06  liq=    31092 b5=49.0 s5=90.0 pc5=57.77
+     -80.8  0.0001210000  1.0390e-06  liq=    29691 b5=51.0 s5=95.0 pc5=44.7
+     -49.6  0.0001154000  9.9150e-07  liq=    28950 b5=41.0 s5=26.0 pc5=17.45
+     -19.5  0.0000866000  7.4380e-07  liq=    24807 b5=46.0 s5=33.0 pc5=-11.9
+      +0.0  0.0000866000  7.4380e-07  liq=    24807 b5=46.0 s5=33.0 pc5=-11.9 <-decision
+     +12.4  0.0000838500  7.2020e-07  liq=    24384 b5=42.0 s5=34.0 pc5=-14.81 <-entry fill
+     +45.1  0.0001081000  9.2860e-07  liq=    27973 b5=56.0 s5=38.0 pc5=9.83
+     +77.7  0.0001196000  1.0280e-06  liq=    29526 b5=58.0 s5=39.0 pc5=7.52 <-exit fill
+    +110.2  0.0001120000  9.6290e-07  liq=    28502 b5=58.0 s5=43.0 pc5=0.65
+    +135.4  0.0001159000  9.9650e-07  liq=    29032 b5=49.0 s5=39.0 pc5=-16.22
+
+flow seen by the signal at decision: {'ub': 12, 'us': 12, 'bsol': 26.191584364999997, 'ssol': 23.628408489999998, 'net': 2.563175874999999, 'newb': 14, 'top': 0.2988015862628783}
+flow with 5 s ingestion lag: {'ub': 9, 'us': 11, 'bsol': 14.640130011999998, 'ssol': 22.708942676, 'net': -8.068812664000001, 'newb': 11, 'top': 0.2915286456132327}
+tape age at decision s: 4.364
+
+on-chain prints (rel s to decision by block time; ingest lag s; dir; SOL; px SOL/token; px / DexScreener fill):
+     -48.4 ingest+ 27.0 BUY     0.860 SOL  7.3884e-07  1.026  w=2niAi7b2
+     -48.4 ingest+ 27.0 SELL    7.844 SOL  7.6581e-07  1.063  w=9omZBh9v
+     -47.4 ingest+ 26.0 SELL    0.172 SOL  7.4685e-07  1.037  w=7FPqg7Mp
+     -47.4 ingest+ 26.0 BUY     1.683 SOL  7.5516e-07  1.049  w=3HEBkNpr
+     -42.4 ingest+ 19.1 SELL    0.442 SOL  7.4286e-07  1.031  w=DKQthJkY
+     -41.4 ingest+ 18.1 BUY     0.850 SOL  7.5471e-07  1.048  w=2niAi7b2
+     -39.4 ingest+ 16.1 SELL    1.123 SOL  7.4381e-07  1.033  w=2rutpG95
+     -36.4 ingest+ 13.1 SELL    2.008 SOL  7.2361e-07  1.005  w=E1EG56JK
+     -34.4 ingest+ 11.1 BUY     0.849 SOL  7.2492e-07  1.007  w=2niAi7b2
+     -32.4 ingest+  9.1 SELL    0.386 SOL  7.1913e-07  0.999  w=DY4tAwMk
+     -31.4 ingest+  8.1 SELL    0.378 SOL  7.1091e-07  0.987  w=HYYtkzfX
+     -31.4 ingest+  8.1 SELL    0.097 SOL  7.1393e-07  0.991  w=CTJWJGiN
+     -31.4 ingest+  8.1 SELL    0.168 SOL  7.1561e-07  0.994  w=75ZMS73h
+     -23.4 ingest+  4.0 BUY     1.139 SOL  7.3521e-07  1.021  w=2npiwsPo
+     -23.4 ingest+  4.0 BUY     0.860 SOL  7.3118e-07  1.015  w=2niAi7b2
+     -21.4 ingest+  1.9 BUY     1.957 SOL  7.4300e-07  1.032  w=FM1YCKED
+     -21.4 ingest+  1.9 SELL    0.930 SOL  7.2766e-07  1.010  w=DryxFnkA
+     -16.4 ingest+  3.0 BUY     0.850 SOL  7.7423e-07  1.075  w=2niAi7b2
+     -16.4 ingest+  3.0 BUY     0.988 SOL  7.6217e-07  1.058  w=HByGZ7iV
+     -15.4 ingest+  2.0 BUY     0.202 SOL  7.8119e-07  1.085  w=68UbqHps
+     -14.4 ingest+  2.9 BUY     1.569 SOL  7.1693e-07  0.995  w=922M9fBT
+     -14.4 ingest+  2.9 BUY     2.749 SOL  6.8152e-07  0.946  w=HvLi4xBR
+     -14.4 ingest+  2.9 SELL    9.161 SOL  7.1253e-07  0.989  w=FM1YCKED
+     -10.4 ingest+  3.0 BUY     0.085 SOL  7.1882e-07  0.998  w=DKMgH5hp
+      -6.4 ingest+  3.0 BUY     0.850 SOL  7.2475e-07  1.006  w=2niAi7b2
+      -4.4 ingest+  3.0 BUY     2.382 SOL  8.5393e-07  1.186  w=Ar2Y6o1Q
+      -4.4 ingest+  3.0 BUY     0.494 SOL  8.2443e-07  1.145  w=5rX7D2hg
+      -4.4 ingest+  3.0 SELL    0.919 SOL  8.1744e-07  1.135  w=922M9fBT
+      -4.4 ingest+  3.0 BUY     7.826 SOL  7.8019e-07  1.083  w=GYbh8LAD
+      -0.4 ingest+  2.9 BUY     0.494 SOL  8.6358e-07  1.199  w=7pTxT24G
+      +3.6 ingest+  3.2 BUY     0.988 SOL  8.7391e-07  1.213  w=DryxFnkA

@@ -1,0 +1,83 @@
+vol policies per cell 58
+rnd sigma available / events / median sigma %: (1222, 1418, 2.856113705810057)
+    cf sigma p25/p50/p75 0.4/0.7/1.3
+    mid sigma p25/p50/p75 1.2/2.1/3.7
+    hi sigma p25/p50/p75 1.5/4.7/8.0
+    hi20 sigma p25/p50/p75 2.5/4.8/9.9
+    all50 sigma p25/p50/p75 0.9/2.3/5.1
+    hiall sigma p25/p50/p75 2.1/4.7/8.9
+mom sigma available / events / median sigma %: (171, 304, 8.810455085272707)
+    cf sigma p25/p50/p75 4.0/12.9/13.0
+    mid sigma p25/p50/p75 5.5/7.8/11.6
+    hi sigma p25/p50/p75 6.2/8.7/11.7
+    hi20 sigma p25/p50/p75 7.6/10.1/20.1
+    all50 sigma p25/p50/p75 5.8/8.4/11.6
+    hiall sigma p25/p50/p75 6.7/9.3/12.9
+vacc sigma available / events / median sigma %: (123, 240, 3.534411395440098)
+    cf sigma p25/p50/p75 0.4/0.6/1.0
+    mid sigma p25/p50/p75 1.2/1.9/3.5
+    hi sigma p25/p50/p75 4.2/6.8/11.7
+    hi20 sigma p25/p50/p75 7.5/12.3/23.8
+    all50 sigma p25/p50/p75 1.1/3.0/6.8
+    hiall sigma p25/p50/p75 5.4/9.1/12.5
+configs evaluated: 1044 secs 8.4
+#### rnd / cf  robust-positive: 0 of 58
+  top  VFIX a5 b4 h240                              n=  11 pr=  5 m50=   1.75 m0=   2.77 med= -1.02 win= 18.2 pf= 1.30 | A=  12.84(3) B=  -2.41(8) xtop=  -4.24 topsh=0.36 sum$=      39 top5%gain=0.50
+  top  VFIX a5 b2 h240                              n=  13 pr=  5 m50=   1.74 m0=   2.76 med= -1.02 win= 23.1 pf= 1.35 | A=  12.84(3) B=  -1.59(10) xtop=  -2.92 topsh=0.31 sum$=      45 top5%gain=0.48
+  top  VFIX a5 b1 h240                              n=  14 pr=  5 m50=   1.14 m0=   2.16 med= -1.02 win= 21.4 pf= 1.23 | A=  12.84(3) B=  -2.05(11) xtop=  -3.29 topsh=0.29 sum$=      32 top5%gain=0.49
+#### rnd / mid  robust-positive: 0 of 58
+  top  VFIX a2 b4 h240                              n=  81 pr= 18 m50=  -3.04 m0=  -2.07 med= -5.55 win= 35.8 pf= 0.60 | A=  -1.28(24) B=  -3.78(57) xtop=  -3.43 topsh=0.19 sum$=    -492 top5%gain=0.38
+  top  VFIX a1 b4 h240                              n= 127 pr= 18 m50=  -3.38 m0=  -2.41 med= -5.65 win= 25.2 pf= 0.47 | A=  -3.05(43) B=  -3.55(84) xtop=  -3.84 topsh=0.18 sum$=    -859 top5%gain=0.48
+  top  VFIX a5 b2 h60                               n= 121 pr= 18 m50=  -3.45 m0=  -2.48 med= -2.59 win= 33.1 pf= 0.40 | A=  -4.07(38) B=  -3.17(83) xtop=  -3.65 topsh=0.13 sum$=    -835 top5%gain=0.51
+#### rnd / hi  robust-positive: 0 of 58
+  top  VFIX a5 b1 h240                              n= 129 pr= 45 m50=  -4.57 m0=  -3.61 med= -2.70 win= 45.0 pf= 0.50 | A=  -5.20(56) B=  -4.08(73) xtop=  -5.17 topsh=0.20 sum$=    -864 top5%gain=0.40
+  top  VFIX a3 b1 h240                              n= 140 pr= 45 m50=  -4.58 m0=  -3.63 med= -2.86 win= 40.7 pf= 0.47 | A=  -4.83(60) B=  -4.40(80) xtop=  -5.34 topsh=0.21 sum$=    -976 top5%gain=0.45
+  top  VFIX a2 b1 h60                               n= 191 pr= 45 m50=  -5.09 m0=  -4.14 med= -3.06 win= 37.7 pf= 0.35 | A=  -4.66(84) B=  -5.43(107) xtop=  -5.84 topsh=0.18 sum$=   -1432 top5%gain=0.54
+#### rnd / hi20  robust-positive: 0 of 58
+  top  VTRAIL a5 b1_1 w1 h240                       n= 138 pr= 84 m50=  -4.46 m0=  -3.50 med=-10.29 win= 28.3 pf= 0.72 | A=  -5.71(78) B=  -2.84(60) xtop=  -8.33 topsh=0.06 sum$=    -231 top5%gain=0.75
+  top  VTRAIL a5 b1_2 w1 h240                       n= 123 pr= 84 m50=  -4.78 m0=  -3.82 med=-13.96 win= 33.3 pf= 0.74 | A=  -6.21(67) B=  -3.06(56) xtop=  -9.13 topsh=0.05 sum$=    -193 top5%gain=0.69
+  top  VTRAIL a5 b1_2 w2 h240                       n= 124 pr= 84 m50=  -5.09 m0=  -4.14 med=-13.78 win= 28.2 pf= 0.72 | A=  -6.39(66) B=  -3.61(58) xtop=  -9.27 topsh=0.06 sum$=    -242 top5%gain=0.68
+#### rnd / all50  robust-positive: 0 of 58
+  top  VFIX a5 b1 h240                              n= 217 pr= 69 m50=  -4.68 m0=  -3.72 med= -1.89 win= 38.2 pf= 0.43 | A=  -5.21(86) B=  -4.33(131) xtop=  -4.99 topsh=0.12 sum$=   -1717 top5%gain=0.46
+  top  VFIX a2 b4 h60                               n= 299 pr= 69 m50=  -4.76 m0=  -3.80 med= -5.21 win= 25.4 pf= 0.44 | A=  -4.80(100) B=  -4.73(199) xtop=  -4.87 topsh=0.06 sum$=   -2465 top5%gain=0.49
+  top  VFIX a2 b1 h60                               n= 426 pr= 69 m50=  -4.78 m0=  -3.82 med= -2.77 win= 28.4 pf= 0.27 | A=  -4.73(140) B=  -4.80(286) xtop=  -5.07 topsh=0.08 sum$=   -3558 top5%gain=0.61
+#### rnd / hiall  robust-positive: 0 of 58
+  top  VTRAIL a5 b1_1 w0.5 h240                     n= 252 pr=118 m50=  -5.80 m0=  -4.85 med= -5.14 win= 29.8 pf= 0.57 | A=  -7.16(128) B=  -4.40(124) xtop=  -7.77 topsh=0.09 sum$=   -1364 top5%gain=0.67
+  top  VFIX a2 b2 h60                               n= 316 pr=118 m50=  -5.88 m0=  -4.94 med=-10.29 win= 32.0 pf= 0.52 | A=  -6.36(156) B=  -5.41(160) xtop=  -7.24 topsh=0.07 sum$=   -1707 top5%gain=0.54
+  top  VTRAIL a2 b1_1 w0.5 h240                     n= 315 pr=118 m50=  -6.02 m0=  -5.08 med= -9.51 win= 27.6 pf= 0.50 | A=  -7.35(152) B=  -4.79(163) xtop=  -7.68 topsh=0.09 sum$=   -1812 top5%gain=0.67
+#### mom / hi  robust-positive: 0 of 58
+  top  VFIX a5 b1 h240                              n=  89 pr= 59 m50=  -2.90 m0=  -1.93 med= -3.19 win= 47.2 pf= 0.70 | A= -11.82(35) B=   2.88(54) xtop=  -5.58 topsh=0.09 sum$=    -417 top5%gain=0.46
+  top  VFIX a5 b1 h60                               n=  98 pr= 59 m50=  -2.99 m0=  -2.02 med= -3.19 win= 44.9 pf= 0.68 | A= -10.99(40) B=   2.52(58) xtop=  -5.42 topsh=0.10 sum$=    -464 top5%gain=0.48
+  top  VFIX a5 b2 h60                               n=  91 pr= 59 m50=  -4.22 m0=  -3.26 med=-10.83 win= 33.0 pf= 0.65 | A= -14.43(38) B=   3.09(53) xtop=  -6.95 topsh=0.10 sum$=    -587 top5%gain=0.49
+#### mom / hi20  robust-positive: 0 of 58
+  top  VFIX a3 b8 h240                              n=  80 pr= 69 m50=  -2.85 m0=  -1.87 med=-14.07 win= 23.8 pf= 0.87 | A=   3.96(36) B=  -8.42(44) xtop=  -7.95 topsh=0.04 sum$=     -17 top5%gain=0.59
+  top  VTRAIL a5 b1_1 w0.5 h240                     n= 101 pr= 69 m50=  -2.94 m0=  -1.97 med= -9.97 win= 40.6 pf= 0.83 | A=  -1.64(49) B=  -4.17(52) xtop=  -7.83 topsh=0.08 sum$=     -16 top5%gain=0.65
+  top  VTRAIL a5 b1_1 w2 h240                       n=  92 pr= 69 m50=  -3.92 m0=  -2.96 med=-14.05 win= 29.3 pf= 0.81 | A=   0.74(42) B=  -7.84(50) xtop=  -9.13 topsh=0.07 sum$=    -103 top5%gain=0.71
+#### mom / all50  robust-positive: 0 of 58
+  top  VFIX a5 b1 h60                               n= 124 pr= 69 m50=  -3.79 m0=  -2.82 med= -5.02 win= 43.5 pf= 0.60 | A=  -9.41(57) B=   0.99(67) xtop=  -5.71 topsh=0.08 sum$=    -817 top5%gain=0.43
+  top  VFIX a5 b2 h60                               n= 115 pr= 69 m50=  -4.56 m0=  -3.60 med=-10.84 win= 33.0 pf= 0.61 | A= -11.70(53) B=   1.54(62) xtop=  -6.72 topsh=0.08 sum$=    -868 top5%gain=0.45
+  top  VFIX a5 b1 h240                              n= 112 pr= 69 m50=  -5.21 m0=  -4.26 med= -3.19 win= 47.3 pf= 0.54 | A= -10.69(49) B=  -0.95(63) xtop=  -7.37 topsh=0.08 sum$=   -1067 top5%gain=0.44
+#### mom / hiall  robust-positive: 0 of 58
+  top  VFIX a3 b1 h60                               n= 200 pr=120 m50=  -4.93 m0=  -3.98 med= -9.39 win= 43.5 pf= 0.61 | A=  -6.41(89) B=  -3.75(111) xtop=  -6.92 topsh=0.06 sum$=    -937 top5%gain=0.49
+  top  VFIX a1 b1 h60                               n= 222 pr=120 m50=  -5.04 m0=  -4.08 med=-11.08 win= 36.0 pf= 0.57 | A=  -7.37(97) B=  -3.23(125) xtop=  -6.91 topsh=0.06 sum$=   -1114 top5%gain=0.54
+  top  VFIX a3 b1 h240                              n= 192 pr=120 m50=  -5.04 m0=  -4.09 med= -9.39 win= 44.8 pf= 0.62 | A=  -5.97(84) B=  -4.31(108) xtop=  -7.11 topsh=0.05 sum$=    -912 top5%gain=0.48
+#### vacc / mid  robust-positive: 0 of 58
+  top  VFIX a1 b8 h240                              n=  36 pr= 13 m50=  -1.51 m0=  -0.52 med= -5.04 win= 19.4 pf= 0.75 | A=  -0.37(15) B=  -2.32(21) xtop=  -2.56 topsh=0.14 sum$=    -109 top5%gain=0.63
+  top  VFIX a3 b8 h240                              n=  25 pr= 13 m50=  -1.72 m0=  -0.73 med= -7.42 win= 28.0 pf= 0.79 | A=  -0.63(12) B=  -2.73(13) xtop=  -3.29 topsh=0.12 sum$=     -86 top5%gain=0.37
+  top  VFIX a5 b2 h240                              n=  32 pr= 13 m50=  -1.83 m0=  -0.85 med= -0.07 win= 46.9 pf= 0.67 | A=   1.58(13) B=  -4.17(19) xtop=  -3.89 topsh=0.16 sum$=    -117 top5%gain=0.35
+#### vacc / hi  robust-positive: 0 of 58
+  top  VFIX a5 b4 h60                               n=  76 pr= 61 m50=  -7.35 m0=  -6.42 med=-13.58 win= 15.8 pf= 0.47 | A=  -8.52(36) B=  -6.30(40) xtop= -10.62 topsh=0.05 sum$=    -883 top5%gain=0.73
+  top  VFIX a5 b1 h60                               n=  80 pr= 61 m50=  -7.62 m0=  -6.69 med=-10.88 win= 32.5 pf= 0.28 | A= -10.01(37) B=  -5.57(43) xtop=  -7.92 topsh=0.06 sum$=    -870 top5%gain=0.44
+  top  VFIX a5 b4 h240                              n=  73 pr= 61 m50=  -7.83 m0=  -6.91 med=-13.69 win= 19.2 pf= 0.50 | A=  -9.54(36) B=  -6.17(37) xtop= -11.25 topsh=0.04 sum$=    -876 top5%gain=0.63
+#### vacc / hi20  robust-positive: 0 of 58
+  top  VFIX a3 b8 h240                              n=  71 pr= 68 m50=  -7.45 m0=  -6.52 med=-14.07 win= 19.7 pf= 0.64 | A=  -1.72(34) B= -12.71(37) xtop= -10.27 topsh=0.04 sum$=    -304 top5%gain=0.44
+  top  VFIX a3 b8 h60                               n=  72 pr= 68 m50=  -7.97 m0=  -7.05 med=-14.07 win= 20.8 pf= 0.60 | A=  -1.18(34) B= -14.05(38) xtop= -10.76 topsh=0.04 sum$=    -334 top5%gain=0.50
+  top  VTRAIL a5 b1_2 w2 h240                       n=  71 pr= 68 m50=  -8.00 m0=  -7.07 med=-14.06 win= 25.4 pf= 0.58 | A=  -5.02(34) B= -10.74(37) xtop= -10.93 topsh=0.03 sum$=    -357 top5%gain=0.61
+#### vacc / all50  robust-positive: 0 of 58
+  top  VFIX a5 b1 h60                               n= 139 pr= 80 m50=  -5.46 m0=  -4.51 med= -2.29 win= 28.8 pf= 0.30 | A=  -7.92(54) B=  -3.89(85) xtop=  -5.89 topsh=0.05 sum$=   -1168 top5%gain=0.53
+  top  VFIX a3 b2 h60                               n= 141 pr= 80 m50=  -5.84 m0=  -4.89 med= -7.42 win= 23.4 pf= 0.35 | A=  -5.50(55) B=  -6.05(86) xtop=  -6.30 topsh=0.05 sum$=   -1271 top5%gain=0.52
+  top  VFIX a5 b2 h60                               n= 137 pr= 80 m50=  -5.87 m0=  -4.93 med= -5.40 win= 24.1 pf= 0.35 | A=  -5.82(54) B=  -5.90(83) xtop=  -6.32 topsh=0.05 sum$=   -1225 top5%gain=0.51
+#### vacc / hiall  robust-positive: 0 of 58
+  top  VTRAIL a5 b1_4 w2 h240                       n= 139 pr=123 m50=  -8.11 m0=  -7.19 med=-13.86 win= 20.1 pf= 0.54 | A=  -7.96(68) B=  -8.25(71) xtop= -10.23 topsh=0.03 sum$=   -1285 top5%gain=0.66
+  top  VFIX a5 b4 h240                              n= 141 pr=123 m50=  -8.86 m0=  -7.94 med=-13.86 win= 22.0 pf= 0.49 | A=  -9.48(70) B=  -8.24(71) xtop= -10.62 topsh=0.04 sum$=   -1207 top5%gain=0.53
+  top  VFIX a5 b8 h60                               n= 145 pr=123 m50=  -9.24 m0=  -8.33 med=-13.87 win= 16.6 pf= 0.49 | A=  -6.76(69) B= -11.49(76) xtop= -10.96 topsh=0.04 sum$=   -1461 top5%gain=0.67

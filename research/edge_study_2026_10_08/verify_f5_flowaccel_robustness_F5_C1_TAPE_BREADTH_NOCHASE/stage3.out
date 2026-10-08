@@ -1,0 +1,39 @@
+== harness sensitivity (same C1 signal)
+  v1-like: next_point fills, no calib, no feed-gap close  train n 69 net50   4.090$ (  5.45%) model   5.584$ | holdout n 22 net50   1.601$ (  1.28%) model   3.253$
+  next_point fills + calib + feed-gap                     train n 70 net50  -3.375$ ( -1.95%) model  -0.383$ | holdout n 22 net50   0.591$ (  0.54%) model   3.253$
+  next_refresh fills, no calib (= audited v2 +50bps)      train n 69 net50  -5.692$ ( -3.67%) model  -4.281$ | holdout n 22 net50   1.960$ (  1.82%) model   3.616$
+  FINAL (next_refresh + calib + feed-gap)                 train n 69 net50  -7.308$ ( -4.78%) model  -4.281$ | holdout n 22 net50   0.943$ (  1.08%) model   3.616$
+== matched control: random entries on the SAME pair within +/-60 min of each C1 decision (universe+no-chase, same exits)
+  control trades pooled over 8 seeds: 1203
+   train {"n_matched": 69, "c1_mean": -7.308, "control_mean": -8.252, "mean_diff": 0.944, "ci95_pair": [-0.045, 2.835], "share_trades_beating_control": 0.565}
+   holdout {"n_matched": 22, "c1_mean": 0.943, "control_mean": -5.034, "mean_diff": 5.977, "ci95_pair": [1.092, 14.502], "share_trades_beating_control": 0.636}
+== tape coverage by hour (events ingested, distinct pools) and C1 universe eligibility
+  hour | tape events | tape pools | eligible pools (universe+nochase) | eligible pts (1/6 sampled) | signal fires (1/6) | C1 trades
+     0 |    1915 |    3 |    4 |     44 |    21 |   3
+     1 |       0 |    0 |    0 |      0 |     0 |   0
+     2 |    9004 |   15 |    5 |    134 |    49 |   7
+     3 |   16040 |   17 |    8 |    263 |    68 |  13
+     4 |   14550 |   25 |    6 |    223 |    51 |   7
+     5 |    7013 |   30 |   11 |    263 |    45 |   6
+     6 |    8058 |   28 |   12 |    322 |    25 |   9
+     7 |    8522 |   29 |   11 |    249 |    33 |   6
+     8 |    8677 |   31 |   11 |    293 |    24 |   7
+     9 |    8043 |   26 |    9 |    345 |    46 |   8
+    10 |    7096 |   36 |   12 |    333 |     7 |   3
+    11 |    7918 |   52 |    8 |    130 |     0 |   0
+    12 |    7522 |   54 |   12 |    232 |     0 |   0
+    13 |    4147 |   46 |   16 |    485 |     0 |   0
+    14 |     504 |   14 |    4 |     21 |     0 |   0
+    15 |    3821 |   27 |    9 |    500 |     8 |   2
+    16 |    6096 |   31 |   10 |    525 |    13 |   4
+    17 |    5749 |   30 |   15 |    563 |    32 |   4
+    18 |    5335 |   24 |   10 |    548 |    23 |   4
+    19 |    4114 |   34 |    9 |    468 |    15 |   2
+    20 |    7108 |   29 |   11 |    385 |    31 |   3
+    21 |    4509 |   36 |    7 |    161 |     7 |   2
+    22 |    3393 |   23 |    6 |    144 |     5 |   1
+  split cut at hour 13.66
+== sign tests (holdout, net50): wins vs losses
+  train wins 32 / 69  P(X>=w | p=.5) = 0.765
+  holdout wins 13 / 22  P(X>=w | p=.5) = 0.262
+done 22.6s

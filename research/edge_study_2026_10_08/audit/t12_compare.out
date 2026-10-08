@@ -1,0 +1,111 @@
+== smoke3: random cost-first, no guard
+  v1                 train n   83 mean  -3.680% | holdout n  129 mean  -5.968% median  -1.187 win  21.7 sum $-1539.82 | model holdout mean  -5.023 | pf3 bal 775.01 mdd 24.85 | 1.1s
+      v1 train {"n": 83, "pairs": 23, "win_rate": 41.0, "mean_pct": -3.68, "median_pct": -0.117, "sum_usd": -610.9, "pf": 0.278, "ci95_mean_usd": [-16.147, 0.219], "ci95_mean_usd_pair": null, "trades_per_hour": 10.16, "top_pair_share": 0.084, "exits": {"HOLD": 71, "STOP": 8, "TP": 3, "OPEN_AT_END/VANISHED": 1}}
+      v1 holdout {"n": 129, "pairs": 28, "win_rate": 21.7, "mean_pct": -5.968, "median_pct": -1.187, "sum_usd": -1539.82, "pf": 0.075, "ci95_mean_usd": [-19.477, -5.79], "ci95_mean_usd_pair": null, "trades_per_hour": 14.2, "top_pair_share": 0.101, "exits": {"HOLD": 92, "STOP": 15, "OPEN_AT_END/VANISHED": 3, "TP": 4, "OPEN_AT_END/END": 15}}
+  v2_F1_fills_only   train n   84 mean  -2.108% | holdout n  126 mean  -6.201% median  -1.171 win  23.0 sum $-1562.68 | model holdout mean  -5.258 | pf3 bal 765.54 mdd 24.88 | 1.5s
+  v2_F2_gaps_only    train n   83 mean  -4.892% | holdout n  129 mean  -5.372% median  -1.297 win  15.5 sum $-1385.85 | model holdout mean  -4.421 | pf3 bal 758.72 mdd 25.24 | 1.5s
+  v2                 train n   84 mean  -3.323% | holdout n  126 mean  -5.591% median  -1.222 win  16.7 sum $-1408.92 | model holdout mean  -4.642 | pf3 bal 759.26 mdd 25.03 | 1.6s
+      v2 train {"n": 84, "pairs": 23, "win_rate": 31.0, "mean_pct": -3.323, "median_pct": -0.909, "sum_usd": -558.34, "pf": 0.114, "ci95_mean_usd": [-14.111, -1.469], "ci95_mean_usd_pair": [-15.625, -1.315], "trades_per_hour": 6.15, "top_pair_share": 0.083, "exits": {"HOLD": 52, "STOP": 9, "TP": 1, "FEED_GAP/GAP": 21, "OPEN_AT_END/VANISHED": 1}}
+      v2 holdout {"n": 126, "pairs": 28, "win_rate": 16.7, "mean_pct": -5.591, "median_pct": -1.222, "sum_usd": -1408.92, "pf": 0.061, "ci95_mean_usd": [-18.826, -5.302], "ci95_mean_usd_pair": [-19.83, -4.958], "trades_per_hour": 13.84, "top_pair_share": 0.087, "exits": {"FEED_GAP/GAP": 13, "STOP": 12, "OPEN_AT_END/VANISHED": 2, "HOLD": 81, "TP": 3, "OPEN_AT_END/END": 15}}
+  v2_gap_pre         train n   84 mean  -3.250% | holdout n  127 mean  -5.441% median  -1.209 win  18.1 sum $-1382.11 | model holdout mean  -4.491 | pf3 bal 954.94 mdd 6.06 | 1.5s
+  v2_gap_return      train n   84 mean  -2.128% | holdout n  126 mean  -5.322% median  -1.138 win  23.8 sum $-1341.23 | model holdout mean  -4.371 | pf3 bal 767.39 mdd 24.83 | 1.6s
+== smoke3: random cost-first + interim rug guard
+  v1                 train n   27 mean  -4.782% | holdout n   43 mean  -3.299% median  -2.775 win  11.6 sum $ -283.73 | model holdout mean  -2.327 | pf3 bal 764.78 mdd 23.52 | 1.5s
+      v1 train {"n": 27, "pairs": 5, "win_rate": 14.8, "mean_pct": -4.782, "median_pct": -2.484, "sum_usd": -258.2, "pf": 0.333, "ci95_mean_usd": [-23.571, 4.873], "ci95_mean_usd_pair": null, "trades_per_hour": 3.3, "top_pair_share": 0.259, "exits": {"HOLD": 18, "STOP": 6, "TP": 3}}
+      v1 holdout {"n": 43, "pairs": 5, "win_rate": 11.6, "mean_pct": -3.299, "median_pct": -2.775, "sum_usd": -283.73, "pf": 0.177, "ci95_mean_usd": [-10.445, -3.846], "ci95_mean_usd_pair": null, "trades_per_hour": 4.84, "top_pair_share": 0.302, "exits": {"HOLD": 27, "STOP": 9, "TP": 3, "OPEN_AT_END/END": 4}}
+  v2_F1_fills_only   train n   28 mean  -0.036% | holdout n   40 mean  -2.993% median  -2.810 win  12.5 sum $ -239.44 | model holdout mean  -2.018 | pf3 bal 794.03 mdd 20.6 | 1.8s
+  v2_F2_gaps_only    train n   27 mean  -6.942% | holdout n   43 mean  -3.286% median  -2.775 win  11.6 sum $ -282.58 | model holdout mean  -2.314 | pf3 bal 765.94 mdd 23.41 | 1.8s
+  v2                 train n   28 mean  -2.239% | holdout n   40 mean  -2.978% median  -2.810 win  12.5 sum $ -238.26 | model holdout mean  -2.003 | pf3 bal 795.2 mdd 20.48 | 1.9s
+      v2 train {"n": 28, "pairs": 5, "win_rate": 10.7, "mean_pct": -2.239, "median_pct": -2.237, "sum_usd": -125.39, "pf": 0.149, "ci95_mean_usd": [-6.695, -1.883], "ci95_mean_usd_pair": [-5.666, -3.477], "trades_per_hour": 2.05, "top_pair_share": 0.25, "exits": {"HOLD": 14, "STOP": 7, "TP": 1, "FEED_GAP/GAP": 6}}
+      v2 holdout {"n": 40, "pairs": 5, "win_rate": 12.5, "mean_pct": -2.978, "median_pct": -2.81, "sum_usd": -238.26, "pf": 0.229, "ci95_mean_usd": [-10.168, -2.414], "ci95_mean_usd_pair": [-9.386, -4.016], "trades_per_hour": 4.39, "top_pair_share": 0.275, "exits": {"FEED_GAP/GAP": 3, "HOLD": 23, "STOP": 7, "TP": 3, "OPEN_AT_END/END": 4}}
+  v2_gap_pre         train n   27 mean  -2.088% | holdout n   40 mean  -2.777% median  -2.526 win  15.0 sum $ -222.15 | model holdout mean  -1.800 | pf3 bal 811.31 mdd 18.87 | 1.7s
+  v2_gap_return      train n   28 mean  -0.156% | holdout n   40 mean  -2.970% median  -2.810 win  12.5 sum $ -237.59 | model holdout mean  -1.995 | pf3 bal 795.88 mdd 20.41 | 1.8s
+== random cost-first + TRAIN-ONLY rug guard (sensitivity)
+  v1                 train n   28 mean  -4.647% | holdout n   54 mean  -4.978% median  -2.462 win   9.3 sum $ -537.65 | model holdout mean  -4.023 | pf3 bal 622.97 mdd 37.7 | 1.5s
+  v2_F1_fills_only   train n   29 mean  -0.086% | holdout n   51 mean  -4.808% median  -2.442 win   9.8 sum $ -490.44 | model holdout mean  -3.852 | pf3 bal 603.33 mdd 39.67 | 1.8s
+  v2_F2_gaps_only    train n   28 mean  -6.771% | holdout n   54 mean  -4.793% median  -2.452 win   9.3 sum $ -517.60 | model holdout mean  -3.836 | pf3 bal 624.13 mdd 37.59 | 1.9s
+  v2                 train n   29 mean  -2.237% | holdout n   51 mean  -4.611% median  -2.300 win   9.8 sum $ -470.37 | model holdout mean  -3.653 | pf3 bal 604.5 mdd 39.55 | 1.9s
+  v2_gap_pre         train n   28 mean  -2.091% | holdout n   51 mean  -4.438% median  -2.187 win  11.8 sum $ -452.64 | model holdout mean  -3.477 | pf3 bal 620.61 mdd 37.94 | 1.8s
+  v2_gap_return      train n   29 mean  -0.186% | holdout n   51 mean  -4.605% median  -2.300 win   9.8 sum $ -469.70 | model holdout mean  -3.646 | pf3 bal 605.18 mdd 39.48 | 1.8s
+== smoke: random all PumpSwap
+  v1                 train n  589 mean  -9.938% | holdout n  468 mean  -7.683% median  -6.267 win  13.9 sum $-7190.98 | model holdout mean  -6.761 | pf3 bal 150.57 mdd 85.27 | 2.2s
+      v1 train {"n": 589, "pairs": 165, "win_rate": 10.0, "mean_pct": -9.938, "median_pct": -7.575, "sum_usd": -11706.56, "pf": 0.137, "ci95_mean_usd": [-23.036, -15.594], "ci95_mean_usd_pair": null, "trades_per_hour": 43.2, "top_pair_share": 0.025, "exits": {"TP": 26, "STOP": 467, "HOLD": 84, "OPEN_AT_END/VANISHED": 10, "STOP/VANISHED": 2}}
+      v1 holdout {"n": 468, "pairs": 132, "win_rate": 13.9, "mean_pct": -7.683, "median_pct": -6.267, "sum_usd": -7190.98, "pf": 0.089, "ci95_mean_usd": [-17.84, -12.976], "ci95_mean_usd_pair": null, "trades_per_hour": 51.53, "top_pair_share": 0.03, "exits": {"HOLD": 132, "TP": 24, "STOP": 267, "OPEN_AT_END/VANISHED": 15, "STOP/VANISHED": 2, "OPEN_AT_END/END": 28}}
+  v2_F1_fills_only   train n  579 mean -10.288% | holdout n  466 mean  -7.361% median  -5.496 win  15.7 sum $-6860.31 | model holdout mean  -6.436 | pf3 bal 391.12 mdd 62.07 | 2.9s
+  v2_F2_gaps_only    train n  589 mean -11.008% | holdout n  470 mean  -7.642% median  -6.229 win  12.8 sum $-7183.15 | model holdout mean  -6.719 | pf3 bal 296.03 mdd 71.4 | 2.8s
+  v2                 train n  579 mean -11.102% | holdout n  468 mean  -7.202% median  -5.379 win  14.5 sum $-6740.89 | model holdout mean  -6.275 | pf3 bal 468.52 mdd 59.08 | 2.8s
+      v2 train {"n": 579, "pairs": 165, "win_rate": 9.3, "mean_pct": -11.102, "median_pct": -7.66, "sum_usd": -12855.87, "pf": 0.051, "ci95_mean_usd": [-24.409, -20.053], "ci95_mean_usd_pair": [-26.037, -18.344], "trades_per_hour": 42.4, "top_pair_share": 0.026, "exits": {"TP": 22, "STOP": 449, "FEED_GAP/GAP": 39, "HOLD": 57, "OPEN_AT_END/VANISHED": 10, "STOP/VANISHED": 2}}
+      v2 holdout {"n": 468, "pairs": 132, "win_rate": 14.5, "mean_pct": -7.202, "median_pct": -5.379, "sum_usd": -6740.89, "pf": 0.138, "ci95_mean_usd": [-17.052, -11.883], "ci95_mean_usd_pair": [-18.481, -10.864], "trades_per_hour": 51.4, "top_pair_share": 0.03, "exits": {"FEED_GAP/GAP": 24, "STOP": 263, "TP": 27, "OPEN_AT_END/VANISHED": 11, "HOLD": 112, "STOP/VANISHED": 3, "OPEN_AT_END/END": 28}}
+  v2_gap_pre         train n  580 mean -10.964% | holdout n  471 mean  -7.149% median  -5.368 win  14.9 sum $-6734.44 | model holdout mean  -6.222 | pf3 bal 518.92 mdd 49.71 | 2.7s
+  v2_gap_return      train n  579 mean -10.257% | holdout n  468 mean  -7.079% median  -5.379 win  15.8 sum $-6625.54 | model holdout mean  -6.151 | pf3 bal 423.99 mdd 62.07 | 2.9s
+== random mid/high fee, liq>=50k, guard
+  v1                 train n  240 mean  -4.480% | holdout n  170 mean  -4.316% median  -6.169 win  17.1 sum $-1467.51 | model holdout mean  -3.355 | pf3 bal 654.5 mdd 35.27 | 1.8s
+  v2_F1_fills_only   train n  234 mean  -5.380% | holdout n  167 mean  -4.409% median  -5.400 win  19.2 sum $-1472.70 | model holdout mean  -3.450 | pf3 bal 362.82 mdd 64.36 | 2.5s
+  v2_F2_gaps_only    train n  241 mean  -4.562% | holdout n  170 mean  -4.902% median  -6.173 win  16.5 sum $-1666.65 | model holdout mean  -3.947 | pf3 bal 512.16 mdd 49.35 | 2.4s
+  v2                 train n  236 mean  -5.571% | holdout n  167 mean  -4.692% median  -5.400 win  18.6 sum $-1567.29 | model holdout mean  -3.736 | pf3 bal 365.53 mdd 64.09 | 2.4s
+  v2_gap_pre         train n  237 mean  -5.390% | holdout n  169 mean  -4.578% median  -5.373 win  18.9 sum $-1547.40 | model holdout mean  -3.620 | pf3 bal 441.62 mdd 56.65 | 2.3s
+  v2_gap_return      train n  236 mean  -5.448% | holdout n  167 mean  -4.445% median  -5.400 win  19.2 sum $-1484.68 | model holdout mean  -3.486 | pf3 bal 370.25 mdd 63.63 | 2.4s
+== probe: momentum (price +3% over 60 s), liq>=50k, guard
+  v1                 train n  369 mean  -6.153% | holdout n  158 mean  -4.169% median  -6.423 win  22.2 sum $-1317.39 | model holdout mean  -3.207 | pf3 bal 279.68 mdd 74.13 | 1.3s
+  v2_F1_fills_only   train n  339 mean  -5.344% | holdout n  151 mean  -4.587% median  -6.148 win  19.2 sum $-1385.38 | model holdout mean  -3.630 | pf3 bal 590.92 mdd 42.15 | 1.7s
+  v2_F2_gaps_only    train n  370 mean  -6.177% | holdout n  158 mean  -4.986% median  -6.426 win  20.9 sum $-1575.47 | model holdout mean  -4.032 | pf3 bal 319.33 mdd 68.51 | 1.9s
+  v2                 train n  340 mean  -5.375% | holdout n  151 mean  -5.281% median  -6.179 win  16.6 sum $-1594.88 | model holdout mean  -4.331 | pf3 bal 425.27 mdd 58.72 | 1.7s
+  v2_gap_pre         train n  340 mean  -5.234% | holdout n  154 mean  -5.070% median  -6.091 win  16.9 sum $-1561.58 | model holdout mean  -4.118 | pf3 bal 414.39 mdd 59.81 | 1.8s
+  v2_gap_return      train n  340 mean  -5.305% | holdout n  151 mean  -4.611% median  -6.179 win  19.2 sum $-1392.62 | model holdout mean  -3.654 | pf3 bal 567.64 mdd 44.48 | 1.9s
+== probe: dip (price -3% over 60 s), liq>=50k, guard
+  v1                 train n  328 mean  -3.805% | holdout n  142 mean  -4.787% median  -6.408 win  16.9 sum $-1359.47 | model holdout mean  -3.831 | pf3 bal 254.99 mdd 75.27 | 1.3s
+  v2_F1_fills_only   train n  320 mean  -5.315% | holdout n  146 mean  -3.724% median  -6.085 win  17.8 sum $-1087.33 | model holdout mean  -2.758 | pf3 bal 514.42 mdd 51.36 | 1.8s
+  v2_F2_gaps_only    train n  329 mean  -4.100% | holdout n  143 mean  -4.762% median  -6.408 win  16.8 sum $-1361.86 | model holdout mean  -3.806 | pf3 bal 377.93 mdd 63.35 | 1.9s
+  v2                 train n  320 mean  -5.690% | holdout n  146 mean  -4.119% median  -6.043 win  17.8 sum $-1202.62 | model holdout mean  -3.156 | pf3 bal 394.21 mdd 62.72 | 1.9s
+  v2_gap_pre         train n  323 mean  -5.563% | holdout n  147 mean  -4.147% median  -6.014 win  18.4 sum $-1219.29 | model holdout mean  -3.185 | pf3 bal 360.8 mdd 65.96 | 2.8s
+  v2_gap_return      train n  320 mean  -5.426% | holdout n  146 mean  -3.713% median  -6.043 win  17.8 sum $-1084.29 | model holdout mean  -2.747 | pf3 bal 511.03 mdd 51.68 | 2.8s
+== probe: momentum, tight exits -3/+3/15
+  v1                 train n  465 mean  -4.737% | holdout n  212 mean  -3.675% median  -4.296 win  11.8 sum $-1558.08 | model holdout mean  -2.708 | pf3 bal -437.46 mdd 143.75 | 1.6s
+  v2_F1_fills_only   train n  442 mean  -4.287% | holdout n  202 mean  -3.295% median  -4.050 win  15.3 sum $-1331.14 | model holdout mean  -2.325 | pf3 bal 190.82 mdd 81.18 | 2.0s
+  v2_F2_gaps_only    train n  465 mean  -4.737% | holdout n  212 mean  -3.789% median  -4.299 win  11.3 sum $-1606.54 | model holdout mean  -2.824 | pf3 bal 194.08 mdd 80.59 | 1.9s
+  v2                 train n  442 mean  -4.295% | holdout n  202 mean  -3.450% median  -4.083 win  14.4 sum $-1393.68 | model holdout mean  -2.481 | pf3 bal 178.81 mdd 82.36 | 1.8s
+  v2_gap_pre         train n  442 mean  -4.252% | holdout n  204 mean  -3.463% median  -4.089 win  14.2 sum $-1412.71 | model holdout mean  -2.494 | pf3 bal 192.86 mdd 80.98 | 1.9s
+  v2_gap_return      train n  442 mean  -4.293% | holdout n  202 mean  -3.292% median  -4.050 win  15.3 sum $-1330.03 | model holdout mean  -2.322 | pf3 bal 189.95 mdd 81.26 | 1.8s
+== base rates: forward net %, $200, model costs, sampled 1/min/pair (v1 forward_net vs v2)
+    900s v1 fee100-125  liq50-250k  {'n': 10650, 'mean': -3.14, 'median': -3.4, 'p10': -15.61, 'p90': 7.66, 'win': 25.6}
+    900s v1 fee100-125  liq<50k     {'n': 19393, 'mean': -16.01, 'median': -18.99, 'p10': -32.98, 'p90': 2.58, 'win': 12.2}
+    900s v1 fee100-125  liq>=250k   {'n': 625, 'mean': -0.32, 'median': 0.13, 'p10': -5.33, 'p90': 5.05, 'win': 50.7}
+    900s v1 fee55-95    liq50-250k  {'n': 8883, 'mean': -2.77, 'median': -2.24, 'p10': -11.08, 'p90': 4.99, 'win': 23.3}
+    900s v1 fee55-95    liq>=250k   {'n': 6103, 'mean': -2.24, 'median': -2.22, 'p10': -5.67, 'p90': 1.02, 'win': 16.3}
+    900s v1 fee<=50     liq50-250k  {'n': 696, 'mean': -1.46, 'median': -1.46, 'p10': -2.3, 'p90': -0.59, 'win': 1.1}
+    900s v1 fee<=50     liq>=250k   {'n': 15071, 'mean': -1.11, 'median': -0.84, 'p10': -1.89, 'p90': 0.08, 'win': 10.8}
+    900s v2_F3F6_only fee100-125  liq50-250k  {'n': 10982, 'mean': -3.69, 'median': -3.4, 'p10': -15.84, 'p90': 7.4, 'win': 25.1}
+    900s v2_F3F6_only fee100-125  liq<50k     {'n': 22907, 'mean': -16.49, 'median': -19.17, 'p10': -35.9, 'p90': 1.64, 'win': 11.2}
+    900s v2_F3F6_only fee100-125  liq>=250k   {'n': 752, 'mean': -15.96, 'median': -1.03, 'p10': -100.01, 'p90': 4.51, 'win': 42.2}
+    900s v2_F3F6_only fee55-95    liq50-250k  {'n': 8978, 'mean': -2.99, 'median': -2.28, 'p10': -11.41, 'p90': 4.94, 'win': 23.0}
+    900s v2_F3F6_only fee55-95    liq>=250k   {'n': 6103, 'mean': -2.24, 'median': -2.22, 'p10': -5.67, 'p90': 1.02, 'win': 16.3}
+    900s v2_F3F6_only fee<=50     liq50-250k  {'n': 713, 'mean': -1.58, 'median': -1.48, 'p10': -2.36, 'p90': -0.59, 'win': 1.4}
+    900s v2_F3F6_only fee<=50     liq>=250k   {'n': 15301, 'mean': -1.83, 'median': -0.85, 'p10': -2.0, 'p90': 0.07, 'win': 10.7}
+    900s v2 fee100-125  liq50-250k  {'n': 10981, 'mean': -4.61, 'median': -3.44, 'p10': -15.89, 'p90': 6.29, 'win': 23.8}
+    900s v2 fee100-125  liq<50k     {'n': 22901, 'mean': -17.33, 'median': -19.15, 'p10': -35.81, 'p90': 0.8, 'win': 10.7}
+    900s v2 fee100-125  liq>=250k   {'n': 750, 'mean': -16.22, 'median': -0.99, 'p10': -100.01, 'p90': 4.39, 'win': 42.7}
+    900s v2 fee55-95    liq50-250k  {'n': 8978, 'mean': -3.18, 'median': -2.32, 'p10': -11.47, 'p90': 4.32, 'win': 21.8}
+    900s v2 fee55-95    liq>=250k   {'n': 6103, 'mean': -2.29, 'median': -2.26, 'p10': -5.7, 'p90': 1.01, 'win': 15.3}
+    900s v2 fee<=50     liq50-250k  {'n': 713, 'mean': -1.66, 'median': -1.48, 'p10': -2.33, 'p90': -0.68, 'win': 0.8}
+    900s v2 fee<=50     liq>=250k   {'n': 15301, 'mean': -1.99, 'median': -0.87, 'p10': -2.01, 'p90': -0.12, 'win': 8.1}
+   3600s v1 fee100-125  liq50-250k  {'n': 9835, 'mean': 0.47, 'median': -3.11, 'p10': -26.73, 'p90': 22.17, 'win': 38.8}
+   3600s v1 fee100-125  liq<50k     {'n': 14548, 'mean': -14.55, 'median': -21.49, 'p10': -36.25, 'p90': 7.39, 'win': 15.3}
+   3600s v1 fee100-125  liq>=250k   {'n': 333, 'mean': 7.69, 'median': 7.56, 'p10': -5.36, 'p90': 21.35, 'win': 74.8}
+   3600s v1 fee55-95    liq50-250k  {'n': 8311, 'mean': -4.03, 'median': -2.19, 'p10': -22.1, 'p90': 12.43, 'win': 31.8}
+   3600s v1 fee55-95    liq>=250k   {'n': 5793, 'mean': -2.95, 'median': -2.76, 'p10': -9.79, 'p90': 3.34, 'win': 24.9}
+   3600s v1 fee<=50     liq50-250k  {'n': 653, 'mean': -0.58, 'median': -0.66, 'p10': -1.61, 'p90': 0.64, 'win': 23.9}
+   3600s v1 fee<=50     liq>=250k   {'n': 13695, 'mean': -0.49, 'median': 0.01, 'p10': -2.57, 'p90': 2.58, 'win': 50.2}
+   3600s v2_F3F6_only fee100-125  liq50-250k  {'n': 10503, 'mean': -1.55, 'median': -3.4, 'p10': -28.33, 'p90': 20.7, 'win': 37.0}
+   3600s v2_F3F6_only fee100-125  liq<50k     {'n': 22292, 'mean': -19.36, 'median': -23.18, 'p10': -50.26, 'p90': 2.84, 'win': 12.1}
+   3600s v2_F3F6_only fee100-125  liq>=250k   {'n': 708, 'mean': -46.15, 'median': -13.85, 'p10': -100.01, 'p90': 16.84, 'win': 35.2}
+   3600s v2_F3F6_only fee55-95    liq50-250k  {'n': 8613, 'mean': -4.85, 'median': -2.49, 'p10': -22.89, 'p90': 11.97, 'win': 30.7}
+   3600s v2_F3F6_only fee55-95    liq>=250k   {'n': 5793, 'mean': -2.95, 'median': -2.76, 'p10': -9.79, 'p90': 3.34, 'win': 24.9}
+   3600s v2_F3F6_only fee<=50     liq50-250k  {'n': 670, 'mean': -0.73, 'median': -0.69, 'p10': -1.8, 'p90': 0.66, 'win': 23.6}
+   3600s v2_F3F6_only fee<=50     liq>=250k   {'n': 14473, 'mean': -3.52, 'median': -0.15, 'p10': -4.4, 'p90': 2.51, 'win': 47.5}
+   3600s v2 fee100-125  liq50-250k  {'n': 10502, 'mean': -5.18, 'median': -4.02, 'p10': -28.32, 'p90': 15.25, 'win': 33.9}
+   3600s v2 fee100-125  liq<50k     {'n': 22287, 'mean': -21.0, 'median': -23.18, 'p10': -49.24, 'p90': 1.08, 'win': 10.7}
+   3600s v2 fee100-125  liq>=250k   {'n': 706, 'mean': -46.11, 'median': -13.39, 'p10': -100.01, 'p90': 16.76, 'win': 35.1}
+   3600s v2 fee55-95    liq50-250k  {'n': 8613, 'mean': -5.58, 'median': -2.86, 'p10': -22.73, 'p90': 9.79, 'win': 26.8}
+   3600s v2 fee55-95    liq>=250k   {'n': 5793, 'mean': -3.08, 'median': -2.92, 'p10': -9.8, 'p90': 3.18, 'win': 22.6}
+   3600s v2 fee<=50     liq50-250k  {'n': 670, 'mean': -1.03, 'median': -0.86, 'p10': -2.18, 'p90': 0.51, 'win': 19.4}
+   3600s v2 fee<=50     liq>=250k   {'n': 14473, 'mean': -4.04, 'median': -0.46, 'p10': -4.42, 'p90': 1.68, 'win': 40.8}

@@ -1,0 +1,74 @@
+#1 G2a_grown_survivor|E1 secs=0
+   net50 {"n": 7, "pairs": 4, "clusters": 5, "win_rate": 42.9, "mean_pct": 7.635, "median_pct": -16.589, "mean_usd": 8.04, "sum_usd": 56.28, "pf": 1.519, "ci95_mean_usd": [-31.755, 51.753], "trades_per_hour": 2.59, "avg_hold_min": 4.4, "top_pair_share": 0.286, "exits": {"TRAIL": 2, "STOP": 4, "OPEN_AT_END/VANISHED": 1}}
+   net0 mean_pct 8.712 median -15.755 | robust {"cp_mean_pct": 7.654, "cp_median_pct": -16.578, "gap_trades": 0, "nogap_mean_pct": 7.635, "vanished": 1}
+       AFsEwPX1 Gamby net50 40.5 TRAIL  hold_min 10.6 mfe 59.9 fee 120.0 liq 23463
+       ATJ6YUTe Tweetboy net50 -17.6 STOP  hold_min 1.6 mfe -4.7 fee 120.0 liq 28784
+       AFsEwPX1 Gamby net50 76.5 OPEN_AT_END VANISHED hold_min 9.5 mfe 107.6 fee 120.0 liq 29493
+       8sbe1R1t UI net50 -16.8 STOP  hold_min 0.5 mfe -4.2 fee 110.0 liq 49029
+       9Bq3P2yY VIBE net50 -17.1 STOP  hold_min 1.2 mfe -8.1 fee 120.0 liq 19136
+       9Bq3P2yY VIBE net50 4.5 TRAIL  hold_min 7.4 mfe 33.7 fee 120.0 liq 19488
+       8sbe1R1t UI net50 -16.6 STOP  hold_min 0.2 mfe -15.8 fee 115.0 liq 43314
+#2 G2a_grown_survivor|E2 secs=0
+   net50 {"n": 6, "pairs": 4, "clusters": 5, "win_rate": 16.7, "mean_pct": 4.727, "median_pct": -26.383, "mean_usd": -1.99, "sum_usd": -11.94, "pf": 0.943, "ci95_mean_usd": [-55.606, 95.02], "trades_per_hour": 2.22, "avg_hold_min": 18.0, "top_pair_share": 0.333, "exits": {"OPEN_AT_END/VANISHED": 2, "STOP": 4}}
+   net0 mean_pct 5.775 median -25.647 | robust {"cp_mean_pct": 4.749, "cp_median_pct": -26.373, "gap_trades": 0, "nogap_mean_pct": 4.727, "vanished": 2}
+       AFsEwPX1 Gamby net50 169.2 OPEN_AT_END VANISHED hold_min 26.2 mfe 216.5 fee 120.0 liq 23463
+       ATJ6YUTe Tweetboy net50 -26.1 OPEN_AT_END VANISHED hold_min 2.3 mfe -4.7 fee 120.0 liq 28784
+       8sbe1R1t UI net50 -33.1 STOP  hold_min 47.7 mfe -4.2 fee 110.0 liq 49029
+       9Bq3P2yY VIBE net50 -26.4 STOP  hold_min 2.7 mfe -8.1 fee 120.0 liq 19136
+       9Bq3P2yY VIBE net50 -28.2 STOP  hold_min 17.3 mfe 34.8 fee 120.0 liq 19401
+       8sbe1R1t UI net50 -27.0 STOP  hold_min 12.0 mfe -0.3 fee 115.0 liq 43314
+#3 G2b_runner_dip|E1 secs=0
+   net50 {"n": 13, "pairs": 8, "clusters": 9, "win_rate": 30.8, "mean_pct": 26.491, "median_pct": -17.579, "mean_usd": 58.614, "sum_usd": 761.98, "pf": 4.561, "ci95_mean_usd": [-14.668, 185.02], "trades_per_hour": 1.47, "avg_hold_min": 16.0, "top_pair_share": 0.308, "exits": {"TRAIL": 3, "STOP": 9, "HOLD": 1}}
+   net0 mean_pct 27.756 median -16.755 | robust {"cp_mean_pct": 26.527, "cp_median_pct": -17.567, "gap_trades": 1, "nogap_mean_pct": -5.768, "vanished": 0}
+       2or8ATkU PPAV net50 15.8 TRAIL  hold_min 8.5 mfe 36.3 fee 115.0 liq 41768
+       2or8ATkU PPAV net50 -17.6 STOP  hold_min 7.5 mfe 6.2 fee 115.0 liq 43770
+       ATJ6YUTe Tweetboy net50 58.1 TRAIL  hold_min 13.2 mfe 82.8 fee 120.0 liq 20134
+       FZkmnKhs Benben net50 -19.2 STOP  hold_min 1.8 mfe -4.8 fee 125.0 liq 15836
+       8sbe1R1t UI net50 30.4 TRAIL  hold_min 14.6 mfe 50.2 fee 115.0 liq 37933
+       9Bq3P2yY VIBE net50 -21.3 STOP  hold_min 5.9 mfe 4.1 fee 120.0 liq 18439
+       9Bq3P2yY VIBE net50 -26.3 STOP  hold_min 2.0 mfe 7.2 fee 120.0 liq 20644
+       9Bq3P2yY VIBE net50 -17.6 STOP  hold_min 5.6 mfe -0.9 fee 125.0 liq 16949
+       FkfDrvbz LOBBY net50 -18.9 STOP  hold_min 6.1 mfe -4.3 fee 115.0 liq 47073
+       9Bq3P2yY VIBE net50 -19.0 STOP  hold_min 3.4 mfe -4.3 fee 125.0 liq 16164
+       FkfDrvbz LOBBY net50 413.6 HOLD  hold_min 138.8 mfe 418.7 fee 115.0 liq 41928
+       6kSizKgA peakmale net50 -17.1 STOP  hold_min 0.3 mfe -16.2 fee 120.0 liq 34445
+       Bp1QyynD COMP net50 -16.6 STOP  hold_min 0.6 mfe -4.6 fee 120.0 liq 25143
+#4 G2b_runner_dip|E2 secs=0
+   net50 {"n": 9, "pairs": 8, "clusters": 9, "win_rate": 33.3, "mean_pct": -20.486, "median_pct": -25.873, "mean_usd": -34.329, "sum_usd": -308.96, "pf": 0.191, "ci95_mean_usd": [-80.301, 2.887], "trades_per_hour": 1.02, "avg_hold_min": 19.0, "top_pair_share": 0.222, "exits": {"STOP": 5, "OPEN_AT_END/VANISHED": 2, "TRAIL": 2}}
+   net0 mean_pct -19.691 median -25.131 | robust {"cp_mean_pct": -20.474, "cp_median_pct": -25.865, "gap_trades": 0, "nogap_mean_pct": -20.486, "vanished": 2}
+       2or8ATkU PPAV net50 -99.0 STOP  hold_min 37.6 mfe 36.3 fee 115.0 liq 41768
+       ATJ6YUTe Tweetboy net50 41.9 OPEN_AT_END VANISHED hold_min 13.9 mfe 82.8 fee 120.0 liq 20134
+       FZkmnKhs Benben net50 -27.4 STOP  hold_min 3.7 mfe -4.8 fee 125.0 liq 15836
+       8sbe1R1t UI net50 8.4 TRAIL  hold_min 63.7 mfe 55.3 fee 115.0 liq 37933
+       9Bq3P2yY VIBE net50 15.4 TRAIL  hold_min 17.9 mfe 47.6 fee 120.0 liq 18439
+       9Bq3P2yY VIBE net50 -30.1 STOP  hold_min 15.4 mfe 13.6 fee 125.0 liq 16949
+       FkfDrvbz LOBBY net50 -25.9 STOP  hold_min 12.5 mfe -4.3 fee 115.0 liq 47073
+       6kSizKgA peakmale net50 -11.0 OPEN_AT_END VANISHED hold_min 2.6 mfe 16.9 fee 120.0 liq 34445
+       Bp1QyynD COMP net50 -56.6 STOP  hold_min 4.0 mfe -4.6 fee 120.0 liq 25143
+#5 G2c_grad_scalp|S8_TP15_H10 secs=0
+   net50 {"n": 24, "pairs": 24, "clusters": 24, "win_rate": 12.5, "mean_pct": -14.639, "median_pct": -14.988, "mean_usd": -14.802, "sum_usd": -355.24, "pf": 0.264, "ci95_mean_usd": [-27.058, -1.413], "trades_per_hour": 2.61, "avg_hold_min": 1.2, "top_pair_share": 0.042, "exits": {"OPEN_AT_END/VANISHED": 13, "TP": 3, "STOP": 8}}
+   net0 mean_pct -13.785 median -14.137 | robust {"cp_mean_pct": -14.625, "cp_median_pct": -14.976, "gap_trades": 0, "nogap_mean_pct": -14.639, "vanished": 13}
+       4CZLAuLP SC net50 -15.0 OPEN_AT_END VANISHED hold_min 0.1 mfe -4.7 fee 120.0 liq 20088
+       CDpeE2uP POISE net50 -15.1 OPEN_AT_END VANISHED hold_min 0.4 mfe -4.8 fee 125.0 liq 16776
+       2cRT2N5A PHASEONE net50 16.7 TP  hold_min 0.6 mfe 17.9 fee 120.0 liq 18644
+       CQiAHFkY Bond net50 -91.4 STOP  hold_min 0.9 mfe 1.9 fee 125.0 liq 17850
+       CRvE2Thp ACTII net50 -33.7 STOP  hold_min 0.3 mfe -4.7 fee 120.0 liq 20533
+       8vw8ssaQ ONRAMP net50 -4.6 OPEN_AT_END VANISHED hold_min 0.3 mfe 6.9 fee 120.0 liq 18654
+       5Us6qCc7 LLL net50 -10.8 STOP  hold_min 0.4 mfe -4.7 fee 120.0 liq 19087
+       CmmHprTz GPAD net50 -10.0 STOP  hold_min 0.5 mfe -4.7 fee 120.0 liq 18927
+       AKqiwHHe PILLY net50 -14.6 STOP  hold_min 0.4 mfe -4.7 fee 120.0 liq 24398
+       8BVfAF9y GodTerm net50 -15.0 OPEN_AT_END VANISHED hold_min 0.0 mfe 0.0 fee 120.0 liq 19857
+       Eji6Lww6 BLOX net50 76.3 TP  hold_min 0.4 mfe 78.0 fee 120.0 liq 23211
+       7Ptac8gH neetjak net50 21.9 TP  hold_min 1.1 mfe 23.1 fee 120.0 liq 22433
+       3YPcMDkZ SPLAZU net50 -12.2 STOP  hold_min 0.9 mfe -3.2 fee 120.0 liq 18369
+       876WGa4Y CRINE net50 -16.2 STOP  hold_min 0.6 mfe -4.7 fee 120.0 liq 24377
+       FZc1MxnM STREETCRAF net50 -15.1 OPEN_AT_END VANISHED hold_min 0.6 mfe -4.8 fee 125.0 liq 19899
+       3UotiyY5 SCHISM net50 -15.1 OPEN_AT_END VANISHED hold_min 0.6 mfe -4.8 fee 125.0 liq 19696
+       AQBw9ZEH FISHTANK net50 -15.0 OPEN_AT_END VANISHED hold_min 0.3 mfe -4.7 fee 120.0 liq 18546
+       6a2dXHgF Human net50 -15.0 OPEN_AT_END VANISHED hold_min 0.6 mfe -4.7 fee 120.0 liq 39106
+       GP8fkGCH Q net50 -14.3 OPEN_AT_END VANISHED hold_min 1.9 mfe -3.9 fee 125.0 liq 19817
+       6kxDGmWP Babem net50 -15.0 OPEN_AT_END VANISHED hold_min 0.3 mfe -4.7 fee 120.0 liq 39094
+       2UitS919 SCraft net50 -15.1 OPEN_AT_END VANISHED hold_min 0.3 mfe -4.8 fee 125.0 liq 19797
+       8PwEy33D SHIFT net50 -95.0 STOP  hold_min 16.3 mfe -4.7 fee 120.0 liq 19752
+       Gp3SXLx3 AgencyGuy net50 -15.0 OPEN_AT_END VANISHED hold_min 0.5 mfe -4.7 fee 120.0 liq 18983
+       5Yu3SqEz LIMITLESS net50 -13.1 OPEN_AT_END VANISHED hold_min 0.5 mfe -1.8 fee 120.0 liq 17327

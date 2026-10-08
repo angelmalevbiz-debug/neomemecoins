@@ -1,0 +1,9 @@
+stop      x0.7 -17.5     | f2r1 tr   -6.515 ho n22 p13    4.226 (-bestHr   0.377) gate False | 10 seeds tr  -10.079 ho   -0.849 pos 0.40 | dense tr  -12.117 ho   -8.683 n38  [24s]
+stop      x0.8 -20.0     | f2r1 tr   -7.327 ho n21 p13     5.96 (-bestHr   2.091) gate False | 10 seeds tr   -9.856 ho   -1.013 pos 0.40 | dense tr  -10.792 ho   -7.604 n36  [21s]
+stop      x1.2 -30.0     | f2r1 tr    -8.24 ho n21 p13    7.016 (-bestHr  -0.548) gate False | 10 seeds tr   -6.312 ho   -1.006 pos 0.40 | dense tr  -12.632 ho   -9.171 n34  [19s]
+stop      x1.3 -32.5     | f2r1 tr   -5.391 ho n21 p13    6.819 (-bestHr  -0.778) gate False | 10 seeds tr   -6.225 ho   -1.193 pos 0.40 | dense tr  -13.146 ho   -9.694 n34  [19s]
+hold_min  x0.7 63.0      | f2r1 tr   -9.336 ho n21 p13    0.413 (-bestHr  -2.041) gate False | 10 seeds tr  -11.322 ho   -6.084 pos 0.10 | dense tr   -13.12 ho  -11.935 n34  [18s]
+hold_min  x0.8 72.0      | f2r1 tr    -9.18 ho n21 p13    3.544 (-bestHr   1.017) gate False | 10 seeds tr   -9.812 ho   -3.725 pos 0.20 | dense tr  -11.451 ho  -10.599 n34  [18s]
+hold_min  x1.2 108.0     | f2r1 tr   -8.119 ho n21 p13     6.18 (-bestHr  -1.523) gate False | 10 seeds tr   -9.089 ho    0.156 pos 0.50 | dense tr  -12.363 ho   -8.097 n34  [18s]
+hold_min  x1.3 117.0     | f2r1 tr   -8.135 ho n21 p13    5.789 (-bestHr  -1.979) gate False | 10 seeds tr   -9.602 ho    0.028 pos 0.60 | dense tr  -11.899 ho   -8.123 n34  [17s]
+done 154.0s

@@ -1,0 +1,9 @@
+{
+ "units": 7387,
+ "groups": {
+  "OVER_BUDGET_OR_UNKNOWN": 4556,
+  "EXPLORATION_OR_PIN": 2189,
+  "FEASIBLE": 642
+ },
+ "tradable_any": 922
+}

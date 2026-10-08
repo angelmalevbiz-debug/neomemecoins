@@ -1,0 +1,24 @@
+holdout f2r1 n 21 mean net50 % 3.721
+LOO pair (pair, sym, n removed, holdout mean without it):
+   ('867dKvaC', 'MISTAKE', 2, 2.613)
+   ('12jc1DzJ', 'SI276', 1, 2.811)
+   ('8ewuF2o8', 'swordcat', 1, 2.886)
+   ('CR5dTgvT', 'ZKDARK', 1, 2.987)
+   ('745ATaSS', 'Frank', 3, 3.139)
+   ('BaiHzFqn', 'phubber', 1, 3.3)
+   ('53W7r4XU', 'darwin', 1, 3.858)
+   ('BFrSZake', 'HIGGS', 1, 3.923)
+   ('2B8tftZ5', 'CRAWL', 1, 4.209)
+   ('GLL3Czyb', 'HOTBOT', 1, 4.212)
+   ('HMzvsEEm', 'CATE', 1, 4.219)
+   ('69fyvgoT', 'swordinu', 4, 5.136)
+   ('4JAnKFdd', 'e/acc', 3, 5.346)
+drop best trades {'all': 3.721, 'drop1': 2.113, 'drop2': 1.051, 'drop3': -0.109}
+exit fill mode trigger {'train_mean': -1.798, 'holdout_n': 21, 'holdout_mean': 3.594}
+exit fill mode min {'train_mean': -4.577, 'holdout_n': 21, 'holdout_mean': 2.96}
+END marks -10% {'holdout_mean': 2.375, 'n': 21} excluding END trades 5.281
+holdout halves {'first_n': 10, 'first_mean': 6.027, 'second_n': 11, 'second_mean': 1.626} train thirds [-3.451, -0.527, -8.013]
+no-fill skips [('BaiHzFqn', 'phubber', 1791413034055.0, 'holdout', 4078)]
+   skipped trade, hypothetical buy at next point, 90-min mark net0 3.38%
+tape check (pair, sym, reason, series raw ret %, tape raw ret %):
+secs 1.1

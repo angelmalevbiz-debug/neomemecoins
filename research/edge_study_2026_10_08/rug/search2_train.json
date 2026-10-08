@@ -1,0 +1,346 @@
+{
+ "C_struct": [
+  [
+   {
+    "LP": 0.6,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9946685539042227,
+    "residual": 0.052834935753436965,
+    "recall_pts": 0.20647773279352227,
+    "precision": 0.7303102625298329,
+    "cf_recall": 0.0,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": 0.8,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9946685539042227,
+    "residual": 0.052834935753436965,
+    "recall_pts": 0.20647773279352227,
+    "precision": 0.7303102625298329,
+    "cf_recall": 0.0,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": 1.0,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9946685539042227,
+    "residual": 0.052834935753436965,
+    "recall_pts": 0.20647773279352227,
+    "precision": 0.7303102625298329,
+    "cf_recall": 0.0,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": 1.2,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9946685539042227,
+    "residual": 0.052834935753436965,
+    "recall_pts": 0.20647773279352227,
+    "precision": 0.7303102625298329,
+    "cf_recall": 0.0,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": 0.6,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9003538570417551,
+    "residual": 0.05762962962962963,
+    "recall_pts": 0.2125506072874494,
+    "precision": 0.12978986402966625,
+    "cf_recall": 0.0,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 0.8,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9003538570417551,
+    "residual": 0.05762962962962963,
+    "recall_pts": 0.2125506072874494,
+    "precision": 0.12978986402966625,
+    "cf_recall": 0.0,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 1.0,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9003538570417551,
+    "residual": 0.05762962962962963,
+    "recall_pts": 0.2125506072874494,
+    "precision": 0.12978986402966625,
+    "cf_recall": 0.0,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 1.2,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9003538570417551,
+    "residual": 0.05762962962962963,
+    "recall_pts": 0.2125506072874494,
+    "precision": 0.12978986402966625,
+    "cf_recall": 0.0,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": null,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.9004482189195565,
+    "residual": 0.05869297163995068,
+    "recall_pts": 0.1970310391363023,
+    "precision": 0.12156536219816819,
+    "cf_recall": 0.0,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": null,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": null,
+    "IMBAL": null
+   },
+   {
+    "retention": 1.0,
+    "residual": 0.06535255986241566,
+    "recall_pts": 0.0,
+    "precision": 0.0,
+    "cf_recall": 0.0,
+    "n_atoms": 0
+   }
+  ]
+ ],
+ "C_young": [
+  [
+   {
+    "LP": null,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8760084925690022,
+    "residual": 0.02983592851917651,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.2574173495337666,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 1
+   }
+  ],
+  [
+   {
+    "LP": 0.6,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8760084925690022,
+    "residual": 0.02983592851917651,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.2574173495337666,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 0.8,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8760084925690022,
+    "residual": 0.02983592851917651,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.2574173495337666,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 1.0,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8760084925690022,
+    "residual": 0.02983592851917651,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.2574173495337666,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 1.2,
+    "FAKE": null,
+    "REUSE": null,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8760084925690022,
+    "residual": 0.02983592851917651,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.2574173495337666,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": null,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8018872375560273,
+    "residual": 0.03250412705641259,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.17827788649706458,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 2
+   }
+  ],
+  [
+   {
+    "LP": 0.6,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8018872375560273,
+    "residual": 0.03250412705641259,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.17827788649706458,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 3
+   }
+  ],
+  [
+   {
+    "LP": 0.8,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8018872375560273,
+    "residual": 0.03250412705641259,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.17827788649706458,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 3
+   }
+  ],
+  [
+   {
+    "LP": 1.0,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8018872375560273,
+    "residual": 0.03250412705641259,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.17827788649706458,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 3
+   }
+  ],
+  [
+   {
+    "LP": 1.2,
+    "FAKE": null,
+    "REUSE": 6,
+    "YOUNG": 720,
+    "IMBAL": null
+   },
+   {
+    "retention": 0.8018872375560273,
+    "residual": 0.03250412705641259,
+    "recall_pts": 0.6147098515519568,
+    "precision": 0.17827788649706458,
+    "cf_recall": 0.8790322580645161,
+    "n_atoms": 3
+   }
+  ]
+ ]
+}

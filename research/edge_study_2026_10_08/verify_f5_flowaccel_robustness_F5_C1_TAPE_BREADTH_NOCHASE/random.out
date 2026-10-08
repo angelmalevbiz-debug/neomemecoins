@@ -1,0 +1,26 @@
+calib prob 0.002 52
+calib prob 0.0035 92
+calib prob 0.005 108
+seed 0 50 train -8.761 holdout n 24 -7.078
+seed 1 53 train -3.937 holdout n 23 -4.264
+seed 2 52 train -8.12 holdout n 28 -6.932
+seed 3 62 train -7.684 holdout n 30 -12.603
+seed 4 46 train -7.534 holdout n 22 -11.178
+seed 5 58 train -7.753 holdout n 27 -7.17
+seed 6 56 train -6.347 holdout n 27 -5.807
+seed 7 61 train -10.691 holdout n 31 -7.828
+seed 8 66 train -10.732 holdout n 30 -4.718
+seed 9 51 train -11.434 holdout n 24 -15.241
+seed 10 61 train -8.386 holdout n 33 -6.723
+seed 11 43 train -10.463 holdout n 20 -4.377
+seed 12 55 train -9.746 holdout n 28 -13.059
+seed 13 55 train -4.494 holdout n 24 -5.685
+seed 14 64 train -8.362 holdout n 31 -5.632
+seed 15 58 train -9.471 holdout n 27 -15.528
+seed 16 56 train -10.271 holdout n 26 -7.508
+seed 17 59 train -8.146 holdout n 34 -3.859
+seed 18 57 train -7.937 holdout n 27 -4.395
+seed 19 53 train -8.977 holdout n 25 -5.292
+pair-matched -4.792 0 0
+{"seeds": 20, "holdout_mean_usd_sorted": [-15.528, -15.241, -13.059, -12.603, -11.178, -7.828, -7.508, -7.17, -7.078, -6.932, -6.723, -5.807, -5.685, -5.632, -5.292, -4.718, -4.395, -4.377, -4.264, -3.859], "seeds_holdout_mean_ge_C1": 0, "seeds_holdout_mean_pos": 0, "first5": [-7.078, -4.264, -6.932, -12.603, -11.178]} {"draws": 40000, "share_mean_ge_6.106": 0.0}
+done 63.8s

@@ -1,0 +1,13 @@
+pc1h_max  x0.7 -8.4      | f2r1 tr   -7.672 ho n28 p15    1.577 (-bestHr  -4.398) gate False | 10 seeds tr   -9.211 ho   -4.902 pos 0.10 | dense tr  -12.283 ho   -9.593 n43  [24s]
+pc1h_max  x0.8 -9.6      | f2r1 tr   -8.963 ho n23 p14    4.721 (-bestHr  -2.431) gate False | 10 seeds tr   -8.854 ho   -3.118 pos 0.20 | dense tr  -12.033 ho  -10.781 n39  [23s]
+pc1h_max  x1.2 -14.4     | f2r1 tr  -10.259 ho n14 p 9    6.196 (-bestHr   3.243) gate False | 10 seeds tr   -6.731 ho   -0.423 pos 0.40 | dense tr  -11.256 ho   -8.019 n29  [20s]
+pc1h_max  x1.3 -15.6     | f2r1 tr   -4.341 ho n11 p 7   12.661 (-bestHr   6.626) gate False | 10 seeds tr   -4.218 ho    0.197 pos 0.40 | dense tr  -10.835 ho   -5.576 n26  [22s]
+liq_min   x0.7 35000.0   | f2r1 tr    4.375 ho n24 p14   -0.671 (-bestHr  -6.009) gate False | 10 seeds tr   -4.422 ho   -7.291 pos 0.00 | dense tr   -6.813 ho  -13.412 n38  [22s]
+liq_min   x0.8 40000.0   | f2r1 tr    1.328 ho n23 p14    1.609 (-bestHr  -6.009) gate True | 10 seeds tr   -5.898 ho   -3.976 pos 0.30 | dense tr   -7.716 ho   -8.525 n34  [21s]
+liq_min   x1.2 60000.0   | f2r1 tr  -11.867 ho n20 p12    5.621 (-bestHr  -2.633) gate False | 10 seeds tr   -8.966 ho    0.224 pos 0.60 | dense tr   -9.158 ho   -5.472 n32  [21s]
+liq_min   x1.3 65000.0   | f2r1 tr  -13.834 ho n20 p12    5.621 (-bestHr  -2.633) gate False | 10 seeds tr  -11.857 ho    0.009 pos 0.50 | dense tr  -11.624 ho   -4.828 n31  [22s]
+tp        x0.7 14.0      | f2r1 tr   -9.904 ho n21 p13    2.408 (-bestHr  -1.626) gate False | 10 seeds tr   -9.808 ho   -1.903 pos 0.40 | dense tr  -10.992 ho   -8.268 n34  [21s]
+tp        x0.8 16.0      | f2r1 tr   -9.513 ho n21 p13    4.118 (-bestHr  -0.344) gate False | 10 seeds tr    -9.63 ho   -0.421 pos 0.40 | dense tr  -10.741 ho   -7.617 n34  [20s]
+tp        x1.2 24.0      | f2r1 tr   -5.363 ho n21 p13    6.103 (-bestHr  -0.948) gate False | 10 seeds tr   -8.191 ho    0.315 pos 0.60 | dense tr  -11.272 ho   -8.574 n34  [19s]
+tp        x1.3 26.0      | f2r1 tr   -5.262 ho n21 p13    5.062 (-bestHr  -0.996) gate False | 10 seeds tr   -8.378 ho     0.22 pos 0.50 | dense tr  -11.353 ho   -8.666 n34  [19s]
+done 254.9s

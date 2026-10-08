@@ -1,0 +1,37 @@
+loaded 0.4 s
+tape pairs with events 349
+in series 307 pumpswap-SOL in series 305
+programs [('pAMMBa', 185465)]
+quote assets [('So11', 185412), ('EPjF', 53)]
+flags [('QUOTE_USD_UNKNOWN', 23322), ('SWAP_ACTOR_NOT_TRANSACTION_SIGNER', 2499), ('QUOTE_ASSET_USD_REFERENCE_ESTIMATE', 147)]
+available - event_time ms: p10 1760 p50 4300 p90 216001 p99 80371131
+pumpswap-SOL pairs with tape events inside the series span: 300
+HU22UBaT SNDWITCH events 28061 buy/sell 17165 10896 tape span h 18.22 series pts 7226 series span h 11.34
+69fyvgoT swordinu events 18969 buy/sell 14409 4560 tape span h 11.17 series pts 9609 series span h 14.43
+F2P22Sfc A1 events 18734 buy/sell 11015 7719 tape span h 15.1 series pts 10331 series span h 17.47
+7mQDGtei CATCRAFT events 15582 buy/sell 10209 5373 tape span h 18.27 series pts 7842 series span h 13.43
+A2ASUorC RARINU events 15137 buy/sell 10717 4420 tape span h 24.8 series pts 13389 series span h 21.69
+UCWmMumV ECSTASY events 6527 buy/sell 4285 2242 tape span h 17.7 series pts 11198 series span h 17.95
+28CJf2tS HASHERS events 5805 buy/sell 3320 2485 tape span h 16.6 series pts 5484 series span h 15.28
+CR5dTgvT ZKDARK events 2474 buy/sell 1718 756 tape span h 4.67 series pts 2047 series span h 6.14
+8J42or3k MINER events 2473 buy/sell 1713 760 tape span h 22.81 series pts 6137 series span h 16.53
+AGZjpu5v VSOF events 1845 buy/sell 1104 741 tape span h 12.1 series pts 8900 series span h 14.43
+867dKvaC MISTAKE events 1837 buy/sell 1137 700 tape span h 14.53 series pts 9235 series span h 14.92
+12jc1DzJ SI276 events 1806 buy/sell 1091 715 tape span h 26.11 series pts 14181 series span h 22.76
+8sbe1R1t UI events 1656 buy/sell 976 680 tape span h 2.4 series pts 1209 series span h 2.45
+5CihwRiq BOOT events 1613 buy/sell 1076 537 tape span h 0.32 series pts 416 series span h 0.7
+3NBq9zyn TWEETCRAFT events 1484 buy/sell 803 681 tape span h 16.1 series pts 10729 series span h 17.29
+units check on HU22UBaT
+  t 1791362460712 dex pnative 4.9440e-06 last tape 5.0108e-06 SELL age_s 1.7
+  t 1791365792897 dex pnative 1.0240e-05 last tape 4.3245e-06 SELL age_s 2765.9
+  t 1791369094896 dex pnative 4.1860e-06 last tape 4.3245e-06 SELL age_s 6067.9
+  t 1791372256031 dex pnative 4.2600e-06 last tape 4.3787e-06 SELL age_s 0.0
+  t 1791376684308 dex pnative 4.0810e-06 last tape 3.8669e-06 SELL age_s 149.3
+  t 1791380092565 dex pnative 4.7090e-06 last tape 4.9016e-06 SELL age_s 11.6
+  t 1791383212036 dex pnative 3.6710e-06 last tape 3.6495e-06 BUY age_s 0.0
+  t 1791386470471 dex pnative 3.5400e-06 last tape 3.4401e-06 BUY age_s 42.5
+  t 1791390002466 dex pnative 3.5700e-06 last tape 3.7082e-06 BUY age_s 31.5
+  t 1791393458939 dex pnative 2.4700e-06 last tape 2.4318e-06 SELL age_s 1260.9
+  t 1791396634462 dex pnative 2.7450e-06 last tape 2.7339e-06 SELL age_s 69.5
+  t 1791400091765 dex pnative 1.5260e-06 last tape 2.4616e-06 BUY age_s 1263.8
+  t 1791403295621 dex pnative 1.7320e-06 last tape 2.4616e-06 BUY age_s 4467.6

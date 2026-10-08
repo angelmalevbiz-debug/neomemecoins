@@ -1,0 +1,259 @@
+policies per cell 2835 {'BE': 728, 'FIX': 294, 'PARTIAL': 225, 'PTRAIL': 168, 'STALE': 720, 'TRAIL': 700}
+signal rnd train events 1418 secs 17.1
+signal mom train events 304 secs 19.9
+signal vacc train events 240 secs 22.3
+configs evaluated (signal x universe x policy): 42525
+#### rnd / cf (train n=133)
+  top  FIX sNone t5 h240                            n= 133 pr=  5 m50=   6.59 m0=   7.66 med= -0.62 win= 46.6 pf= 3.28 | A=  16.56(15) B=   5.33(118) xtop=  -0.90 topsh=0.28 sum$=    1754 top5%gain=0.24
+  top  FIX sNone t3 h240                            n= 133 pr=  5 m50=   6.48 m0=   7.55 med=  0.03 win= 50.4 pf= 3.26 | A=  16.19(15) B=   5.25(118) xtop=  -1.05 topsh=0.28 sum$=    1724 top5%gain=0.25
+  top  FIX sNone t10 h240                           n= 133 pr=  5 m50=   6.34 m0=   7.41 med= -0.97 win= 42.9 pf= 3.02 | A=  16.32(15) B=   5.08(118) xtop=  -1.24 topsh=0.28 sum$=    1688 top5%gain=0.24
+  top  BE sNone t10 a6 b0.5 h240                    n= 133 pr=  5 m50=   6.24 m0=   7.31 med= -0.89 win= 40.6 pf= 3.09 | A=  16.32(15) B=   4.96(118) xtop=  -1.38 topsh=0.28 sum$=    1661 top5%gain=0.25
+  top  BE sNone t10 a6 b2.0 h240                    n= 133 pr=  5 m50=   6.17 m0=   7.24 med= -0.77 win= 44.4 pf= 3.09 | A=  16.32(15) B=   4.88(118) xtop=  -1.48 topsh=0.28 sum$=    1641 top5%gain=0.25
+  top  BE sNone t10 a3 b0.5 h240                    n= 133 pr=  5 m50=   6.15 m0=   7.22 med= -0.84 win= 38.3 pf= 3.06 | A=  16.00(15) B=   4.90(118) xtop=  -1.50 topsh=0.28 sum$=    1637 top5%gain=0.25
+  top  BE sNone t10 a3 b2.0 h240                    n= 133 pr=  5 m50=   6.13 m0=   7.20 med= -0.61 win= 47.4 pf= 3.10 | A=  16.09(15) B=   4.87(118) xtop=  -1.53 topsh=0.28 sum$=    1631 top5%gain=0.26
+  top  BE sNone t20 a3 b2.0 h240                    n= 133 pr=  5 m50=   5.91 m0=   6.97 med= -0.61 win= 45.9 pf= 3.02 | A=  16.09(15) B=   4.61(118) xtop=  -1.84 topsh=0.28 sum$=    1571 top5%gain=0.26
+  fam  FIX sNone t5 h240                            n= 133 pr=  5 m50=   6.59 m0=   7.66 med= -0.62 win= 46.6 pf= 3.28 | A=  16.56(15) B=   5.33(118) xtop=  -0.90 topsh=0.28 sum$=    1754 top5%gain=0.24
+  fam  BE sNone t10 a6 b0.5 h240                    n= 133 pr=  5 m50=   6.24 m0=   7.31 med= -0.89 win= 40.6 pf= 3.09 | A=  16.32(15) B=   4.96(118) xtop=  -1.38 topsh=0.28 sum$=    1661 top5%gain=0.25
+  fam  PARTIAL sNone t1_5 hold h240                 n= 133 pr=  5 m50=   4.89 m0=   5.94 med= -0.91 win= 42.1 pf= 2.64 | A=   7.67(15) B=   4.54(118) xtop=  -1.66 topsh=0.28 sum$=    1301 top5%gain=0.29
+  fam  STALE sNone t10 m40 x0.0 h120                n= 133 pr=  5 m50=   0.99 m0=   2.01 med= -2.14 win= 18.0 pf= 1.41 | A=   8.78(15) B=   0.00(118) xtop=  -1.84 topsh=0.28 sum$=     264 top5%gain=0.64
+  fam  PTRAIL sNone a5 g0.25 h120                   n= 133 pr=  5 m50=   0.03 m0=   1.03 med= -1.92 win= 24.1 pf= 1.01 | A=  -1.99(15) B=   0.28(118) xtop=  -2.00 topsh=0.28 sum$=       7 top5%gain=0.79
+  fam  TRAIL sNone a5 w2 h120                       n= 133 pr=  5 m50=  -0.01 m0=   0.99 med= -1.92 win= 23.3 pf= 0.99 | A=  -1.99(15) B=   0.24(118) xtop=  -2.06 topsh=0.28 sum$=      -4 top5%gain=0.80
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 133 pr=  5 m50=  -0.16 m0=   0.84 med= -2.16 win= 18.0 pf= 0.94 | A=  -2.35(15) B=   0.12(118) xtop=  -2.11 topsh=0.28 sum$=     -43 top5%gain=0.83
+  ref  FIX sNone tNone h240                         n= 133 pr=  5 m50=   3.19 m0=   4.23 med= -1.41 win= 33.1 pf= 1.88 | A=  -1.22(15) B=   3.75(118) xtop=  -2.42 topsh=0.28 sum$=     848 top5%gain=0.34
+  ref  FIX s-5 t10 h60                              n= 133 pr=  5 m50=  -2.59 m0=  -1.61 med= -2.46 win= 20.3 pf= 0.59 | A=  11.95(15) B=  -4.44(118) xtop=  -2.55 topsh=0.28 sum$=    -689 top5%gain=0.58
+#### rnd / mid (train n=491)
+  top  FIX sNone t5 h240                            n= 491 pr= 18 m50=  -3.26 m0=  -2.29 med=  1.88 win= 53.4 pf= 0.53 | A=  -0.63(140) B=  -4.31(351) xtop=  -4.14 topsh=0.11 sum$=   -3201 top5%gain=0.30
+  top  FIX sNone t3 h240                            n= 491 pr= 18 m50=  -3.26 m0=  -2.29 med=  2.02 win= 58.5 pf= 0.45 | A=  -1.05(140) B=  -4.15(351) xtop=  -4.05 topsh=0.11 sum$=   -3204 top5%gain=0.37
+  top  BE sNone t10 a3 b0.5 h240                    n= 491 pr= 18 m50=  -3.30 m0=  -2.33 med= -1.25 win= 28.5 pf= 0.49 | A=  -0.38(140) B=  -4.47(351) xtop=  -4.31 topsh=0.11 sum$=   -3242 top5%gain=0.34
+  top  FIX s-20 t10 h5                              n= 491 pr= 18 m50=  -3.31 m0=  -2.34 med= -3.18 win=  9.6 pf= 0.11 | A=  -3.27(140) B=  -3.32(351) xtop=  -3.32 topsh=0.11 sum$=   -3248 top5%gain=0.92
+  top  FIX s-12 t10 h5                              n= 491 pr= 18 m50=  -3.33 m0=  -2.36 med= -3.18 win=  9.6 pf= 0.11 | A=  -3.35(140) B=  -3.33(351) xtop=  -3.35 topsh=0.11 sum$=   -3274 top5%gain=0.92
+  top  FIX sNone t10 h5                             n= 491 pr= 18 m50=  -3.34 m0=  -2.37 med= -3.18 win=  9.6 pf= 0.11 | A=  -3.26(140) B=  -3.37(351) xtop=  -3.35 topsh=0.11 sum$=   -3278 top5%gain=0.92
+  top  FIX s-35 t10 h5                              n= 491 pr= 18 m50=  -3.34 m0=  -2.37 med= -3.18 win=  9.6 pf= 0.11 | A=  -3.26(140) B=  -3.37(351) xtop=  -3.35 topsh=0.11 sum$=   -3278 top5%gain=0.92
+  top  FIX s-20 t3 h5                               n= 491 pr= 18 m50=  -3.35 m0=  -2.37 med= -3.14 win= 10.0 pf= 0.09 | A=  -3.34(140) B=  -3.35(351) xtop=  -3.34 topsh=0.11 sum$=   -3285 top5%gain=0.88
+  fam  FIX sNone t5 h240                            n= 491 pr= 18 m50=  -3.26 m0=  -2.29 med=  1.88 win= 53.4 pf= 0.53 | A=  -0.63(140) B=  -4.31(351) xtop=  -4.14 topsh=0.11 sum$=   -3201 top5%gain=0.30
+  fam  BE sNone t10 a3 b0.5 h240                    n= 491 pr= 18 m50=  -3.30 m0=  -2.33 med= -1.25 win= 28.5 pf= 0.49 | A=  -0.38(140) B=  -4.47(351) xtop=  -4.31 topsh=0.11 sum$=   -3242 top5%gain=0.34
+  fam  STALE s-20 t10 m5 x2.0 h60                   n= 491 pr= 18 m50=  -3.36 m0=  -2.39 med= -3.18 win=  8.8 pf= 0.11 | A=  -3.28(140) B=  -3.39(351) xtop=  -3.37 topsh=0.11 sum$=   -3296 top5%gain=0.97
+  fam  TRAIL s-3 a3 w7 h30                          n= 491 pr= 18 m50=  -3.68 m0=  -2.71 med= -4.21 win=  8.8 pf= 0.11 | A=  -3.97(140) B=  -3.56(351) xtop=  -3.67 topsh=0.11 sum$=   -3611 top5%gain=0.91
+  fam  PTRAIL s-3 a10 g0.25 h30                     n= 491 pr= 18 m50=  -3.71 m0=  -2.75 med= -4.22 win=  8.8 pf= 0.10 | A=  -4.10(140) B=  -3.56(351) xtop=  -3.71 topsh=0.11 sum$=   -3646 top5%gain=0.91
+  fam  PARTIAL sNone t1_5 a5 w4 h60                 n= 491 pr= 18 m50=  -3.85 m0=  -2.88 med= -2.65 win= 34.6 pf= 0.31 | A=  -2.99(140) B=  -4.19(351) xtop=  -3.94 topsh=0.11 sum$=   -3778 top5%gain=0.39
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 491 pr= 18 m50=  -4.48 m0=  -3.52 med= -3.52 win= 23.8 pf= 0.31 | A=  -3.24(140) B=  -4.97(351) xtop=  -4.62 topsh=0.11 sum$=   -4396 top5%gain=0.60
+  ref  FIX sNone tNone h240                         n= 491 pr= 18 m50=  -6.45 m0=  -5.51 med= -4.79 win= 29.1 pf= 0.45 | A=  -3.58(140) B=  -7.60(351) xtop=  -8.05 topsh=0.11 sum$=   -6335 top5%gain=0.52
+  ref  FIX s-5 t10 h60                              n= 491 pr= 18 m50=  -3.94 m0=  -2.97 med= -6.06 win= 15.5 pf= 0.23 | A=  -4.38(140) B=  -3.76(351) xtop=  -3.97 topsh=0.11 sum$=   -3867 top5%gain=0.58
+#### rnd / hi (train n=389)
+  top  FIX sNone t20 h240                           n= 389 pr= 45 m50=   0.30 m0=   1.31 med=  1.28 win= 51.9 pf= 1.03 | A=  -4.15(178) B=   4.05(211) xtop=  -1.41 topsh=0.16 sum$=     -64 top5%gain=0.24
+  top  FIX sNone t3 h240                            n= 389 pr= 45 m50=   0.01 m0=   1.02 med=  2.34 win= 71.2 pf= 1.00 | A=  -3.61(178) B=   3.07(211) xtop=  -1.21 topsh=0.16 sum$=    -109 top5%gain=0.43
+  top  BE sNone t10 a3 b0.5 h240                    n= 389 pr= 45 m50=  -0.21 m0=   0.79 med= -1.16 win= 39.3 pf= 0.97 | A=  -4.68(178) B=   3.56(211) xtop=  -1.44 topsh=0.16 sum$=    -222 top5%gain=0.38
+  top  FIX sNone t10 h240                           n= 389 pr= 45 m50=  -0.30 m0=   0.70 med=  8.95 win= 58.1 pf= 0.97 | A=  -3.71(178) B=   2.57(211) xtop=  -1.22 topsh=0.16 sum$=    -366 top5%gain=0.29
+  top  TRAIL sNone a20 w2 h240                      n= 389 pr= 45 m50=  -0.44 m0=   0.56 med=  0.94 win= 51.4 pf= 0.96 | A=  -5.58(178) B=   3.90(211) xtop=  -1.96 topsh=0.16 sum$=    -498 top5%gain=0.28
+  top  BE sNone t10 a3 b2.0 h240                    n= 389 pr= 45 m50=  -0.44 m0=   0.56 med=  0.22 win= 53.5 pf= 0.93 | A=  -4.83(178) B=   3.27(211) xtop=  -1.66 topsh=0.16 sum$=    -358 top5%gain=0.43
+  top  FIX sNone t5 h240                            n= 389 pr= 45 m50=  -0.47 m0=   0.53 med=  4.27 win= 65.3 pf= 0.93 | A=  -3.79(178) B=   2.33(211) xtop=  -1.70 topsh=0.16 sum$=    -428 top5%gain=0.37
+  top  PARTIAL sNone t1_20 a5 w4 h240               n= 389 pr= 45 m50=  -0.52 m0=   0.48 med=  0.94 win= 51.7 pf= 0.94 | A=  -4.84(178) B=   3.13(211) xtop=  -1.89 topsh=0.16 sum$=    -494 top5%gain=0.31
+  fam  FIX sNone t20 h240                           n= 389 pr= 45 m50=   0.30 m0=   1.31 med=  1.28 win= 51.9 pf= 1.03 | A=  -4.15(178) B=   4.05(211) xtop=  -1.41 topsh=0.16 sum$=     -64 top5%gain=0.24
+  fam  BE sNone t10 a3 b0.5 h240                    n= 389 pr= 45 m50=  -0.21 m0=   0.79 med= -1.16 win= 39.3 pf= 0.97 | A=  -4.68(178) B=   3.56(211) xtop=  -1.44 topsh=0.16 sum$=    -222 top5%gain=0.38
+  fam  TRAIL sNone a20 w2 h240                      n= 389 pr= 45 m50=  -0.44 m0=   0.56 med=  0.94 win= 51.4 pf= 0.96 | A=  -5.58(178) B=   3.90(211) xtop=  -1.96 topsh=0.16 sum$=    -498 top5%gain=0.28
+  fam  PARTIAL sNone t1_20 a5 w4 h240               n= 389 pr= 45 m50=  -0.52 m0=   0.48 med=  0.94 win= 51.7 pf= 0.94 | A=  -4.84(178) B=   3.13(211) xtop=  -1.89 topsh=0.16 sum$=    -494 top5%gain=0.31
+  fam  PTRAIL sNone a20 g0.25 h240                  n= 389 pr= 45 m50=  -1.28 m0=  -0.29 med=  0.48 win= 50.6 pf= 0.88 | A=  -6.09(178) B=   2.77(211) xtop=  -2.88 topsh=0.16 sum$=    -950 top5%gain=0.28
+  fam  STALE sNone t10 m40 x-3.0 h240               n= 389 pr= 45 m50=  -2.39 m0=  -1.42 med= -4.58 win= 37.0 pf= 0.73 | A=  -4.36(178) B=  -0.74(211) xtop=  -3.63 topsh=0.16 sum$=   -1546 top5%gain=0.39
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 389 pr= 45 m50=  -5.99 m0=  -5.05 med= -4.72 win= 28.3 pf= 0.48 | A=  -8.74(178) B=  -3.67(211) xtop=  -7.24 topsh=0.16 sum$=   -3442 top5%gain=0.52
+  ref  FIX sNone tNone h240                         n= 389 pr= 45 m50=  -9.39 m0=  -8.48 med=-13.30 win= 29.8 pf= 0.48 | A= -12.80(178) B=  -6.51(211) xtop= -13.11 topsh=0.16 sum$=   -5296 top5%gain=0.43
+  ref  FIX s-5 t10 h60                              n= 389 pr= 45 m50=  -4.60 m0=  -3.64 med= -6.40 win= 15.7 pf= 0.28 | A=  -4.76(178) B=  -4.47(211) xtop=  -4.79 topsh=0.16 sum$=   -2631 top5%gain=0.61
+#### rnd / hi20 (train n=374)
+  top  FIX s-20 t80 h120                            n= 374 pr= 84 m50=   0.27 m0=   1.27 med=-11.55 win= 23.0 pf= 1.02 | A=  -1.37(207) B=   2.30(167) xtop=  -2.52 topsh=0.11 sum$=     461 top5%gain=0.56
+  top  TRAIL s-20 a40 w20 h120                      n= 374 pr= 84 m50=  -0.98 m0=   0.02 med=-11.05 win= 24.6 pf= 0.92 | A=  -2.54(207) B=   0.96(167) xtop=  -3.71 topsh=0.11 sum$=     135 top5%gain=0.59
+  top  FIX s-12 t80 h120                            n= 374 pr= 84 m50=  -1.17 m0=  -0.18 med=-13.25 win= 17.1 pf= 0.91 | A=  -3.05(207) B=   1.16(167) xtop=  -3.20 topsh=0.11 sum$=      23 top5%gain=0.65
+  top  FIX s-35 t80 h120                            n= 374 pr= 84 m50=  -1.32 m0=  -0.33 med=-10.27 win= 25.1 pf= 0.92 | A=  -3.30(207) B=   1.13(167) xtop=  -4.64 topsh=0.11 sum$=     118 top5%gain=0.53
+  top  TRAIL s-20 a40 w7 h120                       n= 374 pr= 84 m50=  -1.32 m0=  -0.33 med=-11.05 win= 24.6 pf= 0.90 | A=  -3.77(207) B=   1.72(167) xtop=  -4.08 topsh=0.11 sum$=     144 top5%gain=0.59
+  top  TRAIL s-20 a20 w12 h120                      n= 374 pr= 84 m50=  -1.37 m0=  -0.38 med= -9.64 win= 29.4 pf= 0.88 | A=  -3.59(207) B=   1.39(167) xtop=  -3.90 topsh=0.11 sum$=     136 top5%gain=0.63
+  top  TRAIL s-20 a40 w12 h120                      n= 374 pr= 84 m50=  -1.42 m0=  -0.43 med=-11.05 win= 24.6 pf= 0.89 | A=  -3.96(207) B=   1.72(167) xtop=  -4.20 topsh=0.11 sum$=     110 top5%gain=0.60
+  top  TRAIL s-20 a40 w4 h120                       n= 374 pr= 84 m50=  -1.70 m0=  -0.72 med=-11.05 win= 24.6 pf= 0.87 | A=  -3.63(207) B=   0.68(167) xtop=  -4.50 topsh=0.11 sum$=       6 top5%gain=0.57
+  fam  FIX s-20 t80 h120                            n= 374 pr= 84 m50=   0.27 m0=   1.27 med=-11.55 win= 23.0 pf= 1.02 | A=  -1.37(207) B=   2.30(167) xtop=  -2.52 topsh=0.11 sum$=     461 top5%gain=0.56
+  fam  TRAIL s-20 a40 w20 h120                      n= 374 pr= 84 m50=  -0.98 m0=   0.02 med=-11.05 win= 24.6 pf= 0.92 | A=  -2.54(207) B=   0.96(167) xtop=  -3.71 topsh=0.11 sum$=     135 top5%gain=0.59
+  fam  PARTIAL s-20 t1_20 a40 w20 h120              n= 374 pr= 84 m50=  -1.90 m0=  -0.92 med= -9.87 win= 28.1 pf= 0.84 | A=  -3.40(207) B=  -0.05(167) xtop=  -3.86 topsh=0.11 sum$=    -135 top5%gain=0.52
+  fam  PTRAIL s-20 a20 g0.25 h120                   n= 374 pr= 84 m50=  -1.96 m0=  -0.98 med= -9.64 win= 29.9 pf= 0.83 | A=  -3.90(207) B=   0.43(167) xtop=  -4.16 topsh=0.11 sum$=     -62 top5%gain=0.58
+  fam  BE s-20 tNone a20 b0.5 h120                  n= 374 pr= 84 m50=  -3.39 m0=  -2.42 med=-10.06 win= 17.6 pf= 0.73 | A=  -5.77(207) B=  -0.44(167) xtop=  -5.35 topsh=0.11 sum$=    -749 top5%gain=0.69
+  fam  STALE s-20 t20 m40 x2.0 h60                  n= 374 pr= 84 m50=  -3.65 m0=  -2.68 med= -7.00 win= 27.0 pf= 0.67 | A=  -4.71(207) B=  -2.33(167) xtop=  -4.83 topsh=0.11 sum$=    -728 top5%gain=0.49
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 374 pr= 84 m50= -11.02 m0= -10.13 med= -9.57 win= 23.5 pf= 0.40 | A= -13.12(207) B=  -8.41(167) xtop= -12.21 topsh=0.11 sum$=   -2556 top5%gain=0.63
+  ref  FIX sNone tNone h240                         n= 374 pr= 84 m50= -15.69 m0= -14.84 med=-14.07 win= 21.1 pf= 0.42 | A= -16.71(207) B= -14.43(167) xtop= -20.41 topsh=0.11 sum$=   -3522 top5%gain=0.55
+  ref  FIX s-5 t10 h60                              n= 374 pr= 84 m50=  -5.58 m0=  -4.64 med= -6.64 win= 13.4 pf= 0.35 | A=  -6.56(207) B=  -4.37(167) xtop=  -6.76 topsh=0.11 sum$=   -1356 top5%gain=0.76
+#### rnd / all50 (train n=1044)
+  top  FIX sNone t3 h240                            n=1044 pr= 69 m50=  -0.83 m0=   0.16 med=  2.08 win= 61.1 pf= 0.85 | A=  -1.78(337) B=  -0.38(707) xtop=  -1.82 topsh=0.06 sum$=   -1855 top5%gain=0.48
+  top  BE sNone t10 a3 b0.5 h240                    n=1044 pr= 69 m50=  -0.98 m0=   0.01 med= -1.19 win= 33.4 pf= 0.84 | A=  -2.07(337) B=  -0.46(707) xtop=  -1.97 topsh=0.06 sum$=   -2108 top5%gain=0.44
+  top  FIX sNone t5 h240                            n=1044 pr= 69 m50=  -1.00 m0=  -0.01 med=  3.98 win= 55.9 pf= 0.84 | A=  -1.68(337) B=  -0.68(707) xtop=  -1.99 topsh=0.06 sum$=   -2151 top5%gain=0.41
+  top  BE sNone t10 a3 b2.0 h240                    n=1044 pr= 69 m50=  -1.13 m0=  -0.14 med= -0.07 win= 49.2 pf= 0.80 | A=  -2.43(337) B=  -0.52(707) xtop=  -2.13 topsh=0.06 sum$=   -2384 top5%gain=0.48
+  top  FIX sNone t10 h240                           n=1044 pr= 69 m50=  -1.14 m0=  -0.15 med= -0.61 win= 48.1 pf= 0.85 | A=  -1.24(337) B=  -1.10(707) xtop=  -2.14 topsh=0.06 sum$=   -2519 top5%gain=0.34
+  top  FIX sNone t20 h240                           n=1044 pr= 69 m50=  -1.20 m0=  -0.20 med= -1.92 win= 41.4 pf= 0.87 | A=  -1.29(337) B=  -1.15(707) xtop=  -2.19 topsh=0.06 sum$=   -2795 top5%gain=0.31
+  top  BE sNone t10 a6 b0.5 h240                    n=1044 pr= 69 m50=  -1.25 m0=  -0.26 med= -1.06 win= 40.9 pf= 0.83 | A=  -1.80(337) B=  -0.99(707) xtop=  -2.25 topsh=0.06 sum$=   -2650 top5%gain=0.38
+  top  BE sNone t10 a6 b2.0 h240                    n=1044 pr= 69 m50=  -1.32 m0=  -0.33 med= -0.59 win= 46.8 pf= 0.81 | A=  -1.90(337) B=  -1.04(707) xtop=  -2.32 topsh=0.06 sum$=   -2750 top5%gain=0.39
+  fam  FIX sNone t3 h240                            n=1044 pr= 69 m50=  -0.83 m0=   0.16 med=  2.08 win= 61.1 pf= 0.85 | A=  -1.78(337) B=  -0.38(707) xtop=  -1.82 topsh=0.06 sum$=   -1855 top5%gain=0.48
+  fam  BE sNone t10 a3 b0.5 h240                    n=1044 pr= 69 m50=  -0.98 m0=   0.01 med= -1.19 win= 33.4 pf= 0.84 | A=  -2.07(337) B=  -0.46(707) xtop=  -1.97 topsh=0.06 sum$=   -2108 top5%gain=0.44
+  fam  PARTIAL sNone t1_5 a5 w4 h240                n=1044 pr= 69 m50=  -1.98 m0=  -1.00 med=  1.17 win= 54.3 pf= 0.69 | A=  -3.05(337) B=  -1.47(707) xtop=  -2.54 topsh=0.06 sum$=   -4111 top5%gain=0.41
+  fam  TRAIL sNone a3 w2 h240                       n=1044 pr= 69 m50=  -2.56 m0=  -1.59 med= -0.28 win= 46.8 pf= 0.56 | A=  -4.04(337) B=  -1.86(707) xtop=  -3.13 topsh=0.06 sum$=   -5222 top5%gain=0.55
+  fam  STALE sNone t10 m40 x0.0 h240                n=1044 pr= 69 m50=  -2.79 m0=  -1.82 med= -3.26 win= 22.8 pf= 0.57 | A=  -3.70(337) B=  -2.36(707) xtop=  -3.20 topsh=0.06 sum$=   -5525 top5%gain=0.49
+  fam  PTRAIL sNone a5 g0.25 h240                   n=1044 pr= 69 m50=  -3.00 m0=  -2.03 med= -0.15 win= 49.2 pf= 0.55 | A=  -4.22(337) B=  -2.42(707) xtop=  -3.45 topsh=0.06 sum$=   -6001 top5%gain=0.46
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n=1044 pr= 69 m50=  -4.49 m0=  -3.53 med= -3.48 win= 24.2 pf= 0.42 | A=  -6.24(337) B=  -3.66(707) xtop=  -4.96 topsh=0.06 sum$=   -8162 top5%gain=0.61
+  ref  FIX sNone tNone h240                         n=1044 pr= 69 m50=  -6.26 m0=  -5.32 med= -4.66 win= 29.6 pf= 0.51 | A=  -8.46(337) B=  -5.21(707) xtop=  -7.14 topsh=0.06 sum$=  -11058 top5%gain=0.47
+  ref  FIX s-5 t10 h60                              n=1044 pr= 69 m50=  -4.01 m0=  -3.05 med= -6.07 win= 15.9 pf= 0.30 | A=  -3.90(337) B=  -4.07(707) xtop=  -4.08 topsh=0.06 sum$=   -7428 top5%gain=0.68
+#### mom / cf: n=4 too few train events, skipped
+#### mom / mid (train n=37)
+  top  FIX sNone t20 h120                           n=  37 pr=  8 m50=   3.36 m0=   4.40 med= 19.80 win= 59.5 pf= 1.36 | A=   6.51(27) B=  -5.14(10) xtop=  -1.67 topsh=0.59 sum$=     249 top5%gain=0.11
+  top  FIX s-35 t20 h240                            n=  37 pr=  8 m50=   3.27 m0=   4.31 med= 20.36 win= 59.5 pf= 1.33 | A=   9.67(27) B= -13.99(10) xtop=  -0.34 topsh=0.59 sum$=     242 top5%gain=0.11
+  top  FIX sNone t20 h240                           n=  37 pr=  8 m50=   2.56 m0=   3.59 med= 20.74 win= 64.9 pf= 1.21 | A=   9.17(27) B= -15.32(10) xtop=  -0.61 topsh=0.59 sum$=     189 top5%gain=0.10
+  top  FIX s-35 t20 h120                            n=  37 pr=  8 m50=   1.98 m0=   3.00 med= 19.32 win= 54.1 pf= 1.21 | A=   7.86(27) B= -13.92(10) xtop=  -1.67 topsh=0.59 sum$=     146 top5%gain=0.12
+  top  FIX sNone t20 h60                            n=  37 pr=  8 m50=   0.97 m0=   1.98 med=  4.25 win= 54.1 pf= 1.11 | A=   2.86(27) B=  -4.14(10) xtop=  -2.83 topsh=0.59 sum$=      71 top5%gain=0.14
+  top  BE sNone t20 a3 b0.5 h60                     n=  37 pr=  8 m50=   0.72 m0=   1.74 med= -1.47 win= 45.9 pf= 1.10 | A=   1.97(27) B=  -2.65(10) xtop=  -4.29 topsh=0.59 sum$=      54 top5%gain=0.16
+  top  BE sNone t20 a3 b0.5 h120                    n=  37 pr=  8 m50=   0.28 m0=   1.29 med= -1.88 win= 40.5 pf= 1.04 | A=   2.48(27) B=  -5.67(10) xtop=  -3.56 topsh=0.59 sum$=      21 top5%gain=0.17
+  top  BE sNone t20 a6 b0.5 h60                     n=  37 pr=  8 m50=   0.18 m0=   1.19 med= -1.47 win= 48.6 pf= 1.02 | A=   1.23(27) B=  -2.65(10) xtop=  -2.83 topsh=0.59 sum$=      13 top5%gain=0.15
+  fam  FIX sNone t20 h120                           n=  37 pr=  8 m50=   3.36 m0=   4.40 med= 19.80 win= 59.5 pf= 1.36 | A=   6.51(27) B=  -5.14(10) xtop=  -1.67 topsh=0.59 sum$=     249 top5%gain=0.11
+  fam  BE sNone t20 a3 b0.5 h60                     n=  37 pr=  8 m50=   0.72 m0=   1.74 med= -1.47 win= 45.9 pf= 1.10 | A=   1.97(27) B=  -2.65(10) xtop=  -4.29 topsh=0.59 sum$=      54 top5%gain=0.16
+  fam  PARTIAL sNone t1_20 a5 w4 h120               n=  37 pr=  8 m50=  -0.13 m0=   0.87 med= 10.45 win= 62.2 pf= 0.98 | A=   2.71(27) B=  -7.79(10) xtop=  -3.48 topsh=0.59 sum$=     -10 top5%gain=0.13
+  fam  TRAIL s-35 a20 w2 h240                       n=  37 pr=  8 m50=  -0.35 m0=   0.65 med=  8.80 win= 59.5 pf= 0.96 | A=   6.58(27) B= -19.08(10) xtop=  -2.55 topsh=0.59 sum$=     -26 top5%gain=0.15
+  fam  STALE sNone t20 m40 x-3.0 h240               n=  37 pr=  8 m50=  -1.27 m0=  -0.28 med= -5.22 win= 37.8 pf= 0.87 | A=  -0.84(27) B=  -2.44(10) xtop=  -1.97 topsh=0.59 sum$=     -94 top5%gain=0.16
+  fam  PTRAIL s-35 a20 g0.25 h240                   n=  37 pr=  8 m50=  -2.00 m0=  -1.02 med=  7.14 win= 56.8 pf= 0.80 | A=   4.33(27) B= -19.08(10) xtop=  -3.86 topsh=0.59 sum$=    -148 top5%gain=0.17
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n=  37 pr=  8 m50=  -6.42 m0=  -5.48 med= -4.29 win= 40.5 pf= 0.36 | A=  -4.85(27) B= -10.66(10) xtop=  -7.46 topsh=0.59 sum$=    -475 top5%gain=0.24
+  ref  FIX sNone tNone h240                         n=  37 pr=  8 m50= -35.85 m0= -35.20 med=-41.89 win= 13.5 pf= 0.07 | A= -24.55(27) B= -66.34(10) xtop= -40.78 topsh=0.59 sum$=   -2653 top5%gain=0.58
+  ref  FIX s-5 t10 h60                              n=  37 pr=  8 m50=  -5.06 m0=  -4.10 med= -6.46 win= 16.2 pf= 0.29 | A=  -4.78(27) B=  -5.80(10) xtop=  -5.51 topsh=0.59 sum$=    -374 top5%gain=0.44
+#### mom / hi (train n=134)
+  top  FIX sNone t20 h120                           n= 134 pr= 59 m50=  -1.34 m0=  -0.35 med= -7.67 win= 41.8 pf= 0.90 | A= -17.15(52) B=   8.68(82) xtop=  -4.83 topsh=0.17 sum$=    -339 top5%gain=0.38
+  top  STALE sNone t20 m40 x-3.0 h120               n= 134 pr= 59 m50=  -1.61 m0=  -0.62 med= -9.75 win= 33.6 pf= 0.87 | A= -14.53(52) B=   6.59(82) xtop=  -5.11 topsh=0.17 sum$=    -436 top5%gain=0.42
+  top  STALE sNone t20 m40 x-3.0 h240               n= 134 pr= 59 m50=  -1.80 m0=  -0.82 med= -9.76 win= 32.8 pf= 0.86 | A= -14.53(52) B=   6.27(82) xtop=  -5.30 topsh=0.17 sum$=    -477 top5%gain=0.42
+  top  PARTIAL sNone t1_20 a20 w12 h120             n= 134 pr= 59 m50=  -1.80 m0=  -0.82 med= -7.67 win= 41.8 pf= 0.87 | A= -17.08(52) B=   7.88(82) xtop=  -5.31 topsh=0.17 sum$=    -430 top5%gain=0.39
+  top  FIX sNone t20 h60                            n= 134 pr= 59 m50=  -1.99 m0=  -1.01 med= -9.39 win= 38.8 pf= 0.85 | A= -16.28(52) B=   7.07(82) xtop=  -5.50 topsh=0.17 sum$=    -458 top5%gain=0.42
+  top  BE sNone t20 a3 b2.0 h120                    n= 134 pr= 59 m50=  -2.05 m0=  -1.07 med= -3.18 win= 35.8 pf= 0.77 | A= -12.88(52) B=   4.82(82) xtop=  -3.75 topsh=0.17 sum$=    -414 top5%gain=0.48
+  top  FIX sNone t3 h120                            n= 134 pr= 59 m50=  -2.06 m0=  -1.07 med=  2.54 win= 61.9 pf= 0.74 | A= -12.59(52) B=   4.62(82) xtop=  -3.81 topsh=0.17 sum$=    -388 top5%gain=0.44
+  top  STALE sNone t20 m40 x-3.0 h60                n= 134 pr= 59 m50=  -2.09 m0=  -1.11 med= -9.39 win= 35.1 pf= 0.83 | A= -14.53(52) B=   5.80(82) xtop=  -5.60 topsh=0.17 sum$=    -518 top5%gain=0.44
+  fam  FIX sNone t20 h120                           n= 134 pr= 59 m50=  -1.34 m0=  -0.35 med= -7.67 win= 41.8 pf= 0.90 | A= -17.15(52) B=   8.68(82) xtop=  -4.83 topsh=0.17 sum$=    -339 top5%gain=0.38
+  fam  STALE sNone t20 m40 x-3.0 h120               n= 134 pr= 59 m50=  -1.61 m0=  -0.62 med= -9.75 win= 33.6 pf= 0.87 | A= -14.53(52) B=   6.59(82) xtop=  -5.11 topsh=0.17 sum$=    -436 top5%gain=0.42
+  fam  PARTIAL sNone t1_20 a20 w12 h120             n= 134 pr= 59 m50=  -1.80 m0=  -0.82 med= -7.67 win= 41.8 pf= 0.87 | A= -17.08(52) B=   7.88(82) xtop=  -5.31 topsh=0.17 sum$=    -430 top5%gain=0.39
+  fam  BE sNone t20 a3 b2.0 h120                    n= 134 pr= 59 m50=  -2.05 m0=  -1.07 med= -3.18 win= 35.8 pf= 0.77 | A= -12.88(52) B=   4.82(82) xtop=  -3.75 topsh=0.17 sum$=    -414 top5%gain=0.48
+  fam  TRAIL sNone a20 w12 h120                     n= 134 pr= 59 m50=  -2.27 m0=  -1.29 med= -7.67 win= 39.6 pf= 0.83 | A= -17.00(52) B=   7.08(82) xtop=  -5.78 topsh=0.17 sum$=    -521 top5%gain=0.43
+  fam  PTRAIL sNone a20 g0.25 h120                  n= 134 pr= 59 m50=  -3.20 m0=  -2.23 med= -7.67 win= 40.3 pf= 0.76 | A= -17.45(52) B=   5.83(82) xtop=  -6.73 topsh=0.17 sum$=    -681 top5%gain=0.44
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 134 pr= 59 m50=  -9.91 m0=  -9.00 med=-11.08 win= 25.4 pf= 0.41 | A= -22.02(52) B=  -2.22(82) xtop= -13.53 topsh=0.17 sum$=   -1855 top5%gain=0.65
+  ref  FIX sNone tNone h240                         n= 134 pr= 59 m50= -16.03 m0= -15.19 med=-13.87 win= 23.1 pf= 0.34 | A= -24.33(52) B= -10.77(82) xtop= -24.33 topsh=0.17 sum$=   -2876 top5%gain=0.45
+  ref  FIX s-5 t10 h60                              n= 134 pr= 59 m50=  -6.06 m0=  -5.12 med= -7.43 win= 14.2 pf= 0.26 | A=  -9.31(52) B=  -4.00(82) xtop=  -6.45 topsh=0.17 sum$=   -1131 top5%gain=0.56
+#### mom / hi20 (train n=124)
+  top  FIX s-35 t40 h240                            n= 124 pr= 69 m50=   5.19 m0=   6.25 med=-13.86 win= 41.9 pf= 1.30 | A=   7.55(57) B=   3.19(67) xtop=  -1.48 topsh=0.16 sum$=     596 top5%gain=0.37
+  top  TRAIL s-35 a40 w2 h240                       n= 124 pr= 69 m50=   4.91 m0=   5.96 med=-13.86 win= 41.9 pf= 1.28 | A=   6.06(57) B=   3.93(67) xtop=   1.00 topsh=0.16 sum$=     523 top5%gain=0.43
+  top  FIX s-35 t40 h120                            n= 124 pr= 69 m50=   4.37 m0=   5.42 med=-11.17 win= 41.1 pf= 1.26 | A=   7.97(57) B=   1.31(67) xtop=  -1.05 topsh=0.16 sum$=     526 top5%gain=0.38
+  top  BE s-35 t40 a20 b0.5 h120                    n= 124 pr= 69 m50=   3.75 m0=   4.79 med= -9.44 win= 37.1 pf= 1.23 | A=   7.56(57) B=   0.51(67) xtop=   0.53 topsh=0.16 sum$=     484 top5%gain=0.41
+  top  TRAIL s-35 a40 w2 h120                       n= 124 pr= 69 m50=   3.68 m0=   4.72 med=-11.17 win= 41.1 pf= 1.22 | A=   6.48(57) B=   1.30(67) xtop=   0.45 topsh=0.16 sum$=     404 top5%gain=0.43
+  top  TRAIL s-35 a40 w7 h240                       n= 124 pr= 69 m50=   3.57 m0=   4.61 med=-13.86 win= 41.9 pf= 1.20 | A=   4.40(57) B=   2.86(67) xtop=  -0.35 topsh=0.16 sum$=     460 top5%gain=0.45
+  top  BE s-35 t40 a20 b0.5 h240                    n= 124 pr= 69 m50=   3.48 m0=   4.52 med=-10.39 win= 37.1 pf= 1.21 | A=   7.33(57) B=   0.20(67) xtop=   0.25 topsh=0.16 sum$=     457 top5%gain=0.41
+  top  TRAIL s-35 a40 w4 h240                       n= 124 pr= 69 m50=   3.45 m0=   4.49 med=-13.86 win= 41.9 pf= 1.20 | A=   4.72(57) B=   2.37(67) xtop=  -0.47 topsh=0.16 sum$=     438 top5%gain=0.44
+  fam  FIX s-35 t40 h240                            n= 124 pr= 69 m50=   5.19 m0=   6.25 med=-13.86 win= 41.9 pf= 1.30 | A=   7.55(57) B=   3.19(67) xtop=  -1.48 topsh=0.16 sum$=     596 top5%gain=0.37
+  fam  TRAIL s-35 a40 w2 h240                       n= 124 pr= 69 m50=   4.91 m0=   5.96 med=-13.86 win= 41.9 pf= 1.28 | A=   6.06(57) B=   3.93(67) xtop=   1.00 topsh=0.16 sum$=     523 top5%gain=0.43
+  fam  BE s-35 t40 a20 b0.5 h120                    n= 124 pr= 69 m50=   3.75 m0=   4.79 med= -9.44 win= 37.1 pf= 1.23 | A=   7.56(57) B=   0.51(67) xtop=   0.53 topsh=0.16 sum$=     484 top5%gain=0.41
+  fam  PTRAIL s-35 a20 g0.25 h120                   n= 124 pr= 69 m50=   1.38 m0=   2.40 med= -8.96 win= 47.6 pf= 1.09 | A=   2.65(57) B=   0.30(67) xtop=  -1.86 topsh=0.16 sum$=     257 top5%gain=0.46
+  fam  STALE s-20 t40 m40 x-3.0 h60                 n= 124 pr= 69 m50=   0.46 m0=   1.47 med=-14.07 win= 30.6 pf= 1.03 | A=   3.61(57) B=  -2.21(67) xtop=  -2.79 topsh=0.16 sum$=     161 top5%gain=0.47
+  fam  PARTIAL sNone t1_20 a20 w12 h120             n= 124 pr= 69 m50=  -0.38 m0=   0.62 med=  0.61 win= 50.0 pf= 0.98 | A=  -0.17(57) B=  -0.56(67) xtop=  -3.64 topsh=0.16 sum$=     169 top5%gain=0.40
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 4 of 2835
+  rob  TRAIL s-35 a40 w2 h240                       n= 124 pr= 69 m50=   4.91 m0=   5.96 med=-13.86 win= 41.9 pf= 1.28 | A=   6.06(57) B=   3.93(67) xtop=   1.00 topsh=0.16 sum$=     523 top5%gain=0.43
+  rob  BE s-35 t40 a20 b0.5 h120                    n= 124 pr= 69 m50=   3.75 m0=   4.79 med= -9.44 win= 37.1 pf= 1.23 | A=   7.56(57) B=   0.51(67) xtop=   0.53 topsh=0.16 sum$=     484 top5%gain=0.41
+  rob  TRAIL s-35 a40 w2 h120                       n= 124 pr= 69 m50=   3.68 m0=   4.72 med=-11.17 win= 41.1 pf= 1.22 | A=   6.48(57) B=   1.30(67) xtop=   0.45 topsh=0.16 sum$=     404 top5%gain=0.43
+  rob  BE s-35 t40 a20 b0.5 h240                    n= 124 pr= 69 m50=   3.48 m0=   4.52 med=-10.39 win= 37.1 pf= 1.21 | A=   7.33(57) B=   0.20(67) xtop=   0.25 topsh=0.16 sum$=     457 top5%gain=0.41
+  ref  FIX sNone tNone h60                          n= 124 pr= 69 m50= -16.24 m0= -15.40 med=-14.07 win= 25.0 pf= 0.43 | A= -11.81(57) B= -20.01(67) xtop= -19.63 topsh=0.16 sum$=   -1228 top5%gain=0.67
+  ref  FIX sNone tNone h240                         n= 124 pr= 69 m50= -19.38 m0= -18.57 med=-18.52 win= 17.7 pf= 0.43 | A=  -3.21(57) B= -33.14(67) xtop= -23.31 topsh=0.16 sum$=   -1683 top5%gain=0.54
+  ref  FIX s-5 t10 h60                              n= 124 pr= 69 m50=  -5.60 m0=  -4.65 med= -8.31 win= 23.4 pf= 0.44 | A=  -5.23(57) B=  -5.92(67) xtop=  -6.42 topsh=0.16 sum$=    -439 top5%gain=0.40
+#### mom / all50 (train n=180)
+  top  FIX sNone t20 h120                           n= 180 pr= 69 m50=  -0.97 m0=   0.03 med= -4.74 win= 43.3 pf= 0.92 | A=  -9.37(83) B=   6.23(97) xtop=  -3.55 topsh=0.13 sum$=    -327 top5%gain=0.29
+  top  FIX sNone t20 h60                            n= 180 pr= 69 m50=  -1.97 m0=  -0.99 med= -7.14 win= 40.0 pf= 0.84 | A= -10.01(83) B=   4.90(97) xtop=  -4.57 topsh=0.13 sum$=    -634 top5%gain=0.34
+  top  PARTIAL sNone t1_20 a20 w12 h120             n= 180 pr= 69 m50=  -2.11 m0=  -1.13 med= -4.74 win= 43.3 pf= 0.83 | A= -10.63(83) B=   5.18(97) xtop=  -4.71 topsh=0.13 sum$=    -706 top5%gain=0.33
+  top  BE sNone t20 a3 b2.0 h120                    n= 180 pr= 69 m50=  -2.32 m0=  -1.34 med= -3.18 win= 36.7 pf= 0.73 | A=  -8.44(83) B=   2.92(97) xtop=  -3.58 topsh=0.13 sum$=    -700 top5%gain=0.40
+  top  STALE sNone t20 m40 x-3.0 h120               n= 180 pr= 69 m50=  -2.33 m0=  -1.35 med= -9.32 win= 32.8 pf= 0.81 | A= -10.33(83) B=   4.52(97) xtop=  -4.93 topsh=0.13 sum$=    -844 top5%gain=0.36
+  top  BE sNone t20 a3 b2.0 h60                     n= 180 pr= 69 m50=  -2.35 m0=  -1.37 med= -3.22 win= 35.6 pf= 0.73 | A=  -7.76(83) B=   2.28(97) xtop=  -3.61 topsh=0.13 sum$=    -717 top5%gain=0.40
+  top  STALE sNone t20 m40 x-3.0 h240               n= 180 pr= 69 m50=  -2.39 m0=  -1.41 med= -9.39 win= 32.2 pf= 0.81 | A= -10.16(83) B=   4.25(97) xtop=  -5.00 topsh=0.13 sum$=    -855 top5%gain=0.35
+  top  BE sNone t20 a3 b0.5 h120                    n= 180 pr= 69 m50=  -2.44 m0=  -1.47 med= -3.47 win= 27.8 pf= 0.75 | A=  -9.05(83) B=   3.21(97) xtop=  -3.69 topsh=0.13 sum$=    -682 top5%gain=0.35
+  fam  FIX sNone t20 h120                           n= 180 pr= 69 m50=  -0.97 m0=   0.03 med= -4.74 win= 43.3 pf= 0.92 | A=  -9.37(83) B=   6.23(97) xtop=  -3.55 topsh=0.13 sum$=    -327 top5%gain=0.29
+  fam  PARTIAL sNone t1_20 a20 w12 h120             n= 180 pr= 69 m50=  -2.11 m0=  -1.13 med= -4.74 win= 43.3 pf= 0.83 | A= -10.63(83) B=   5.18(97) xtop=  -4.71 topsh=0.13 sum$=    -706 top5%gain=0.33
+  fam  BE sNone t20 a3 b2.0 h120                    n= 180 pr= 69 m50=  -2.32 m0=  -1.34 med= -3.18 win= 36.7 pf= 0.73 | A=  -8.44(83) B=   2.92(97) xtop=  -3.58 topsh=0.13 sum$=    -700 top5%gain=0.40
+  fam  STALE sNone t20 m40 x-3.0 h120               n= 180 pr= 69 m50=  -2.33 m0=  -1.35 med= -9.32 win= 32.8 pf= 0.81 | A= -10.33(83) B=   4.52(97) xtop=  -4.93 topsh=0.13 sum$=    -844 top5%gain=0.36
+  fam  TRAIL sNone a20 w2 h120                      n= 180 pr= 69 m50=  -2.93 m0=  -1.95 med= -4.74 win= 42.2 pf= 0.77 | A= -10.79(83) B=   3.80(97) xtop=  -5.54 topsh=0.13 sum$=    -902 top5%gain=0.36
+  fam  PTRAIL sNone a20 g0.25 h120                  n= 180 pr= 69 m50=  -3.56 m0=  -2.59 med= -4.74 win= 41.7 pf= 0.72 | A= -11.30(83) B=   3.07(97) xtop=  -6.17 topsh=0.13 sum$=   -1102 top5%gain=0.38
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 180 pr= 69 m50=  -9.38 m0=  -8.47 med=-10.83 win= 27.2 pf= 0.38 | A= -16.12(83) B=  -3.62(97) xtop= -12.06 topsh=0.13 sum$=   -2578 top5%gain=0.57
+  ref  FIX sNone tNone h240                         n= 180 pr= 69 m50= -20.23 m0= -19.43 med=-14.16 win= 20.0 pf= 0.25 | A= -24.01(83) B= -16.99(97) xtop= -26.70 topsh=0.13 sum$=   -5860 top5%gain=0.48
+  ref  FIX s-5 t10 h60                              n= 180 pr= 69 m50=  -6.30 m0=  -5.36 med= -7.30 win= 13.9 pf= 0.25 | A=  -8.08(83) B=  -4.77(97) xtop=  -6.59 topsh=0.13 sum$=   -1774 top5%gain=0.54
+#### vacc / cf: n=15 too few train events, skipped
+#### vacc / mid (train n=56)
+  top  STALE sNone t20 m20 x0.0 h120                n=  56 pr= 13 m50=  -0.74 m0=   0.26 med= -2.21 win= 19.6 pf= 0.83 | A=   2.46(19) B=  -2.38(37) xtop=  -1.87 topsh=0.14 sum$=     -83 top5%gain=0.47
+  top  STALE sNone t20 m20 x0.0 h240                n=  56 pr= 13 m50=  -0.78 m0=   0.21 med= -2.28 win= 16.1 pf= 0.82 | A=   2.07(19) B=  -2.25(37) xtop=  -1.92 topsh=0.14 sum$=     -88 top5%gain=0.47
+  top  STALE s-20 t20 m20 x0.0 h120                 n=  56 pr= 13 m50=  -0.92 m0=   0.08 med= -2.21 win= 19.6 pf= 0.79 | A=   1.92(19) B=  -2.38(37) xtop=  -2.06 topsh=0.14 sum$=    -103 top5%gain=0.47
+  top  STALE sNone t20 m20 x-3.0 h120               n=  56 pr= 13 m50=  -0.93 m0=   0.07 med= -4.43 win= 28.6 pf= 0.80 | A=   2.72(19) B=  -2.80(37) xtop=  -2.07 topsh=0.14 sum$=    -104 top5%gain=0.44
+  top  STALE s-20 t20 m20 x0.0 h240                 n=  56 pr= 13 m50=  -0.96 m0=   0.03 med= -2.28 win= 16.1 pf= 0.79 | A=   1.54(19) B=  -2.25(37) xtop=  -2.11 topsh=0.14 sum$=    -108 top5%gain=0.47
+  top  FIX sNone t3 h30                             n=  56 pr= 13 m50=  -1.00 m0=  -0.01 med= -1.14 win= 44.6 pf= 0.65 | A=   1.58(19) B=  -2.33(37) xtop=  -2.21 topsh=0.14 sum$=    -112 top5%gain=0.34
+  top  FIX s-35 t3 h30                              n=  56 pr= 13 m50=  -1.00 m0=  -0.01 med= -1.14 win= 44.6 pf= 0.65 | A=   1.58(19) B=  -2.33(37) xtop=  -2.21 topsh=0.14 sum$=    -112 top5%gain=0.34
+  top  STALE s-20 t20 m20 x-3.0 h120                n=  56 pr= 13 m50=  -1.11 m0=  -0.12 med= -4.43 win= 28.6 pf= 0.77 | A=   2.19(19) B=  -2.80(37) xtop=  -2.26 topsh=0.14 sum$=    -124 top5%gain=0.44
+  fam  STALE sNone t20 m20 x0.0 h120                n=  56 pr= 13 m50=  -0.74 m0=   0.26 med= -2.21 win= 19.6 pf= 0.83 | A=   2.46(19) B=  -2.38(37) xtop=  -1.87 topsh=0.14 sum$=     -83 top5%gain=0.47
+  fam  FIX sNone t3 h30                             n=  56 pr= 13 m50=  -1.00 m0=  -0.01 med= -1.14 win= 44.6 pf= 0.65 | A=   1.58(19) B=  -2.33(37) xtop=  -2.21 topsh=0.14 sum$=    -112 top5%gain=0.34
+  fam  TRAIL sNone a3 w2 h60                        n=  56 pr= 13 m50=  -1.20 m0=  -0.21 med= -0.21 win= 48.2 pf= 0.63 | A=   2.03(19) B=  -2.86(37) xtop=  -2.32 topsh=0.14 sum$=    -134 top5%gain=0.42
+  fam  BE sNone t20 a3 b0.5 h30                     n=  56 pr= 13 m50=  -1.37 m0=  -0.38 med= -2.49 win= 28.6 pf= 0.61 | A=   2.20(19) B=  -3.21(37) xtop=  -2.28 topsh=0.14 sum$=    -154 top5%gain=0.54
+  fam  PARTIAL sNone t1_20 a10 w7 h60               n=  56 pr= 13 m50=  -2.06 m0=  -1.08 med= -0.95 win= 39.3 pf= 0.60 | A=   2.40(19) B=  -4.35(37) xtop=  -2.58 topsh=0.14 sum$=    -231 top5%gain=0.35
+  fam  PTRAIL s-5 a20 g0.25 h120                    n=  56 pr= 13 m50=  -2.09 m0=  -1.10 med= -6.16 win= 26.8 pf= 0.60 | A=  -0.16(19) B=  -3.07(37) xtop=  -3.15 topsh=0.14 sum$=    -234 top5%gain=0.53
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n=  56 pr= 13 m50=  -2.97 m0=  -2.00 med= -1.22 win= 37.5 pf= 0.48 | A=  -0.33(19) B=  -4.33(37) xtop=  -3.57 topsh=0.14 sum$=    -333 top5%gain=0.46
+  ref  FIX sNone tNone h240                         n=  56 pr= 13 m50=  -9.13 m0=  -8.21 med= -5.74 win= 26.8 pf= 0.27 | A= -15.17(19) B=  -6.03(37) xtop= -11.97 topsh=0.14 sum$=   -1022 top5%gain=0.64
+  ref  FIX s-5 t10 h60                              n=  56 pr= 13 m50=  -2.86 m0=  -1.89 med= -5.40 win= 28.6 pf= 0.39 | A=  -2.13(19) B=  -3.24(37) xtop=  -3.21 topsh=0.14 sum$=    -321 top5%gain=0.38
+#### vacc / hi (train n=87)
+  top  FIX s-3 t10 h5                               n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  FIX s-3 t10 h15                              n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  FIX s-3 t10 h30                              n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  FIX s-3 t10 h60                              n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  FIX s-3 t10 h120                             n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  FIX s-3 t10 h240                             n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  BE s-3 t10 a3 b0.5 h30                       n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  top  BE s-3 t10 a3 b2.0 h30                       n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  fam  FIX s-3 t10 h5                               n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  fam  BE s-3 t10 a3 b0.5 h30                       n=  87 pr= 61 m50=  -4.22 m0=  -3.26 med= -4.33 win=  1.1 pf= 0.04 | A=  -4.25(38) B=  -4.19(49) xtop=  -4.44 topsh=0.08 sum$=    -537 top5%gain=0.74
+  fam  TRAIL s-3 a3 w2 h30                          n=  87 pr= 61 m50=  -4.35 m0=  -3.39 med= -4.33 win=  1.1 pf= 0.01 | A=  -4.25(38) B=  -4.43(49) xtop=  -4.44 topsh=0.08 sum$=    -558 top5%gain=-0.05
+  fam  PTRAIL s-3 a5 g0.25 h30                      n=  87 pr= 61 m50=  -4.35 m0=  -3.39 med= -4.33 win=  1.1 pf= 0.01 | A=  -4.25(38) B=  -4.43(49) xtop=  -4.44 topsh=0.08 sum$=    -558 top5%gain=-0.05
+  fam  STALE sNone t10 m5 x0.0 h60                  n=  87 pr= 61 m50=  -6.91 m0=  -5.98 med= -9.75 win= 13.8 pf= 0.25 | A= -10.23(38) B=  -4.34(49) xtop=  -7.36 topsh=0.08 sum$=    -881 top5%gain=0.56
+  fam  PARTIAL sNone t1_5 a5 w4 h240                n=  87 pr= 61 m50=  -7.54 m0=  -6.61 med=-10.83 win= 39.1 pf= 0.29 | A=  -8.32(38) B=  -6.94(49) xtop=  -8.43 topsh=0.08 sum$=    -935 top5%gain=0.49
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n=  87 pr= 61 m50= -12.00 m0= -11.11 med=-13.78 win= 12.6 pf= 0.28 | A= -12.17(38) B= -11.86(49) xtop= -14.90 topsh=0.08 sum$=   -1525 top5%gain=0.85
+  ref  FIX sNone tNone h240                         n=  87 pr= 61 m50= -17.78 m0= -16.95 med=-13.87 win= 11.5 pf= 0.14 | A= -13.96(38) B= -20.75(49) xtop= -19.92 topsh=0.08 sum$=   -2223 top5%gain=0.88
+  ref  FIX s-5 t10 h60                              n=  87 pr= 61 m50=  -7.81 m0=  -6.88 med= -9.75 win= 10.3 pf= 0.22 | A=  -9.80(38) B=  -6.26(49) xtop=  -8.51 topsh=0.08 sum$=    -975 top5%gain=0.70
+#### vacc / hi20 (train n=77)
+  top  FIX s-3 t20 h5                               n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  FIX s-3 t20 h15                              n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  FIX s-3 t20 h30                              n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  FIX s-3 t20 h60                              n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  FIX s-3 t20 h120                             n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  FIX s-3 t20 h240                             n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  BE s-3 t20 a3 b0.5 h30                       n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  top  BE s-3 t20 a3 b2.0 h30                       n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  fam  FIX s-3 t20 h5                               n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  fam  BE s-3 t20 a3 b0.5 h30                       n=  77 pr= 68 m50=  -3.39 m0=  -2.42 med= -4.55 win=  3.9 pf= 0.22 | A=  -3.82(38) B=  -2.96(39) xtop=  -3.85 topsh=0.05 sum$=    -171 top5%gain=0.98
+  fam  TRAIL s-35 a40 w2 h240                       n=  77 pr= 68 m50=  -3.46 m0=  -2.49 med=-14.07 win= 27.3 pf= 0.81 | A=  -2.41(38) B=  -4.49(39) xtop=  -5.32 topsh=0.05 sum$=    -128 top5%gain=0.36
+  fam  PTRAIL s-3 a5 g0.25 h30                      n=  77 pr= 68 m50=  -3.49 m0=  -2.52 med= -4.55 win=  3.9 pf= 0.19 | A=  -3.82(38) B=  -3.16(39) xtop=  -3.86 topsh=0.05 sum$=    -174 top5%gain=0.97
+  fam  PARTIAL s-5 t1_20 a20 w12 h60                n=  77 pr= 68 m50=  -5.97 m0=  -5.02 med=-11.41 win= 18.2 pf= 0.52 | A=  -7.36(38) B=  -4.62(39) xtop=  -7.71 topsh=0.05 sum$=    -267 top5%gain=0.61
+  fam  STALE s-5 t20 m40 x-3.0 h60                  n=  77 pr= 68 m50=  -6.28 m0=  -5.34 med=-11.41 win= 18.2 pf= 0.49 | A=  -7.40(38) B=  -5.18(39) xtop=  -7.79 topsh=0.05 sum$=    -277 top5%gain=0.56
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n=  77 pr= 68 m50= -27.06 m0= -26.33 med=-14.14 win= 13.0 pf= 0.16 | A= -16.31(38) B= -37.54(39) xtop= -31.70 topsh=0.05 sum$=   -1221 top5%gain=0.82
+  ref  FIX sNone tNone h240                         n=  77 pr= 68 m50= -28.50 m0= -27.79 med=-14.16 win= 10.4 pf= 0.18 | A= -20.43(38) B= -36.37(39) xtop= -31.77 topsh=0.05 sum$=   -1254 top5%gain=0.88
+  ref  FIX s-5 t10 h60                              n=  77 pr= 68 m50=  -8.34 m0=  -7.42 med=-11.41 win= 19.5 pf= 0.33 | A=  -9.48(38) B=  -7.24(39) xtop=  -9.49 topsh=0.05 sum$=    -369 top5%gain=0.54
+#### vacc / all50 (train n=163)
+  top  FIX s-3 t3 h5                                n= 163 pr= 80 m50=  -3.56 m0=  -2.59 med= -4.23 win=  7.4 pf= 0.10 | A=  -3.77(62) B=  -3.43(101) xtop=  -3.63 topsh=0.06 sum$=    -962 top5%gain=0.89
+  top  FIX s-3 t10 h5                               n= 163 pr= 80 m50=  -3.58 m0=  -2.61 med= -4.23 win=  6.1 pf= 0.11 | A=  -3.91(62) B=  -3.37(101) xtop=  -3.69 topsh=0.06 sum$=    -969 top5%gain=0.97
+  top  FIX s-3 t3 h15                               n= 163 pr= 80 m50=  -3.58 m0=  -2.62 med= -4.30 win=  9.2 pf= 0.11 | A=  -3.67(62) B=  -3.53(101) xtop=  -3.66 topsh=0.06 sum$=    -971 top5%gain=0.81
+  top  FIX s-3 t40 h15                              n= 163 pr= 80 m50=  -3.60 m0=  -2.64 med= -4.32 win=  6.7 pf= 0.13 | A=  -3.43(62) B=  -3.71(101) xtop=  -3.65 topsh=0.06 sum$=    -977 top5%gain=0.98
+  top  FIX s-3 tNone h5                             n= 163 pr= 80 m50=  -3.61 m0=  -2.64 med= -4.23 win=  6.1 pf= 0.10 | A=  -3.80(62) B=  -3.49(101) xtop=  -3.66 topsh=0.06 sum$=    -978 top5%gain=0.96
+  top  FIX s-3 t40 h5                               n= 163 pr= 80 m50=  -3.61 m0=  -2.64 med= -4.23 win=  6.1 pf= 0.10 | A=  -3.80(62) B=  -3.49(101) xtop=  -3.66 topsh=0.06 sum$=    -978 top5%gain=0.96
+  top  FIX s-3 t80 h5                               n= 163 pr= 80 m50=  -3.61 m0=  -2.64 med= -4.23 win=  6.1 pf= 0.10 | A=  -3.80(62) B=  -3.49(101) xtop=  -3.66 topsh=0.06 sum$=    -978 top5%gain=0.96
+  top  FIX s-3 t20 h5                               n= 163 pr= 80 m50=  -3.65 m0=  -2.68 med= -4.23 win=  6.1 pf= 0.09 | A=  -3.91(62) B=  -3.49(101) xtop=  -3.70 topsh=0.06 sum$=    -990 top5%gain=0.96
+  fam  FIX s-3 t3 h5                                n= 163 pr= 80 m50=  -3.56 m0=  -2.59 med= -4.23 win=  7.4 pf= 0.10 | A=  -3.77(62) B=  -3.43(101) xtop=  -3.63 topsh=0.06 sum$=    -962 top5%gain=0.89
+  fam  BE s-3 t20 a3 b2.0 h120                      n= 163 pr= 80 m50=  -3.66 m0=  -2.69 med= -4.33 win= 13.5 pf= 0.23 | A=  -2.71(62) B=  -4.24(101) xtop=  -3.95 topsh=0.06 sum$=    -995 top5%gain=0.91
+  fam  TRAIL s-3 a20 w2 h30                         n= 163 pr= 80 m50=  -3.69 m0=  -2.73 med= -4.33 win=  8.6 pf= 0.15 | A=  -3.18(62) B=  -4.01(101) xtop=  -3.76 topsh=0.06 sum$=   -1006 top5%gain=0.94
+  fam  PTRAIL s-3 a20 g0.25 h30                     n= 163 pr= 80 m50=  -3.79 m0=  -2.83 med= -4.33 win=  8.6 pf= 0.13 | A=  -3.44(62) B=  -4.01(101) xtop=  -3.86 topsh=0.06 sum$=   -1038 top5%gain=0.93
+  fam  STALE sNone t40 m5 x2.0 h240                 n= 163 pr= 80 m50=  -4.70 m0=  -3.75 med= -4.49 win=  9.8 pf= 0.28 | A=  -6.99(62) B=  -3.30(101) xtop=  -5.40 topsh=0.06 sum$=   -1171 top5%gain=0.96
+  fam  PARTIAL sNone t1_5 a20 w12 h60               n= 163 pr= 80 m50=  -5.31 m0=  -4.36 med= -4.72 win= 31.3 pf= 0.37 | A=  -5.74(62) B=  -5.04(101) xtop=  -6.09 topsh=0.06 sum$=   -1395 top5%gain=0.54
+  robust-positive policies (A>0, B>0, ex-top-pair>0): 0 of 2835
+  ref  FIX sNone tNone h60                          n= 163 pr= 80 m50=  -7.78 m0=  -6.85 med= -8.16 win= 21.5 pf= 0.31 | A=  -7.95(62) B=  -7.67(101) xtop=  -9.30 topsh=0.06 sum$=   -1974 top5%gain=0.73
+  ref  FIX sNone tNone h240                         n= 163 pr= 80 m50= -12.54 m0= -11.66 med=-11.52 win= 20.2 pf= 0.21 | A= -13.55(62) B= -11.93(101) xtop= -13.55 topsh=0.06 sum$=   -3219 top5%gain=0.74
+  ref  FIX s-5 t10 h60                              n= 163 pr= 80 m50=  -5.87 m0=  -4.92 med= -6.81 win= 17.8 pf= 0.26 | A=  -6.36(62) B=  -5.57(101) xtop=  -6.20 topsh=0.06 sum$=   -1530 top5%gain=0.62
+secs 22.4

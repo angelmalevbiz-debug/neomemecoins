@@ -1,0 +1,86 @@
+loaded in 0.4s
+orig n 91 replica n 91 leaderboard n 91 | orig==replica True | orig==leaderboard True 6.3s
+ub=7               n= 93 train  -7.337$ (n 70) holdout   0.441$ (n 23, pairs  8)  2.9s
+ub=8               n= 92 train  -7.265$ (n 69) holdout   0.441$ (n 23, pairs  8)  2.5s
+ub=12              n= 91 train  -7.311$ (n 69) holdout   1.171$ (n 22, pairs  8)  2.6s
+ub=13              n= 89 train  -7.253$ (n 68) holdout   0.911$ (n 21, pairs  8)  2.6s
+newb=4             n= 92 train  -8.084$ (n 70) holdout   0.943$ (n 22, pairs  8)  2.7s
+newb=6             n= 89 train  -7.792$ (n 67) holdout   0.943$ (n 22, pairs  8)  2.6s
+newb=7             n= 90 train  -8.593$ (n 68) holdout   0.943$ (n 22, pairs  8)  2.6s
+top=0.21           n= 74 train  -7.639$ (n 62) holdout  -1.931$ (n 12, pairs  5)  2.6s
+top=0.24           n= 81 train  -7.664$ (n 64) holdout   0.202$ (n 17, pairs  5)  2.6s
+top=0.36           n=103 train  -8.698$ (n 79) holdout   0.854$ (n 24, pairs 10)  2.6s
+top=0.39           n=106 train  -8.557$ (n 82) holdout   1.045$ (n 24, pairs 10)  2.8s
+nc_lo=-1.5         n= 91 train  -7.203$ (n 69) holdout   0.921$ (n 22, pairs  8)  2.9s
+nc_lo=-2.5         n= 93 train  -7.373$ (n 71) holdout   0.943$ (n 22, pairs  8)  3.0s
+nc_hi=3.5          n= 85 train  -7.071$ (n 64) holdout   0.050$ (n 21, pairs  8)  3.3s
+nc_hi=4.0          n= 88 train  -6.888$ (n 66) holdout   0.823$ (n 22, pairs  8)  2.9s
+nc_hi=6.0          n= 92 train  -7.413$ (n 69) holdout   1.627$ (n 23, pairs  8)  3.0s
+nc_hi=6.5          n= 91 train  -7.428$ (n 69) holdout   1.272$ (n 22, pairs  8)  2.7s
+liq=14000          n= 94 train  -7.156$ (n 70) holdout   0.053$ (n 24, pairs  9)  2.9s
+liq=16000          n= 93 train  -7.308$ (n 69) holdout   0.053$ (n 24, pairs  9)  3.3s
+liq=24000          n= 91 train  -7.308$ (n 69) holdout   0.943$ (n 22, pairs  8)  3.2s
+liq=26000          n= 90 train  -7.464$ (n 68) holdout   0.392$ (n 22, pairs  8)  3.4s
+live=420           n= 91 train  -7.308$ (n 69) holdout   0.943$ (n 22, pairs  8)  3.2s
+live=480           n= 91 train  -7.308$ (n 69) holdout   0.943$ (n 22, pairs  8)  3.1s
+live=720           n= 91 train  -7.308$ (n 69) holdout   0.943$ (n 22, pairs  8)  2.9s
+live=780           n= 91 train  -7.308$ (n 69) holdout   0.943$ (n 22, pairs  8)  2.9s
+win=210            n= 82 train  -9.676$ (n 63) holdout   0.855$ (n 19, pairs  8)  3.0s
+win=240            n= 84 train  -9.982$ (n 65) holdout  -0.281$ (n 19, pairs  8)  3.1s
+win=360            n= 95 train  -8.572$ (n 70) holdout   0.487$ (n 25, pairs  9)  3.2s
+win=390            n= 95 train  -8.719$ (n 70) holdout   0.731$ (n 25, pairs  9)  3.5s
+nc_win=210         n=100 train  -8.936$ (n 75) holdout  -1.468$ (n 25, pairs  9)  3.3s
+nc_win=240         n= 99 train  -7.644$ (n 73) holdout   0.364$ (n 26, pairs  9)  3.1s
+nc_win=360         n= 79 train  -4.694$ (n 59) holdout   0.823$ (n 20, pairs  9)  3.0s
+nc_win=390         n= 82 train  -7.257$ (n 61) holdout  -1.020$ (n 21, pairs 10)  2.8s
+stop=-7.0          n=101 train  -8.486$ (n 78) holdout   0.603$ (n 23, pairs  8)  2.8s
+stop=-8.0          n= 96 train  -7.594$ (n 74) holdout   0.887$ (n 22, pairs  8)  2.8s
+stop=-12.0         n= 86 train  -8.874$ (n 64) holdout   2.890$ (n 22, pairs  8)  2.7s
+stop=-13.0         n= 86 train  -9.057$ (n 64) holdout   2.583$ (n 22, pairs  8)  2.8s
+tp=4.2             n= 97 train  -8.284$ (n 73) holdout  -0.675$ (n 24, pairs  8)  2.9s
+tp=4.8             n= 95 train  -8.623$ (n 73) holdout   1.267$ (n 22, pairs  8)  2.8s
+tp=7.2             n= 90 train  -8.669$ (n 70) holdout   1.176$ (n 20, pairs  8)  2.9s
+tp=7.8             n= 86 train  -9.231$ (n 66) holdout   1.809$ (n 20, pairs  8)  2.8s
+hold=21            n= 93 train  -7.965$ (n 71) holdout   1.926$ (n 22, pairs  8)  3.1s
+hold=24            n= 94 train  -8.482$ (n 72) holdout   1.126$ (n 22, pairs  8)  2.9s
+hold=36            n= 91 train  -8.176$ (n 69) holdout   0.790$ (n 22, pairs  8)  3.1s
+hold=39            n= 90 train  -7.708$ (n 68) holdout   1.122$ (n 22, pairs  8)  3.1s
+cooldown=210       n= 93 train  -7.830$ (n 71) holdout   0.836$ (n 22, pairs  8)  3.4s
+cooldown=240       n= 93 train  -7.909$ (n 71) holdout   0.893$ (n 22, pairs  8)  3.0s
+cooldown=360       n= 87 train  -5.287$ (n 65) holdout   0.984$ (n 22, pairs  8)  2.9s
+cooldown=390       n= 87 train  -4.881$ (n 66) holdout   0.276$ (n 21, pairs  8)  2.8s
+size_frac=0.0014   n= 91 train  -5.687$ (n 69) holdout   1.721$ (n 22, pairs  8)  3.0s
+size_frac=0.0016   n= 91 train  -6.368$ (n 69) holdout   1.510$ (n 22, pairs  8)  3.0s
+size_frac=0.0024   n= 91 train  -8.186$ (n 69) holdout   0.527$ (n 22, pairs  8)  3.2s
+size_frac=0.0026   n= 91 train  -8.550$ (n 69) holdout   0.508$ (n 22, pairs  8)  2.9s
+JOINT_00   n=112 train  -6.920$ (n 82) holdout  -2.770$ (n 30, pairs 11) 2.8s | {"ub": 9, "newb": 5, "top": 0.371, "nc_lo": -1.78, "nc_hi": 3.967, "liq": 22149.567, "live": 543.106, "win": 326.237, "nc_win": 257.788, "stop": -8.109, "tp": 6.741, "hold": 22.917}
+JOINT_01   n=105 train  -8.745$ (n 75) holdout  -0.711$ (n 30, pairs 11) 2.8s | {"ub": 9, "newb": 4, "top": 0.375, "nc_lo": -1.56, "nc_hi": 3.984, "liq": 23209.013, "live": 537.055, "win": 323.697, "nc_win": 299.079, "stop": -12.44, "tp": 4.674, "hold": 34.483}
+JOINT_02   n= 72 train  -6.713$ (n 55) holdout   1.175$ (n 17, pairs  8) 2.9s | {"ub": 8, "newb": 5, "top": 0.274, "nc_lo": -2.078, "nc_hi": 5.271, "liq": 18174.954, "live": 554.954, "win": 232.835, "nc_win": 335.416, "stop": -10.825, "tp": 5.381, "hold": 36.021}
+JOINT_03   n= 77 train  -7.405$ (n 60) holdout   2.804$ (n 17, pairs  6) 2.9s | {"ub": 11, "newb": 4, "top": 0.266, "nc_lo": -1.505, "nc_hi": 5.696, "liq": 15174.189, "live": 578.451, "win": 229.086, "nc_win": 303.155, "stop": -11.331, "tp": 4.749, "hold": 34.636}
+JOINT_04   n=105 train  -6.788$ (n 75) holdout  -0.919$ (n 30, pairs 11) 2.7s | {"ub": 8, "newb": 5, "top": 0.337, "nc_lo": -2.196, "nc_hi": 4.842, "liq": 22652.139, "live": 539.666, "win": 356.79, "nc_win": 242.363, "stop": -11.338, "tp": 5.589, "hold": 26.11}
+JOINT_05   n= 90 train  -7.108$ (n 66) holdout  -1.764$ (n 24, pairs  9) 2.6s | {"ub": 11, "newb": 5, "top": 0.295, "nc_lo": -1.768, "nc_hi": 4.088, "liq": 24534.246, "live": 523.62, "win": 308.433, "nc_win": 264.915, "stop": -9.834, "tp": 6.706, "hold": 25.991}
+JOINT_06   n= 76 train  -8.116$ (n 59) holdout  -0.826$ (n 17, pairs  7) 3.0s | {"ub": 12, "newb": 6, "top": 0.305, "nc_lo": -1.806, "nc_hi": 3.851, "liq": 17830.097, "live": 604.685, "win": 230.828, "nc_win": 239.95, "stop": -9.726, "tp": 5.751, "hold": 25.756}
+JOINT_07   n= 97 train  -5.616$ (n 72) holdout  -1.865$ (n 25, pairs 11) 2.6s | {"ub": 9, "newb": 4, "top": 0.372, "nc_lo": -1.71, "nc_hi": 6.107, "liq": 24903.611, "live": 573.998, "win": 286.594, "nc_win": 370.607, "stop": -9.035, "tp": 6.717, "hold": 33.615}
+JOINT_08   n= 83 train  -7.464$ (n 65) holdout  -0.080$ (n 18, pairs  7) 2.8s | {"ub": 12, "newb": 4, "top": 0.254, "nc_lo": -2.334, "nc_hi": 5.622, "liq": 21383.175, "live": 557.851, "win": 270.512, "nc_win": 324.539, "stop": -7.732, "tp": 5.324, "hold": 32.111}
+JOINT_09   n= 82 train  -5.625$ (n 61) holdout   2.277$ (n 21, pairs  8) 2.8s | {"ub": 8, "newb": 4, "top": 0.293, "nc_lo": -1.504, "nc_hi": 6.037, "liq": 23458.086, "live": 635.745, "win": 310.73, "nc_win": 362.167, "stop": -11.005, "tp": 5.302, "hold": 29.505}
+JOINT_10   n= 85 train  -4.322$ (n 63) holdout   0.080$ (n 22, pairs  8) 2.7s | {"ub": 8, "newb": 4, "top": 0.294, "nc_lo": -1.828, "nc_hi": 6.186, "liq": 22418.777, "live": 723.657, "win": 296.268, "nc_win": 338.536, "stop": -9.821, "tp": 6.29, "hold": 33.229}
+JOINT_11   n=100 train  -6.654$ (n 72) holdout  -1.270$ (n 28, pairs 11) 2.8s | {"ub": 10, "newb": 5, "top": 0.33, "nc_lo": -2.108, "nc_hi": 6.068, "liq": 22720.201, "live": 637.54, "win": 275.293, "nc_win": 263.162, "stop": -11.061, "tp": 4.931, "hold": 31.558}
+JOINT_12   n= 84 train -11.802$ (n 60) holdout   0.342$ (n 24, pairs 11) 2.8s | {"ub": 12, "newb": 6, "top": 0.364, "nc_lo": -1.66, "nc_hi": 4.591, "liq": 18065.717, "live": 714.833, "win": 237.604, "nc_win": 267.623, "stop": -12.175, "tp": 6.91, "hold": 26.471}
+JOINT_13   n=106 train  -6.640$ (n 77) holdout  -2.964$ (n 29, pairs 11) 2.8s | {"ub": 10, "newb": 6, "top": 0.369, "nc_lo": -1.674, "nc_hi": 4.85, "liq": 19436.655, "live": 533.855, "win": 286.755, "nc_win": 264.364, "stop": -9.41, "tp": 4.844, "hold": 28.498}
+JOINT_14   n= 90 train  -7.982$ (n 67) holdout  -0.470$ (n 23, pairs  9) 3.6s | {"ub": 10, "newb": 5, "top": 0.294, "nc_lo": -2.396, "nc_hi": 5.467, "liq": 15757.456, "live": 528.974, "win": 285.732, "nc_win": 320.966, "stop": -10.499, "tp": 6.094, "hold": 26.527}
+JOINT_15   n=100 train  -8.206$ (n 74) holdout  -0.104$ (n 26, pairs 10) 3.3s | {"ub": 11, "newb": 5, "top": 0.335, "nc_lo": -1.82, "nc_hi": 5.578, "liq": 21256.299, "live": 575.871, "win": 284.003, "nc_win": 271.921, "stop": -9.616, "tp": 5.803, "hold": 23.164}
+JOINT_16   n= 75 train  -6.469$ (n 58) holdout   0.775$ (n 17, pairs  7) 3.4s | {"ub": 12, "newb": 4, "top": 0.266, "nc_lo": -1.8, "nc_hi": 5.346, "liq": 22253.363, "live": 635.711, "win": 253.903, "nc_win": 343.073, "stop": -9.523, "tp": 4.556, "hold": 35.81}
+JOINT_17   n=111 train  -9.211$ (n 83) holdout  -5.457$ (n 28, pairs 10) 3.1s | {"ub": 9, "newb": 4, "top": 0.314, "nc_lo": -2.225, "nc_hi": 4.02, "liq": 15439.707, "live": 633.878, "win": 283.398, "nc_win": 297.21, "stop": -7.836, "tp": 4.518, "hold": 34.822}
+JOINT_18   n=122 train  -6.042$ (n 87) holdout  -2.379$ (n 35, pairs 14) 3.5s | {"ub": 8, "newb": 4, "top": 0.367, "nc_lo": -1.545, "nc_hi": 5.284, "liq": 15599.016, "live": 728.376, "win": 361.161, "nc_win": 252.677, "stop": -11.427, "tp": 4.718, "hold": 23.287}
+JOINT_19   n= 72 train  -5.951$ (n 54) holdout   0.157$ (n 18, pairs  9) 3.5s | {"ub": 10, "newb": 6, "top": 0.302, "nc_lo": -2.079, "nc_hi": 6.114, "liq": 20415.099, "live": 705.387, "win": 232.09, "nc_win": 350.53, "stop": -10.513, "tp": 6.225, "hold": 26.363}
+JOINT_20   n= 68 train  -5.963$ (n 49) holdout   1.407$ (n 19, pairs  9) 3.4s | {"ub": 9, "newb": 5, "top": 0.298, "nc_lo": -1.56, "nc_hi": 5.809, "liq": 17579.99, "live": 516.657, "win": 257.542, "nc_win": 355.522, "stop": -12.319, "tp": 6.741, "hold": 36.075}
+JOINT_21   n= 92 train  -8.067$ (n 69) holdout  -0.777$ (n 23, pairs  9) 3.5s | {"ub": 11, "newb": 6, "top": 0.295, "nc_lo": -2.106, "nc_hi": 4.157, "liq": 18502.709, "live": 555.168, "win": 349.858, "nc_win": 295.636, "stop": -8.652, "tp": 6.366, "hold": 24.155}
+JOINT_22   n= 75 train  -6.466$ (n 57) holdout  -0.675$ (n 18, pairs  8) 3.3s | {"ub": 10, "newb": 6, "top": 0.312, "nc_lo": -2.16, "nc_hi": 4.139, "liq": 23417.824, "live": 507.615, "win": 239.669, "nc_win": 359.637, "stop": -8.852, "tp": 4.816, "hold": 36.709}
+JOINT_23   n=103 train  -7.490$ (n 78) holdout  -3.447$ (n 25, pairs 10) 3.3s | {"ub": 10, "newb": 4, "top": 0.282, "nc_lo": -1.915, "nc_hi": 4.874, "liq": 16258.728, "live": 507.624, "win": 295.769, "nc_win": 230.01, "stop": -7.929, "tp": 5.464, "hold": 25.733}
+JOINT_24   n= 93 train  -7.058$ (n 68) holdout  -2.551$ (n 25, pairs 10) 3.4s | {"ub": 11, "newb": 5, "top": 0.361, "nc_lo": -2.059, "nc_hi": 3.996, "liq": 17330.574, "live": 705.765, "win": 258.377, "nc_win": 241.106, "stop": -11.324, "tp": 6.198, "hold": 28.152}
+JOINT_25   n= 96 train  -7.557$ (n 74) holdout  -1.162$ (n 22, pairs  9) 3.4s | {"ub": 11, "newb": 6, "top": 0.283, "nc_lo": -2.215, "nc_hi": 5.832, "liq": 15069.157, "live": 511.866, "win": 359.866, "nc_win": 317.524, "stop": -9.82, "tp": 6.926, "hold": 31.263}
+JOINT_26   n= 82 train  -5.762$ (n 59) holdout  -1.234$ (n 23, pairs  9) 3.3s | {"ub": 8, "newb": 5, "top": 0.274, "nc_lo": -2.223, "nc_hi": 3.992, "liq": 24197.684, "live": 650.994, "win": 357.18, "nc_win": 339.072, "stop": -9.887, "tp": 6.198, "hold": 33.924}
+JOINT_27   n= 86 train  -4.299$ (n 63) holdout  -3.500$ (n 23, pairs  9) 3.4s | {"ub": 11, "newb": 5, "top": 0.319, "nc_lo": -1.762, "nc_hi": 3.932, "liq": 16451.136, "live": 738.971, "win": 257.797, "nc_win": 244.251, "stop": -11.488, "tp": 4.945, "hold": 30.154}
+JOINT_28   n= 89 train  -7.583$ (n 66) holdout  -2.429$ (n 23, pairs  9) 3.3s | {"ub": 10, "newb": 4, "top": 0.255, "nc_lo": -2.262, "nc_hi": 4.838, "liq": 22356.729, "live": 472.21, "win": 351.814, "nc_win": 244.453, "stop": -11.294, "tp": 6.811, "hold": 29.606}
+JOINT_29   n= 90 train  -8.223$ (n 70) holdout  -2.423$ (n 20, pairs  7) 3.4s | {"ub": 11, "newb": 4, "top": 0.261, "nc_lo": -1.96, "nc_hi": 4.882, "liq": 16504.005, "live": 565.771, "win": 313.23, "nc_win": 295.871, "stop": -7.856, "tp": 6.189, "hold": 31.604}
+done 255.0s

@@ -1,0 +1,17 @@
+gap events (>10 min, pair returns): 252
+ALL
+  across gap (return price / last pre-gap price): n   252 mean   -5.1% median   +0.5% p10  -19.2% p90  +25.0% share<-50% 0.048
+  matched continuous controls, same interval  : n   769 mean   -8.0% median   +0.0% p10  -11.5% p90   +7.6% share<-50% 0.022
+liq>=250k
+  across gap (return price / last pre-gap price): n    84 mean   +1.4% median   +1.4% p10   -2.0% p90   +4.2% share<-50% 0.000
+  matched continuous controls, same interval  : n   319 mean  -11.6% median   +0.2% p10   -3.7% p90   +3.0% share<-50% 0.022
+liq50-250k
+  across gap (return price / last pre-gap price): n    82 mean   -6.0% median   +1.0% p10  -22.1% p90  +37.4% share<-50% 0.037
+  matched continuous controls, same interval  : n   389 mean   -3.5% median   -0.4% p10  -14.8% p90  +11.6% share<-50% 0.015
+liq<50k
+  across gap (return price / last pre-gap price): n    86 mean  -10.2% median   -0.9% p10  -51.2% p90  +31.5% share<-50% 0.105
+  matched continuous controls, same interval  : n    61 mean  -16.8% median   -1.0% p10  -39.5% p90   +5.5% share<-50% 0.066
+gap duration min: p10 12 p50 53 p90 111
+tape-covered gaps (tape price 10 min into the gap vs gap start; DexScreener return vs start): 1
+  tape +10min: n     1 mean   -0.1% median   -0.1% p10   -0.1% p90   -0.1% share<-50% 0.000
+  dex return : n     1 mean   +1.4% median   +1.4% p10   +1.4% p90   +1.4% share<-50% 0.000

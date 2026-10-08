@@ -1,0 +1,9 @@
+(a) random_all         v1 n 1057 (1.2s) | v2-in-v1-mode n 1057 | identical False | differing 3, explained by liq==0 (F6) 3
+(b) random_all         v2 pair-ordered n 1047 (1.4s) vs time-ordered n 1047 (1.5s) identical True
+(a) cf_guard           v1 n 70 (1.4s) | v2-in-v1-mode n 70 | identical True | differing 0, explained by liq==0 (F6) 0
+(b) cf_guard           v2 pair-ordered n 68 (1.5s) vs time-ordered n 68 (1.7s) identical True
+(a) mid_trail_exitfn   v1 n 595 (1.4s) | v2-in-v1-mode n 595 | identical False | differing 5, explained by liq==0 (F6) 5
+(b) mid_trail_exitfn   v2 pair-ordered n 592 (1.4s) vs time-ordered n 592 (1.8s) identical True
+(c) forward_net v1-mode: compared 14837, mismatches 5, extra values for vanished pairs (F3) 3684
+(d) v1 cross-pair state: 118272 of 130986 signal calls happened after a call at a later time
+(d) v2 cross-pair state: 0 of 130986 signal calls happened after a call at a later time

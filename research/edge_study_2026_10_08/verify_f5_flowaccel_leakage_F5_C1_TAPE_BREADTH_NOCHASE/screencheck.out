@@ -1,0 +1,36 @@
+[   0.4s] loaded series 2042 pairs; cut 1791411625348.0
+[   2.4s] tape built 349 pools {'rows': 185465, 'confirmed': 185465, 'buy_sell': 185465, 'non_wsol_quote': 53, 'bad_q': 0, 'et_gt_av': 0, 'payload_av_mismatch': 0}
+[   2.5s] stored guard holdout 11 6.106
+[   5.8s] family rerun guard n 66 identical to stored: True
+[   9.8s] reimpl guard n 66 holdout 11 6.106
+[  13.7s] reimpl orig n 91 holdout 22 0.943
+[  13.7s] overlap guard {'a': 66, 'b': 66, 'both': 64, 'only_a': 2, 'only_b': 2} holdout {'a': 11, 'b': 11, 'both': 11, 'only_a': 0, 'only_b': 0}
+[  17.9s] lag 30000 holdout 12 1.798
+[  22.5s] lag 120000 holdout 13 -0.676
+[  31.5s] random vA holdout n 54 -5.584
+[  35.2s] random vB holdout n 61 -11.472
+[  38.9s] random vC holdout n 53 -5.901
+[  43.0s] random vD holdout n 57 -9.231
+[  46.8s] random vE holdout n 57 -5.578
+[  50.5s] random vF holdout n 58 -7.678
+[  50.7s] pair-matched random pA n 29 -6.009
+[  50.9s] pair-matched random pB n 32 -4.122
+[  51.1s] pair-matched random pC n 28 -5.386
+[  51.3s] pair-matched random pD n 29 -3.476
+[  51.5s] pair-matched random pE n 29 -7.162
+[  51.7s] pair-matched random pF n 28 -3.972
+[  51.9s] pair-matched random pG n 29 -5.096
+[  52.1s] pair-matched random pH n 25 -4.857
+[  52.2s] done
+INTERIM_REMOVED holdout|fake=False|ticker=True|Agency n 1 sum usd50 6.15 mean 6.15
+INTERIM_REMOVED holdout|fake=False|ticker=True|CLAUDIA n 3 sum usd50 -58.6 mean -19.53
+INTERIM_REMOVED holdout|fake=False|ticker=True|ECSTASY n 12 sum usd50 -65.33 mean -5.44
+INTERIM_REMOVED train|fake=False|ticker=True|A1 n 13 sum usd50 -133.5 mean -10.27
+INTERIM_REMOVED train|fake=False|ticker=True|CLAUDIA n 2 sum usd50 -13.8 mean -6.9
+INTERIM_REMOVED train|fake=False|ticker=True|HASHERS n 1 sum usd50 3.3 mean 3.3
+INTERIM_REMOVED train|fake=False|ticker=True|RARINU n 21 sum usd50 -82.04 mean -3.91
+INTERIM_REMOVED train|fake=False|ticker=True|TWEETCRAFT n 4 sum usd50 -58.84 mean -14.71
+train-only screen: train 55 -6.489 holdout 11 5 6.106 [-0.591, 11.128]
+TIMING {'random_trades_pooled': 1135, 'random_mean_usd50': -4.42, 'random_per_pair_mean_usd50': {'2B8tftZ5': -5.705, '867dKvaC': -2.695, 'AFaYrFH7': -6.0, '4R8CiMnJ': -1.322, '8ewuF2o8': -7.535}, 'random_per_pair_n': {'2B8tftZ5': 338, '867dKvaC': 300, 'AFaYrFH7': 104, '4R8CiMnJ': 210, '8ewuF2o8': 183}, 'real_mean_usd50': 6.106, 'p_value_composition_matched': 0.0029}
+TIMING_TRAIN {'random_trades_pooled': 809, 'random_mean_usd50': -7.389, 'real_mean_usd50': -6.489, 'p_value_composition_matched': 0.0662}
+done

@@ -1,0 +1,1541 @@
+{
+ "C1": {
+  "all": {
+   "n": 91,
+   "buy_bias_bps": {
+    "n": 71,
+    "mean": 0.3,
+    "median": -1.8
+   },
+   "sell_bias_bps": {
+    "n": 35,
+    "mean": 0.2,
+    "median": -29.3
+   },
+   "repriced": {
+    "n": 31,
+    "net50_mean": 0.456,
+    "net50_tape_mean": 0.508,
+    "usd50_mean": 0.606,
+    "usd50_tape_mean": 0.298
+   }
+  },
+  "train": {
+   "n": 69,
+   "buy_bias_bps": {
+    "n": 54,
+    "mean": -15.6,
+    "median": 5.5
+   },
+   "sell_bias_bps": {
+    "n": 29,
+    "mean": 2.2,
+    "median": -29.3
+   },
+   "repriced": {
+    "n": 25,
+    "net50_mean": 0.836,
+    "net50_tape_mean": 0.651,
+    "usd50_mean": 1.08,
+    "usd50_tape_mean": 0.479
+   }
+  },
+  "holdout": {
+   "n": 22,
+   "buy_bias_bps": {
+    "n": 17,
+    "mean": 50.7,
+    "median": -19.1
+   },
+   "sell_bias_bps": {
+    "n": 6,
+    "mean": -9.8,
+    "median": 47.7
+   },
+   "repriced": {
+    "n": 6,
+    "net50_mean": -1.128,
+    "net50_tape_mean": -0.087,
+    "usd50_mean": -1.367,
+    "usd50_tape_mean": -0.455
+   }
+  }
+ },
+ "C1_rows": [
+  {
+   "pair": "F2P22Sfc",
+   "sym": "A1",
+   "ho": false,
+   "net50": 0.7460490563677382,
+   "usd50": 1.4920981127354764,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -12.592120173888128,
+   "usd50": -25.184240347776257,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -104.18625883038268,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -11.83283191953945,
+   "usd50": -16.89146222779792,
+   "size": 142.7508,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 6.214101178497645,
+   "usd50": 8.550170720170737,
+   "size": 137.59304,
+   "reason": "TP",
+   "flag": "",
+   "sell_bias_bps": -112.07031711373111,
+   "kind_x": "mid"
+  },
+  {
+   "pair": "A2ASUorC",
+   "sym": "RARINU",
+   "ho": false,
+   "net50": -12.680184036794163,
+   "usd50": -25.360368073588326,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -29.608380842892544,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -2.2372041968341754,
+   "usd50": -4.474408393668351,
+   "size": 200.0,
+   "reason": "FEED_GAP",
+   "flag": "GAP",
+   "buy_bias_bps": 196.14328419005616,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -14.458855602107223,
+   "usd50": -21.055112765717837,
+   "size": 145.62088,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -108.39484032415046,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "A2ASUorC",
+   "sym": "RARINU",
+   "ho": false,
+   "net50": 6.1531882920269645,
+   "usd50": 12.306376584053929,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -32.45466925225937,
+   "kind_e": "mid",
+   "sell_bias_bps": -128.89155471960513,
+   "kind_x": "mid",
+   "net50_tape": 5.134400338411971,
+   "usd50_tape": 10.268800676823941
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -13.644846551162768,
+   "usd50": -19.317407692000426,
+   "size": 141.57292,
+   "reason": "FEED_GAP",
+   "flag": "GAP",
+   "buy_bias_bps": -151.01941733246414,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "A2ASUorC",
+   "sym": "RARINU",
+   "ho": false,
+   "net50": -1.2857091352430519,
+   "usd50": -2.5714182704861037,
+   "size": 200.0,
+   "reason": "FEED_GAP",
+   "flag": "GAP",
+   "buy_bias_bps": -1.781134293758525,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8NVFB1un",
+   "sym": "Pumpoween",
+   "ho": false,
+   "net50": -4.076273122771416,
+   "usd50": -7.518940134394737,
+   "size": 184.45624,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": -61.2854071081974,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -14.505106216691905,
+   "usd50": -20.295918850135703,
+   "size": 139.92257999999998,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -71.25977769512279,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "A2ASUorC",
+   "sym": "RARINU",
+   "ho": false,
+   "net50": -13.87538800050548,
+   "usd50": -27.75077600101096,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 88.79936529256258,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 11.598777960233619,
+   "usd50": 23.197555920467238,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -62.28657380319579,
+   "kind_e": "mid",
+   "sell_bias_bps": 381.83105870859544,
+   "kind_x": "mid",
+   "net50_tape": 16.66678300042097,
+   "usd50_tape": 33.33356600084194
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -16.011319430122676,
+   "usd50": -32.02263886024535,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -693.1993270631698,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 2.3750964480873993,
+   "usd50": 3.253263658764655,
+   "size": 136.97396,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 135.4098315961443,
+   "kind_e": "mid",
+   "sell_bias_bps": 2.275659619886572,
+   "kind_x": "mid",
+   "net50_tape": 1.0211667918919032,
+   "usd50_tape": 1.3987325930592989
+  },
+  {
+   "pair": "A2ASUorC",
+   "sym": "RARINU",
+   "ho": false,
+   "net50": -14.200523688632193,
+   "usd50": -28.401047377264387,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -11.130686587565586,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "12jc1DzJ",
+   "sym": "SI276",
+   "ho": false,
+   "net50": 14.785951047785286,
+   "usd50": 14.601239032915933,
+   "size": 98.75076,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 12.26248032780767,
+   "kind_e": "mid",
+   "sell_bias_bps": 36.65544925892544,
+   "kind_x": "last",
+   "net50_tape": 15.06628983731293,
+   "usd50_tape": 14.878075718149283
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 15.063661263710674,
+   "usd50": 30.12732252742135,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 48.70974042115265,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -15.880951249192549,
+   "usd50": -31.761902498385098,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 5.801485471666705,
+   "usd50": 7.750298425664193,
+   "size": 133.59162,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 78.20693566841369,
+   "kind_e": "mid",
+   "sell_bias_bps": 50.68885910826211,
+   "kind_x": "mid",
+   "net50_tape": 5.510740354718302,
+   "usd50_tape": 7.361887313861927
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -21.301092488243167,
+   "usd50": -42.602184976486335,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -77.32103405151376,
+   "kind_e": "mid",
+   "sell_bias_bps": -9.508077652697123,
+   "kind_x": "mid",
+   "net50_tape": -20.765598309801568,
+   "usd50_tape": -41.531196619603136
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 4.022426643859626,
+   "usd50": 8.044853287719253,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -59.992364839810826,
+   "kind_e": "mid",
+   "sell_bias_bps": 60.55545768358401,
+   "kind_x": "mid",
+   "net50_tape": 5.283982962595912,
+   "usd50_tape": 10.567965925191825
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 5.917888822047718,
+   "usd50": 11.835777644095437,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 127.47142431847357,
+   "kind_e": "mid",
+   "sell_bias_bps": -769.7702479855001,
+   "kind_x": "mid",
+   "net50_tape": -3.171633574144772,
+   "usd50_tape": -6.343267148289544
+  },
+  {
+   "pair": "12jc1DzJ",
+   "sym": "SI276",
+   "ho": false,
+   "net50": -13.404535872389182,
+   "usd50": -14.428103550697648,
+   "size": 107.63598,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -39.037225688873065,
+   "kind_e": "last",
+   "sell_bias_bps": 56.51644987805095,
+   "kind_x": "mid",
+   "net50_tape": -12.573118460466526,
+   "usd50_tape": -13.533199271484058
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -12.845692676392199,
+   "usd50": -17.492927729562776,
+   "size": 136.17738,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 346.6477323779274,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -21.49986419875411,
+   "usd50": -42.99972839750822,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -957.5726945148635,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -2.7683674958443136,
+   "usd50": -5.536734991688627,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 93.60776778692984,
+   "kind_e": "mid",
+   "sell_bias_bps": -60.80555231490394,
+   "kind_x": "mid",
+   "net50_tape": -4.258221150151053,
+   "usd50_tape": -8.516442300302106
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -0.787888461192534,
+   "usd50": -1.1213048941122992,
+   "size": 142.31772,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "2ddkUY8T",
+   "sym": "GOMOCAT",
+   "ho": false,
+   "net50": 0.6811820405549185,
+   "usd50": 0.8001620640325244,
+   "size": 117.4667,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -32.119583724164364,
+   "kind_e": "mid",
+   "sell_bias_bps": -63.16100984312009,
+   "kind_x": "mid",
+   "net50_tape": 0.36913785855157144,
+   "usd50_tape": 0.43361406089119875
+  },
+  {
+   "pair": "FsojuJgS",
+   "sym": "REF",
+   "ho": false,
+   "net50": 17.41265469865949,
+   "usd50": 15.017961948571646,
+   "size": 86.2474,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -291.77865214092174,
+   "kind_e": "last",
+   "sell_bias_bps": -178.43628713286697,
+   "kind_x": "mid",
+   "net50_tape": 18.751007772745787,
+   "usd50_tape": 16.17225667779115
+  },
+  {
+   "pair": "2ddkUY8T",
+   "sym": "GOMOCAT",
+   "ho": false,
+   "net50": 1.2653112199207395,
+   "usd50": 1.408800549006679,
+   "size": 111.34024000000001,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -208.24055404000845,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "2ddkUY8T",
+   "sym": "GOMOCAT",
+   "ho": false,
+   "net50": -99.16995666075816,
+   "usd50": -117.19500864745223,
+   "size": 118.17592,
+   "reason": "FEED_GAP",
+   "flag": "GAP"
+  },
+  {
+   "pair": "FcfEJ9uJ",
+   "sym": "EVERYTHING",
+   "ho": false,
+   "net50": 3.3698499370691253,
+   "usd50": 6.739699874138251,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 40.53815898997426,
+   "kind_e": "last"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 2.8782003533290257,
+   "usd50": 3.7353548979936604,
+   "size": 129.78092,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 117.08049543603539,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": -14.056850924803427,
+   "usd50": -12.082107959074637,
+   "size": 85.95174,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 875.5064799408003,
+   "kind_e": "mid",
+   "sell_bias_bps": -69.78355223705155,
+   "kind_x": "mid",
+   "net50_tape": -21.808807199367397,
+   "usd50_tape": -18.745049261101546
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -15.777154239228327,
+   "usd50": -20.462839675614376,
+   "size": 129.69917999999998,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 35.472820954491965,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": -6.040783878422477,
+   "usd50": -4.9093378090532935,
+   "size": 81.26988,
+   "reason": "TP",
+   "flag": "",
+   "sell_bias_bps": -68.37642427490478,
+   "kind_x": "mid"
+  },
+  {
+   "pair": "8J42or3k",
+   "sym": "MINER",
+   "ho": false,
+   "net50": 6.583544367072581,
+   "usd50": 3.3159061404771055,
+   "size": 50.366580000000006,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -256.3299832174574,
+   "kind_e": "mid",
+   "sell_bias_bps": -87.6581652089509,
+   "kind_x": "mid",
+   "net50_tape": 8.396555598367584,
+   "usd50_tape": 4.2290578926962885
+  },
+  {
+   "pair": "XDTrVqPD",
+   "sym": "LOOT",
+   "ho": false,
+   "net50": 5.240308243728801,
+   "usd50": 4.63907615024766,
+   "size": 88.52678,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 63.68546211862211,
+   "kind_e": "mid",
+   "sell_bias_bps": -33.32488618029371,
+   "kind_x": "last",
+   "net50_tape": 4.224304459998174,
+   "usd50_tape": 3.7396407158327714
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 5.433738467557595,
+   "usd50": 6.792834913792343,
+   "size": 125.01218,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 143.14214742782718,
+   "kind_e": "mid",
+   "sell_bias_bps": -30.917652398251924,
+   "kind_x": "mid",
+   "net50_tape": 3.6144401931919035,
+   "usd50_tape": 4.51849048030541
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": -3.7054171214039933,
+   "usd50": -3.3336926401184415,
+   "size": 89.96808,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 0.6995723572075585,
+   "usd50": 0.893817156968995,
+   "size": 127.76622,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 65.96988054022535,
+   "kind_e": "mid",
+   "sell_bias_bps": 393.90889326161556,
+   "kind_x": "mid",
+   "net50_tape": 4.056649158001169,
+   "usd50_tape": 5.183027287839921
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": 5.2548962537043975,
+   "usd50": 4.839463073513041,
+   "size": 92.09436000000001,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 0.6016075231559704,
+   "usd50": 0.7787118741817455,
+   "size": 129.43852,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 270.24775488282654,
+   "kind_e": "mid",
+   "sell_bias_bps": -26.82253578643512,
+   "kind_x": "mid",
+   "net50_tape": -2.3430128433412523,
+   "usd50_tape": -3.032761147830836
+  },
+  {
+   "pair": "34w9ReB7",
+   "sym": "TON618",
+   "ho": false,
+   "net50": 12.08674329306568,
+   "usd50": 14.463978468037789,
+   "size": 119.66812,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 109.80861380231055,
+   "kind_e": "mid",
+   "sell_bias_bps": 357.03495411251953,
+   "kind_x": "mid",
+   "net50_tape": 14.89236105781593,
+   "usd50_tape": 17.821408501500436
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -22.890340406062197,
+   "usd50": -45.780680812124395,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "sell_bias_bps": -104.7357584466572,
+   "kind_x": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 0.5036693202078757,
+   "usd50": 0.663290891627923,
+   "size": 131.69173999999998,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": -4.2626890382778875,
+   "usd50": -3.2785543471704033,
+   "size": 76.91282000000001,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -138.0924158696497,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": 1.9230698344222703,
+   "usd50": 1.5409773967047107,
+   "size": 80.13112,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -83.9953264250778,
+   "kind_e": "mid",
+   "sell_bias_bps": 89.21820611388989,
+   "kind_x": "last",
+   "net50_tape": 3.703893948804815,
+   "usd50_tape": 2.967971704789525
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -17.178608285186716,
+   "usd50": -19.846930588629856,
+   "size": 115.53282000000002,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 101.67671923087204,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8sbe1R1t",
+   "sym": "UI",
+   "ho": false,
+   "net50": -11.132036131710494,
+   "usd50": -9.154990967533163,
+   "size": 82.24004,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -302.4064087531769,
+   "kind_e": "mid",
+   "sell_bias_bps": -314.606856381003,
+   "kind_x": "mid",
+   "net50_tape": -11.2403929121051,
+   "usd50_tape": -9.244103627072398
+  },
+  {
+   "pair": "FkfDrvbz",
+   "sym": "LOBBY",
+   "ho": false,
+   "net50": -5.3275824876106,
+   "usd50": -4.487436581028876,
+   "size": 84.23026,
+   "reason": "FEED_GAP",
+   "flag": "GAP",
+   "buy_bias_bps": -264.97277217890286,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -7.896804584912652,
+   "usd50": -15.793609169825304,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 51.01772408586112,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8J42or3k",
+   "sym": "MINER",
+   "ho": false,
+   "net50": 1.623467426255059,
+   "usd50": 1.1025369911619818,
+   "size": 67.91248,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 85.19701905098891,
+   "kind_e": "mid",
+   "sell_bias_bps": 734.2245425961017,
+   "kind_x": "last",
+   "net50_tape": 8.437854514337072,
+   "usd50_tape": 5.7303562594782615
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -21.321748750097836,
+   "usd50": -42.64349750019567,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -60.3493867564406,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -13.351265222969918,
+   "usd50": -14.794235254978927,
+   "size": 110.80774000000001,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 94.74403102549473,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 20.475935856629356,
+   "usd50": 40.95187171325871,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 3.6127520113933107,
+   "usd50": 4.102894799329444,
+   "size": 113.56702,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 5.468396907843895,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -13.254070935413722,
+   "usd50": -26.508141870827444,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -63.97863677362002,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 8.765638743326551,
+   "usd50": 10.265804182881448,
+   "size": 117.11416000000001,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -5.404914762494032,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "8J42or3k",
+   "sym": "MINER",
+   "ho": false,
+   "net50": -14.51192673830667,
+   "usd50": -12.221552876979946,
+   "size": 84.21730000000001,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 22.958633156123284,
+   "usd50": 45.91726631224657,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 57.08584623133174,
+   "kind_e": "mid",
+   "sell_bias_bps": -64.01104435509562,
+   "kind_x": "mid",
+   "net50_tape": 21.47862166725334,
+   "usd50_tape": 42.95724333450667
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": 9.071790712649877,
+   "usd50": 11.378275357759684,
+   "size": 125.4248,
+   "reason": "TP",
+   "flag": "",
+   "sell_bias_bps": 75.31697399361651,
+   "kind_x": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -11.92131630649494,
+   "usd50": -17.13366389813068,
+   "size": 143.72292000000002,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": 5.874891642245521,
+   "usd50": 11.749783284491041,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 66.99816652154493,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "HU22UBaT",
+   "sym": "SNDWITCH",
+   "ho": false,
+   "net50": -25.325762540339568,
+   "usd50": -31.44916216646059,
+   "size": 124.17854,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 66.89999199508134,
+   "kind_e": "mid",
+   "sell_bias_bps": -21.043310365954916,
+   "kind_x": "mid",
+   "net50_tape": -25.979593229244013,
+   "usd50_tape": -32.26107957001407
+  },
+  {
+   "pair": "34w9ReB7",
+   "sym": "TON618",
+   "ho": false,
+   "net50": 5.018467602108871,
+   "usd50": 5.365740541707202,
+   "size": 106.9199,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -165.01376305630308,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "7mQDGtei",
+   "sym": "CATCRAFT",
+   "ho": false,
+   "net50": -17.001108843754636,
+   "usd50": -34.00221768750927,
+   "size": 200.0,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": 115.23825478887112,
+   "kind_e": "mid",
+   "sell_bias_bps": -29.32310667964721,
+   "kind_x": "mid",
+   "net50_tape": -18.19232120542862,
+   "usd50_tape": -36.38464241085724
+  },
+  {
+   "pair": "AVCKHsDf",
+   "sym": "B22",
+   "ho": true,
+   "net50": 1.7371577588756368,
+   "usd50": 0.9617846892640836,
+   "size": 55.36542,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -19.069094193934248,
+   "kind_e": "mid",
+   "sell_bias_bps": 144.10681091664702,
+   "kind_x": "mid",
+   "net50_tape": 3.4108814705222645,
+   "usd50_tape": 1.8884488518568279
+  },
+  {
+   "pair": "2XjwJiED",
+   "sym": "LOADED",
+   "ho": true,
+   "net50": 34.505448225616384,
+   "usd50": 17.119229434712928,
+   "size": 49.61312,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 1541.0603525071986,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "2B8tftZ5",
+   "sym": "CRAWL",
+   "ho": true,
+   "net50": 8.738668665607545,
+   "usd50": 17.47733733121509,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 28.25965125323934,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "4R8CiMnJ",
+   "sym": "JEANPHIL",
+   "ho": true,
+   "net50": 3.9198890208161377,
+   "usd50": 7.839778041632275,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 110.63670704866135,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "867dKvaC",
+   "sym": "MISTAKE",
+   "ho": true,
+   "net50": -4.703722234803641,
+   "usd50": -9.407444469607283,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 49.02984030465526,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": -14.072724162435547,
+   "usd50": -15.999268842093644,
+   "size": 113.68992,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -228.73622019001414,
+   "kind_e": "mid",
+   "sell_bias_bps": -41.72378365345553,
+   "kind_x": "mid",
+   "net50_tape": -12.450657179966962,
+   "usd50_tape": -14.155142187378694
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": 1.4249110687870823,
+   "usd50": 1.5574243783977157,
+   "size": 109.29975999999999,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -107.60305695457691,
+   "kind_e": "mid",
+   "sell_bias_bps": 168.81812365492573,
+   "kind_x": "mid",
+   "net50_tape": 4.267618660353256,
+   "usd50_tape": 4.664496953481324
+  },
+  {
+   "pair": "2B8tftZ5",
+   "sym": "CRAWL",
+   "ho": true,
+   "net50": 12.843160403077464,
+   "usd50": 25.686320806154928,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -81.0772701908959,
+   "kind_e": "last"
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": -12.18328958189592,
+   "usd50": -13.685898545873638,
+   "size": 112.33336,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": 8.576343843084413,
+   "usd50": 10.775512229822109,
+   "size": 125.64226,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -174.40088308688183,
+   "kind_e": "mid",
+   "sell_bias_bps": -191.62823249743604,
+   "kind_x": "mid",
+   "net50_tape": 8.389456606580637,
+   "usd50_tape": 10.540702882227222
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": -12.566374385752724,
+   "usd50": -16.637728890243977,
+   "size": 132.3988,
+   "reason": "STOP",
+   "flag": ""
+  },
+  {
+   "pair": "2B8tftZ5",
+   "sym": "CRAWL",
+   "ho": true,
+   "net50": 7.778289253691216,
+   "usd50": 15.556578507382431,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 68.54994621720904,
+   "kind_e": "last"
+  },
+  {
+   "pair": "AFaYrFH7",
+   "sym": "LMAO!",
+   "ho": true,
+   "net50": -6.618099630146981,
+   "usd50": -13.236199260293962,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": -102.60145537304865,
+   "kind_e": "last"
+  },
+  {
+   "pair": "8ewuF2o8",
+   "sym": "swordcat",
+   "ho": true,
+   "net50": 7.153219813916076,
+   "usd50": 14.306439627832152,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "8ewuF2o8",
+   "sym": "swordcat",
+   "ho": true,
+   "net50": 6.194628656491392,
+   "usd50": 12.389257312982783,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": -59.67032382435892,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "867dKvaC",
+   "sym": "MISTAKE",
+   "ho": true,
+   "net50": 9.1223491577345,
+   "usd50": 18.244698315469,
+   "size": 200.0,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 67.41155461378517,
+   "kind_e": "mid",
+   "sell_bias_bps": -186.1874070205685,
+   "kind_x": "mid",
+   "net50_tape": 6.38981258106841,
+   "usd50_tape": 12.779625162136819
+  },
+  {
+   "pair": "8ewuF2o8",
+   "sym": "swordcat",
+   "ho": true,
+   "net50": -8.102537008756176,
+   "usd50": -16.205074017512352,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": "",
+   "buy_bias_bps": 45.164129593180505,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": 3.8928428312285517,
+   "usd50": 6.480874816600254,
+   "size": 166.4818,
+   "reason": "TP",
+   "flag": "",
+   "buy_bias_bps": 93.70244263518998,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": 6.182158498130557,
+   "usd50": 10.705012054614176,
+   "size": 173.15978,
+   "reason": "TP",
+   "flag": ""
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": -13.553075552208549,
+   "usd50": -23.741638047192872,
+   "size": 175.17528000000001,
+   "reason": "STOP",
+   "flag": "",
+   "buy_bias_bps": -295.79407503581626,
+   "kind_e": "mid",
+   "sell_bias_bps": 47.69769914435332,
+   "kind_x": "mid",
+   "net50_tape": -10.532107953331826,
+   "usd50_tape": -18.449649597151296
+  },
+  {
+   "pair": "CR5dTgvT",
+   "sym": "ZKDARK",
+   "ho": true,
+   "net50": -13.859580837073727,
+   "usd50": -23.958516869396707,
+   "size": 172.86610000000002,
+   "reason": "OPEN_AT_END",
+   "flag": "VANISHED",
+   "buy_bias_bps": -72.7953371638179,
+   "kind_e": "mid"
+  },
+  {
+   "pair": "2B8tftZ5",
+   "sym": "CRAWL",
+   "ho": true,
+   "net50": -2.741219297911757,
+   "usd50": -5.482438595823514,
+   "size": 200.0,
+   "reason": "HOLD",
+   "flag": ""
+  }
+ ],
+ "RANDOM_TAPE_LIVE_NOCHASE": {
+  "all": {
+   "n": 136,
+   "buy_bias_bps": {
+    "n": 43,
+    "mean": -32.5,
+    "median": 0.3
+   },
+   "sell_bias_bps": {
+    "n": 26,
+    "mean": 12.7,
+    "median": 35.0
+   },
+   "repriced": {
+    "n": 12,
+    "net50_mean": 0.712,
+    "net50_tape_mean": 0.553,
+    "usd50_mean": 0.494,
+    "usd50_tape_mean": -0.241
+   }
+  },
+  "train": {
+   "n": 74,
+   "buy_bias_bps": {
+    "n": 25,
+    "mean": 18.6,
+    "median": -16.8
+   },
+   "sell_bias_bps": {
+    "n": 17,
+    "mean": 16.8,
+    "median": 37.1
+   },
+   "repriced": {
+    "n": 9,
+    "net50_mean": -0.317,
+    "net50_tape_mean": -0.743,
+    "usd50_mean": -1.608,
+    "usd50_tape_mean": -2.488
+   }
+  },
+  "holdout": {
+   "n": 62,
+   "buy_bias_bps": {
+    "n": 18,
+    "mean": -103.6,
+    "median": 1.2
+   },
+   "sell_bias_bps": {
+    "n": 9,
+    "mean": 5.0,
+    "median": -18.8
+   },
+   "repriced": {
+    "n": 3,
+    "net50_mean": 3.799,
+    "net50_tape_mean": 4.441,
+    "usd50_mean": 6.799,
+    "usd50_tape_mean": 6.498
+   }
+  }
+ },
+ "RANDOM_TAPE_LIVE": {
+  "all": {
+   "n": 163,
+   "buy_bias_bps": {
+    "n": 42,
+    "mean": 70.6,
+    "median": 30.1
+   },
+   "sell_bias_bps": {
+    "n": 42,
+    "mean": -40.0,
+    "median": 29.9
+   },
+   "repriced": {
+    "n": 15,
+    "net50_mean": -4.906,
+    "net50_tape_mean": -6.288,
+    "usd50_mean": -7.024,
+    "usd50_tape_mean": -8.564
+   }
+  },
+  "train": {
+   "n": 97,
+   "buy_bias_bps": {
+    "n": 24,
+    "mean": 83.9,
+    "median": 52.8
+   },
+   "sell_bias_bps": {
+    "n": 27,
+    "mean": -75.4,
+    "median": 29.9
+   },
+   "repriced": {
+    "n": 9,
+    "net50_mean": -3.227,
+    "net50_tape_mean": -5.56,
+    "usd50_mean": -2.33,
+    "usd50_tape_mean": -4.954
+   }
+  },
+  "holdout": {
+   "n": 66,
+   "buy_bias_bps": {
+    "n": 18,
+    "mean": 52.8,
+    "median": 5.7
+   },
+   "sell_bias_bps": {
+    "n": 15,
+    "mean": 23.7,
+    "median": 21.2
+   },
+   "repriced": {
+    "n": 6,
+    "net50_mean": -7.424,
+    "net50_tape_mean": -7.381,
+    "usd50_mean": -14.066,
+    "usd50_tape_mean": -13.978
+   }
+  }
+ },
+ "rug_removed_holdout": [
+  [
+   "ECSTASY",
+   "UCWmMumV",
+   18,
+   -7.9
+  ],
+  [
+   "SharkTank",
+   "65GHmCby",
+   6,
+   -12.22
+  ],
+  [
+   "CLAUDIA",
+   "Fe7bpDYC",
+   3,
+   -14.91
+  ],
+  [
+   "404",
+   "Z8pYeboR",
+   2,
+   8.89
+  ],
+  [
+   "PQC",
+   "6qUUCwD9",
+   2,
+   -28.85
+  ],
+  [
+   "GRAVY",
+   "EHoijSHM",
+   2,
+   9.77
+  ],
+  [
+   "FRENS",
+   "Z4zm8YZo",
+   1,
+   -4.26
+  ],
+  [
+   "Agency",
+   "CyJwKnLi",
+   1,
+   3.07
+  ],
+  [
+   "Tincan",
+   "4sVitrei",
+   1,
+   -19.73
+  ],
+  [
+   "MOGCAT",
+   "2WFm4D9u",
+   1,
+   -31.82
+  ]
+ ],
+ "rug_removed_why": {
+  "CLAUDIA:Fe7bpDYC": [
+   "ticker_reuse=3",
+   "age_d=0.9"
+  ],
+  "ECSTASY:UCWmMumV": [
+   "ticker_reuse=1",
+   "age_d=0.4"
+  ],
+  "FRENS:Z4zm8YZo": [
+   "ticker_reuse=2",
+   "age_d=0.0"
+  ],
+  "404:Z8pYeboR": [
+   "ticker_reuse=5",
+   "age_d=0.1"
+  ],
+  "SharkTank:65GHmCby": [
+   "ticker_reuse=10",
+   "age_d=0.0"
+  ],
+  "Agency:CyJwKnLi": [
+   "ticker_reuse=1",
+   "age_d=6.2"
+  ],
+  "PQC:6qUUCwD9": [
+   "ticker_reuse=2",
+   "age_d=0.0"
+  ],
+  "Tincan:4sVitrei": [
+   "ticker_reuse=7",
+   "age_d=0.0"
+  ],
+  "GRAVY:EHoijSHM": [
+   "ticker_reuse=2",
+   "age_d=0.0"
+  ],
+  "MOGCAT:2WFm4D9u": [
+   "ticker_reuse=5",
+   "age_d=0.0"
+  ]
+ },
+ "lag0_vs_lag5_holdout": {
+  "common": 18,
+  "only_lag0": [
+   [
+    "LOADED",
+    "2XjwJiED",
+    1791419056364,
+    34.51,
+    17.12
+   ],
+   [
+    "CRAWL",
+    "2B8tftZ5",
+    1791420866568,
+    8.74,
+    17.48
+   ],
+   [
+    "CRAWL",
+    "2B8tftZ5",
+    1791425025415,
+    12.84,
+    25.69
+   ],
+   [
+    "swordcat",
+    "8ewuF2o8",
+    1791434753744,
+    -8.1,
+    -16.21
+   ]
+  ],
+  "only_lag5": [
+   [
+    "LOADED",
+    "2XjwJiED",
+    1791419183037,
+    8.76,
+    4.99
+   ],
+   [
+    "CRAWL",
+    "2B8tftZ5",
+    1791420848119,
+    8.84,
+    17.67
+   ],
+   [
+    "CRAWL",
+    "2B8tftZ5",
+    1791424970188,
+    6.23,
+    12.46
+   ],
+   [
+    "swordcat",
+    "8ewuF2o8",
+    1791434759862,
+    -10.63,
+    -21.26
+   ]
+  ]
+ }
+}

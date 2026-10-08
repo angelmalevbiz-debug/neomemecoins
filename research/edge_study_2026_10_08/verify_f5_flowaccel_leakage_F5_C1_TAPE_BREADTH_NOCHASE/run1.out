@@ -1,0 +1,14 @@
+loaded 0.4 s; cut 1791411625348.0
+tape {'skipped_non_sol': 53, 'pairs': 347} 2.7 s
+orig rerun n 91 3.1 s
+orig identical to leaderboard: True
+{"n": 22, "pairs": 8, "clusters": 16, "win_rate": 59.1, "mean_usd": 0.943, "mean_pct": 1.076, "median_pct": 2.815, "sum_usd": 20.75, "pf": 1.15, "ci95_mean_usd": [-5.328, 7.469], "ci95_mean_usd_pair": [-5.14, 10.066], "top_pair_share": 0.409, "trades_per_hour": 2.42, "exits": {"TP": 13, "HOLD": 4, "STOP": 4, "OPEN_AT_END/VANISHED": 1}}
+indep event n 91 3.2 s {"orig_n": 91, "indep_n": 91, "common": 91, "only_orig": 0, "only_indep": 0}
+   train {"n": 69, "pairs": 14, "clusters": 38, "win_rate": 46.4, "mean_usd": -7.308, "mean_pct": -4.783, "median_pct": -2.237, "sum_usd": -504.24, "pf": 0.386, "ci95_mean_usd": [-12.258, -2.589], "ci95_mean_usd_pair": [-12.282, -2.652], "top_pair_share": 0.319, "trades_per_hour": 5.05, "exits": {"TP": 33, "STOP": 26, "FEED_GAP/GAP": 5, "HOLD": 5}}
+   holdout {"n": 22, "pairs": 8, "clusters": 16, "win_rate": 59.1, "mean_usd": 0.943, "mean_pct": 1.076, "median_pct": 2.815, "sum_usd": 20.75, "pf": 1.15, "ci95_mean_usd": [-5.328, 7.469], "ci95_mean_usd_pair": [-5.14, 10.066], "top_pair_share": 0.409, "trades_per_hour": 2.42, "exits": {"TP": 13, "HOLD": 4, "STOP": 4, "OPEN_AT_END/VANISHED": 1}}
+   holdout_model {'n': 22, 'mean_usd': 3.616, 'mean_pct': 2.848, 'median_pct': 4.588} portfolio {'taken': 22, 'final_balance': 1020.75, 'max_drawdown_pct': 5.44, 'skipped_no_cash': 0}
+indep wallet n 91 3.0 s {"orig_n": 91, "indep_n": 91, "common": 89, "only_orig": 2, "only_indep": 2}
+   train {"n": 69, "pairs": 14, "clusters": 38, "win_rate": 46.4, "mean_usd": -7.336, "mean_pct": -4.815, "median_pct": -2.237, "sum_usd": -506.2, "pf": 0.385, "ci95_mean_usd": [-12.285, -2.608], "ci95_mean_usd_pair": [-12.313, -2.693], "top_pair_share": 0.319, "trades_per_hour": 5.05, "exits": {"TP": 33, "STOP": 26, "FEED_GAP/GAP": 5, "HOLD": 5}}
+   holdout {"n": 22, "pairs": 8, "clusters": 16, "win_rate": 59.1, "mean_usd": 0.943, "mean_pct": 1.076, "median_pct": 2.815, "sum_usd": 20.75, "pf": 1.15, "ci95_mean_usd": [-5.328, 7.469], "ci95_mean_usd_pair": [-5.14, 10.066], "top_pair_share": 0.409, "trades_per_hour": 2.42, "exits": {"TP": 13, "HOLD": 4, "STOP": 4, "OPEN_AT_END/VANISHED": 1}}
+   holdout_model {'n': 22, 'mean_usd': 3.616, 'mean_pct': 2.848, 'median_pct': 4.588} portfolio {'taken': 22, 'final_balance': 1020.75, 'max_drawdown_pct': 5.44, 'skipped_no_cash': 0}
+done 12.1 s

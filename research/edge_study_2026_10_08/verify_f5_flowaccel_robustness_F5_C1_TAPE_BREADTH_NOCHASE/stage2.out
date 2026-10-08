@@ -1,0 +1,60 @@
+== split shifts (net50 calibrated stress; usd/trade)
+  frac 0.5  train {"n": 69, "pairs": 14, "mean_usd": -7.308, "mean_pct": -4.783, "sum_usd": -504.24, "win": 46.4, "top_pair_share": 0.319, "ci_pair": [-12.282, -2.652]}
+            holdout {"n": 22, "pairs": 8, "mean_usd": 0.943, "mean_pct": 1.076, "sum_usd": 20.75, "win": 59.1, "top_pair_share": 0.409, "ci_pair": [-5.14, 10.066]}
+            holdout model(net0) 3.616 | train model -4.281
+  frac 0.6  train {"n": 69, "pairs": 14, "mean_usd": -7.308, "mean_pct": -4.783, "sum_usd": -504.24, "win": 46.4, "top_pair_share": 0.319, "ci_pair": [-12.282, -2.652]}
+            holdout {"n": 22, "pairs": 8, "mean_usd": 0.943, "mean_pct": 1.076, "sum_usd": 20.75, "win": 59.1, "top_pair_share": 0.409, "ci_pair": [-5.14, 10.066]}
+            holdout model(net0) 3.616 | train model -4.281
+  frac 0.7  train {"n": 71, "pairs": 16, "mean_usd": -6.847, "mean_pct": -4.137, "sum_usd": -486.16, "win": 47.9, "top_pair_share": 0.31, "ci_pair": [-10.784, -1.619]}
+            holdout {"n": 20, "pairs": 6, "mean_usd": 0.133, "mean_pct": -0.629, "sum_usd": 2.67, "win": 55.0, "top_pair_share": 0.45, "ci_pair": [-5.888, 9.923]}
+            holdout model(net0) 2.942 | train model -3.868
+  full sample {"n": 91, "pairs": 22, "mean_usd": -5.313, "mean_pct": -3.366, "sum_usd": -483.5, "win": 49.5, "top_pair_share": 0.242, "ci_pair": [-8.709, -0.33]} | model -2.372 | v2 stress (no calib) -3.842 | calib only -3.853
+== rolling 3-hour blocks (by entry time)
+   {"block": 0, "hours": "0-3.0", "n": 10, "pairs": 4, "mean_usd": -9.251, "sum_usd": -92.51, "mean_usd_model": -5.764}
+   {"block": 1, "hours": "3-6.0", "n": 26, "pairs": 9, "mean_usd": -10.565, "sum_usd": -274.7, "mean_usd_model": -7.408}
+   {"block": 2, "hours": "6-9.0", "n": 22, "pairs": 7, "mean_usd": -4.75, "sum_usd": -104.5, "mean_usd_model": -2.166}
+   {"block": 3, "hours": "9-12.0", "n": 11, "pairs": 4, "mean_usd": -2.958, "sum_usd": -32.53, "mean_usd_model": 0.23}
+   {"block": 4, "hours": "12-15.0", "n": 0, "pairs": 0, "mean_usd": null, "sum_usd": 0, "mean_usd_model": null}
+   {"block": 5, "hours": "15-18.0", "n": 10, "pairs": 6, "mean_usd": 4.232, "sum_usd": 42.32, "mean_usd_model": 6.638}
+   {"block": 6, "hours": "18-21.0", "n": 9, "pairs": 5, "mean_usd": 3.512, "sum_usd": 31.6, "mean_usd_model": 6.291}
+   {"block": 7, "hours": "21-22.8", "n": 3, "pairs": 2, "mean_usd": -17.728, "sum_usd": -53.18, "mean_usd_model": -14.48}
+  blocks with trades: 7 positive (net50): 2 positive (model): 3
+  sliding 3h windows (start_h, n, sum$): [(0, 10, -92.51), (1, 20, -155.3), (2, 27, -224.24), (3, 26, -274.7), (4, 22, -178.76), (5, 21, -162.06), (6, 22, -104.5), (7, 21, -69.51), (8, 18, -77.35), (9, 11, -32.53), (10, 3, -60.09), (13, 2, 18.08), (14, 6, 17.99), (15, 10, 42.32), (16, 12, 24.23), (17, 10, 54.96), (18, 9, 31.6), (19, 7, -16.09), (20, 6, -52.2)]
+  sliding windows positive: 6 / 19
+== doubled stress: STRESS_BPS 50 -> 100 per leg (plus calibration, as in the acceptance path)
+  same trade list as base: True
+  train {"n": 69, "pairs": 14, "mean_usd": -8.694, "mean_pct": -5.732, "sum_usd": -599.9, "win": 39.1, "top_pair_share": 0.319, "ci_pair": [-13.65, -3.767]}
+  holdout {"n": 22, "pairs": 8, "mean_usd": -0.689, "mean_pct": 0.069, "sum_usd": -15.16, "win": 59.1, "top_pair_share": 0.409, "ci_pair": [-6.58, 8.243]}
+  full {"n": 91, "pairs": 22, "mean_usd": -6.759, "mean_pct": -4.329, "sum_usd": -615.06, "win": 44.0, "top_pair_share": 0.242, "ci_pair": [-10.162, -1.733]}
+== leave-best-out / concentration
+   holdout {"mean": 0.943, "n": 22, "wo_best_pair": {"pair": "2B8tftZ5", "sym": "CRAWL", "pair_sum_usd": 53.24, "n": 18, "mean_usd": -1.805, "sum_usd": -32.49}, "wo_best_hour": {"hour": 19, "n": 20, "mean_usd": -0.494, "sum_usd": -9.89}, "wo_busiest_pair": {"pair": "CR5dTgvT", "n_removed": 9, "mean_usd": 6.558}, "wo_best_pair_and_hour": {"n": 16, "mean_usd": -3.945}, "top5_trades_sum_usd": 94.08, "total_sum_usd": 20.75, "gross_positive_usd": 159.1, "top5_share_of_gross_positive": 0.591, "mean_wo_top5_trades": -4.314, "top_pair_share": 0.409}
+   train {"mean": -7.308, "n": 69, "wo_best_pair": {"pair": "34w9ReB7", "sym": "TON618", "pair_sum_usd": 19.83, "n": 67, "mean_usd": -7.822, "sum_usd": -524.07}, "wo_best_hour": {"hour": 9, "n": 61, "mean_usd": -8.718, "sum_usd": -531.79}, "wo_busiest_pair": {"pair": "HU22UBaT", "n_removed": 22, "mean_usd": -7.714}, "wo_best_pair_and_hour": {"n": 59, "mean_usd": -9.35}, "top5_trades_sum_usd": 155.21, "total_sum_usd": -504.24, "gross_positive_usd": 317.62, "top5_share_of_gross_positive": 0.489, "mean_wo_top5_trades": -10.304, "top_pair_share": 0.319}
+   full {"mean": -5.313, "n": 91, "wo_best_pair": {"pair": "2B8tftZ5", "sym": "CRAWL", "pair_sum_usd": 53.24, "n": 87, "mean_usd": -6.169, "sum_usd": -536.73}, "wo_best_hour": {"hour": 19, "n": 89, "mean_usd": -5.777, "sum_usd": -514.13}, "wo_busiest_pair": {"pair": "HU22UBaT", "n_removed": 22, "mean_usd": -4.954}, "wo_best_pair_and_hour": {"n": 85, "mean_usd": -6.675}, "top5_trades_sum_usd": 165.88, "total_sum_usd": -483.5, "gross_positive_usd": 476.72, "top5_share_of_gross_positive": 0.348, "mean_wo_top5_trades": -7.551, "top_pair_share": 0.242}
+  holdout per pair (sym, pair8, n, sum$, mean$): [('ZKDARK', 'CR5dTgvT', 9, -64.5, -7.17), ('CRAWL', '2B8tftZ5', 4, 53.24, 13.31), ('swordcat', '8ewuF2o8', 3, 10.49, 3.5), ('MISTAKE', '867dKvaC', 2, 8.84, 4.42), ('B22', 'AVCKHsDf', 1, 0.96, 0.96), ('LOADED', '2XjwJiED', 1, 17.12, 17.12), ('JEANPHIL', '4R8CiMnJ', 1, 7.84, 7.84), ('LMAO!', 'AFaYrFH7', 1, -13.24, -13.24)]
+  holdout trades: [('B22', 15.27, 'TP', 1.74), ('LOADED', 15.72, 'TP', 34.51), ('CRAWL', 16.23, 'TP', 8.74), ('JEANPHIL', 16.33, 'TP', 3.92), ('MISTAKE', 16.8, 'HOLD', -4.7), ('ZKDARK', 16.98, 'STOP', -14.07), ('ZKDARK', 17.25, 'TP', 1.42), ('CRAWL', 17.39, 'TP', 12.84), ('ZKDARK', 17.46, 'STOP', -12.18), ('ZKDARK', 17.74, 'TP', 8.58), ('ZKDARK', 18.04, 'STOP', -12.57), ('CRAWL', 18.06, 'TP', 7.78), ('LMAO!', 18.54, 'HOLD', -6.62), ('swordcat', 18.87, 'TP', 7.15), ('swordcat', 19.23, 'TP', 6.19), ('MISTAKE', 19.29, 'TP', 9.12), ('swordcat', 20.08, 'HOLD', -8.1), ('ZKDARK', 20.29, 'TP', 3.89), ('ZKDARK', 20.65, 'TP', 6.18), ('ZKDARK', 21.05, 'STOP', -13.55), ('ZKDARK', 21.35, 'OPEN_AT_END', -13.86), ('CRAWL', 22.05, 'HOLD', -2.74)]
+== random baselines (same universe + no-chase, same exits/sizing), 5 seeds x 2 probabilities
+  p=0.007 vf5rob1 n=137 train -10.032 (n 77) holdout -10.878 (n 60, pairs 19, win 20.0) full -10.403
+  p=0.007 vf5rob2 n=130 train  -9.721 (n 68) holdout  -6.007 (n 62, pairs 14, win 24.2) full  -7.949
+  p=0.007 vf5rob3 n=143 train  -5.283 (n 84) holdout -10.087 (n 59, pairs 18, win 20.3) full  -7.265
+  p=0.007 vf5rob4 n=139 train  -8.245 (n 87) holdout -10.341 (n 52, pairs 14, win 15.4) full  -9.029
+  p=0.007 vf5rob5 n=140 train  -6.274 (n 81) holdout  -6.332 (n 59, pairs 13, win 22.0) full  -6.298
+  p=0.004 vf5rob1 n= 91 train  -7.584 (n 47) holdout -10.747 (n 44, pairs 15, win 25.0) full  -9.113
+  p=0.004 vf5rob2 n= 83 train  -9.938 (n 41) holdout  -8.747 (n 42, pairs 14, win 26.2) full  -9.335
+  p=0.004 vf5rob3 n=104 train  -5.659 (n 57) holdout -10.954 (n 47, pairs 18, win 21.3) full  -8.052
+  p=0.004 vf5rob4 n= 97 train  -7.823 (n 62) holdout -12.985 (n 35, pairs 11, win 20.0) full  -9.685
+  p=0.004 vf5rob5 n= 98 train  -6.278 (n 52) holdout  -5.964 (n 46, pairs 12, win 23.9) full  -6.130
+== random entries restricted to the pairs C1 traded (diagnostic: is it timing or which pairs happened to rise?)
+  vf5sp1 train  -8.128 (n 74) holdout  -6.092 (n 39) | holdout on C1-holdout pairs only  -5.988 (n 38)
+  vf5sp2 train  -5.231 (n 73) holdout  -4.326 (n 33) | holdout on C1-holdout pairs only  -4.092 (n 32)
+  vf5sp3 train  -3.736 (n 77) holdout  -3.385 (n 39) | holdout on C1-holdout pairs only  -3.385 (n 39)
+  vf5sp4 train  -7.479 (n 83) holdout  -7.444 (n 34) | holdout on C1-holdout pairs only  -7.374 (n 33)
+  vf5sp5 train  -7.461 (n 76) holdout  -5.139 (n 36) | holdout on C1-holdout pairs only  -5.007 (n 35)
+== rug-screen variants
+  train_only     train {"n": 69, "pairs": 14, "mean_usd": -7.308, "mean_pct": -4.783, "sum_usd": -504.24, "win": 46.4, "top_pair_share": 0.319, "ci_pair": [-12.282, -2.652]}
+                 holdout {"n": 22, "pairs": 8, "mean_usd": 0.943, "mean_pct": 1.076, "sum_usd": 20.75, "win": 59.1, "top_pair_share": 0.409, "ci_pair": [-5.14, 10.066]}
+  interim+guard  train {"n": 55, "pairs": 9, "mean_usd": -6.454, "mean_pct": -3.702, "sum_usd": -354.96, "win": 47.3, "top_pair_share": 0.4, "ci_pair": [-8.764, -1.457]}
+                 holdout {"n": 11, "pairs": 5, "mean_usd": 6.106, "mean_pct": 3.053, "sum_usd": 67.17, "win": 63.6, "top_pair_share": 0.364, "ci_pair": [-0.591, 11.128]}
+== perturbation summary (stage 1)
+   one_at_a_time {"variants": 53, "holdout_pos": 48, "train_pos": 0, "full_pos": 0, "holdout_median": 0.893, "holdout_mean": 0.756, "holdout_min": -1.931, "holdout_max": 2.89, "train_max": -4.694, "full_max": -3.297, "pass_gate_wo_baseline": 0}
+   joint {"variants": 30, "holdout_pos": 8, "train_pos": 0, "full_pos": 0, "holdout_median": -0.826, "holdout_mean": -1.025, "holdout_min": -5.457, "holdout_max": 2.804, "train_max": -4.299, "full_max": -3.183, "pass_gate_wo_baseline": 0}
+done 48.9s

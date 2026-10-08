@@ -1,0 +1,27 @@
+== F1_TREND_PULLBACK_HI30_PC1H35_R5M-4_S8_TP15_H60 0.2 s
+  train {'n': 66, 'pairs': 22, 'win_rate': 27.3, 'mean_pct': 0.989, 'median_pct': -10.794, 'pf': 1.093, 'ci95_mean_usd': [-16.392, 29.479], 'top_pair_share': 0.076, 'exits': {'TP': 18, 'STOP': 47, 'OPEN_AT_END/VANISHED': 1}}
+  train model mean 2.0
+  train 1st half {'n': 19, 'pairs': 9, 'win_rate': 31.6, 'mean_pct': -2.723, 'median_pct': -10.935, 'pf': 0.707, 'ci95_mean_usd': [-20.354, 15.458], 'top_pair_share': 0.263, 'exits': {'TP': 6, 'STOP': 13}}
+  train 2nd half {'n': 47, 'pairs': 15, 'win_rate': 25.5, 'mean_pct': 2.49, 'median_pct': -10.794, 'pf': 1.222, 'ci95_mean_usd': [-19.124, 40.665], 'top_pair_share': 0.106, 'exits': {'STOP': 34, 'TP': 12, 'OPEN_AT_END/VANISHED': 1}}
+  top pairs by $ [('FkfDrvbz', 744.0), ('AFsEwPX1', 122.9), ('njgy96vd', 66.4), ('HU22UBaT', 31.6), ('FsojuJgS', 11.0)] worst [('XDTrVqPD', -83.9), ('FUt6Bkuu', -111.9), ('9rSmRH9w', -142.8)]
+  drop top-1 pairs: n 62 mean50 -4.947
+  drop top-3 pairs: n 57 mean50 -7.042
+  baseline RANDOM_HI30_S8_TP15_H60 train {'n': 68, 'pairs': 18, 'win_rate': 23.5, 'mean_pct': -3.788, 'median_pct': -9.388, 'pf': 0.538, 'ci95_mean_usd': [-13.751, -1.449], 'top_pair_share': 0.147, 'exits': {'STOP': 44, 'HOLD': 10, 'OPEN_AT_END/VANISHED': 2, 'TP': 12}}
+== F1_TREND_PULLBACK_HI30_PC1H20_R5M-4_S8_TP40_TRAIL15/8_H120 0.2 s
+  train {'n': 85, 'pairs': 23, 'win_rate': 25.9, 'mean_pct': 0.004, 'median_pct': -9.729, 'pf': 1.0, 'ci95_mean_usd': [-14.299, 22.011], 'top_pair_share': 0.106, 'exits': {'TP': 7, 'STOP': 61, 'TRAIL': 15, 'HOLD': 1, 'OPEN_AT_END/VANISHED': 1}}
+  train model mean 1.005
+  train 1st half {'n': 24, 'pairs': 10, 'win_rate': 25.0, 'mean_pct': -3.665, 'median_pct': -9.752, 'pf': 0.628, 'ci95_mean_usd': [-20.433, 11.142], 'top_pair_share': 0.208, 'exits': {'TP': 2, 'STOP': 18, 'TRAIL': 4}}
+  train 2nd half {'n': 61, 'pairs': 16, 'win_rate': 26.2, 'mean_pct': 1.448, 'median_pct': -9.504, 'pf': 1.144, 'ci95_mean_usd': [-16.206, 30.887], 'top_pair_share': 0.115, 'exits': {'STOP': 43, 'TP': 5, 'TRAIL': 11, 'HOLD': 1, 'OPEN_AT_END/VANISHED': 1}}
+  top pairs by $ [('FkfDrvbz', 744.0), ('AFsEwPX1', 122.9), ('HU22UBaT', 52.8), ('njgy96vd', 29.6), ('12jc1DzJ', 28.4)] worst [('7BzskuDb', -108.8), ('FUt6Bkuu', -111.9), ('9rSmRH9w', -142.8)]
+  drop top-1 pairs: n 81 mean50 -4.588
+  drop top-3 pairs: n 73 mean50 -6.295
+  baseline RANDOM_HI30_S8_TP40_TRAIL15/8_H120 train {'n': 60, 'pairs': 23, 'win_rate': 16.7, 'mean_pct': -7.72, 'median_pct': -9.561, 'pf': 0.29, 'ci95_mean_usd': [-25.128, -6.495], 'top_pair_share': 0.117, 'exits': {'STOP': 43, 'HOLD': 9, 'OPEN_AT_END/VANISHED': 2, 'TRAIL': 4, 'TP': 2}}
+== F1_SPIKE_HI50_R5M+8_BUY55_VACC1_S5_TP20_H15 0.4 s
+  train {'n': 54, 'pairs': 13, 'win_rate': 22.2, 'mean_pct': -3.044, 'median_pct': -6.508, 'pf': 0.588, 'ci95_mean_usd': [-13.054, 1.748], 'top_pair_share': 0.241, 'exits': {'STOP': 40, 'TP': 9, 'HOLD': 5}}
+  train model mean -2.073
+  train 1st half {'n': 18, 'pairs': 5, 'win_rate': 16.7, 'mean_pct': -4.883, 'median_pct': -6.788, 'pf': 0.432, 'ci95_mean_usd': [-23.282, 3.82], 'top_pair_share': 0.444, 'exits': {'STOP': 14, 'TP': 3, 'HOLD': 1}}
+  train 2nd half {'n': 36, 'pairs': 11, 'win_rate': 25.0, 'mean_pct': -2.125, 'median_pct': -6.39, 'pf': 0.686, 'ci95_mean_usd': [-12.273, 4.933], 'top_pair_share': 0.194, 'exits': {'STOP': 26, 'TP': 6, 'HOLD': 4}}
+  top pairs by $ [('XDTrVqPD', 82.6), ('BaiHzFqn', 40.1), ('HU22UBaT', 5.7), ('6kSizKgA', 4.3), ('745ATaSS', 0.4)] worst [('9rSmRH9w', -74.4), ('12jc1DzJ', -112.0), ('34w9ReB7', -126.6)]
+  drop top-1 pairs: n 52 mean50 -3.956
+  drop top-3 pairs: n 35 mean50 -6.533
+  baseline RANDOM_HI50_S5_TP20_H15 train {'n': 41, 'pairs': 11, 'win_rate': 9.8, 'mean_pct': -6.491, 'median_pct': -6.307, 'pf': 0.053, 'ci95_mean_usd': [-18.402, -8.905], 'top_pair_share': 0.22, 'exits': {'OPEN_AT_END/VANISHED': 1, 'STOP': 25, 'HOLD': 15}}

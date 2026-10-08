@@ -1,0 +1,4 @@
+under harness_final: rug_guard is harness rug_guard_v1: True
+local copy vs harness_final.rug_guard_v1: points 60000 mismatches 0 blocked share 0.949
+plain harness module file: harness.py has rug_guard_v1: False
+under v1: rug_guard is local copy: True | CONFIGS ['LAB_A_SURGE_EST_GUARD', 'LAB_B_DIP_MKTDIP_GUARD', 'LAB_C_TAPE_BREADTH_EST'] | BASELINES ['RND_LAB_A', 'RND_LAB_B', 'RND_LAB_C']

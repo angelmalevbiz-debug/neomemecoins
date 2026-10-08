@@ -1,0 +1,32 @@
+== random_all_ps trades 1057 secs 2.0
+  exits {'TP': 50, 'STOP': 734, 'HOLD': 216, 'OPEN_AT_END/VANISHED': 25, 'STOP/VANISHED': 4, 'OPEN_AT_END/END': 28}
+  trigger->fill gap s: p50 5.0 p90 6.6 p99 11.0 max 19.3 ; >60s 0 ; >600s 0
+  exit fill at the SAME DexScreener price as the trigger point: 939 of 1000 (93.9%)
+  triggers at a point with missing liquidity (20% modeled impact): 3
+  HOLD overshoot min: p50 0.13 p90 18.93 max 87.5
+  STOP net0: n 734 median -7.23 p10 -26.59 min -100.01 (stop=-5)
+  TP net0: n 50 median 11.59 p90 22.43 max 432.34 (tp=+10)
+  END/OPEN_AT_END trades 53 mean net50 -8.63 ; their entries within 60 min of dataset end: 28
+  VANISHED trades 29 mean net50 -17.10 (haircut 10% applied)
+  holdout mean net50 all -7.683 (n 468) vs excluding entries in last 65 min -7.772 (n 405)
+== random_cf_guard trades 70 secs 1.8
+  exits {'HOLD': 45, 'STOP': 15, 'TP': 6, 'OPEN_AT_END/END': 4}
+  trigger->fill gap s: p50 4.9 p90 7.2 p99 17.7 max 17.7 ; >60s 0 ; >600s 0
+  exit fill at the SAME DexScreener price as the trigger point: 63 of 66 (95.5%)
+  triggers at a point with missing liquidity (20% modeled impact): 0
+  HOLD overshoot min: p50 0.14 p90 7.49 max 37.6
+  STOP net0: n 15 median -6.65 p10 -30.92 min -74.94 (stop=-5)
+  TP net0: n 6 median 10.71 p90 43.50 max 43.50 (tp=+10)
+  END/OPEN_AT_END trades 4 mean net50 -0.99 ; their entries within 60 min of dataset end: 4
+  holdout mean net50 all -3.299 (n 43) vs excluding entries in last 65 min -3.536 (n 39)
+== random_mid_fee trades 410 secs 2.3
+  exits {'TP': 46, 'HOLD': 84, 'STOP': 268, 'OPEN_AT_END/VANISHED': 8, 'OPEN_AT_END/END': 4}
+  trigger->fill gap s: p50 5.1 p90 6.9 p99 11.5 max 157.2 ; >60s 1 ; >600s 0
+  exit fill at the SAME DexScreener price as the trigger point: 382 of 398 (96.0%)
+  triggers at a point with missing liquidity (20% modeled impact): 1
+  HOLD overshoot min: p50 0.13 p90 6.68 max 64.1
+  STOP net0: n 268 median -5.70 p10 -9.63 min -96.90 (stop=-5)
+  TP net0: n 46 median 11.59 p90 19.13 max 29.72 (tp=+10)
+  END/OPEN_AT_END trades 12 mean net50 -9.01 ; their entries within 60 min of dataset end: 4
+  VANISHED trades 8 mean net50 -11.92 (haircut 10% applied)
+  holdout mean net50 all -4.316 (n 170) vs excluding entries in last 65 min -4.368 (n 153)

@@ -1,0 +1,155 @@
+(a) first sight, age<5 min                                 n=1273  KM survival% (at-risk): 5m:74.2(84)  15m:51.7(56)  30m:35.3(33)  60m:28.8(19)  120m:22.6(14)  240m:21.0(11)
+                                                                  observed death by: 5m:6%  15m:8%  30m:9%  60m:10%  120m:10%  240m:10% | reached 2x (observed) by: 5m:1%  15m:1%  30m:2%  60m:2%  120m:2%  240m:2% | still visible: 5m:9%  15m:8%  30m:7%  60m:3%  120m:1%  240m:1%
+    liq0 in [0k,15k)                                       n= 158  KM survival% (at-risk): 5m:60.0(9)  15m:45.7(6)  30m:30.5(3)  60m:30.5(0)  120m:30.5(0)  240m:30.5(0)
+                                                                  observed death by: 5m:20%  15m:22%  30m:23%  60m:23%  120m:23%  240m:23% | reached 2x (observed) by: 5m:4%  15m:4%  30m:4%  60m:4%  120m:4%  240m:4% | still visible: 5m:8%  15m:7%  30m:6%  60m:1%  120m:0%  240m:0%
+    liq0 in [15k,25k)                                      n= 631  KM survival% (at-risk): 5m:74.9(61)  15m:47.5(37)  30m:28.6(19)  60m:19.5(9)  120m:15.2(7)  240m:13.0(5)
+                                                                  observed death by: 5m:5%  15m:8%  30m:10%  60m:11%  120m:12%  240m:12% | reached 2x (observed) by: 5m:1%  15m:2%  30m:2%  60m:3%  120m:3%  240m:3% | still visible: 5m:13%  15m:12%  30m:10%  60m:4%  120m:2%  240m:1%
+    liq0 in [25k,60k)                                      n= 372  KM survival% (at-risk): 5m:76.5(6)  15m:76.5(6)  30m:63.8(5)  60m:63.8(4)  120m:47.8(3)  240m:47.8(3)
+                                                                  observed death by: 5m:3%  15m:3%  30m:3%  60m:3%  120m:4%  240m:4% | reached 2x (observed) by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:1% | still visible: 5m:2%  15m:2%  30m:2%  60m:1%  120m:1%  240m:1%
+    liq0 in [60k,250k)                                     n=  94  KM survival% (at-risk): 5m:97.6(7)  15m:83.7(6)  30m:83.7(5)  60m:83.7(5)  120m:66.9(3)  240m:66.9(2)
+                                                                  observed death by: 5m:2%  15m:3%  30m:3%  60m:3%  120m:4%  240m:4% | reached 2x (observed) by: 5m:0%  15m:0%  30m:1%  60m:1%  120m:1%  240m:3% | still visible: 5m:7%  15m:6%  30m:5%  60m:5%  120m:3%  240m:2%
+    liq0 in [250k,1000000000k)                             n=  18  KM survival% (at-risk): 5m:100.0(1)  15m:100.0(1)  30m:100.0(1)  60m:100.0(1)  120m:100.0(1)  240m:100.0(1)
+                                                                  observed death by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:0% | reached 2x (observed) by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:0% | still visible: 5m:6%  15m:6%  30m:6%  60m:6%  120m:6%  240m:6%
+    pump-suffix mint                                       n= 568  KM survival% (at-risk): 5m:77.5(55)  15m:54.9(38)  30m:35.8(22)  60m:27.3(10)  120m:19.1(7)  240m:19.1(7)
+                                                                  observed death by: 5m:7%  15m:10%  30m:12%  60m:13%  120m:14%  240m:14% | reached 2x (observed) by: 5m:2%  15m:3%  30m:3%  60m:3%  120m:4%  240m:4% | still visible: 5m:12%  15m:11%  30m:10%  60m:4%  120m:2%  240m:1%
+    non-pump mint                                          n= 705  KM survival% (at-risk): 5m:67.7(29)  15m:45.9(18)  30m:34.2(11)  60m:30.8(9)  120m:27.4(7)  240m:23.5(4)
+                                                                  observed death by: 5m:5%  15m:6%  30m:7%  60m:7%  120m:7%  240m:7% | reached 2x (observed) by: 5m:0%  15m:0%  30m:1%  60m:1%  120m:1%  240m:1% | still visible: 5m:6%  15m:5%  30m:4%  60m:2%  120m:1%  240m:1%
+(b) in feed >=10 min, age<240                              n= 162  KM survival% (at-risk): 5m:88.0(138)  15m:76.0(104)  30m:58.7(57)  60m:51.1(29)  120m:41.3(20)  240m:25.4(11)
+                                                                  observed death by: 5m:12%  15m:23%  30m:36%  60m:40%  120m:43%  240m:48% | reached 2x (observed) by: 5m:2%  15m:3%  30m:6%  60m:7%  120m:7%  240m:8% | still visible: 5m:96%  15m:84%  30m:61%  60m:28%  120m:15%  240m:10%
+    liq in [0k,15k)                                        n=  81  KM survival% (at-risk): 5m:83.4(65)  15m:74.1(49)  30m:55.0(23)  60m:52.6(6)  120m:42.1(3)  240m:14.0(1)
+                                                                  observed death by: 5m:16%  15m:25%  30m:38%  60m:40%  120m:41%  240m:43% | reached 2x (observed) by: 5m:1%  15m:2%  30m:4%  60m:4%  120m:4%  240m:4% | still visible: 5m:95%  15m:81%  30m:54%  60m:15%  120m:4%  240m:4%
+    liq in [15k,25k)                                       n=  39  KM survival% (at-risk): 5m:89.4(33)  15m:69.2(22)  30m:52.7(10)  60m:46.9(4)  120m:35.1(2)  240m:35.1(2)
+                                                                  observed death by: 5m:10%  15m:28%  30m:41%  60m:44%  120m:46%  240m:46% | reached 2x (observed) by: 5m:3%  15m:5%  30m:15%  60m:15%  120m:15%  240m:15% | still visible: 5m:95%  15m:82%  30m:56%  60m:23%  120m:8%  240m:5%
+    liq in [25k,60k)                                       n=  25  KM survival% (at-risk): 5m:96.0(24)  15m:80.0(20)  30m:60.0(13)  60m:50.8(10)  120m:45.7(9)  240m:40.0(7)
+                                                                  observed death by: 5m:4%  15m:20%  30m:40%  60m:48%  120m:52%  240m:56% | reached 2x (observed) by: 5m:4%  15m:4%  30m:4%  60m:8%  120m:8%  240m:16% | still visible: 5m:100%  15m:100%  30m:88%  60m:64%  120m:48%  240m:44%
+    liq in [60k,250k)                                      n=  14  KM survival% (at-risk): 5m:92.9(13)  15m:92.9(10)  30m:83.6(9)  60m:65.0(7)  120m:43.3(4)  240m:0.0(0)
+                                                                  observed death by: 5m:7%  15m:7%  30m:14%  60m:29%  120m:43%  240m:64% | reached 2x (observed) by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:0% | still visible: 5m:100%  15m:71%  30m:64%  60m:50%  120m:29%  240m:0%
+    liq in [250k,1000000000k)                              n=   3  KM survival% (at-risk): 5m:100.0(3)  15m:100.0(3)  30m:100.0(2)  60m:100.0(2)  120m:100.0(2)  240m:50.0(1)
+                                                                  observed death by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:33% | reached 2x (observed) by: 5m:0%  15m:0%  30m:0%  60m:0%  120m:0%  240m:0% | still visible: 5m:100%  15m:100%  30m:67%  60m:67%  120m:67%  240m:33%
+    interim_rug_risk at reference                          n= 104  KM survival% (at-risk): 5m:86.1(86)  15m:74.8(64)  30m:56.8(33)  60m:46.4(17)  120m:33.2(9)  240m:16.9(4)
+                                                                  observed death by: 5m:13%  15m:24%  30m:38%  60m:42%  120m:46%  240m:50% | reached 2x (observed) by: 5m:3%  15m:5%  30m:9%  60m:10%  120m:10%  240m:10% | still visible: 5m:95%  15m:82%  30m:57%  60m:30%  120m:12%  240m:7%
+    passes interim screen                                  n=  58  KM survival% (at-risk): 5m:91.3(52)  15m:78.1(40)  30m:61.9(24)  60m:59.1(12)  120m:54.2(11)  240m:37.9(7)
+                                                                  observed death by: 5m:9%  15m:21%  30m:34%  60m:36%  120m:38%  240m:43% | reached 2x (observed) by: 5m:0%  15m:0%  30m:2%  60m:2%  120m:2%  240m:5% | still visible: 5m:98%  15m:88%  30m:69%  60m:26%  120m:21%  240m:17%
+(c) in feed >=30 min, age<240                              n= 132  KM survival% (at-risk): 5m:95.3(116)  15m:85.8(78)  30m:83.1(44)  60m:73.0(28)  120m:60.8(17)  240m:39.3(11)
+                                                                  observed death by: 5m:5%  15m:12%  30m:14%  60m:17%  120m:20%  240m:25% | reached 2x (observed) by: 5m:0%  15m:0%  30m:4%  60m:5%  120m:5%  240m:6% | still visible: 5m:92%  15m:66%  30m:39%  60m:27%  120m:14%  240m:13%
+(d) first sight age<30 with liq>=100k                      n= 119  KM survival% (at-risk): 5m:92.0(15)  15m:67.5(11)  30m:67.5(10)  60m:60.7(8)  120m:53.1(6)  240m:33.2(3)
+                                                                  observed death by: 5m:3%  15m:6%  30m:6%  60m:7%  120m:8%  240m:9% | reached 2x (observed) by: 5m:0%  15m:0%  30m:1%  60m:1%  120m:1%  240m:3% | still visible: 5m:13%  15m:9%  30m:8%  60m:7%  120m:5%  240m:3%
+      14PrwFtd DANALAB    mint_pump=True liq0=107k lm0=1.33 mcap0=81k dur=1m price_max/0=1.13 price_last/0=1.13 drained=False reuse=0
+      27Q6T8ec Oilcann    mint_pump=False liq0=128k lm0=0.00 mcap0=37822k dur=1m price_max/0=1.08 price_last/0=1.08 drained=False reuse=0
+      282Ka3TZ SpaceXSI   mint_pump=False liq0=223k lm0=1.62 mcap0=137k dur=8m price_max/0=1.22 price_last/0=1.22 drained=True reuse=2
+      2FVsvw8p Mcfist     mint_pump=False liq0=127k lm0=1.85 mcap0=69k dur=1m price_max/0=1.05 price_last/0=1.05 drained=False reuse=0
+      2N4dCRXE Kanec      mint_pump=False liq0=120k lm0=1.91 mcap0=63k dur=2m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      2aVLU5z3 SAUDSIR    mint_pump=False liq0=120k lm0=0.00 mcap0=64539k dur=1m price_max/0=1.02 price_last/0=1.02 drained=False reuse=0
+      2oaDGFyT THCLOCK    mint_pump=True liq0=125k lm0=1.76 mcap0=71k dur=1m price_max/0=1.10 price_last/0=1.10 drained=False reuse=0
+      2vZhCuCR USDP       mint_pump=True liq0=312k lm0=0.03 mcap0=11865k dur=2m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      3EjLjxBv ST O NK    mint_pump=True liq0=364k lm0=0.02 mcap0=16363k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=1
+      3G6pDhYY SHROOM     mint_pump=False liq0=118k lm0=1.73 mcap0=68k dur=1m price_max/0=1.03 price_last/0=1.01 drained=False reuse=2
+      3X2tcPLX BIOCELL    mint_pump=False liq0=131k lm0=1.81 mcap0=72k dur=1m price_max/0=1.05 price_last/0=1.05 drained=False reuse=0
+      3aogJsYU TITS       mint_pump=False liq0=135k lm0=1.83 mcap0=74k dur=275m price_max/0=2.43 price_last/0=2.42 drained=True reuse=8
+      3gpUutPu OILANVL    mint_pump=True liq0=131k lm0=0.00 mcap0=72876k dur=1m price_max/0=1.04 price_last/0=1.04 drained=False reuse=0
+      3h94MKHu IOF        mint_pump=True liq0=707k lm0=0.01 mcap0=61351k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=5
+      499UUZCJ Nstdunk    mint_pump=False liq0=122k lm0=1.07 mcap0=114k dur=1m price_max/0=1.12 price_last/0=1.12 drained=False reuse=0
+      4PGpSNq5 SEOCYBR    mint_pump=False liq0=131k lm0=0.00 mcap0=73988k dur=1m price_max/0=1.07 price_last/0=1.07 drained=False reuse=0
+      4RJjYb7Z IOF        mint_pump=True liq0=154k lm0=0.05 mcap0=2952k dur=2m price_max/0=1.03 price_last/0=1.03 drained=False reuse=6
+      4RaxuEry USDP       mint_pump=True liq0=1164k lm0=0.01 mcap0=166559k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=3
+      4SW6R7Wc KFACAND    mint_pump=False liq0=140k lm0=1.70 mcap0=82k dur=1m price_max/0=1.01 price_last/0=1.01 drained=False reuse=0
+      4b5LcreJ PORGEAR    mint_pump=False liq0=115k lm0=2.08 mcap0=55k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      4fjeL4FP SHITCOIN   mint_pump=False liq0=235k lm0=1.51 mcap0=155k dur=37m price_max/0=1.26 price_last/0=1.21 drained=False reuse=4
+      4jQDG9FY JIRAPIR    mint_pump=True liq0=121k lm0=1.20 mcap0=101k dur=1m price_max/0=1.19 price_last/0=1.19 drained=False reuse=0
+      54TyDv21 TWEETCRAFT mint_pump=False liq0=208k lm0=1.68 mcap0=124k dur=228m price_max/0=1.98 price_last/0=1.90 drained=True reuse=13
+      554iHxzx Fijiboat   mint_pump=False liq0=106k lm0=1.87 mcap0=57k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      5AdTXfAy SURFRTX    mint_pump=False liq0=117k lm0=1.80 mcap0=65k dur=1m price_max/0=1.03 price_last/0=1.03 drained=False reuse=0
+      5W7nDoeT TWEETCRAFT mint_pump=False liq0=146k lm0=1.78 mcap0=82k dur=283m price_max/0=2.29 price_last/0=2.27 drained=True reuse=11
+      5WSZjkud PEPGLP     mint_pump=False liq0=127k lm0=1.77 mcap0=71k dur=2m price_max/0=1.08 price_last/0=1.08 drained=False reuse=0
+      6Hq98WAc FROGMAN    mint_pump=False liq0=126k lm0=1.63 mcap0=77k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=8
+      6P2bLeKU SI276      mint_pump=True liq0=248k lm0=0.03 mcap0=7617k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=1
+      6VBm3h4u CHOP       mint_pump=False liq0=170k lm0=1.96 mcap0=87k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=1
+      6h99DwSY LURNA      mint_pump=False liq0=117k lm0=2.02 mcap0=58k dur=2m price_max/0=1.04 price_last/0=1.04 drained=False reuse=0
+      6hMvyCwP MBRAKE     mint_pump=False liq0=118k lm0=2.00 mcap0=59k dur=2m price_max/0=1.11 price_last/0=1.11 drained=False reuse=0
+      6msBHvSi 分身         mint_pump=False liq0=249k lm0=1.49 mcap0=167k dur=11m price_max/0=1.06 price_last/0=0.29 drained=True reuse=3
+      6zPBL2oc SharkTank  mint_pump=False liq0=214k lm0=1.65 mcap0=130k dur=8m price_max/0=1.20 price_last/0=1.20 drained=True reuse=33
+      72cg2oSw HDRONE     mint_pump=False liq0=122k lm0=1.90 mcap0=64k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      77sohBdM ATFS       mint_pump=True liq0=253k lm0=0.03 mcap0=7962k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=3
+      7BCQSXhz BLOODLINE  mint_pump=False liq0=110k lm0=1.87 mcap0=59k dur=1m price_max/0=1.18 price_last/0=1.18 drained=False reuse=1
+      7DvJmm1m WHUF       mint_pump=False liq0=362k lm0=0.34 mcap0=1079k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      7G8HFQq7 USDF       mint_pump=True liq0=706k lm0=0.01 mcap0=61277k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=3
+      7RF2cUFA KASOM      mint_pump=False liq0=121k lm0=1.90 mcap0=63k dur=1m price_max/0=1.02 price_last/0=1.02 drained=False reuse=0
+      7UQ3NRcf USOF       mint_pump=True liq0=190k lm0=0.04 mcap0=4476k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      7VDog5qa USDP       mint_pump=True liq0=1190k lm0=0.01 mcap0=171205k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=1
+      7We8KQkr Bohunt     mint_pump=False liq0=128k lm0=1.87 mcap0=68k dur=1m price_max/0=1.04 price_last/0=1.04 drained=False reuse=0
+      7b4FGS2X DAWNROV    mint_pump=False liq0=126k lm0=1.45 mcap0=87k dur=2m price_max/0=1.06 price_last/0=1.06 drained=False reuse=0
+      7dWNCEBu Eurodoor   mint_pump=True liq0=123k lm0=1.83 mcap0=67k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      7kw8Wq3j CHOP       mint_pump=False liq0=167k lm0=1.94 mcap0=86k dur=2m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      7rrriLXA XP         mint_pump=False liq0=235k lm0=1.52 mcap0=154k dur=4m price_max/0=1.09 price_last/0=1.09 drained=True reuse=5
+      7v9X57d1 HASHERS    mint_pump=False liq0=106k lm0=1.95 mcap0=54k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=5
+      8F3W7z8c SPX80B     mint_pump=True liq0=152k lm0=0.05 mcap0=2895k dur=1m price_max/0=1.01 price_last/0=1.01 drained=False reuse=0
+      8cyvjFfk Sparkpc    mint_pump=False liq0=118k lm0=1.89 mcap0=62k dur=1m price_max/0=1.12 price_last/0=1.12 drained=False reuse=0
+      8h24S84W 分身         mint_pump=False liq0=178k lm0=1.94 mcap0=92k dur=1m price_max/0=1.04 price_last/0=1.04 drained=True reuse=2
+      8jV6ajgL DJT        mint_pump=True liq0=187k lm0=0.04 mcap0=4296k dur=2m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      8oPrYudk Playjoy    mint_pump=False liq0=129k lm0=1.86 mcap0=69k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      97GJmLk8 TDF        mint_pump=True liq0=1191k lm0=0.01 mcap0=170765k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      9DB8PFAa KFACNDL    mint_pump=False liq0=139k lm0=1.69 mcap0=82k dur=1m price_max/0=1.00 price_last/0=0.99 drained=False reuse=0
+      9WC8faVn WOSE       mint_pump=True liq0=227k lm0=0.04 mcap0=6390k dur=1m price_max/0=1.01 price_last/0=1.01 drained=False reuse=1
+      9XhaaoSr CAPYBARA   mint_pump=False liq0=116k lm0=1.75 mcap0=67k dur=2m price_max/0=1.04 price_last/0=1.03 drained=False reuse=0
+      9zHHccMq UU         mint_pump=False liq0=116k lm0=1.75 mcap0=66k dur=1m price_max/0=1.11 price_last/0=1.11 drained=False reuse=0
+      A2DzAZZz Poellm     mint_pump=False liq0=116k lm0=0.00 mcap0=29668k dur=1m price_max/0=1.17 price_last/0=1.17 drained=False reuse=1
+      A6ZMZFQ1 HERUC      mint_pump=False liq0=124k lm0=1.73 mcap0=71k dur=2m price_max/0=1.09 price_last/0=1.09 drained=False reuse=0
+      A6gqKgHr IOF        mint_pump=True liq0=475k lm0=0.02 mcap0=27776k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      AFRqyXJG Umi        mint_pump=False liq0=103k lm0=1.95 mcap0=53k dur=1m price_max/0=1.21 price_last/0=1.21 drained=False reuse=1
+      AU6PVpvD Phoegg     mint_pump=True liq0=113k lm0=1.82 mcap0=62k dur=1m price_max/0=1.04 price_last/0=1.04 drained=False reuse=0
+      AXEMvq7N Surfbot    mint_pump=True liq0=114k lm0=1.87 mcap0=61k dur=1m price_max/0=1.16 price_last/0=1.16 drained=False reuse=0
+      AiA3c3s1 ATFS       mint_pump=True liq0=273k lm0=0.03 mcap0=9291k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=1
+      B818BDSt FRENS      mint_pump=False liq0=115k lm0=1.77 mcap0=65k dur=1m price_max/0=1.04 price_last/0=1.04 drained=False reuse=2
+      BEwnnCUY Discto     mint_pump=False liq0=121k lm0=0.91 mcap0=133k dur=1m price_max/0=1.18 price_last/0=1.18 drained=False reuse=0
+      BJhYp7Ly APLBELL    mint_pump=False liq0=135k lm0=1.71 mcap0=79k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      BLrRWwzY ESWIN      mint_pump=True liq0=137k lm0=0.06 mcap0=2363k dur=1m price_max/0=1.02 price_last/0=1.02 drained=False reuse=0
+      BUgWj5TL Icebear    mint_pump=False liq0=120k lm0=0.00 mcap0=64755k dur=1m price_max/0=1.18 price_last/0=1.18 drained=False reuse=0
+      Bd7EXsmF Sunovin    mint_pump=False liq0=116k lm0=1.99 mcap0=58k dur=1m price_max/0=1.14 price_last/0=1.14 drained=False reuse=0
+      BhGDfqqK CAPYBARA   mint_pump=False liq0=143k lm0=1.73 mcap0=82k dur=92m price_max/0=1.60 price_last/0=1.59 drained=False reuse=28
+      BrwKX5aS IBVM       mint_pump=True liq0=149k lm0=0.05 mcap0=2838k dur=1m price_max/0=1.02 price_last/0=1.02 drained=False reuse=1
+      BxEmiB2x Holdoween  mint_pump=True liq0=121k lm0=0.07 mcap0=1860k dur=1m price_max/0=1.02 price_last/0=1.02 drained=False reuse=0
+      C6QStSdj BORDR      mint_pump=False liq0=121k lm0=1.69 mcap0=72k dur=1m price_max/0=1.00 price_last/0=0.98 drained=False reuse=8
+      CNVmpS1z CAPYBARA   mint_pump=False liq0=175k lm0=1.97 mcap0=89k dur=1m price_max/0=1.06 price_last/0=1.06 drained=False reuse=17
+      CNhwwjWn CREW12     mint_pump=True liq0=119k lm0=0.01 mcap0=16091k dur=1m price_max/0=1.05 price_last/0=1.05 drained=False reuse=0
+      CRGN2uGj SharkTank  mint_pump=False liq0=210k lm0=1.69 mcap0=124k dur=31m price_max/0=1.41 price_last/0=1.36 drained=True reuse=34
+      CZ67xbpv DOTF       mint_pump=True liq0=281k lm0=0.03 mcap0=9821k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      ChkXrtoK Messfb     mint_pump=True liq0=113k lm0=1.92 mcap0=59k dur=1m price_max/0=1.13 price_last/0=1.13 drained=False reuse=0
+      Ci6ME4Jh Synthid    mint_pump=True liq0=124k lm0=0.00 mcap0=69874k dur=1m price_max/0=1.07 price_last/0=1.07 drained=False reuse=0
+      Cu1k3vfU BORDR      mint_pump=False liq0=209k lm0=1.75 mcap0=119k dur=67m price_max/0=1.68 price_last/0=1.68 drained=True reuse=15
+      Cx1kJANv Sparkpc    mint_pump=False liq0=112k lm0=2.02 mcap0=55k dur=2m price_max/0=1.08 price_last/0=1.08 drained=False reuse=1
+      CzCT33yF SPARK      mint_pump=False liq0=124k lm0=0.00 mcap0=67412k dur=1m price_max/0=1.03 price_last/0=1.03 drained=False reuse=0
+      D2pVedgH GOIF       mint_pump=True liq0=1172k lm0=0.01 mcap0=168074k dur=386m price_max/0=1.16 price_last/0=1.16 drained=False reuse=2
+      DGXeXji6 HAIKU55    mint_pump=False liq0=127k lm0=0.00 mcap0=70269k dur=1m price_max/0=1.10 price_last/0=1.10 drained=False reuse=0
+      DKufAd78 TWEETCRAFT mint_pump=False liq0=178k lm0=1.94 mcap0=92k dur=8m price_max/0=1.37 price_last/0=1.36 drained=True reuse=12
+      DNGD1SwQ WOSE       mint_pump=True liq0=140k lm0=0.06 mcap0=2459k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      DaQs1pBC Anthropic  mint_pump=False liq0=252k lm0=1.50 mcap0=168k dur=132m price_max/0=1.50 price_last/0=1.40 drained=True reuse=5
+      DyFtBBjS XRPN       mint_pump=True liq0=2325k lm0=0.00 mcap0=660821k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      E1BJHDQh CATMAN     mint_pump=False liq0=105k lm0=1.95 mcap0=54k dur=1m price_max/0=1.28 price_last/0=1.28 drained=False reuse=1
+      ELn16EP1 CHOP       mint_pump=False liq0=171k lm0=1.95 mcap0=87k dur=1m price_max/0=1.19 price_last/0=1.19 drained=False reuse=5
+      EVGgrZSQ BRENT      mint_pump=False liq0=131k lm0=0.00 mcap0=72568k dur=1m price_max/0=1.03 price_last/0=1.03 drained=False reuse=0
+      EWNLzVuz Tsmctig    mint_pump=False liq0=119k lm0=0.99 mcap0=120k dur=1m price_max/0=1.07 price_last/0=1.07 drained=False reuse=0
+      EdNAnj5k TITS       mint_pump=False liq0=125k lm0=1.93 mcap0=65k dur=1m price_max/0=1.26 price_last/0=1.25 drained=False reuse=4
+      EqAAhWGE USDP       mint_pump=True liq0=292k lm0=0.03 mcap0=10617k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=4
+      EsbXiFru Rydsiren   mint_pump=False liq0=111k lm0=1.95 mcap0=57k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      EumDiwwg SARP       mint_pump=True liq0=706k lm0=0.01 mcap0=60730k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      F8zUagqb SharkTank  mint_pump=False liq0=181k lm0=1.79 mcap0=101k dur=2m price_max/0=7.80 price_last/0=7.80 drained=True reuse=31
+      FJDpyaKN BORDR      mint_pump=False liq0=186k lm0=1.87 mcap0=100k dur=20m price_max/0=1.74 price_last/0=1.74 drained=False reuse=7
+      G8hHREGb Exfil      mint_pump=False liq0=142k lm0=0.00 mcap0=43401k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      GGyrbLN8 Saudim     mint_pump=False liq0=116k lm0=1.99 mcap0=58k dur=1m price_max/0=1.20 price_last/0=1.20 drained=False reuse=0
+      GNnVkTDa TWEETCRAFT mint_pump=False liq0=105k lm0=1.88 mcap0=56k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      GaVFbagN WOSE       mint_pump=True liq0=353k lm0=0.02 mcap0=15362k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      GguTnStb IOF        mint_pump=True liq0=259k lm0=0.03 mcap0=8340k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      H66u4gnT CAPYBARA   mint_pump=False liq0=182k lm0=1.92 mcap0=95k dur=136m price_max/0=2.63 price_last/0=2.45 drained=False reuse=21
+      HBrA8hF6 Dsbowl     mint_pump=False liq0=131k lm0=1.77 mcap0=74k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      HFb5tP4E ATFS       mint_pump=True liq0=1173k lm0=0.01 mcap0=168494k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=5
+      HHQ6Lb3T WREEL      mint_pump=False liq0=118k lm0=1.89 mcap0=62k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      HWv6muqL XRPN       mint_pump=True liq0=1624k lm0=0.01 mcap0=323512k dur=1m price_max/0=1.01 price_last/0=1.01 drained=False reuse=0
+      HYvqfq7v Spiko      mint_pump=False liq0=134k lm0=1.56 mcap0=86k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      HZ62TjEM WSOS       mint_pump=True liq0=764k lm0=0.01 mcap0=71399k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=2
+      HdB5c7KY Marsr      mint_pump=False liq0=112k lm0=1.96 mcap0=57k dur=2m price_max/0=1.37 price_last/0=1.37 drained=False reuse=0
+      HtH2Pphj TWEETCRAFT mint_pump=False liq0=167k lm0=1.98 mcap0=84k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=0
+      HzhDkNgY ATFS       mint_pump=False liq0=179k lm0=1.94 mcap0=92k dur=1m price_max/0=1.05 price_last/0=1.05 drained=False reuse=4
+      QfpiorFQ MXVAULT    mint_pump=False liq0=121k lm0=1.68 mcap0=72k dur=1m price_max/0=1.11 price_last/0=1.11 drained=False reuse=0
+      i8DczR3m PARSIREN   mint_pump=False liq0=118k lm0=0.00 mcap0=59422k dur=1m price_max/0=1.06 price_last/0=1.06 drained=False reuse=0
+      nYNQS3NJ SHITCOIN   mint_pump=False liq0=111k lm0=1.83 mcap0=61k dur=1m price_max/0=1.16 price_last/0=1.16 drained=False reuse=9
+      v4BWpcne Playground mint_pump=False liq0=143k lm0=1.82 mcap0=79k dur=1m price_max/0=1.00 price_last/0=1.00 drained=False reuse=4

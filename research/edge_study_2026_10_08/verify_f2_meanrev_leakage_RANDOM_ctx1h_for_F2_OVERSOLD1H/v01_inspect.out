@@ -1,0 +1,120 @@
+F2_OVERSOLD1H_STAB_20_25_90 orig config 46 1.5 None
+F2_OVERSOLD_COMBO_STAB_25_30_120 orig config 55 1.6 None
+F2_OVERSOLD1H_KNIFE_CONTROL orig config 62 1.5 None
+RANDOM_ctx1h_for_F2_OVERSOLD1H_STAB orig baseline 51 1.4 None
+RANDOM_ctxcombo_for_F2_OVERSOLD_COMBO orig baseline 64 1.4 None
+RANDOM_universe_for_F2_KNIFE_CONTROL orig baseline 110 1.4 None
+F2_OVERSOLD1H_STAB_20_25_90 rug_guard_v1 config 46 1.6 None
+F2_OVERSOLD_COMBO_STAB_25_30_120 rug_guard_v1 config 54 1.6 None
+F2_OVERSOLD1H_KNIFE_CONTROL rug_guard_v1 config 60 1.5 None
+RANDOM_ctx1h_for_F2_OVERSOLD1H_STAB rug_guard_v1 baseline 49 1.3 None
+RANDOM_ctxcombo_for_F2_OVERSOLD_COMBO rug_guard_v1 baseline 63 1.4 None
+RANDOM_universe_for_F2_KNIFE_CONTROL rug_guard_v1 baseline 104 1.4 None
+
+== orig kwargs {'tp': 20.0, 'stop': -25.0, 'hold_min': 90.0} n 51 train 30 holdout 21
+  -- TRAIN mean net50 -3.759  mean usd50 -7.518  mean net0 -2.016
+   A2ASUorC RARINU     08:45:45 dec=1791362736267 ent=1791362745662 (+   9s) exit=58.5min STOP                  net0  -23.89 net50  -26.40 mfe   +2.8 mae  -25.9 fee  90.0 liq   132699 epx 0.00196 xpx 0.00153
+   12jc1DzJ SI276      09:12:26 dec=1791364330532 ent=1791364346580 (+  16s) exit=24.8min TP                    net0  -14.56 net50  -16.09 mfe  +30.1 mae  -13.2 fee 110.0 liq    50601 epx 0.000306 xpx 0.000272
+   A2ASUorC RARINU     09:59:49 dec=1791367157263 ent=1791367189576 (+  32s) exit=100.8min FEED_GAP     GAP      net0  +14.28 net50  +12.79 mfe  +16.2 mae   -6.5 fee  95.0 liq   119593 epx 0.0016 xpx 0.00188
+   HU22UBaT SNDWITCH   10:28:54 dec=1791368917574 ent=1791368934204 (+  17s) exit=71.7min FEED_GAP     GAP      net0  -10.31 net50  -11.48 mfe   +5.4 mae  -13.0 fee 105.0 liq    70286 epx 0.000506 xpx 0.000471
+   A2ASUorC RARINU     12:23:24 dec=1791375783460 ent=1791375804084 (+  21s) exit=2.1min TP                    net0  +25.55 net50  +23.91 mfe  +23.3 mae   -3.0 fee  95.0 liq   115406 epx 0.00148 xpx 0.00192
+   BNG5962Z slopcannon 14:16:36 dec=1791382592606 ent=1791382596877 (+   4s) exit=90.2min HOLD                  net0  -10.07 net50  -11.24 mfe   -1.3 mae  -13.0 fee 105.0 liq    72407 epx 0.000443 xpx 0.000413
+   HU22UBaT SNDWITCH   14:53:53 dec=1791384824529 ent=1791384833823 (+   9s) exit=31.0min TP                    net0  +19.67 net50  +17.53 mfe  +25.1 mae   -4.9 fee 110.0 liq    60088 epx 0.000356 xpx 0.000443
+   53W7r4XU darwin     15:11:42 dec=1791385869621 ent=1791385902444 (+  33s) exit=31.2min TP                    net0  +32.40 net50  +30.67 mfe  +36.2 mae   -6.8 fee 100.0 liq   110633 epx 0.00101 xpx 0.00138
+   8ewuF2o8 swordcat   15:16:27 dec=1791386176137 ent=1791386187353 (+  11s) exit=61.0min TP                    net0  +21.59 net50  +20.00 mfe  +21.9 mae   -6.3 fee  90.0 liq   173337 epx 0.00178 xpx 0.00223
+   GLL3Czyb HOTBOT     15:17:27 dec=1791386235811 ent=1791386247731 (+  12s) exit=90.4min HOLD                  net0   -1.70 net50   -2.97 mfe  +11.1 mae  -10.9 fee  95.0 liq   151257 epx 0.00175 xpx 0.00177
+   7mQDGtei CATCRAFT   15:23:49 dec=1791386609364 ent=1791386629581 (+  20s) exit=33.2min STOP                  net0  -23.77 net50  -26.28 mfe   -2.6 mae  -25.1 fee  95.0 liq   121929 epx 0.00163 xpx 0.00128
+   7mQDGtei CATCRAFT   16:02:51 dec=1791388945757 ent=1791388971561 (+  26s) exit=9.3min TP                    net0  +21.95 net50  +20.37 mfe  +21.0 mae  -15.0 fee  95.0 liq   106968 epx 0.00125 xpx 0.00158
+   7mQDGtei CATCRAFT   16:29:39 dec=1791390572262 ent=1791390579716 (+   7s) exit=61.6min STOP                  net0  -29.12 net50  -31.46 mfe   +7.1 mae  -27.8 fee  95.0 liq   111166 epx 0.00134 xpx 0.000982
+   2B8tftZ5 CRAWL      16:37:26 dec=1791391025539 ent=1791391046474 (+  21s) exit=90.3min HOLD                  net0   +4.33 net50   +2.97 mfe  +14.7 mae   -4.8 fee  85.0 liq   199630 epx 0.00245 xpx 0.00262
+   HU22UBaT SNDWITCH   16:56:39 dec=1791392171191 ent=1791392199994 (+  29s) exit=81.5min TP                    net0  +23.03 net50  +20.83 mfe  +20.1 mae  -16.0 fee 115.0 liq    54749 epx 0.000282 xpx 0.000362
+   34w9ReB7 TON618     17:31:15 dec=1791394244747 ent=1791394275918 (+  31s) exit=15.1min STOP                  net0  -25.05 net50  -27.89 mfe   -1.9 mae  -25.5 fee 105.0 liq    62011 epx 0.000451 xpx 0.000351
+   53W7r4XU darwin     17:33:19 dec=1791394373188 ent=1791394399512 (+  26s) exit=84.7min STOP                  net0  -27.97 net50  -30.35 mfe   -3.1 mae  -26.9 fee 100.0 liq   116724 epx 0.00112 xpx 0.000829
+   8ewuF2o8 swordcat   17:34:52 dec=1791394482152 ent=1791394492108 (+  10s) exit=90.4min HOLD                  net0   +1.56 net50   +0.23 mfe   +4.9 mae   -7.8 fee  90.0 liq   186702 epx 0.00205 xpx 0.00214
+   8NVFB1un Pumpoween  17:46:55 dec=1791395199016 ent=1791395215016 (+  16s) exit=90.3min HOLD                  net0  +11.66 net50  +10.21 mfe  +13.5 mae   -3.9 fee 100.0 liq    87991 epx 0.000885 xpx 0.00102
+   34w9ReB7 TON618     17:52:43 dec=1791395536285 ent=1791395563686 (+  27s) exit=41.0min TP                    net0  +32.29 net50  +29.93 mfe  +20.5 mae   -5.3 fee 110.0 liq    58356 epx 0.0004 xpx 0.000551
+   BNG5962Z slopcannon 17:55:47 dec=1791395715922 ent=1791395747957 (+  32s) exit=64.9min TP                    net0  +25.10 net50  +22.86 mfe  +24.8 mae  -16.0 fee 110.0 liq    62637 epx 0.000332 xpx 0.000432
+   BFrSZake HIGGS      18:12:25 dec=1791396730817 ent=1791396745034 (+  14s) exit=90.2min HOLD                  net0  -12.22 net50  -13.36 mfe   -1.5 mae  -15.2 fee  95.0 liq   153625 epx 0.00138 xpx 0.00125
+   69fyvgoT swordinu   19:07:43 dec=1791400032743 ent=1791400063530 (+  31s) exit=116.9min FEED_GAP     GAP      net0   -0.28 net50   -1.81 mfe   +8.9 mae   -1.2 fee  30.0 liq   436532 epx 0.0196 xpx 0.0198
+   7mQDGtei CATCRAFT   19:30:15 dec=1791401384863 ent=1791401415024 (+  30s) exit=14.4min STOP                  net0  -26.56 net50  -28.98 mfe   -0.6 mae  -25.3 fee  95.0 liq   111414 epx 0.00135 xpx 0.00102
+   53W7r4XU darwin     19:30:15 dec=1791401385145 ent=1791401415324 (+  30s) exit=95.5min FEED_GAP     GAP      net0  -11.89 net50  -13.03 mfe   +0.7 mae  -16.8 fee 100.0 liq    96881 epx 0.000773 xpx 0.000704
+   12jc1DzJ SI276      21:22:19 dec=1791408124527 ent=1791408139910 (+  15s) exit=62.4min TP                    net0  +19.01 net50  +16.88 mfe  +20.6 mae  -16.7 fee 110.0 liq    56542 epx 0.000378 xpx 0.000469
+   BNG5962Z slopcannon 21:28:44 dec=1791408503586 ent=1791408524534 (+  21s) exit=44.1min OPEN_AT_END  VANISHED net0  -23.28 net50  -24.65 mfe   +8.3 mae  -15.5 fee 115.0 liq    58103 epx 0.000284 xpx 0.000226
+   7mQDGtei CATCRAFT   21:29:44 dec=1791408549723 ent=1791408584371 (+  35s) exit=4.8min STOP                  net0  -71.85 net50  -72.78 mfe   +7.9 mae  -45.4 fee 105.0 liq    67499 epx 0.000499 xpx 0.000146
+   867dKvaC MISTAKE    21:33:58 dec=1791408822753 ent=1791408838247 (+  15s) exit=123.2min FEED_GAP     GAP      net0   -0.19 net50   -1.49 mfe   +3.6 mae   -3.8 fee  65.0 liq   246956 epx 0.00498 xpx 0.00507
+   69fyvgoT swordinu   22:16:51 dec=1791411379448 ent=1791411411148 (+  32s) exit=80.2min FEED_GAP     GAP      net0   -0.17 net50   -1.71 mfe   +8.0 mae   -1.2 fee  30.0 liq   435090 epx 0.0194 xpx 0.0196
+  -- HOLDOUT mean net50 3.721  mean usd50 7.443  mean net0 5.267
+   745ATaSS Frank      22:21:40 dec=1791411678568 ent=1791411700407 (+  22s) exit=75.5min FEED_GAP     GAP      net0  +11.48 net50  +10.03 mfe  +15.4 mae   -7.2 fee 105.0 liq    71044 epx 0.000513 xpx 0.000592
+   4JAnKFdd e/acc      23:47:39 dec=1791416853590 ent=1791416859188 (+   6s) exit=90.5min HOLD                  net0   -7.80 net50   -9.00 mfe   +1.8 mae  -10.3 fee  65.0 liq   397191 epx 0.00466 xpx 0.00438
+   745ATaSS Frank      00:12:58 dec=1791418355096 ent=1791418378196 (+  23s) exit=90.5min HOLD                  net0  -23.27 net50  -24.26 mfe   -1.3 mae  -23.8 fee 105.0 liq    72594 epx 0.000529 xpx 0.000421
+   69fyvgoT swordinu   00:27:05 dec=1791419216853 ent=1791419225133 (+   8s) exit=54.8min TP                    net0  +19.72 net50  +17.88 mfe  +20.8 mae   -4.1 fee  30.0 liq   396823 epx 0.0159 xpx 0.0193
+   GLL3Czyb HOTBOT     00:29:46 dec=1791419361946 ent=1791419386016 (+  24s) exit=90.2min HOLD                  net0   -4.85 net50   -6.09 mfe   -0.8 mae   -8.0 fee  95.0 liq   146794 epx 0.00163 xpx 0.00159
+   12jc1DzJ SI276      00:42:15 dec=1791420110880 ent=1791420135918 (+  25s) exit=56.5min TP                    net0  +24.16 net50  +21.94 mfe  +20.9 mae   -3.9 fee 110.0 liq    57095 epx 0.000383 xpx 0.000495
+   HMzvsEEm CATE       01:01:00 dec=1791421249601 ent=1791421260663 (+  11s) exit=90.1min HOLD                  net0   -4.76 net50   -6.22 mfe   -1.0 mae   -5.5 fee  30.0 liq  2906313 epx 0.0596 xpx 0.0573
+   BFrSZake HIGGS      01:52:40 dec=1791424355749 ent=1791424360948 (+   5s) exit=90.1min HOLD                  net0   +1.00 net50   -0.31 mfe   +3.8 mae   -6.6 fee  95.0 liq   144102 epx 0.00122 xpx 0.00126
+   745ATaSS Frank      02:14:21 dec=1791425650559 ent=1791425661141 (+  11s) exit=71.4min TP                    net0  +38.36 net50  +35.88 mfe  +31.2 mae   -7.1 fee 110.0 liq    64574 epx 0.000418 xpx 0.000601
+   8ewuF2o8 swordcat   02:16:47 dec=1791425802260 ent=1791425807895 (+   6s) exit=87.6min TP                    net0  +22.01 net50  +20.42 mfe  +20.9 mae  -13.1 fee  90.0 liq   190025 epx 0.00211 xpx 0.00264
+   867dKvaC MISTAKE    02:57:39 dec=1791428250355 ent=1791428259232 (+   9s) exit=72.9min TP                    net0  +23.90 net50  +22.29 mfe  +21.6 mae  -11.2 fee  65.0 liq   249343 epx 0.00501 xpx 0.00633
+   BaiHzFqn phubber    03:20:32 dec=1791429591971 ent=1791429632855 (+  41s) exit=55.1min FEED_GAP     GAP      net0  +13.62 net50  +12.15 mfe  +19.2 mae   -6.1 fee 105.0 liq    74803 epx 0.000458 xpx 0.00054
+   53W7r4XU darwin     03:30:56 dec=1791430236553 ent=1791430256690 (+  20s) exit=90.2min HOLD                  net0   +2.32 net50   +0.99 mfe   +2.8 mae  -12.3 fee 100.0 liq   109565 epx 0.000968 xpx 0.00102
+   69fyvgoT swordinu   03:46:24 dec=1791431159842 ent=1791431184505 (+  25s) exit=75.8min TP                    net0  +14.15 net50  +12.40 mfe  +20.4 mae   -1.6 fee  30.0 liq   394901 epx 0.0158 xpx 0.0182
+   4JAnKFdd e/acc      03:51:12 dec=1791431466601 ent=1791431472638 (+   6s) exit=90.6min HOLD                  net0   -7.36 net50   -8.57 mfe   +1.7 mae   -7.5 fee  75.0 liq   356613 epx 0.00375 xpx 0.00355
+   CR5dTgvT ZKDARK     04:56:03 dec=1791435348157 ent=1791435363568 (+  15s) exit=34.0min TP                    net0  +19.97 net50  +18.41 mfe  +22.5 mae   -3.3 fee 100.0 liq    81810 epx 0.000823 xpx 0.00102
+   867dKvaC MISTAKE    05:48:52 dec=1791438523365 ent=1791438532329 (+   9s) exit=90.4min HOLD                  net0   +7.61 net50   +6.21 mfe   +7.4 mae   -5.7 fee  65.0 liq   245833 epx 0.00489 xpx 0.00537
+   69fyvgoT swordinu   06:03:28 dec=1791439381502 ent=1791439408998 (+  27s) exit=31.3min STOP                  net0  -26.48 net50  -29.08 mfe   +0.7 mae  -26.8 fee  40.0 liq   304685 epx 0.00941 xpx 0.00703
+   4JAnKFdd e/acc      06:11:28 dec=1791439885107 ent=1791439888760 (+   4s) exit=75.2min OPEN_AT_END  END      net0   +0.79 net50   -0.52 mfe  +11.1 mae   -2.8 fee  80.0 liq   326871 epx 0.00316 xpx 0.00326
+   2B8tftZ5 CRAWL      06:51:43 dec=1791442285765 ent=1791442303489 (+  18s) exit=35.0min OPEN_AT_END  END      net0   -4.79 net50   -6.03 mfe   -1.4 mae   -6.4 fee  75.0 liq   242659 epx 0.0036 xpx 0.0035
+   69fyvgoT swordinu   06:52:13 dec=1791442321160 ent=1791442333872 (+  13s) exit=34.4min OPEN_AT_END  END      net0   -9.17 net50  -10.36 mfe   +0.9 mae   -9.8 fee  55.0 liq   241447 epx 0.00589 xpx 0.00545
+
+== rug_guard_v1 kwargs {'tp': 20.0, 'stop': -25.0, 'hold_min': 90.0} n 49 train 29 holdout 20
+  -- TRAIN mean net50 -2.978  mean usd50 -5.957  mean net0 -1.262
+   12jc1DzJ SI276      09:12:26 dec=1791364330532 ent=1791364346580 (+  16s) exit=24.8min TP                    net0  -14.56 net50  -16.09 mfe  +30.1 mae  -13.2 fee 110.0 liq    50601 epx 0.000306 xpx 0.000272
+   A2ASUorC RARINU     09:59:49 dec=1791367157263 ent=1791367189576 (+  32s) exit=100.8min FEED_GAP     GAP      net0  +14.28 net50  +12.79 mfe  +16.2 mae   -6.5 fee  95.0 liq   119593 epx 0.0016 xpx 0.00188
+   HU22UBaT SNDWITCH   10:28:54 dec=1791368917574 ent=1791368934204 (+  17s) exit=71.7min FEED_GAP     GAP      net0  -10.31 net50  -11.48 mfe   +5.4 mae  -13.0 fee 105.0 liq    70286 epx 0.000506 xpx 0.000471
+   A2ASUorC RARINU     12:23:24 dec=1791375783460 ent=1791375804084 (+  21s) exit=2.1min TP                    net0  +25.55 net50  +23.91 mfe  +23.3 mae   -3.0 fee  95.0 liq   115406 epx 0.00148 xpx 0.00192
+   BNG5962Z slopcannon 14:16:36 dec=1791382592606 ent=1791382596877 (+   4s) exit=90.2min HOLD                  net0  -10.07 net50  -11.24 mfe   -1.3 mae  -13.0 fee 105.0 liq    72407 epx 0.000443 xpx 0.000413
+   HU22UBaT SNDWITCH   14:53:53 dec=1791384824529 ent=1791384833823 (+   9s) exit=31.0min TP                    net0  +19.67 net50  +17.53 mfe  +25.1 mae   -4.9 fee 110.0 liq    60088 epx 0.000356 xpx 0.000443
+   53W7r4XU darwin     15:11:42 dec=1791385869621 ent=1791385902444 (+  33s) exit=31.2min TP                    net0  +32.40 net50  +30.67 mfe  +36.2 mae   -6.8 fee 100.0 liq   110633 epx 0.00101 xpx 0.00138
+   8ewuF2o8 swordcat   15:16:27 dec=1791386176137 ent=1791386187353 (+  11s) exit=61.0min TP                    net0  +21.59 net50  +20.00 mfe  +21.9 mae   -6.3 fee  90.0 liq   173337 epx 0.00178 xpx 0.00223
+   GLL3Czyb HOTBOT     15:17:27 dec=1791386235811 ent=1791386247731 (+  12s) exit=90.4min HOLD                  net0   -1.70 net50   -2.97 mfe  +11.1 mae  -10.9 fee  95.0 liq   151257 epx 0.00175 xpx 0.00177
+   7mQDGtei CATCRAFT   15:23:49 dec=1791386609364 ent=1791386629581 (+  20s) exit=33.2min STOP                  net0  -23.77 net50  -26.28 mfe   -2.6 mae  -25.1 fee  95.0 liq   121929 epx 0.00163 xpx 0.00128
+   7mQDGtei CATCRAFT   16:02:51 dec=1791388945757 ent=1791388971561 (+  26s) exit=9.3min TP                    net0  +21.95 net50  +20.37 mfe  +21.0 mae  -15.0 fee  95.0 liq   106968 epx 0.00125 xpx 0.00158
+   7mQDGtei CATCRAFT   16:29:39 dec=1791390572262 ent=1791390579716 (+   7s) exit=61.6min STOP                  net0  -29.12 net50  -31.46 mfe   +7.1 mae  -27.8 fee  95.0 liq   111166 epx 0.00134 xpx 0.000982
+   2B8tftZ5 CRAWL      16:37:26 dec=1791391025539 ent=1791391046474 (+  21s) exit=90.3min HOLD                  net0   +4.33 net50   +2.97 mfe  +14.7 mae   -4.8 fee  85.0 liq   199630 epx 0.00245 xpx 0.00262
+   HU22UBaT SNDWITCH   16:56:39 dec=1791392171191 ent=1791392199994 (+  29s) exit=81.5min TP                    net0  +23.03 net50  +20.83 mfe  +20.1 mae  -16.0 fee 115.0 liq    54749 epx 0.000282 xpx 0.000362
+   34w9ReB7 TON618     17:31:15 dec=1791394244747 ent=1791394275918 (+  31s) exit=15.1min STOP                  net0  -25.05 net50  -27.89 mfe   -1.9 mae  -25.5 fee 105.0 liq    62011 epx 0.000451 xpx 0.000351
+   53W7r4XU darwin     17:33:19 dec=1791394373188 ent=1791394399512 (+  26s) exit=84.7min STOP                  net0  -27.97 net50  -30.35 mfe   -3.1 mae  -26.9 fee 100.0 liq   116724 epx 0.00112 xpx 0.000829
+   8ewuF2o8 swordcat   17:34:52 dec=1791394482152 ent=1791394492108 (+  10s) exit=90.4min HOLD                  net0   +1.56 net50   +0.23 mfe   +4.9 mae   -7.8 fee  90.0 liq   186702 epx 0.00205 xpx 0.00214
+   8NVFB1un Pumpoween  17:46:55 dec=1791395199016 ent=1791395215016 (+  16s) exit=90.3min HOLD                  net0  +11.66 net50  +10.21 mfe  +13.5 mae   -3.9 fee 100.0 liq    87991 epx 0.000885 xpx 0.00102
+   34w9ReB7 TON618     17:52:43 dec=1791395536285 ent=1791395563686 (+  27s) exit=41.0min TP                    net0  +32.29 net50  +29.93 mfe  +20.5 mae   -5.3 fee 110.0 liq    58356 epx 0.0004 xpx 0.000551
+   BNG5962Z slopcannon 17:55:47 dec=1791395715922 ent=1791395747957 (+  32s) exit=64.9min TP                    net0  +25.10 net50  +22.86 mfe  +24.8 mae  -16.0 fee 110.0 liq    62637 epx 0.000332 xpx 0.000432
+   BFrSZake HIGGS      18:12:25 dec=1791396730817 ent=1791396745034 (+  14s) exit=90.2min HOLD                  net0  -12.22 net50  -13.36 mfe   -1.5 mae  -15.2 fee  95.0 liq   153625 epx 0.00138 xpx 0.00125
+   69fyvgoT swordinu   19:07:43 dec=1791400032743 ent=1791400063530 (+  31s) exit=116.9min FEED_GAP     GAP      net0   -0.28 net50   -1.81 mfe   +8.9 mae   -1.2 fee  30.0 liq   436532 epx 0.0196 xpx 0.0198
+   7mQDGtei CATCRAFT   19:30:15 dec=1791401384863 ent=1791401415024 (+  30s) exit=14.4min STOP                  net0  -26.56 net50  -28.98 mfe   -0.6 mae  -25.3 fee  95.0 liq   111414 epx 0.00135 xpx 0.00102
+   53W7r4XU darwin     19:30:15 dec=1791401385145 ent=1791401415324 (+  30s) exit=95.5min FEED_GAP     GAP      net0  -11.89 net50  -13.03 mfe   +0.7 mae  -16.8 fee 100.0 liq    96881 epx 0.000773 xpx 0.000704
+   12jc1DzJ SI276      21:22:19 dec=1791408124527 ent=1791408139910 (+  15s) exit=62.4min TP                    net0  +19.01 net50  +16.88 mfe  +20.6 mae  -16.7 fee 110.0 liq    56542 epx 0.000378 xpx 0.000469
+   BNG5962Z slopcannon 21:28:44 dec=1791408503586 ent=1791408524534 (+  21s) exit=44.1min OPEN_AT_END  VANISHED net0  -23.28 net50  -24.65 mfe   +8.3 mae  -15.5 fee 115.0 liq    58103 epx 0.000284 xpx 0.000226
+   7mQDGtei CATCRAFT   21:29:44 dec=1791408549723 ent=1791408584371 (+  35s) exit=4.8min STOP                  net0  -71.85 net50  -72.78 mfe   +7.9 mae  -45.4 fee 105.0 liq    67499 epx 0.000499 xpx 0.000146
+   867dKvaC MISTAKE    21:33:58 dec=1791408822753 ent=1791408838247 (+  15s) exit=123.2min FEED_GAP     GAP      net0   -0.19 net50   -1.49 mfe   +3.6 mae   -3.8 fee  65.0 liq   246956 epx 0.00498 xpx 0.00507
+   69fyvgoT swordinu   22:16:51 dec=1791411379448 ent=1791411411148 (+  32s) exit=80.2min FEED_GAP     GAP      net0   -0.17 net50   -1.71 mfe   +8.0 mae   -1.2 fee  30.0 liq   435090 epx 0.0194 xpx 0.0196
+  -- HOLDOUT mean net50 2.987  mean usd50 5.974  mean net0 4.532
+   745ATaSS Frank      22:21:40 dec=1791411678568 ent=1791411700407 (+  22s) exit=75.5min FEED_GAP     GAP      net0  +11.48 net50  +10.03 mfe  +15.4 mae   -7.2 fee 105.0 liq    71044 epx 0.000513 xpx 0.000592
+   4JAnKFdd e/acc      23:47:39 dec=1791416853590 ent=1791416859188 (+   6s) exit=90.5min HOLD                  net0   -7.80 net50   -9.00 mfe   +1.8 mae  -10.3 fee  65.0 liq   397191 epx 0.00466 xpx 0.00438
+   745ATaSS Frank      00:12:58 dec=1791418355096 ent=1791418378196 (+  23s) exit=90.5min HOLD                  net0  -23.27 net50  -24.26 mfe   -1.3 mae  -23.8 fee 105.0 liq    72594 epx 0.000529 xpx 0.000421
+   69fyvgoT swordinu   00:27:05 dec=1791419216853 ent=1791419225133 (+   8s) exit=54.8min TP                    net0  +19.72 net50  +17.88 mfe  +20.8 mae   -4.1 fee  30.0 liq   396823 epx 0.0159 xpx 0.0193
+   GLL3Czyb HOTBOT     00:29:46 dec=1791419361946 ent=1791419386016 (+  24s) exit=90.2min HOLD                  net0   -4.85 net50   -6.09 mfe   -0.8 mae   -8.0 fee  95.0 liq   146794 epx 0.00163 xpx 0.00159
+   12jc1DzJ SI276      00:42:15 dec=1791420110880 ent=1791420135918 (+  25s) exit=56.5min TP                    net0  +24.16 net50  +21.94 mfe  +20.9 mae   -3.9 fee 110.0 liq    57095 epx 0.000383 xpx 0.000495
+   HMzvsEEm CATE       01:01:00 dec=1791421249601 ent=1791421260663 (+  11s) exit=90.1min HOLD                  net0   -4.76 net50   -6.22 mfe   -1.0 mae   -5.5 fee  30.0 liq  2906313 epx 0.0596 xpx 0.0573
+   BFrSZake HIGGS      01:52:40 dec=1791424355749 ent=1791424360948 (+   5s) exit=90.1min HOLD                  net0   +1.00 net50   -0.31 mfe   +3.8 mae   -6.6 fee  95.0 liq   144102 epx 0.00122 xpx 0.00126
+   745ATaSS Frank      02:14:21 dec=1791425650559 ent=1791425661141 (+  11s) exit=71.4min TP                    net0  +38.36 net50  +35.88 mfe  +31.2 mae   -7.1 fee 110.0 liq    64574 epx 0.000418 xpx 0.000601
+   8ewuF2o8 swordcat   02:16:47 dec=1791425802260 ent=1791425807895 (+   6s) exit=87.6min TP                    net0  +22.01 net50  +20.42 mfe  +20.9 mae  -13.1 fee  90.0 liq   190025 epx 0.00211 xpx 0.00264
+   867dKvaC MISTAKE    02:57:39 dec=1791428250355 ent=1791428259232 (+   9s) exit=72.9min TP                    net0  +23.90 net50  +22.29 mfe  +21.6 mae  -11.2 fee  65.0 liq   249343 epx 0.00501 xpx 0.00633
+   BaiHzFqn phubber    03:20:32 dec=1791429591971 ent=1791429632855 (+  41s) exit=55.1min FEED_GAP     GAP      net0  +13.62 net50  +12.15 mfe  +19.2 mae   -6.1 fee 105.0 liq    74803 epx 0.000458 xpx 0.00054
+   53W7r4XU darwin     03:30:56 dec=1791430236553 ent=1791430256690 (+  20s) exit=90.2min HOLD                  net0   +2.32 net50   +0.99 mfe   +2.8 mae  -12.3 fee 100.0 liq   109565 epx 0.000968 xpx 0.00102
+   69fyvgoT swordinu   03:46:24 dec=1791431159842 ent=1791431184505 (+  25s) exit=75.8min TP                    net0  +14.15 net50  +12.40 mfe  +20.4 mae   -1.6 fee  30.0 liq   394901 epx 0.0158 xpx 0.0182
+   4JAnKFdd e/acc      03:51:12 dec=1791431466601 ent=1791431472638 (+   6s) exit=90.6min HOLD                  net0   -7.36 net50   -8.57 mfe   +1.7 mae   -7.5 fee  75.0 liq   356613 epx 0.00375 xpx 0.00355
+   867dKvaC MISTAKE    05:48:52 dec=1791438523365 ent=1791438532329 (+   9s) exit=90.4min HOLD                  net0   +7.61 net50   +6.21 mfe   +7.4 mae   -5.7 fee  65.0 liq   245833 epx 0.00489 xpx 0.00537
+   69fyvgoT swordinu   06:03:28 dec=1791439381502 ent=1791439408998 (+  27s) exit=31.3min STOP                  net0  -26.48 net50  -29.08 mfe   +0.7 mae  -26.8 fee  40.0 liq   304685 epx 0.00941 xpx 0.00703
+   4JAnKFdd e/acc      06:11:28 dec=1791439885107 ent=1791439888760 (+   4s) exit=75.2min OPEN_AT_END  END      net0   +0.79 net50   -0.52 mfe  +11.1 mae   -2.8 fee  80.0 liq   326871 epx 0.00316 xpx 0.00326
+   2B8tftZ5 CRAWL      06:51:43 dec=1791442285765 ent=1791442303489 (+  18s) exit=35.0min OPEN_AT_END  END      net0   -4.79 net50   -6.03 mfe   -1.4 mae   -6.4 fee  75.0 liq   242659 epx 0.0036 xpx 0.0035
+   69fyvgoT swordinu   06:52:13 dec=1791442321160 ent=1791442333872 (+  13s) exit=34.4min OPEN_AT_END  END      net0   -9.17 net50  -10.36 mfe   +0.9 mae   -9.8 fee  55.0 liq   241447 epx 0.00589 xpx 0.00545

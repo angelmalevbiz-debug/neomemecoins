@@ -1,0 +1,267 @@
+
+===== FIRST_latest n 51 rug-flagged 12
+   age        p10 0.8  p50 9.7  p90 91.7
+   liq        p10 12000.9  p50 23314.8  p90 58005.5
+   mcap       p10 24056.0  p50 77632.0  p90 420703.0
+   pc5        p10 -33.4  p50 10.7  p90 124.0
+   pc1h       p10 -42.3  p50 49.5  p90 415.0
+   v5         p10 2313.0  p50 32849.0  p90 200720.6
+   b5         p10 33.0  p50 308.0  p90 1146.0
+   s5         p10 20.0  p50 217.0  p90 861.0
+   fee        p10 105.0  p50 120.0  p90 125.0
+   life_min   p10 23.8  p50 42.0  p90 289.2
+   score      p10 60.0  p50 79.0  p90 94.0
+   same_ticker p10 0  p50 0  p90 1
+    PHASEONE   2cRT2N5A rug=0 age=     0m liq=  18236 mc=    50418 pc5=   7.5 pc1h=    7.5 boost=0.0 life=   47m path%(1,3,5,10,20,30,45,60m)=[-2.0, 18.0, -35.0, -70.0, -87.0, -85.0, -92.0, None]
+    GOMOCAT    2ddkUY8T rug=0 age=    92m liq=  58005 mc=   420703 pc5=  19.7 pc1h=   48.4 boost=0.0 life=  478m path%(1,3,5,10,20,30,45,60m)=[1.0, -5.0, 2.0, 4.0, -10.0, 1.0, -99.0, -99.0]
+    PPAV       2or8ATkU rug=0 age=   115m liq=  53922 mc=   360481 pc5=  -3.1 pc1h=  121.0 boost=0.0 life=  445m path%(1,3,5,10,20,30,45,60m)=[-5.0, -1.0, 4.0, -1.0, -18.0, -20.0, -42.0, -25.0]
+    UNKNOWN    3RAFMXR7 rug=0 age=  2602m liq= 112132 mc=  1341892 pc5=  25.9 pc1h=55530.0 boost=0.0 life=   29m path%(1,3,5,10,20,30,45,60m)=[-2.0, -25.0, -31.0, -28.0, -6.0, None, None, None]
+    SGI        3SYRfaoe rug=1 age=     4m liq=  12752 mc=    26810 pc5= -42.6 pc1h=  -42.6 boost=0.0 life=   52m path%(1,3,5,10,20,30,45,60m)=[-21.0, -17.0, -8.0, -45.0, -37.0, -83.0, -88.0, None]
+    SPLAZU     3YPcMDkZ rug=0 age=     2m liq=  18369 mc=    50910 pc5=   5.3 pc1h=    5.3 boost=0.0 life=   42m path%(1,3,5,10,20,30,45,60m)=[-7.0, -21.0, -78.0, -95.0, -95.0, -95.0, None, None]
+    JET        3eHU5CgU rug=0 age=    42m liq=  72127 mc=   548977 pc5=  28.9 pc1h= 1046.0 boost=0.0 life=   23m path%(1,3,5,10,20,30,45,60m)=[29.0, 24.0, -2.0, -17.0, -99.0, None, None, None]
+    gem        3jA1KKnK rug=1 age=    16m liq=  25552 mc=    85550 pc5=  38.8 pc1h=   84.1 boost=0.0 life=   39m path%(1,3,5,10,20,30,45,60m)=[5.0, 32.0, 30.0, -35.0, -31.0, -49.0, None, None]
+    PIXEL      4M8CKsEv rug=1 age=     6m liq=  18173 mc=    49677 pc5=  19.5 pc1h=    4.8 boost=0.0 life=   39m path%(1,3,5,10,20,30,45,60m)=[-27.0, -52.0, -80.0, -90.0, -93.0, -92.0, None, None]
+    SCraft     4d17cm7j rug=1 age=    57m liq=  25625 mc=    80635 pc5= -14.4 pc1h=  132.0 boost=0.0 life=   24m path%(1,3,5,10,20,30,45,60m)=[-1.0, -25.0, -15.0, -20.0, -53.0, None, None, None]
+    JIPPI      6US3uMtB rug=1 age=    27m liq=  19767 mc=    56234 pc5= -12.7 pc1h=   19.4 boost=0.0 life=   54m path%(1,3,5,10,20,30,45,60m)=[-12.0, -12.0, -26.0, -75.0, -68.0, -75.0, -84.0, None]
+    peakmale   6kSizKgA rug=0 age=    11m liq=  37365 mc=   182314 pc5= 175.0 pc1h=  262.0 boost=0.0 life=   46m path%(1,3,5,10,20,30,45,60m)=[26.0, 12.0, 27.0, 34.0, 55.0, -31.0, 1.0, None]
+    HASH       6rYoJFeJ rug=0 age=     6m liq=  14767 mc=    34378 pc5= -22.8 pc1h=  -26.8 boost=0.0 life=   48m path%(1,3,5,10,20,30,45,60m)=[35.0, -87.0, -85.0, -84.0, -87.0, -88.0, -90.0, None]
+    FROGMAN    7KYba5Lh rug=1 age=    25m liq=  44404 mc=   250153 pc5=  20.6 pc1h=  415.0 boost=0.0 life=  289m path%(1,3,5,10,20,30,45,60m)=[-8.0, -7.0, -22.0, 2.0, -18.0, -13.0, -10.0, 15.0]
+    SHIFT      8PwEy33D rug=0 age=     0m liq=  19752 mc=    58993 pc5=  27.2 pc1h=   27.2 boost=0.0 life=   28m path%(1,3,5,10,20,30,45,60m)=[0.0, -95.0, -95.0, -95.0, -95.0, None, None, None]
+    ETAC       8pQbBq4e rug=0 age=    30m liq=  79052 mc=   724302 pc5=  15.0 pc1h=  898.0 boost=0.0 life=  213m path%(1,3,5,10,20,30,45,60m)=[-2.0, -21.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0]
+    UI         8sbe1R1t rug=0 age=    25m liq=  42199 mc=   235199 pc5=  10.7 pc1h=  393.0 boost=0.0 life=  147m path%(1,3,5,10,20,30,45,60m)=[-6.0, 6.0, 3.0, -9.0, -1.0, 0.0, 27.0, -7.0]
+    EMBEDPAD   9etnNzzZ rug=0 age=     4m liq=  22203 mc=    71195 pc5=  51.8 pc1h=   51.8 boost=0.0 life=   49m path%(1,3,5,10,20,30,45,60m)=[-44.0, -58.0, -83.0, -93.0, -96.0, -96.0, -96.0, None]
+    FIAT       9okRiw1a rug=0 age=     2m liq=  19968 mc=    58940 pc5=  25.2 pc1h=   25.2 boost=0.0 life=   39m path%(1,3,5,10,20,30,45,60m)=[25.0, 83.0, 191.0, -2.0, -11.0, -4.0, None, None]
+    OGTRUMP    9rSmRH9w rug=0 age=     6m liq=  38586 mc=   194406 pc5= 124.0 pc1h=  303.0 boost=0.0 life=   46m path%(1,3,5,10,20,30,45,60m)=[-39.0, 63.0, 120.0, 90.0, 50.0, -99.0, -99.0, None]
+    CHILL      9sTi8f8m rug=0 age=    10m liq=  37515 mc=   179184 pc5=  49.7 pc1h=  261.0 boost=0.0 life=   38m path%(1,3,5,10,20,30,45,60m)=[23.0, 47.0, -98.0, -99.0, -99.0, -99.0, None, None]
+    $HNITE     ADptfpqJ rug=0 age=     8m liq=  34221 mc=   156951 pc5= 124.0 pc1h=  215.0 boost=0.0 life=   41m path%(1,3,5,10,20,30,45,60m)=[-9.0, 32.0, 3.0, 16.0, -8.0, -46.0, None, None]
+    Tweetboy   ATJ6YUTe rug=0 age=    40m liq=  24785 mc=    81969 pc5=   1.3 pc1h=   74.6 boost=0.0 life=   38m path%(1,3,5,10,20,30,45,60m)=[26.0, 20.0, 6.0, -23.0, -26.0, -1.0, None, None]
+    Qual       AYFJAzie rug=0 age=    75m liq=   9723 mc=    15993 pc5= 101.0 pc1h=  -29.7 boost=0.0 life=   42m path%(1,3,5,10,20,30,45,60m)=[-1.0, 52.0, 40.0, 7.0, 8.0, 17.0, None, None]
+    VEEMO      Ae2DT8rt rug=0 age=     3m liq=  23315 mc=    77632 pc5=  59.7 pc1h=   59.7 boost=0.0 life=   49m path%(1,3,5,10,20,30,45,60m)=[-53.0, -89.0, -70.0, -70.0, -96.0, -96.0, -97.0, None]
+    SHRENIS    BaeWN4c2 rug=0 age=     8m liq=  13101 mc=    27947 pc5=  26.2 pc1h=  -42.3 boost=0.0 life=   43m path%(1,3,5,10,20,30,45,60m)=[-30.0, -34.0, -38.0, -27.0, -40.0, -53.0, None, None]
+    COMP       Bp1QyynD rug=0 age=     8m liq=  27102 mc=   102201 pc5=  18.3 pc1h=  118.0 boost=0.0 life=   32m path%(1,3,5,10,20,30,45,60m)=[-19.0, 23.0, -14.0, -15.0, -30.0, -61.0, None, None]
+    Bond       CQiAHFkY rug=0 age=     3m liq=  17850 mc=    48386 pc5=   0.1 pc1h=    0.1 boost=0.0 life=   47m path%(1,3,5,10,20,30,45,60m)=[7.0, -91.0, -92.0, -92.0, -92.0, -92.0, -92.0, None]
+    APES       Cr7Caxi4 rug=0 age=     1m liq=  15717 mc=    38533 pc5= -15.3 pc1h=  -15.3 boost=0.0 life=   47m path%(1,3,5,10,20,30,45,60m)=[10.0, -12.0, -21.0, -43.0, -28.0, -5.0, -70.0, None]
+    WUMPUS     DPY7QWZo rug=1 age=     5m liq=  11535 mc=    22433 pc5= -41.2 pc1h=  -52.4 boost=0.0 life=   48m path%(1,3,5,10,20,30,45,60m)=[-37.0, -22.0, -19.0, -46.0, -60.0, -61.0, -70.0, None]
+    RIGHT      DTHbZMiv rug=0 age=    11m liq=  75394 mc=   712746 pc5=  75.9 pc1h= 1312.0 boost=0.0 life=   18m path%(1,3,5,10,20,30,45,60m)=[-11.0, 0.0, -2.0, 19.0, None, None, None, None]
+    CATE       E6wuSkGL rug=1 age=     1m liq=  15312 mc=    36972 pc5= -22.5 pc1h=  -22.5 boost=0.0 life=   24m path%(1,3,5,10,20,30,45,60m)=[-30.0, -35.0, -31.0, -17.0, -49.0, None, None, None]
+    BULLCRAFT  EGHZxFBb rug=0 age=    50m liq=  28018 mc=   101066 pc5=   1.1 pc1h=   14.6 boost=0.0 life=  768m path%(1,3,5,10,20,30,45,60m)=[1.0, 0.0, 1.0, 1.0, -4.0, 4.0, -8.0, -11.0]
+    SLOP       EKsR2wGC rug=0 age=    18m liq=  25965 mc=    92940 pc5=  -9.8 pc1h=   94.4 boost=0.0 life=   40m path%(1,3,5,10,20,30,45,60m)=[-26.0, -51.0, -67.0, -84.0, -87.0, -91.0, None, None]
+    pip        ENcVHXxN rug=1 age=     1m liq=  15818 mc=    39135 pc5= -14.1 pc1h=  -14.1 boost=0.0 life=   45m path%(1,3,5,10,20,30,45,60m)=[-37.0, -86.0, -86.0, -86.0, -88.0, -89.0, None, None]
+    BLOODLINE  F6YtXrW8 rug=0 age=     4m liq=  30451 mc=   127691 pc5= 166.0 pc1h=  166.0 boost=0.0 life=   46m path%(1,3,5,10,20,30,45,60m)=[-14.0, -62.0, -55.0, -45.0, -22.0, -59.0, -48.0, None]
+    doxxed     FUt6Bkuu rug=0 age=     3m liq=  32256 mc=   141491 pc5= 193.0 pc1h=  193.0 boost=0.0 life=   38m path%(1,3,5,10,20,30,45,60m)=[40.0, 69.0, 35.0, 34.0, 3.0, -15.0, None, None]
+    HIGHER     FZLeARDh rug=0 age=     0m liq=  16481 mc=    42001 pc5= -10.4 pc1h=  -10.4 boost=0.0 life=   38m path%(1,3,5,10,20,30,45,60m)=[-18.0, -27.0, -50.0, -81.0, -92.0, -93.0, None, None]
+    Benben     FZkmnKhs rug=0 age=     4m liq=  15217 mc=    36462 pc5= -18.2 pc1h=  -18.2 boost=0.0 life=   42m path%(1,3,5,10,20,30,45,60m)=[3.0, -2.0, -13.0, 24.0, 11.0, 7.0, None, None]
+    LOBBY      FkfDrvbz rug=0 age=     3m liq=  51905 mc=   325460 pc5= 129.0 pc1h=  129.0 boost=0.0 life=  373m path%(1,3,5,10,20,30,45,60m)=[11.0, 12.0, 6.0, 4.0, -12.0, -35.0, 254.0, 254.0]
+
+===== FIRSTPAIR_latest n 41 rug-flagged 41
+   age        p10 0.4  p50 0.6  p90 0.9
+   liq        p10 14547.6  p50 17300.2  p90 19536.2
+   mcap       p10 34441.0  p50 45266.0  p90 56865.0
+   pc5        p10 -27.7  p50 -4.8  p90 19.2
+   pc1h       p10 -27.7  p50 -2.9  p90 33.2
+   v5         p10 1073.2  p50 4059.4  p90 11677.3
+   b5         p10 20.0  p50 48.0  p90 179.0
+   s5         p10 9.0  p50 37.0  p90 113.0
+   fee        p10 120.0  p50 125.0  p90 125.0
+   life_min   p10 11.9  p50 35.1  p90 101.0
+   score      p10 64.0  p50 80.0  p90 91.0
+   same_ticker p10 1  p50 1  p90 2
+    SLEDGE     1XmrCvzt rug=1 age=     0m liq=  18334 mc=    50801 pc5=   7.8 pc1h=    7.8 boost=0.0 life=   11m path%(1,3,5,10,20,30,45,60m)=[4.0, 7.0, 9.0, -94.0, None, None, None, None]
+    XEC        3khFt2Si rug=1 age=     1m liq=  18162 mc=    49152 pc5=   5.5 pc1h=    5.5 boost=0.0 life=   47m path%(1,3,5,10,20,30,45,60m)=[7.0, 4.0, -5.0, -83.0, -91.0, -94.0, -94.0, None]
+    DoomTweet  4gHCanVp rug=1 age=     1m liq=  17084 mc=    44698 pc5=  -6.3 pc1h=   -6.3 boost=0.0 life=   30m path%(1,3,5,10,20,30,45,60m)=[-12.0, -45.0, -74.0, -87.0, -91.0, None, None, None]
+    JONATHAN   55JuD9oS rug=1 age=     1m liq=  20794 mc=    63802 pc5=  46.6 pc1h=   46.6 boost=0.0 life=   24m path%(1,3,5,10,20,30,45,60m)=[18.0, 16.0, 4.0, -19.0, -77.0, None, None, None]
+    FortniteOG 5Aj8SwQQ rug=1 age=     1m liq=  15697 mc=    38604 pc5= -15.7 pc1h=  -15.7 boost=0.0 life=   26m path%(1,3,5,10,20,30,45,60m)=[-11.0, -60.0, -58.0, -55.0, -90.0, None, None, None]
+    BOOT       5CihwRiq rug=1 age=     0m liq=  18400 mc=    50931 pc5=   6.0 pc1h=    6.0 boost=0.0 life=   42m path%(1,3,5,10,20,30,45,60m)=[-6.0, -5.0, 2.0, 6.0, 33.0, -94.0, None, None]
+    CLOUT      5TMbvSEY rug=1 age=     1m liq=  16799 mc=    43448 pc5=  -9.5 pc1h=   -9.5 boost=0.0 life=   21m path%(1,3,5,10,20,30,45,60m)=[-22.0, -19.0, -19.0, -5.0, -19.0, None, None, None]
+    Singularit 5iynUnTg rug=1 age=     0m liq=  17300 mc=    45266 pc5=  -4.8 pc1h=   -4.8 boost=0.0 life=  101m path%(1,3,5,10,20,30,45,60m)=[-17.0, -42.0, -70.0, -78.0, -87.0, -88.0, -88.0, -88.0]
+    ART        6Fpp3Cbe rug=1 age=   260m liq=  30041 mc=    98928 pc5= -15.4 pc1h=  -45.6 boost=0.0 life=   54m path%(1,3,5,10,20,30,45,60m)=[16.0, 16.0, 10.0, -13.0, -13.0, -26.0, -52.0, None]
+    Eko        6hT2Wae8 rug=1 age=    76m liq=  16537 mc=    40075 pc5= -28.5 pc1h=   33.2 boost=0.0 life=   33m path%(1,3,5,10,20,30,45,60m)=[4.0, 19.0, 29.0, 21.0, 25.0, 9.0, None, None]
+    SHROOM     6tv1HzMF rug=1 age=     0m liq=  16649 mc=    42711 pc5=  -8.7 pc1h=   -8.7 boost=0.0 life=   45m path%(1,3,5,10,20,30,45,60m)=[-2.0, -12.0, 76.0, 37.0, -3.0, -9.0, -29.0, None]
+    SPAWN      6vbvxqs4 rug=1 age=     1m liq=  14738 mc=    34441 pc5= -28.1 pc1h=  -28.1 boost=0.0 life=   31m path%(1,3,5,10,20,30,45,60m)=[9.0, 12.0, 14.0, -48.0, -12.0, -67.0, None, None]
+    Exlipse    79yQTA3u rug=1 age=     1m liq=  14548 mc=    33778 pc5= -27.7 pc1h=  -27.7 boost=0.0 life=   39m path%(1,3,5,10,20,30,45,60m)=[-2.0, 7.0, 2.0, 10.0, -1.0, 8.0, None, None]
+    Higher     7g7VM9Hw rug=1 age=     1m liq=  17798 mc=    48205 pc5=   1.3 pc1h=    1.3 boost=0.0 life=   37m path%(1,3,5,10,20,30,45,60m)=[1.0, -69.0, -67.0, -83.0, -94.0, -93.0, None, None]
+    PRINT      7kNQLkTu rug=1 age=     2m liq=  13771 mc=    34522 pc5= -25.1 pc1h=  -25.1 boost=0.0 life=    1m path%(1,3,5,10,20,30,45,60m)=[None, None, None, None, None, None, None, None]
+    QUAKE      7mAwgbki rug=1 age=     1m liq=  19536 mc=    56865 pc5=  19.2 pc1h=   19.2 boost=0.0 life=   35m path%(1,3,5,10,20,30,45,60m)=[0.0, -32.0, -62.0, -85.0, -66.0, -76.0, None, None]
+    Leoncio    7yoL9U1E rug=1 age=     1m liq=  22939 mc=    75803 pc5=  67.8 pc1h=   67.8 boost=0.0 life=   26m path%(1,3,5,10,20,30,45,60m)=[1.0, -15.0, -46.0, -58.0, -77.0, None, None, None]
+    OMEN       887SJmQd rug=1 age=     1m liq=  15353 mc=    36567 pc5= -20.8 pc1h=  -20.8 boost=0.0 life=   98m path%(1,3,5,10,20,30,45,60m)=[-22.0, 32.0, 17.0, -11.0, 57.0, 13.0, -10.0, -42.0]
+    NEXUM      8AF4QPsx rug=1 age=     0m liq=  16958 mc=    44179 pc5=  -7.6 pc1h=   -7.6 boost=0.0 life=   51m path%(1,3,5,10,20,30,45,60m)=[-25.0, -62.0, -72.0, -88.0, -93.0, -93.0, -93.0, None]
+    NOBO       8DanH6yA rug=1 age=     0m liq=  17450 mc=    46670 pc5=   3.1 pc1h=    3.1 boost=0.0 life=   27m path%(1,3,5,10,20,30,45,60m)=[83.0, 127.0, 57.0, -45.0, -38.0, None, None, None]
+    Izzy       8Ufn8VUL rug=1 age=     1m liq=  14256 mc=    32210 pc5= -32.1 pc1h=  -32.1 boost=0.0 life=  113m path%(1,3,5,10,20,30,45,60m)=[34.0, -37.0, -65.0, -71.0, -78.0, -87.0, -89.0, -88.0]
+    Karl       8dfPAs3d rug=1 age=     0m liq=  17483 mc=    46572 pc5=  -2.8 pc1h=   -2.8 boost=0.0 life=   60m path%(1,3,5,10,20,30,45,60m)=[-23.0, -37.0, -77.0, -80.0, -85.0, -86.0, -91.0, None]
+    DOCK       8xzTUDgK rug=1 age=     1m liq=  17528 mc=    46923 pc5=   0.1 pc1h=    0.1 boost=0.0 life=   12m path%(1,3,5,10,20,30,45,60m)=[-3.0, 4.0, 6.0, 4.0, None, None, None, None]
+    EIN        AA9bkEEG rug=1 age=     1m liq=  17777 mc=    47584 pc5=  -0.1 pc1h=   -0.1 boost=0.0 life=   57m path%(1,3,5,10,20,30,45,60m)=[14.0, -7.0, -12.0, -71.0, -74.0, -68.0, -72.0, None]
+    TONCAT     AKeLYLQW rug=1 age=     0m liq=  16927 mc=    43805 pc5=  -9.2 pc1h=   -9.2 boost=0.0 life=   26m path%(1,3,5,10,20,30,45,60m)=[8.0, 8.0, -23.0, -29.0, -6.0, None, None, None]
+    VIBERS     Ajm1VazX rug=1 age=     1m liq=  16182 mc=    39512 pc5= -14.0 pc1h=  -14.0 boost=0.0 life=    4m path%(1,3,5,10,20,30,45,60m)=[13.0, 13.0, None, None, None, None, None, None]
+    Mongo      BffxqaZq rug=1 age=     1m liq=  17683 mc=    47093 pc5=  -2.9 pc1h=   -2.9 boost=0.0 life=   76m path%(1,3,5,10,20,30,45,60m)=[-15.0, -12.0, -38.0, -46.0, -35.0, -51.0, -66.0, -65.0]
+    HASHFORGE  Crn5iG5B rug=1 age=     0m liq=  17781 mc=    47743 pc5=   0.6 pc1h=    0.6 boost=0.0 life=    9m path%(1,3,5,10,20,30,45,60m)=[-21.0, 2.0, 90.0, None, None, None, None, None]
+    BIOHUB     DEuT2cR2 rug=1 age=     0m liq=  16779 mc=    43345 pc5=  -7.7 pc1h=   -7.7 boost=0.0 life=   22m path%(1,3,5,10,20,30,45,60m)=[-24.0, -70.0, -74.0, -81.0, -89.0, None, None, None]
+    TREEPAD    EM5Rfnvv rug=1 age=     0m liq=  16800 mc=    43583 pc5=  -8.1 pc1h=   -8.1 boost=0.0 life=   50m path%(1,3,5,10,20,30,45,60m)=[-26.0, -24.0, -21.0, 9.0, -91.0, -92.0, -92.0, None]
+    cage       ETJJk6uP rug=1 age=     1m liq=    547 mc=     3753 pc5=  62.1 pc1h=   62.1 boost=0.0 life=   45m path%(1,3,5,10,20,30,45,60m)=[47.0, 224.0, -10.0, 131.0, 498.0, 105.0, 55.0, None]
+    CORNYBOB   EVcJU4r4 rug=1 age=     0m liq=  17148 mc=    44386 pc5=  -1.2 pc1h=   -1.2 boost=0.0 life=   58m path%(1,3,5,10,20,30,45,60m)=[11.0, 42.0, 46.0, -24.0, -42.0, -75.0, -71.0, None]
+    World      EpExi2We rug=1 age=     1m liq=  21085 mc=    65234 pc5=  36.5 pc1h=   36.5 boost=0.0 life=   18m path%(1,3,5,10,20,30,45,60m)=[1.0, 36.0, 14.0, -56.0, None, None, None, None]
+    BACK       EwJZyBsQ rug=1 age=     0m liq=  17364 mc=    46015 pc5=  -1.4 pc1h=   -1.4 boost=0.0 life=   36m path%(1,3,5,10,20,30,45,60m)=[-32.0, -34.0, -44.0, -20.0, -37.0, -77.0, None, None]
+    Clementine G3U3RsdP rug=1 age=     1m liq=  16771 mc=    43088 pc5= -10.7 pc1h=  -10.7 boost=0.0 life=   32m path%(1,3,5,10,20,30,45,60m)=[-15.0, -55.0, -63.0, -75.0, -93.0, -93.0, None, None]
+    Hama       GKJqoq1w rug=1 age=     1m liq=  18012 mc=    49143 pc5=   4.7 pc1h=    4.7 boost=0.0 life=   33m path%(1,3,5,10,20,30,45,60m)=[11.0, 54.0, 32.0, -72.0, -57.0, -85.0, None, None]
+    XPLACE     GQ5xy5gf rug=1 age=     1m liq=  13291 mc=    28793 pc5= -38.6 pc1h=  -38.6 boost=0.0 life=   35m path%(1,3,5,10,20,30,45,60m)=[-41.0, -81.0, -82.0, -81.0, -79.0, -80.0, None, None]
+    Cayetana   HmVRgN5d rug=1 age=     0m liq=  17326 mc=    45292 pc5=  -7.0 pc1h=   -7.0 boost=0.0 life=  105m path%(1,3,5,10,20,30,45,60m)=[4.0, -21.0, 44.0, 56.0, -23.0, -67.0, -45.0, -63.0]
+    TOWN       HoPvwptp rug=1 age=     0m liq=  16774 mc=    43217 pc5=  -8.5 pc1h=   -8.5 boost=0.0 life=   23m path%(1,3,5,10,20,30,45,60m)=[-1.0, 53.0, -15.0, -67.0, -45.0, None, None, None]
+    FLY        J4AzHntu rug=1 age=     1m liq=  18623 mc=    49449 pc5=  10.2 pc1h=   10.2 boost=0.0 life=  732m path%(1,3,5,10,20,30,45,60m)=[66.0, 134.0, 103.0, 152.0, 898.0, 511.0, 1160.0, 1155.0]
+
+===== ONSET1_latest n 17 rug-flagged 7
+   age        p10 1.7  p50 6.2  p90 24.8
+   liq        p10 3595.8  p50 18167.5  p90 25721.5
+   mcap       p10 3877.0  p50 50119.0  p90 91877.0
+   pc5        p10 -21.5  p50 9.9  p90 58.9
+   pc1h       p10 -92.0  p50 5.8  p90 92.4
+   v5         p10 58.1  p50 38868.1  p90 157506.1
+   b5         p10 0.0  p50 356.0  p90 1047.0
+   s5         p10 1.0  p50 310.0  p90 859.0
+   fee        p10 120.0  p50 120.0  p90 125.0
+   life_min   p10 13.7  p50 40.7  p90 88.7
+   score      p10 23.0  p50 79.0  p90 99.0
+   same_ticker p10 0  p50 0  p90 2
+    ANTMIWOJ   2iaQyL9E rug=0 age=     7m liq=  29740 mc=   117195 pc5=  44.8 pc1h=  146.0 boost=0.0 life=   29m path%(1,3,5,10,20,30,45,60m)=[-98.0, -98.0, -98.0, -98.0, -98.0, None, None, None]
+    META       7TJFv3Fg rug=1 age=    24m liq=   3154 mc=     3211 pc5=  -0.5 pc1h=  -93.2 boost=0.0 life=   14m path%(1,3,5,10,20,30,45,60m)=[-2.0, -5.0, -5.0, -14.0, None, None, None, None]
+    CRINE      876WGa4Y rug=0 age=     4m liq=  24377 mc=    84092 pc5=  79.7 pc1h=   79.7 boost=0.0 life=   33m path%(1,3,5,10,20,30,45,60m)=[-23.0, -49.0, -73.0, -75.0, -93.0, -94.0, None, None]
+    VIBE       9Bq3P2yY rug=0 age=     5m liq=  12827 mc=    26979 pc5= -22.6 pc1h=  -42.5 boost=0.0 life=  103m path%(1,3,5,10,20,30,45,60m)=[151.0, 192.0, 217.0, 30.0, 106.0, 99.0, 128.0, 58.0]
+    Gamby      AFsEwPX1 rug=0 age=    17m liq=  18167 mc=    50119 pc5=   9.9 pc1h=    4.6 boost=0.0 life=   41m path%(1,3,5,10,20,30,45,60m)=[0.0, 1.0, 6.0, 46.0, 80.0, 156.0, None, None]
+    Infection  Aq2wDjQi rug=0 age=    29m liq=   3596 mc=     3877 pc5=  -2.3 pc1h=  -92.0 boost=0.0 life=    6m path%(1,3,5,10,20,30,45,60m)=[0.0, 0.0, 0.0, None, None, None, None, None]
+    9-5        Bv7QR31h rug=1 age=    95m liq=  23810 mc=    74070 pc5=  22.5 pc1h=   80.5 boost=0.0 life=   51m path%(1,3,5,10,20,30,45,60m)=[-5.0, -3.0, -12.0, 13.0, -1.0, -27.0, -1.0, None]
+    ACTII      CRvE2Thp rug=1 age=    11m liq=  23477 mc=    76511 pc5=  13.2 pc1h=   57.6 boost=0.0 life=   46m path%(1,3,5,10,20,30,45,60m)=[-27.0, -46.0, -33.0, -71.0, -81.0, -87.0, -91.0, None]
+    GPAD       CmmHprTz rug=0 age=     3m liq=  18158 mc=    49744 pc5=   5.8 pc1h=    5.8 boost=0.0 life=   47m path%(1,3,5,10,20,30,45,60m)=[2.0, -28.0, -13.0, 5.0, -36.0, -52.0, -59.0, None]
+    FPRO       DK98xZqj rug=0 age=     5m liq=  25722 mc=    91877 pc5=  58.9 pc1h=   92.4 boost=0.0 life=   29m path%(1,3,5,10,20,30,45,60m)=[13.0, 43.0, 60.0, -97.0, -97.0, None, None, None]
+    FLYPAD     DYMBQ4FT rug=0 age=     4m liq=  15353 mc=    36807 pc5= -21.5 pc1h=  -21.5 boost=0.0 life=   38m path%(1,3,5,10,20,30,45,60m)=[-1.0, -27.0, -25.0, -69.0, -85.0, -90.0, None, None]
+    BLOX       Eji6Lww6 rug=0 age=     6m liq=  42707 mc=   231635 pc5=  98.2 pc1h=  322.0 boost=0.0 life=  759m path%(1,3,5,10,20,30,45,60m)=[8.0, -58.0, -51.0, -22.0, -49.0, -62.0, -98.0, -98.0]
+    slingoor   FUFmDAvc rug=0 age=     3m liq=  16720 mc=    42847 pc5=  -8.6 pc1h=   -8.6 boost=0.0 life=   48m path%(1,3,5,10,20,30,45,60m)=[-5.0, -6.0, -13.0, -70.0, -45.0, -63.0, -70.0, None]
+    IRLCraft   GbLV9rYb rug=1 age=     2m liq=  16968 mc=    49672 pc5=   7.0 pc1h=    7.0 boost=0.0 life=   61m path%(1,3,5,10,20,30,45,60m)=[-8.0, 28.0, 91.0, -59.0, -72.0, -51.0, -92.0, -93.0]
+    PEA        HHum972a rug=1 age=    25m liq=   7343 mc=    10741 pc5=  56.5 pc1h=  -77.5 boost=0.0 life=   37m path%(1,3,5,10,20,30,45,60m)=[-4.0, -12.0, 1.0, 5.0, -25.0, -28.0, None, None]
+    NOVUM      Hx51fBYy rug=1 age=     2m liq=  19944 mc=    62705 pc5=   0.0 pc1h=    0.0 boost=0.0 life=   34m path%(1,3,5,10,20,30,45,60m)=[22.0, -93.0, -93.0, -93.0, -93.0, -93.0, None, None]
+    Si27       X7aEa787 rug=1 age=     6m liq=  21160 mc=    64616 pc5=  19.4 pc1h=   35.9 boost=0.0 life=   89m path%(1,3,5,10,20,30,45,60m)=[12.0, -9.0, -10.0, -31.0, -32.0, -14.0, -75.0, -75.0]
+
+===== BOOST_ON n 26 rug-flagged 9
+   age        p10 11.6  p50 1321.0  p90 38499.5
+   liq        p10 16474.6  p50 61230.2  p90 242333.0
+   mcap       p10 41335.0  p50 419928.0  p90 2278141.0
+   pc5        p10 -8.3  p50 1.3  p90 16.0
+   pc1h       p10 -38.8  p50 0.4  p90 36.0
+   v5         p10 761.6  p50 2284.3  p90 21240.5
+   b5         p10 5.0  p50 30.0  p90 222.0
+   s5         p10 5.0  p50 17.0  p90 140.0
+   fee        p10 65.0  p50 105.0  p90 120.0
+   life_min   p10 94.9  p50 620.9  p90 835.0
+   score      p10 59.0  p50 87.0  p90 98.0
+   same_ticker p10 0  p50 0  p90 2
+    SI276      12jc1DzJ rug=0 age=  1540m liq=  61509 mc=   440579 pc5=   4.5 pc1h=   -1.2 boost=110.0 life=  621m path%(1,3,5,10,20,30,45,60m)=[1.0, 1.0, 1.0, 0.0, -17.0, -25.0, -23.0, -23.0]
+    PPAV       2or8ATkU rug=0 age=   115m liq=  53565 mc=   355887 pc5=  -4.4 pc1h=  118.0 boost=30.0 life=  445m path%(1,3,5,10,20,30,45,60m)=[-3.0, -2.0, 5.0, -0.0, -17.0, -19.0, -42.0, -24.0]
+    TON618     34w9ReB7 rug=0 age=  1321m liq=  61230 mc=   419928 pc5=   6.1 pc1h=  -28.6 boost=50.0 life=  838m path%(1,3,5,10,20,30,45,60m)=[1.0, -2.0, 2.0, -4.0, -15.0, 2.0, -5.0, 5.0]
+    Frank      745ATaSS rug=0 age=  4156m liq=  69789 mc=   475910 pc5=   5.3 pc1h=   36.0 boost=10.0 life=  715m path%(1,3,5,10,20,30,45,60m)=[-5.0, -10.0, -9.0, -4.0, -4.0, 15.0, 15.0, 15.0]
+    Frank      745ATaSS rug=0 age=  4250m liq=  75795 mc=   554040 pc5=  -7.8 pc1h=    0.4 boost=10.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[-1.0, -4.0, -3.0, 1.0, 15.0, 6.0, 7.0, 5.0]
+    CATCRAFT   7mQDGtei rug=0 age=  1389m liq=  84239 mc=   760147 pc5=  43.9 pc1h=  -17.6 boost=100.0 life=   61m path%(1,3,5,10,20,30,45,60m)=[-0.0, -1.0, -0.0, -4.0, -13.0, -88.0, -92.0, -100.0]
+    MISTAKE    867dKvaC rug=0 age= 38500m liq= 262995 mc=  5443803 pc5=   2.4 pc1h=    6.9 boost=30.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[1.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0]
+    MISTAKE    867dKvaC rug=0 age= 38566m liq= 249735 mc=  4890794 pc5=  -4.3 pc1h=  -10.4 boost=30.0 life=  621m path%(1,3,5,10,20,30,45,60m)=[-1.0, -1.0, -0.0, -1.0, -3.0, -3.0, 0.0, -2.0]
+    MINER      8J42or3k rug=0 age=  1506m liq=  30396 mc=    81258 pc5=  21.4 pc1h=  -38.8 boost=50.0 life=  549m path%(1,3,5,10,20,30,45,60m)=[-2.0, 2.0, 1.0, 3.0, -14.0, -14.0, -14.0, -14.0]
+    Pumpoween  8NVFB1un rug=0 age= 47596m liq=  98125 mc=  1027899 pc5=   1.9 pc1h=    4.0 boost=200.0 life=  621m path%(1,3,5,10,20,30,45,60m)=[0.0, 1.0, 1.0, 1.0, 1.0, 5.0, 4.0, 6.0]
+    UI         8sbe1R1t rug=0 age=   110m liq=  41118 mc=   208658 pc5=   9.0 pc1h=    0.8 boost=10.0 life=   62m path%(1,3,5,10,20,30,45,60m)=[-0.0, -19.0, -23.0, -19.0, -17.0, -14.0, 10.0, -12.0]
+    VIBE       9Bq3P2yY rug=0 age=    13m liq=  16475 mc=    41335 pc5= -48.3 pc1h=  -11.8 boost=10.0 life=   95m path%(1,3,5,10,20,30,45,60m)=[-23.0, -5.0, 25.0, 57.0, 28.0, 33.0, 21.0, 8.0]
+    PLAGUE     9GBXHym9 rug=1 age=  6116m liq=  89759 mc=   667326 pc5=  -3.4 pc1h=    0.6 boost=10.0 life=  835m path%(1,3,5,10,20,30,45,60m)=[1.0, -2.0, -2.0, -2.0, -9.0, -6.0, -7.0, -16.0]
+    PLAGUE     9GBXHym9 rug=1 age=  6330m liq=  75134 mc=   469335 pc5=   4.0 pc1h=   -8.6 boost=10.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[1.0, 4.0, 3.0, 4.0, -1.0, -1.0, -3.0, 5.0]
+    RARINU     A2ASUorC rug=1 age=  1410m liq= 123718 mc=  1630594 pc5=   5.1 pc1h=   27.4 boost=100.0 life=  557m path%(1,3,5,10,20,30,45,60m)=[-2.0, -5.0, -10.0, -12.0, -2.0, 10.0, 51.0, 94.0]
+    LMAO!      AFaYrFH7 rug=0 age=510846m liq= 297376 mc=  2278141 pc5=  -0.9 pc1h=   -6.0 boost=100.0 life=  621m path%(1,3,5,10,20,30,45,60m)=[0.0, 1.0, -0.0, 0.0, -1.0, -1.0, -2.0, -1.0]
+    BULLCRAFT  EGHZxFBb rug=0 age=    50m liq=  28056 mc=   101315 pc5=   1.3 pc1h=   14.8 boost=500.0 life=  768m path%(1,3,5,10,20,30,45,60m)=[1.0, 0.0, 0.0, 1.0, -3.0, 5.0, -8.0, -12.0]
+    BULLCRAFT  EGHZxFBb rug=0 age=   197m liq=  26690 mc=    91939 pc5=  -0.3 pc1h=   -7.7 boost=500.0 life=  621m path%(1,3,5,10,20,30,45,60m)=[0.0, -0.0, -0.0, -1.0, -2.0, -1.0, -1.0, 1.0]
+    BLOX       Eji6Lww6 rug=1 age=     8m liq=  44199 mc=   246354 pc5=  68.7 pc1h=  349.0 boost=100.0 life=  758m path%(1,3,5,10,20,30,45,60m)=[-44.0, -61.0, -47.0, -36.0, -53.0, -60.0, -98.0, -99.0]
+    A1         F2P22Sfc rug=1 age=  1578m liq= 128868 mc=  1569969 pc5=  -1.6 pc1h=    1.8 boost=500.0 life=  304m path%(1,3,5,10,20,30,45,60m)=[-2.0, -1.0, 4.0, 5.0, -4.0, 1.0, -3.0, 13.0]
+    EVERYTHING FcfEJ9uJ rug=0 age=   246m liq= 242333 mc=  6271033 pc5=   1.3 pc1h=    2.2 boost=10.0 life= 1218m path%(1,3,5,10,20,30,45,60m)=[1.0, 1.0, 0.0, 5.0, 2.0, -2.0, -1.0, -2.0]
+    FLY        J4AzHntu rug=1 age=    12m liq=  30875 mc=   118687 pc5=  -8.3 pc1h=  165.0 boost=50.0 life=  721m path%(1,3,5,10,20,30,45,60m)=[14.0, 133.0, 219.0, 318.0, 199.0, 425.0, 458.0, 538.0]
+    FLY        J4AzHntu rug=1 age=   244m liq=   9368 mc=    11185 pc5= -15.2 pc1h=  -51.1 boost=50.0 life=  489m path%(1,3,5,10,20,30,45,60m)=[2.0, 5.0, 6.0, 9.0, 7.0, 10.0, 10.0, 10.0]
+    ECSTASY    UCWmMumV rug=1 age=     1m liq=  19286 mc=    54541 pc5=  12.5 pc1h=   12.5 boost=100.0 life= 1077m path%(1,3,5,10,20,30,45,60m)=[0.0, 12.0, 22.0, 27.0, 24.0, 23.0, 30.0, 37.0]
+    ECSTASY    UCWmMumV rug=1 age=   457m liq=  23948 mc=    76634 pc5=  -3.3 pc1h=  -34.5 boost=100.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[-1.0, 0.0, -4.0, -3.0, 7.0, 11.0, 9.0, 12.0]
+    PVE        zrPbSddh rug=0 age=    38m liq=  13143 mc=    27908 pc5=  16.0 pc1h=  -41.7 boost=10.0 life=  392m path%(1,3,5,10,20,30,45,60m)=[-4.0, -3.0, -12.0, -13.0, 11.0, 15.0, 9.0, 0.0]
+
+===== ONSET1_boosted-latest n 16 rug-flagged 4
+   age        p10 7.7  p50 115.2  p90 20437.2
+   liq        p10 16474.6  p50 44199.4  p90 242333.0
+   mcap       p10 37558.0  p50 246354.0  p90 2737831.0
+   pc5        p10 -8.3  p50 1.3  p90 16.0
+   pc1h       p10 -28.6  p50 8.7  p90 118.0
+   v5         p10 707.7  p50 2127.5  p90 50773.2
+   b5         p10 3.0  p50 30.0  p90 722.0
+   s5         p10 3.0  p50 15.0  p90 412.0
+   fee        p10 60.0  p50 110.0  p90 125.0
+   life_min   p10 94.9  p50 757.8  p90 1097.1
+   score      p10 59.0  p50 87.0  p90 97.0
+   same_ticker p10 0  p50 0  p90 1
+    SI276      12jc1DzJ rug=0 age=   822m liq=  54034 mc=   343431 pc5=  -1.6 pc1h=    8.7 boost=210.0 life= 1340m path%(1,3,5,10,20,30,45,60m)=[-2.0, -4.0, -11.0, -11.0, -11.0, 20.0, -22.0, -15.0]
+    PPAV       2or8ATkU rug=0 age=   115m liq=  53565 mc=   355887 pc5=  -4.4 pc1h=  118.0 boost=30.0 life=  445m path%(1,3,5,10,20,30,45,60m)=[-3.0, -2.0, 5.0, -0.0, -17.0, -19.0, -42.0, -24.0]
+    TON618     34w9ReB7 rug=0 age=  1321m liq=  61230 mc=   419928 pc5=   6.1 pc1h=  -28.6 boost=50.0 life=  838m path%(1,3,5,10,20,30,45,60m)=[1.0, -2.0, 2.0, -4.0, -15.0, 2.0, -5.0, 5.0]
+    GIGACAT    72tZoSAH rug=0 age= 20437m liq=  18352 mc=    37558 pc5=   4.4 pc1h=   10.6 boost=100.0 life= 1097m path%(1,3,5,10,20,30,45,60m)=[18.0, 12.0, 12.0, 21.0, 31.0, 37.0, 39.0, 43.0]
+    CATCRAFT   7mQDGtei rug=0 age=   855m liq= 159075 mc=  2737831 pc5=  22.6 pc1h=   70.0 boost=100.0 life=  595m path%(1,3,5,10,20,30,45,60m)=[-2.0, -5.0, -1.0, -6.0, -7.0, -16.0, -8.0, 1.0]
+    MISTAKE    867dKvaC rug=0 age= 38292m liq= 262640 mc=  5380848 pc5=  -0.8 pc1h=   -0.4 boost=30.0 life=  895m path%(1,3,5,10,20,30,45,60m)=[-1.0, 1.0, 2.0, 1.0, 1.0, 0.0, -2.0, -6.0]
+    UI         8sbe1R1t rug=0 age=   110m liq=  41118 mc=   208658 pc5=   9.0 pc1h=    0.8 boost=10.0 life=   62m path%(1,3,5,10,20,30,45,60m)=[-0.0, -19.0, -23.0, -19.0, -17.0, -14.0, 10.0, -12.0]
+    VIBE       9Bq3P2yY rug=0 age=    13m liq=  16475 mc=    41335 pc5= -48.3 pc1h=  -11.8 boost=10.0 life=   95m path%(1,3,5,10,20,30,45,60m)=[-23.0, -5.0, 25.0, 57.0, 28.0, 33.0, 21.0, 8.0]
+    PLAGUE     9GBXHym9 rug=1 age=  6116m liq=  89759 mc=   667326 pc5=  -3.4 pc1h=    0.6 boost=10.0 life=  835m path%(1,3,5,10,20,30,45,60m)=[1.0, -2.0, -2.0, -2.0, -9.0, -6.0, -7.0, -16.0]
+    LMAO!      AFaYrFH7 rug=0 age=510773m liq= 304755 mc=  2404681 pc5=  -2.4 pc1h=   10.1 boost=100.0 life=  694m path%(1,3,5,10,20,30,45,60m)=[-0.0, 0.0, 1.0, -6.0, -6.0, -6.0, -6.0, -6.0]
+    BULLCRAFT  EGHZxFBb rug=0 age=    50m liq=  28056 mc=   101315 pc5=   1.3 pc1h=   14.8 boost=500.0 life=  768m path%(1,3,5,10,20,30,45,60m)=[1.0, 0.0, 0.0, 1.0, -3.0, 5.0, -8.0, -12.0]
+    BLOX       Eji6Lww6 rug=1 age=     8m liq=  44199 mc=   246354 pc5=  68.7 pc1h=  349.0 boost=100.0 life=  758m path%(1,3,5,10,20,30,45,60m)=[-44.0, -61.0, -34.0, -36.0, -53.0, -59.0, -98.0, -99.0]
+    EVERYTHING FcfEJ9uJ rug=0 age=   246m liq= 242333 mc=  6271033 pc5=   1.3 pc1h=    2.2 boost=10.0 life= 1218m path%(1,3,5,10,20,30,45,60m)=[1.0, 1.0, 0.0, 5.0, 2.0, -2.0, -1.0, -2.0]
+    FLY        J4AzHntu rug=1 age=    12m liq=  30875 mc=   118687 pc5=  -8.3 pc1h=  165.0 boost=50.0 life=  721m path%(1,3,5,10,20,30,45,60m)=[14.0, 133.0, 219.0, 318.0, 199.0, 425.0, 458.0, 534.0]
+    ECSTASY    UCWmMumV rug=1 age=     1m liq=  19286 mc=    54541 pc5=  12.5 pc1h=   12.5 boost=100.0 life= 1076m path%(1,3,5,10,20,30,45,60m)=[6.0, 16.0, 31.0, 27.0, 19.0, 24.0, 35.0, 27.0]
+    PVE        zrPbSddh rug=0 age=    38m liq=  13143 mc=    27908 pc5=  16.0 pc1h=  -41.7 boost=10.0 life=  392m path%(1,3,5,10,20,30,45,60m)=[-4.0, -3.0, -12.0, -13.0, 11.0, 15.0, 9.0, 0.0]
+
+===== ONSETRE_boosted-latest n 18 rug-flagged 4
+   age        p10 130.5  p50 1446.4  p90 38499.5
+   liq        p10 3284.7  p50 61498.7  p90 262995.0
+   mcap       p10 3003.0  p50 440431.0  p90 2278141.0
+   pc5        p10 -7.8  p50 -0.4  p90 4.5
+   pc1h       p10 -51.1  p50 -1.3  p90 36.0
+   v5         p10 48.2  p50 1799.5  p90 9531.6
+   b5         p10 2.0  p50 18.0  p90 132.0
+   s5         p10 4.0  p50 17.0  p90 70.0
+   fee        p10 85.0  p50 105.0  p90 125.0
+   life_min   p10 610.3  p50 687.7  p90 1141.0
+   score      p10 27.0  p50 80.0  p90 97.0
+   same_ticker p10 0  p50 0  p90 1
+    SI276      12jc1DzJ rug=0 age=  1446m liq=  57695 mc=   390349 pc5=   3.9 pc1h=   79.9 boost=210.0 life=  715m path%(1,3,5,10,20,30,45,60m)=[-0.0, 1.0, 5.0, 3.0, -14.0, 13.0, 13.0, 13.0]
+    SI276      12jc1DzJ rug=0 age=  1474m liq=  60555 mc=   429526 pc5=  25.3 pc1h=   51.7 boost=110.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0, 3.0]
+    SI276      12jc1DzJ rug=0 age=  1541m liq=  61499 mc=   440431 pc5=   4.5 pc1h=   -1.3 boost=110.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[1.0, 1.0, 2.0, 0.0, -24.0, -25.0, -24.0, -21.0]
+    TON618     34w9ReB7 rug=0 age=  1538m liq=  46705 mc=   245558 pc5=   3.6 pc1h=  -28.3 boost=50.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[4.0, 2.0, 3.0, 26.0, 7.0, 9.0, -0.0, 29.0]
+    Frank      745ATaSS rug=0 age=  4156m liq=  69789 mc=   475910 pc5=   5.3 pc1h=   36.0 boost=10.0 life=  715m path%(1,3,5,10,20,30,45,60m)=[-5.0, -10.0, -9.0, -4.0, -4.0, 15.0, 15.0, 15.0]
+    Frank      745ATaSS rug=0 age=  4250m liq=  75795 mc=   554040 pc5=  -7.8 pc1h=    0.4 boost=10.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[-1.0, -4.0, -3.0, 1.0, 15.0, 6.0, 7.0, 5.0]
+    MISTAKE    867dKvaC rug=0 age= 38500m liq= 262995 mc=  5443803 pc5=   2.4 pc1h=    6.9 boost=30.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[1.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0, -10.0]
+    PLAGUE     9GBXHym9 rug=1 age=  6330m liq=  75134 mc=   469335 pc5=   4.0 pc1h=   -8.6 boost=10.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[1.0, 4.0, 3.0, 4.0, -1.0, -1.0, -3.0, 5.0]
+    RARINU     A2ASUorC rug=0 age=   804m liq= 124256 mc=  1698808 pc5=  -1.1 pc1h=   10.2 boost=100.0 life= 1162m path%(1,3,5,10,20,30,45,60m)=[0.0, -2.0, -3.0, -3.0, 5.0, 10.0, 6.0, -11.0]
+    RARINU     A2ASUorC rug=0 age=   813m liq= 120928 mc=  1610257 pc5=  -0.4 pc1h=   -7.3 boost=100.0 life= 1153m path%(1,3,5,10,20,30,45,60m)=[3.0, 6.0, 8.0, 12.0, 16.0, 16.0, 13.0, 4.0]
+    RARINU     A2ASUorC rug=0 age=   825m liq= 126863 mc=  1768275 pc5=  -2.6 pc1h=   -3.2 boost=100.0 life= 1141m path%(1,3,5,10,20,30,45,60m)=[1.0, 3.0, 5.0, 5.0, 5.0, 0.0, -6.0, -11.0]
+    LMAO!      AFaYrFH7 rug=0 age=510779m liq= 308443 mc=  2463447 pc5=   3.3 pc1h=   12.8 boost=100.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[-0.0, -9.0, -9.0, -9.0, -9.0, -9.0, -9.0, -9.0]
+    LMAO!      AFaYrFH7 rug=0 age=510846m liq= 297376 mc=  2278141 pc5=  -0.9 pc1h=   -6.0 boost=100.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[0.0, 1.0, 1.0, 0.0, -1.0, -1.0, -1.0, -1.0]
+    BULLCRAFT  EGHZxFBb rug=0 age=   130m liq=  27686 mc=    98828 pc5=  -0.8 pc1h=    0.6 boost=500.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[0.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0, -7.0]
+    BULLCRAFT  EGHZxFBb rug=0 age=   198m liq=  26690 mc=    91939 pc5=  -0.3 pc1h=   -7.7 boost=500.0 life=  620m path%(1,3,5,10,20,30,45,60m)=[0.0, -0.0, -0.0, -1.0, -3.0, -1.0, -1.0, 2.0]
+    BLOX       Eji6Lww6 rug=1 age=    78m liq=   3285 mc=     3003 pc5=  -3.8 pc1h=  -98.0 boost=100.0 life=  688m path%(1,3,5,10,20,30,45,60m)=[-0.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0, -3.0]
+    BLOX       Eji6Lww6 rug=1 age=   155m liq=   3207 mc=     2914 pc5=  -1.2 pc1h=   -0.8 boost=100.0 life=  610m path%(1,3,5,10,20,30,45,60m)=[-0.0, -0.0, -0.0, -0.0, -0.0, 1.0, -1.0, -3.0]
+    FLY        J4AzHntu rug=1 age=   244m liq=   9368 mc=    11185 pc5= -15.2 pc1h=  -51.1 boost=50.0 life=  489m path%(1,3,5,10,20,30,45,60m)=[2.0, 5.0, 6.0, 9.0, 7.0, 10.0, 10.0, 10.0]
+
+===== FIRST_gecko-new-pools n 679 rug-flagged 359
+   age        p10 0.6  p50 1.2  p90 3.7
+   liq        p10 84.1  p50 20211.5  p90 58447.8
+   mcap       p10 10653.0  p50 46354.4  p90 365154.2
+   pc5        p10 -0.5  p50 1.0  p90 142.1
+   pc1h       p10 -0.5  p50 1.0  p90 160.0
+   v5         p10 3.7  p50 241.4  p90 26264.3
+   b5         p10 6.0  p50 57.0  p90 389.0
+   s5         p10 0.0  p50 8.0  p90 150.0
+   fee        p10 110.0  p50 125.0  p90 125.0
+   life_min   p10 0.7  p50 1.0  p90 1.9
+   score      p10 29.0  p50 58.0  p90 91.0
+   same_ticker p10 0  p50 1  p90 6
+
+gecko-new life minutes p25/50/75/90 0.8 1.0 1.1 1.9
+gecko-new observed >= 10 min: 21 >= 30 min: 20 of 679
+
+pumpfun FIRST_latest n 204
+   gross 60s n 199 mean 2.69 median 0.0 win 49%
+   gross 180s n 193 mean -3.00 median -0.1 win 44%
+   gross 300s n 187 mean -1.58 median 0.0 win 47%
+   gross 600s n 174 mean -10.87 median -5.4 win 39%
+   gross 900s n 163 mean -15.73 median -18.6 win 31%
+   gross 1800s n 138 mean -26.45 median -32.6 win 23%
+   gross 3600s n 35 mean -21.09 median -3.8 win 26%

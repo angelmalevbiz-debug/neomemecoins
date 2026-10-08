@@ -1,0 +1,260 @@
+{
+ "CF_VF": {
+  "train_net50": {
+   "n": 6,
+   "pairs": 2,
+   "clusters": 5,
+   "win_rate": 0.0,
+   "mean_pct": -5.945,
+   "median_pct": -6.141,
+   "pf": 0.0,
+   "sum_usd": -71.35,
+   "ci95_mean_usd": [
+    -13.4,
+    -8.929
+   ],
+   "top_pair_share": 0.833,
+   "trades_per_hour": 1.76,
+   "exits": {
+    "STOP": 5,
+    "HOLD": 1
+   }
+  },
+  "train_net0": {
+   "n": 6,
+   "mean_pct": -5.0,
+   "win_rate": 0.0,
+   "pf": 0.0
+  }
+ },
+ "CF_PROXY": {
+  "train_net50": {
+   "n": 34,
+   "pairs": 11,
+   "clusters": 30,
+   "win_rate": 17.6,
+   "mean_pct": -4.629,
+   "median_pct": -3.198,
+   "pf": 0.39,
+   "sum_usd": -314.8,
+   "ci95_mean_usd": [
+    -21.94,
+    3.538
+   ],
+   "top_pair_share": 0.235,
+   "trades_per_hour": 2.7,
+   "exits": {
+    "OPEN_AT_END/VANISHED": 3,
+    "TP": 3,
+    "HOLD": 17,
+    "STOP": 11
+   }
+  },
+  "train_net0": {
+   "n": 34,
+   "mean_pct": -3.671,
+   "win_rate": 23.5,
+   "pf": 0.465
+  }
+ },
+ "CF_NONE": {
+  "train_net50": {
+   "n": 38,
+   "pairs": 11,
+   "clusters": 34,
+   "win_rate": 15.8,
+   "mean_pct": -5.533,
+   "median_pct": -3.198,
+   "pf": 0.222,
+   "sum_usd": -420.49,
+   "ci95_mean_usd": [
+    -21.19,
+    -1.381
+   ],
+   "top_pair_share": 0.211,
+   "trades_per_hour": 2.97,
+   "exits": {
+    "OPEN_AT_END/VANISHED": 3,
+    "HOLD": 21,
+    "STOP": 12,
+    "TP": 2
+   }
+  },
+  "train_net0": {
+   "n": 38,
+   "mean_pct": -4.584,
+   "win_rate": 26.3,
+   "pf": 0.278
+  }
+ },
+ "WE_VF": {
+  "train_net50": {
+   "n": 5,
+   "pairs": 1,
+   "clusters": 3,
+   "win_rate": 0.0,
+   "mean_pct": -6.537,
+   "median_pct": -6.29,
+   "pf": 0.0,
+   "sum_usd": -65.37,
+   "ci95_mean_usd": [
+    -13.886,
+    -12.282
+   ],
+   "top_pair_share": 1.0,
+   "trades_per_hour": 1.52,
+   "exits": {
+    "STOP": 5
+   }
+  },
+  "train_net0": {
+   "n": 5,
+   "mean_pct": -5.598,
+   "win_rate": 0.0,
+   "pf": 0.0
+  }
+ },
+ "WE_PROXY": {
+  "train_net50": {
+   "n": 11,
+   "pairs": 4,
+   "clusters": 9,
+   "win_rate": 0.0,
+   "mean_pct": -4.911,
+   "median_pct": -6.051,
+   "pf": 0.0,
+   "sum_usd": -108.05,
+   "ci95_mean_usd": [
+    -12.308,
+    -6.205
+   ],
+   "top_pair_share": 0.455,
+   "trades_per_hour": 1.58,
+   "exits": {
+    "HOLD": 4,
+    "STOP": 7
+   }
+  },
+  "train_net0": {
+   "n": 11,
+   "mean_pct": -3.956,
+   "win_rate": 9.1,
+   "pf": 0.019
+  }
+ },
+ "WE_NONE": {
+  "train_net50": {
+   "n": 11,
+   "pairs": 4,
+   "clusters": 9,
+   "win_rate": 0.0,
+   "mean_pct": -4.911,
+   "median_pct": -6.051,
+   "pf": 0.0,
+   "sum_usd": -108.05,
+   "ci95_mean_usd": [
+    -12.308,
+    -6.205
+   ],
+   "top_pair_share": 0.455,
+   "trades_per_hour": 1.58,
+   "exits": {
+    "HOLD": 4,
+    "STOP": 7
+   }
+  },
+  "train_net0": {
+   "n": 11,
+   "mean_pct": -3.956,
+   "win_rate": 9.1,
+   "pf": 0.019
+  }
+ },
+ "OFA_VF": {
+  "train_net50": {
+   "n": 12,
+   "pairs": 3,
+   "clusters": 8,
+   "win_rate": 33.3,
+   "mean_pct": -1.626,
+   "median_pct": -6.104,
+   "pf": 0.671,
+   "sum_usd": -39.03,
+   "ci95_mean_usd": [
+    -11.441,
+    7.762
+   ],
+   "top_pair_share": 0.583,
+   "trades_per_hour": 2.83,
+   "exits": {
+    "TP": 3,
+    "STOP": 8,
+    "HOLD": 1
+   }
+  },
+  "train_net0": {
+   "n": 12,
+   "mean_pct": -0.639,
+   "win_rate": 33.3,
+   "pf": 0.852
+  }
+ },
+ "OFA_PROXY": {
+  "train_net50": {
+   "n": 40,
+   "pairs": 12,
+   "clusters": 33,
+   "win_rate": 20.0,
+   "mean_pct": -4.76,
+   "median_pct": -6.343,
+   "pf": 0.273,
+   "sum_usd": -380.82,
+   "ci95_mean_usd": [
+    -13.81,
+    -5.093
+   ],
+   "top_pair_share": 0.275,
+   "trades_per_hour": 3.1,
+   "exits": {
+    "HOLD": 5,
+    "STOP": 29,
+    "TP": 6
+   }
+  },
+  "train_net0": {
+   "n": 40,
+   "mean_pct": -3.804,
+   "win_rate": 20.0,
+   "pf": 0.345
+  }
+ },
+ "OFA_NONE": {
+  "train_net50": {
+   "n": 43,
+   "pairs": 12,
+   "clusters": 35,
+   "win_rate": 20.9,
+   "mean_pct": -4.298,
+   "median_pct": -6.511,
+   "pf": 0.328,
+   "sum_usd": -369.62,
+   "ci95_mean_usd": [
+    -12.895,
+    -3.857
+   ],
+   "top_pair_share": 0.256,
+   "trades_per_hour": 3.33,
+   "exits": {
+    "HOLD": 4,
+    "TP": 8,
+    "STOP": 31
+   }
+  },
+  "train_net0": {
+   "n": 43,
+   "mean_pct": -3.337,
+   "win_rate": 20.9,
+   "pf": 0.411
+  }
+ }
+}

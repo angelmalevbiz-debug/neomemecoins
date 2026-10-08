@@ -1,0 +1,14 @@
+fee100-125 liq50-250k  G1   pairs   24 | forward_net only: n= 8846 mean    0.47 median  -3.40 win%  36.0 p10   -24.7 | all samples incl.  228 ended: n= 9074 mean   -0.03 median  -3.40 win%  35.6 p10   -25.3
+fee100-125 liq50-250k  none pairs  216 | forward_net only: n= 9835 mean    0.47 median  -3.11 win%  38.8 p10   -26.7 | all samples incl.  657 ended: n=10492 mean   -1.60 median  -3.40 win%  37.0 p10   -28.4
+fee100-125 liq<50k     G1   pairs   31 | forward_net only: n= 5482 mean   -7.04 median  -8.09 win%  26.7 p10   -34.1 | all samples incl.  618 ended: n= 6100 mean   -8.79 median  -9.50 win%  24.0 p10   -35.2
+fee100-125 liq<50k     none pairs 1188 | forward_net only: n=14548 mean  -14.55 median -21.49 win%  15.3 p10   -36.2 | all samples incl. 7691 ended: n=22239 mean  -20.56 median -23.18 win%  12.1 p10   -52.0
+fee100-125 liq>=250k   none pairs   13 | forward_net only: n=  333 mean    7.69 median   7.56 win%  74.8 p10    -5.4 | all samples incl.  375 ended: n=  708 mean  -46.15 median -13.85 win%  35.2 p10  -100.0
+fee55-95 liq50-250k    G1   pairs   25 | forward_net only: n= 7686 mean   -4.08 median  -2.30 win%  31.3 p10   -23.3 | all samples incl.  218 ended: n= 7904 mean   -4.90 median  -2.54 win%  30.4 p10   -24.1
+fee55-95 liq50-250k    none pairs   34 | forward_net only: n= 8311 mean   -4.03 median  -2.19 win%  31.8 p10   -22.1 | all samples incl.  229 ended: n= 8540 mean   -4.79 median  -2.40 win%  31.0 p10   -23.1
+fee55-95 liq>=250k     G1   pairs   10 | forward_net only: n= 5781 mean   -2.93 median  -2.76 win%  24.9 p10    -9.8 | all samples incl.    0 ended: n= 5781 mean   -2.93 median  -2.76 win%  24.9 p10    -9.8
+fee55-95 liq>=250k     none pairs   10 | forward_net only: n= 5793 mean   -2.95 median  -2.76 win%  24.9 p10    -9.8 | all samples incl.    0 ended: n= 5793 mean   -2.95 median  -2.76 win%  24.9 p10    -9.8
+fee<=50 liq50-250k     G1   pairs    2 | forward_net only: n=  653 mean   -0.58 median  -0.66 win%  23.9 p10    -1.6 | all samples incl.    0 ended: n=  653 mean   -0.58 median  -0.66 win%  23.9 p10    -1.6
+fee<=50 liq50-250k     none pairs   17 | forward_net only: n=  653 mean   -0.58 median  -0.66 win%  23.9 p10    -1.6 | all samples incl.   17 ended: n=  670 mean   -0.73 median  -0.69 win%  23.6 p10    -1.8
+fee<=50 liq<50k        none pairs    2 | forward_net only: n=0 | all samples incl.    2 ended: n=    2 mean  -99.94 median -99.87 win%   0.0 p10  -100.0
+fee<=50 liq>=250k      G1   pairs   26 | forward_net only: n= 8497 mean   -1.37 median  -0.89 win%  24.6 p10    -3.5 | all samples incl.  280 ended: n= 8777 mean   -2.21 median  -0.94 win%  23.8 p10    -4.7
+fee<=50 liq>=250k      none pairs   63 | forward_net only: n=13695 mean   -0.49 median   0.01 win%  50.2 p10    -2.6 | all samples incl.  768 ended: n=14463 mean   -3.52 median  -0.15 win%  47.5 p10    -4.4

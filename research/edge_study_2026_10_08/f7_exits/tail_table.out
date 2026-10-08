@@ -1,0 +1,132 @@
+#### rnd / cf   (best of 3315 policies: PARTIAL sNone t1_5 hold h240 mean50 4.94 n 9)
+  FIX sNone tNone h60                n=  24 pairs=  5 mean50=  -0.94 med=  -2.44 win= 16.7 top5%->  78% of gross gains | sum$     -45 | sum$ w/o top5%    -124
+  FIX sNone tNone h240               n=   9 pairs=  5 mean50=   1.31 med=  -1.02 win= 11.1 top5%-> 100% of gross gains | sum$      24 | sum$ w/o top5%     -62
+  FIX s-5 t10 h60                    n=  32 pairs=  5 mean50=  -6.20 med=  -2.82 win= 21.9 top5%->  88% of gross gains | sum$    -397 | sum$ w/o top5%    -500
+  FIX sNone t5 h240                  n=  12 pairs=  5 mean50=   1.68 med=  -0.99 win= 25.0 top5%->  47% of gross gains | sum$      40 | sum$ w/o top5%     -43
+  FIX s-35 t40 h240                  n=  11 pairs=  5 mean50=  -4.54 med=  -1.02 win= 18.2 top5%->  52% of gross gains | sum$    -100 | sum$ w/o top5%    -189
+  TRAIL s-35 a40 w2 h240             n=  11 pairs=  5 mean50= -12.48 med=  -2.32 win=  9.1 top5%-> 100% of gross gains | sum$    -275 | sum$ w/o top5%    -277
+  TRAIL s-35 a3 w2 h240              n=  12 pairs=  5 mean50= -11.33 med=  -1.02 win= 16.7 top5%->  77% of gross gains | sum$    -272 | sum$ w/o top5%    -278
+  TRAIL s-20 a10 w7 h240             n=  13 pairs=  5 mean50= -15.78 med=  -3.54 win=  7.7 top5%-> 100% of gross gains | sum$    -410 | sum$ w/o top5%    -412
+  BE sNone t20 a3 b0.5 h120          n=  18 pairs=  5 mean50=   1.39 med=  -1.78 win= 11.1 top5%->  51% of gross gains | sum$      50 | sum$ w/o top5%     -36
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  13 pairs=  5 mean50= -12.42 med=  -3.54 win= 15.4 top5%->  54% of gross gains | sum$    -323 | sum$ w/o top5%    -368
+#### rnd / mid   (best of 3315 policies: PARTIAL sNone t1_5 a20 w12 h120 mean50 -2.23 n 62)
+  FIX sNone tNone h60                n=  92 pairs= 18 mean50=  -5.01 med=  -3.95 win= 19.6 top5%->  62% of gross gains | sum$    -922 | sum$ w/o top5%   -1124
+  FIX sNone tNone h240               n=  34 pairs= 18 mean50=  -8.97 med=  -6.42 win= 17.6 top5%->  83% of gross gains | sum$    -610 | sum$ w/o top5%    -738
+  FIX s-5 t10 h60                    n= 188 pairs= 18 mean50=  -4.21 med=  -6.20 win= 16.5 top5%->  54% of gross gains | sum$   -1583 | sum$ w/o top5%   -1896
+  FIX sNone t5 h240                  n=  51 pairs= 18 mean50=  -5.43 med=  -0.25 win= 49.0 top5%->  32% of gross gains | sum$    -554 | sum$ w/o top5%    -668
+  FIX s-35 t40 h240                  n=  39 pairs= 18 mean50=  -6.79 med=  -6.42 win= 23.1 top5%->  44% of gross gains | sum$    -529 | sum$ w/o top5%    -706
+  TRAIL s-35 a40 w2 h240             n=  39 pairs= 18 mean50=  -7.23 med=  -6.42 win= 23.1 top5%->  49% of gross gains | sum$    -564 | sum$ w/o top5%    -746
+  TRAIL s-35 a3 w2 h240              n=  66 pairs= 18 mean50=  -5.82 med=  -1.59 win= 45.5 top5%->  44% of gross gains | sum$    -769 | sum$ w/o top5%    -900
+  TRAIL s-20 a10 w7 h240             n=  59 pairs= 18 mean50=  -5.05 med=  -4.27 win= 37.3 top5%->  32% of gross gains | sum$    -595 | sum$ w/o top5%    -735
+  BE sNone t20 a3 b0.5 h120          n=  84 pairs= 18 mean50=  -3.62 med=  -2.43 win= 17.9 top5%->  45% of gross gains | sum$    -608 | sum$ w/o top5%    -813
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  49 pairs= 18 mean50=  -4.75 med=  -4.27 win= 34.7 top5%->  28% of gross gains | sum$    -465 | sum$ w/o top5%    -574
+#### rnd / hi   (best of 3315 policies: TRAIL sNone a3 w7 h240 mean50 -2.49 n 107)
+  FIX sNone tNone h60                n= 104 pairs= 45 mean50=  -9.15 med=  -9.76 win= 25.0 top5%->  57% of gross gains | sum$   -1369 | sum$ w/o top5%   -1802
+  FIX sNone tNone h240               n=  60 pairs= 45 mean50= -21.06 med= -13.88 win= 11.7 top5%->  86% of gross gains | sum$   -1792 | sum$ w/o top5%   -2060
+  FIX s-5 t10 h60                    n= 232 pairs= 45 mean50=  -5.04 med=  -6.88 win= 15.5 top5%->  61% of gross gains | sum$   -1713 | sum$ w/o top5%   -2117
+  FIX sNone t5 h240                  n=  98 pairs= 45 mean50=  -4.00 med=   4.13 win= 56.1 top5%->  45% of gross gains | sum$    -687 | sum$ w/o top5%   -1096
+  FIX s-35 t40 h240                  n=  74 pairs= 45 mean50=  -9.81 med= -13.86 win= 23.0 top5%->  39% of gross gains | sum$    -971 | sum$ w/o top5%   -1327
+  TRAIL s-35 a40 w2 h240             n=  74 pairs= 45 mean50= -10.34 med= -13.86 win= 24.3 top5%->  37% of gross gains | sum$   -1035 | sum$ w/o top5%   -1346
+  TRAIL s-35 a3 w2 h240              n= 123 pairs= 45 mean50=  -5.36 med=  -1.33 win= 43.1 top5%->  48% of gross gains | sum$    -902 | sum$ w/o top5%   -1233
+  TRAIL s-20 a10 w7 h240             n= 112 pairs= 45 mean50=  -7.33 med= -13.78 win= 33.9 top5%->  40% of gross gains | sum$   -1246 | sum$ w/o top5%   -1581
+  BE sNone t20 a3 b0.5 h120          n= 116 pairs= 45 mean50=  -3.47 med=  -2.91 win= 21.6 top5%->  55% of gross gains | sum$    -691 | sum$ w/o top5%   -1198
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 102 pairs= 45 mean50=  -7.60 med= -13.78 win= 29.4 top5%->  33% of gross gains | sum$   -1175 | sum$ w/o top5%   -1415
+#### rnd / hi20   (best of 3315 policies: TRAIL s-35 a5 w2 h240 mean50 -1.93 n 147)
+  FIX sNone tNone h60                n= 129 pairs= 84 mean50= -13.83 med= -14.06 win= 16.3 top5%->  79% of gross gains | sum$    -928 | sum$ w/o top5%   -1491
+  FIX sNone tNone h240               n=  93 pairs= 84 mean50= -22.34 med= -14.07 win=  9.7 top5%->  95% of gross gains | sum$   -1256 | sum$ w/o top5%   -1575
+  FIX s-5 t10 h60                    n= 256 pairs= 84 mean50=  -5.98 med=  -7.20 win= 13.7 top5%->  79% of gross gains | sum$    -959 | sum$ w/o top5%   -1509
+  FIX sNone t5 h240                  n= 139 pairs= 84 mean50=  -3.40 med=   4.15 win= 53.2 top5%->  59% of gross gains | sum$    -144 | sum$ w/o top5%    -718
+  FIX s-35 t40 h240                  n= 123 pairs= 84 mean50=  -5.57 med= -14.07 win= 22.0 top5%->  54% of gross gains | sum$    -283 | sum$ w/o top5%    -955
+  TRAIL s-35 a40 w2 h240             n= 123 pairs= 84 mean50=  -5.31 med= -14.07 win= 22.0 top5%->  61% of gross gains | sum$    -247 | sum$ w/o top5%   -1037
+  TRAIL s-35 a3 w2 h240              n= 151 pairs= 84 mean50=  -5.31 med=  -4.95 win= 38.4 top5%->  55% of gross gains | sum$    -411 | sum$ w/o top5%    -794
+  TRAIL s-20 a10 w7 h240             n= 158 pairs= 84 mean50=  -6.03 med= -14.07 win= 27.8 top5%->  73% of gross gains | sum$    -429 | sum$ w/o top5%   -1183
+  BE sNone t20 a3 b0.5 h120          n= 151 pairs= 84 mean50=  -7.48 med=  -9.44 win= 22.5 top5%->  40% of gross gains | sum$    -630 | sum$ w/o top5%    -908
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 148 pairs= 84 mean50=  -6.57 med= -14.07 win= 25.7 top5%->  67% of gross gains | sum$    -447 | sum$ w/o top5%   -1062
+#### rnd / all50   (best of 3315 policies: BE sNone t20 a3 b0.5 h120 mean50 -2.95 n 217)
+  FIX sNone tNone h60                n= 223 pairs= 69 mean50=  -6.73 med=  -4.84 win= 20.6 top5%->  66% of gross gains | sum$   -2470 | sum$ w/o top5%   -3165
+  FIX sNone tNone h240               n= 105 pairs= 69 mean50= -14.61 med= -13.18 win= 14.3 top5%->  77% of gross gains | sum$   -2333 | sum$ w/o top5%   -2761
+  FIX s-5 t10 h60                    n= 459 pairs= 69 mean50=  -4.79 med=  -6.40 win= 16.1 top5%->  61% of gross gains | sum$   -3773 | sum$ w/o top5%   -4597
+  FIX sNone t5 h240                  n= 159 pairs= 69 mean50=  -3.99 med=  -0.25 win= 49.7 top5%->  45% of gross gains | sum$   -1177 | sum$ w/o top5%   -1775
+  FIX s-35 t40 h240                  n= 126 pairs= 69 mean50=  -8.12 med= -12.98 win= 23.0 top5%->  36% of gross gains | sum$   -1565 | sum$ w/o top5%   -2091
+  TRAIL s-35 a40 w2 h240             n= 126 pairs= 69 mean50=  -9.35 med= -12.88 win= 23.0 top5%->  41% of gross gains | sum$   -1860 | sum$ w/o top5%   -2339
+  TRAIL s-35 a3 w2 h240              n= 202 pairs= 69 mean50=  -5.98 med=  -1.46 win= 41.6 top5%->  50% of gross gains | sum$   -1997 | sum$ w/o top5%   -2459
+  TRAIL s-20 a10 w7 h240             n= 187 pairs= 69 mean50=  -7.05 med=  -9.26 win= 33.2 top5%->  37% of gross gains | sum$   -2242 | sum$ w/o top5%   -2717
+  BE sNone t20 a3 b0.5 h120          n= 217 pairs= 69 mean50=  -2.95 med=  -2.43 win= 18.4 top5%->  57% of gross gains | sum$   -1199 | sum$ w/o top5%   -2014
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 166 pairs= 69 mean50=  -6.85 med= -10.22 win= 30.7 top5%->  32% of gross gains | sum$   -1899 | sum$ w/o top5%   -2294
+#### mom / hi   (best of 3315 policies: BE sNone t10 a3 b0.5 h240 mean50 -2.42 n 92)
+  FIX sNone tNone h60                n=  78 pairs= 59 mean50=  -9.66 med= -11.08 win= 17.9 top5%->  70% of gross gains | sum$   -1082 | sum$ w/o top5%   -1443
+  FIX sNone tNone h240               n=  66 pairs= 59 mean50= -19.68 med= -13.86 win= 10.6 top5%->  76% of gross gains | sum$   -1715 | sum$ w/o top5%   -1934
+  FIX s-5 t10 h60                    n= 120 pairs= 59 mean50=  -6.53 med=  -7.51 win= 13.3 top5%->  58% of gross gains | sum$   -1091 | sum$ w/o top5%   -1276
+  FIX sNone t5 h240                  n=  90 pairs= 59 mean50=  -3.49 med=   4.15 win= 51.1 top5%->  45% of gross gains | sum$    -420 | sum$ w/o top5%    -772
+  FIX s-35 t40 h240                  n=  75 pairs= 59 mean50= -11.73 med= -13.78 win= 18.7 top5%->  44% of gross gains | sum$   -1211 | sum$ w/o top5%   -1472
+  TRAIL s-35 a40 w2 h240             n=  75 pairs= 59 mean50= -11.86 med= -13.78 win= 20.0 top5%->  43% of gross gains | sum$   -1224 | sum$ w/o top5%   -1473
+  TRAIL s-35 a3 w2 h240              n=  98 pairs= 59 mean50=  -5.76 med=  -4.11 win= 37.8 top5%->  44% of gross gains | sum$    -761 | sum$ w/o top5%    -917
+  TRAIL s-20 a10 w7 h240             n=  94 pairs= 59 mean50=  -8.80 med= -13.41 win= 27.7 top5%->  41% of gross gains | sum$   -1165 | sum$ w/o top5%   -1348
+  BE sNone t20 a3 b0.5 h120          n=  93 pairs= 59 mean50=  -3.89 med=  -5.94 win= 22.6 top5%->  54% of gross gains | sum$    -514 | sum$ w/o top5%    -963
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  90 pairs= 59 mean50=  -8.98 med= -13.58 win= 24.4 top5%->  33% of gross gains | sum$   -1119 | sum$ w/o top5%   -1280
+#### mom / hi20   (best of 3315 policies: TRAIL s-35 a3 w2 h240 mean50 1.29 n 105)
+  FIX sNone tNone h60                n=  77 pairs= 69 mean50= -19.32 med= -14.14 win= 14.3 top5%->  87% of gross gains | sum$    -792 | sum$ w/o top5%   -1315
+  FIX sNone tNone h240               n=  71 pairs= 69 mean50= -26.45 med= -15.07 win=  9.9 top5%->  93% of gross gains | sum$   -1125 | sum$ w/o top5%   -1418
+  FIX s-5 t10 h60                    n= 116 pairs= 69 mean50=  -6.04 med=  -8.64 win= 22.4 top5%->  43% of gross gains | sum$    -437 | sum$ w/o top5%    -559
+  FIX sNone t5 h240                  n= 101 pairs= 69 mean50=  -5.83 med=   4.28 win= 51.5 top5%->  60% of gross gains | sum$    -184 | sum$ w/o top5%    -664
+  FIX s-35 t40 h240                  n=  89 pairs= 69 mean50=  -0.98 med= -14.07 win= 31.5 top5%->  47% of gross gains | sum$     111 | sum$ w/o top5%    -443
+  TRAIL s-35 a40 w2 h240             n=  89 pairs= 69 mean50=   0.89 med= -14.07 win= 31.5 top5%->  53% of gross gains | sum$     180 | sum$ w/o top5%    -476
+  TRAIL s-35 a3 w2 h240              n= 105 pairs= 69 mean50=   1.29 med=  -6.14 win= 42.9 top5%->  65% of gross gains | sum$     227 | sum$ w/o top5%    -472
+  TRAIL s-20 a10 w7 h240             n= 102 pairs= 69 mean50=  -1.52 med= -14.06 win= 32.4 top5%->  70% of gross gains | sum$      74 | sum$ w/o top5%    -603
+  BE sNone t20 a3 b0.5 h120          n= 100 pairs= 69 mean50=  -3.71 med=  -9.30 win= 33.0 top5%->  54% of gross gains | sum$     -90 | sum$ w/o top5%    -584
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 100 pairs= 69 mean50=  -3.14 med= -14.06 win= 31.0 top5%->  65% of gross gains | sum$     -32 | sum$ w/o top5%    -601
+#### mom / all50   (best of 3315 policies: FEAT-APC5 sNone t20 h120 5/-3.0 mean50 -3.59 n 112)
+  FIX sNone tNone h60                n=  99 pairs= 69 mean50=  -9.46 med= -11.52 win= 20.2 top5%->  64% of gross gains | sum$   -1449 | sum$ w/o top5%   -1847
+  FIX sNone tNone h240               n=  81 pairs= 69 mean50= -19.90 med= -13.86 win= 11.1 top5%->  71% of gross gains | sum$   -2342 | sum$ w/o top5%   -2628
+  FIX s-5 t10 h60                    n= 161 pairs= 69 mean50=  -6.71 med=  -7.43 win= 13.0 top5%->  57% of gross gains | sum$   -1686 | sum$ w/o top5%   -1946
+  FIX sNone t5 h240                  n= 111 pairs= 69 mean50=  -4.62 med=   2.60 win= 50.5 top5%->  44% of gross gains | sum$    -817 | sum$ w/o top5%   -1226
+  FIX s-35 t40 h240                  n=  91 pairs= 69 mean50= -13.06 med= -13.86 win= 17.6 top5%->  47% of gross gains | sum$   -1827 | sum$ w/o top5%   -2166
+  TRAIL s-35 a40 w2 h240             n=  92 pairs= 69 mean50= -12.71 med= -13.78 win= 19.6 top5%->  44% of gross gains | sum$   -1783 | sum$ w/o top5%   -2116
+  TRAIL s-35 a3 w2 h240              n= 121 pairs= 69 mean50=  -7.40 med=  -4.94 win= 37.2 top5%->  43% of gross gains | sum$   -1423 | sum$ w/o top5%   -1603
+  TRAIL s-20 a10 w7 h240             n= 121 pairs= 69 mean50=  -9.68 med= -13.78 win= 27.3 top5%->  38% of gross gains | sum$   -1853 | sum$ w/o top5%   -2069
+  BE sNone t20 a3 b0.5 h120          n= 116 pairs= 69 mean50=  -4.62 med=  -7.14 win= 21.6 top5%->  49% of gross gains | sum$    -862 | sum$ w/o top5%   -1358
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 114 pairs= 69 mean50=  -9.50 med= -13.78 win= 25.4 top5%->  35% of gross gains | sum$   -1669 | sum$ w/o top5%   -1895
+#### vacc / mid   (best of 3315 policies: FEAT-APC5 sNone t20 h240 10/0.0 mean50 1.60 n 23)
+  FIX sNone tNone h60                n=  35 pairs= 13 mean50=  -3.36 med=  -1.92 win= 28.6 top5%->  40% of gross gains | sum$    -235 | sum$ w/o top5%    -275
+  FIX sNone tNone h240               n=  19 pairs= 13 mean50=  -4.65 med=  -3.71 win= 36.8 top5%->  46% of gross gains | sum$    -177 | sum$ w/o top5%    -230
+  FIX s-5 t10 h60                    n=  41 pairs= 13 mean50=  -3.43 med=  -5.40 win= 26.8 top5%->  29% of gross gains | sum$    -281 | sum$ w/o top5%    -320
+  FIX sNone t5 h240                  n=  25 pairs= 13 mean50=  -4.59 med=   4.05 win= 60.0 top5%->  10% of gross gains | sum$    -230 | sum$ w/o top5%    -244
+  FIX s-35 t40 h240                  n=  21 pairs= 13 mean50=  -4.41 med=  -3.71 win= 38.1 top5%->  41% of gross gains | sum$    -185 | sum$ w/o top5%    -268
+  TRAIL s-35 a40 w2 h240             n=  21 pairs= 13 mean50=  -4.93 med=  -3.71 win= 38.1 top5%->  34% of gross gains | sum$    -207 | sum$ w/o top5%    -268
+  TRAIL s-35 a3 w2 h240              n=  29 pairs= 13 mean50=  -2.03 med=   0.43 win= 58.6 top5%->  32% of gross gains | sum$    -118 | sum$ w/o top5%    -173
+  TRAIL s-20 a10 w7 h240             n=  23 pairs= 13 mean50=  -2.38 med=  -0.58 win= 47.8 top5%->  26% of gross gains | sum$    -110 | sum$ w/o top5%    -163
+  BE sNone t20 a3 b0.5 h120          n=  30 pairs= 13 mean50=  -0.57 med=  -1.76 win= 30.0 top5%->  55% of gross gains | sum$     -34 | sum$ w/o top5%    -174
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  22 pairs= 13 mean50=  -3.38 med=  -3.71 win= 40.9 top5%->  31% of gross gains | sum$    -149 | sum$ w/o top5%    -203
+#### vacc / hi   (best of 3315 policies: FIX s-3 t10 h5 mean50 -4.22 n 87)
+  FIX sNone tNone h60                n=  76 pairs= 61 mean50= -11.12 med= -13.69 win= 11.8 top5%->  91% of gross gains | sum$   -1248 | sum$ w/o top5%   -1671
+  FIX sNone tNone h240               n=  67 pairs= 61 mean50= -15.91 med= -13.86 win= 10.4 top5%->  90% of gross gains | sum$   -1532 | sum$ w/o top5%   -1692
+  FIX s-5 t10 h60                    n=  86 pairs= 61 mean50=  -7.79 med=  -9.75 win= 10.5 top5%->  70% of gross gains | sum$    -958 | sum$ w/o top5%   -1159
+  FIX sNone t5 h240                  n=  76 pairs= 61 mean50=  -7.68 med= -11.06 win= 36.8 top5%->  41% of gross gains | sum$    -852 | sum$ w/o top5%   -1017
+  FIX s-35 t40 h240                  n=  71 pairs= 61 mean50= -11.47 med= -13.78 win= 14.1 top5%->  71% of gross gains | sum$   -1125 | sum$ w/o top5%   -1414
+  TRAIL s-35 a40 w2 h240             n=  71 pairs= 61 mean50= -11.90 med= -13.78 win= 14.1 top5%->  72% of gross gains | sum$   -1172 | sum$ w/o top5%   -1430
+  TRAIL s-35 a3 w2 h240              n=  77 pairs= 61 mean50=  -9.90 med= -11.08 win= 23.4 top5%->  67% of gross gains | sum$   -1123 | sum$ w/o top5%   -1261
+  TRAIL s-20 a10 w7 h240             n=  78 pairs= 61 mean50= -10.46 med= -13.69 win= 19.2 top5%->  62% of gross gains | sum$   -1193 | sum$ w/o top5%   -1329
+  BE sNone t20 a3 b0.5 h120          n=  75 pairs= 61 mean50= -10.32 med= -11.52 win= 10.7 top5%->  72% of gross gains | sum$   -1105 | sum$ w/o top5%   -1301
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  76 pairs= 61 mean50=  -9.68 med= -13.41 win= 18.4 top5%->  58% of gross gains | sum$   -1071 | sum$ w/o top5%   -1220
+#### vacc / hi20   (best of 3315 policies: FIX s-3 t20 h5 mean50 -3.39 n 77)
+  FIX sNone tNone h60                n=  71 pairs= 68 mean50= -27.19 med= -14.13 win= 11.3 top5%->  87% of gross gains | sum$   -1068 | sum$ w/o top5%   -1198
+  FIX sNone tNone h240               n=  69 pairs= 68 mean50= -29.19 med= -14.14 win=  8.7 top5%->  88% of gross gains | sum$   -1094 | sum$ w/o top5%   -1259
+  FIX s-5 t10 h60                    n=  77 pairs= 68 mean50=  -8.34 med= -11.41 win= 19.5 top5%->  54% of gross gains | sum$    -369 | sum$ w/o top5%    -461
+  FIX sNone t5 h240                  n=  75 pairs= 68 mean50= -13.41 med= -14.05 win= 37.3 top5%->  42% of gross gains | sum$    -522 | sum$ w/o top5%    -630
+  FIX s-35 t40 h240                  n=  72 pairs= 68 mean50=  -8.53 med= -14.07 win= 23.6 top5%->  37% of gross gains | sum$    -309 | sum$ w/o top5%    -475
+  TRAIL s-35 a40 w2 h240             n=  72 pairs= 68 mean50=  -6.78 med= -14.07 win= 23.6 top5%->  44% of gross gains | sum$    -278 | sum$ w/o top5%    -487
+  TRAIL s-35 a3 w2 h240              n=  75 pairs= 68 mean50=  -6.88 med= -14.06 win= 33.3 top5%->  55% of gross gains | sum$    -292 | sum$ w/o top5%    -498
+  TRAIL s-20 a10 w7 h240             n=  76 pairs= 68 mean50= -10.26 med= -14.07 win= 25.0 top5%->  60% of gross gains | sum$    -431 | sum$ w/o top5%    -595
+  BE sNone t20 a3 b0.5 h120          n=  75 pairs= 68 mean50= -11.12 med= -14.06 win= 25.3 top5%->  42% of gross gains | sum$    -441 | sum$ w/o top5%    -587
+  PARTIAL s-20 t1_10 a20 w12 h240    n=  74 pairs= 68 mean50=  -9.99 med= -14.07 win= 23.0 top5%->  44% of gross gains | sum$    -395 | sum$ w/o top5%    -522
+#### vacc / all50   (best of 3315 policies: FIX s-3 t3 h5 mean50 -3.59 n 160)
+  FIX sNone tNone h60                n= 126 pairs= 80 mean50=  -8.08 med=  -9.39 win= 15.9 top5%->  81% of gross gains | sum$   -1593 | sum$ w/o top5%   -2056
+  FIX sNone tNone h240               n=  96 pairs= 80 mean50= -12.78 med= -11.58 win= 16.7 top5%->  84% of gross gains | sum$   -1854 | sum$ w/o top5%   -2109
+  FIX s-5 t10 h60                    n= 142 pairs= 80 mean50=  -6.51 med=  -7.16 win= 15.5 top5%->  63% of gross gains | sum$   -1467 | sum$ w/o top5%   -1789
+  FIX sNone t5 h240                  n= 111 pairs= 80 mean50=  -6.20 med=  -8.69 win= 41.4 top5%->  47% of gross gains | sum$   -1060 | sum$ w/o top5%   -1396
+  FIX s-35 t40 h240                  n= 103 pairs= 80 mean50=  -9.94 med= -11.58 win= 20.4 top5%->  56% of gross gains | sum$   -1537 | sum$ w/o top5%   -1914
+  TRAIL s-35 a40 w2 h240             n= 103 pairs= 80 mean50= -11.16 med= -11.58 win= 18.4 top5%->  61% of gross gains | sum$   -1774 | sum$ w/o top5%   -2049
+  TRAIL s-35 a3 w2 h240              n= 119 pairs= 80 mean50=  -8.16 med=  -7.19 win= 31.9 top5%->  56% of gross gains | sum$   -1540 | sum$ w/o top5%   -1756
+  TRAIL s-20 a10 w7 h240             n= 113 pairs= 80 mean50=  -9.01 med= -11.08 win= 24.8 top5%->  57% of gross gains | sum$   -1597 | sum$ w/o top5%   -1846
+  BE sNone t20 a3 b0.5 h120          n= 119 pairs= 80 mean50=  -6.66 med=  -7.14 win= 17.6 top5%->  61% of gross gains | sum$   -1142 | sum$ w/o top5%   -1519
+  PARTIAL s-20 t1_10 a20 w12 h240    n= 110 pairs= 80 mean50=  -8.31 med= -10.88 win= 24.5 top5%->  50% of gross gains | sum$   -1428 | sum$ w/o top5%   -1687

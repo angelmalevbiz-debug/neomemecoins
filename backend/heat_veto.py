@@ -72,9 +72,9 @@ PAID_PROFILE_SOURCE = 'latest'
 # Reserved ids of the pre-registered surge (LAB_A) and dip (LAB_B) hypothesis
 # arms of the research. They are not registered Lab books yet; a book listed
 # here records the heat flags without being blocked. Every registered book,
-# the engine accounts and the training probe enforce. The tape scheduler's
-# seats (shared by every ledger) record the flags log-only; see
-# tape_pool_scheduler.TapePoolScheduler.defensive_entry_decision.
+# the engine accounts and the training probe enforce. The tape scheduler
+# withholds new seats on every flag except its own warm-up and lets running
+# leases expire; see tape_pool_scheduler.TapePoolScheduler.defensive_entry_decision.
 LOG_ONLY_BOOK_IDS = frozenset({'LAB_A_SURGE_EST_GUARD', 'LAB_B_DIP_MKTDIP_GUARD'})
 
 

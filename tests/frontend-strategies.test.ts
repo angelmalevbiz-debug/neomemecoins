@@ -212,7 +212,8 @@ test('DEFENSIVE_ENTRY_LAYER_V1: every defensive block reason is named in Bulgari
   // entry_defense.REASONS_IN_ORDER plus the Lab fallback 'defensive_entry'
   // (tests/test_defensive_entry_layer.py checks this map against the backend list).
   const codes = ['defensive_entry', 'rug_input_unknown', 'rug_lp_pullable', 'rug_young_pool', 'rug_fake_market_cap',
-    'rug_ticker_reuse', 'pool_loss_cooldown', 'heat_history_warming', 'heat_input_unknown', 'heat_return_5m_surge',
+    'rug_ticker_reuse', 'rug_ticker_registry_warming', 'pool_loss_cooldown', 'heat_history_warming',
+    'heat_input_unknown', 'heat_return_5m_surge',
     'heat_buy_share_5m', 'heat_volume_acceleration', 'heat_extended_move', 'heat_paid_profile_high_fee',
     'heat_crash_in_progress', 'heat_turnover_5m', 'defensive_entry_error'];
   const statuses = new Set<string>();

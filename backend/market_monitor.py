@@ -29,7 +29,8 @@ import honest_quote_transport as quote_transport
 import paper_market_feasibility as market_feasibility
 import entry_quote_priority
 import compat_file_lock as file_lock
-from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
+from paper_training import (DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, LEARNER_SCORE_VERSION as TRAINING_SCORE_VERSION,
+                            training_candidate_signal)
 from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
 from shared_snapshot_io import read_shared_text
@@ -95,7 +96,10 @@ SCORE_LP_RISK_LIQ_MC = 1.0
 # position (conviction -> CONVICTION_EXIT/PROFIT_LOCK, hold mode, max hold)
 # and the entry hold mode its blind-flow fallback keeps read the V1 score
 # (coin scoreV1), so exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged
-# for positions opened before and after this change.
+# for positions opened before and after this change. The PAPER_TRAINING_V1
+# learners stay on V1 as well: their recorded context (GOLD_ADAPTIVE exits)
+# comes from Monitor.training_context and their min_score reads scoreV1
+# (paper_training.LEARNER_SCORE_VERSION).
 EXIT_CONTEXT_SCORE_VERSION = PREVIOUS_SCORE_VERSION
 # RugCheck/price prewarm population (see Monitor.prewarm_entry_checks).
 PREWARM_VERSION = 'PREWARM_V2_DEFENSIVE_POPULATION'
@@ -919,6 +923,8 @@ class State:
                     'defensive_entry': dict(entry_defense.VERSIONS),
                     'score_version': SCORE_VERSION,
                     'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
+                    # PAPER_TRAINING_V1 learners: min_score and recorded context conviction.
+                    'training_score_version': TRAINING_SCORE_VERSION,
                     'prewarm_version': PREWARM_VERSION,
                     'paper_only': True,
                     'runtime_version': runtime.VERSION,
@@ -1662,8 +1668,9 @@ class Monitor:
         """This engine's entry_defense.DefensiveEntryLayer."""
         with self._entry_defense_lock:
             if self._entry_defense is None:
-                # A new or empty registry is seeded read-only from the other services'
-                # sidecars (the Lab's and the tape's; see sibling_registry_paths).
+                # A registry without current coverage is seeded read-only from the other
+                # services' sidecars (main's for a personal engine, the Lab's and the
+                # tape's; see sibling_registry_paths, TICKER_REGISTRY_SEED_V2).
                 path = entry_defense.registry_path_for(STATE_PATH)
                 self._entry_defense = entry_defense.DefensiveEntryLayer(
                     registry_path=path, seed_paths=entry_defense.sibling_registry_paths(path))
@@ -1862,6 +1869,31 @@ class Monitor:
             },
         }
 
+    def training_context(self, coin: dict[str, Any], position: dict[str, Any] | None = None,
+                         context: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Context recorded for the PAPER_TRAINING_V1 learners: the V1 score basis.
+
+        GOLD_ADAPTIVE (exit_policy 'adaptive') exits read the recorded
+        conviction and hold mode, so like ORDER_FLOW_ADAPTIVE exits they stay
+        on EXIT_CONTEXT_SCORE_VERSION: an entry context (it carries
+        exit_basis_conviction) gets the V1-basis conviction and hold mode; a
+        held position's context already is V1-based. The learners' min_score
+        reads coin scoreV1 (paper_training.learner_score).
+        """
+        context = self.market_context(coin, position) if context is None else context
+        if not isinstance(context, dict) or not context:
+            return context
+        if 'exit_basis_conviction' not in context:
+            return {**context, 'conviction_score_version': EXIT_CONTEXT_SCORE_VERSION}
+        conviction = context['exit_basis_conviction']
+        hold = oct4.hold_mode(conviction)
+        return {**context, 'conviction': conviction, 'mode': hold['mode'],
+                'max_hold_minutes': hold['max_hold_minutes'], 'target_pct': hold['target_pct'],
+                'trail_arm_pct': hold['trail_arm_pct'], 'trail_pct': hold['trail_pct'],
+                'conviction_score_version': EXIT_CONTEXT_SCORE_VERSION,
+                # The engine's own entry conviction (SCORE_VERSION), for reference only.
+                'entry_conviction': context.get('conviction'), 'entry_score_version': SCORE_VERSION}
+
     def _quote_unavailable(self, position, session, reason, error='no_sell_route', forensics=None):
         with STATE.lock:
             live = next((p for p in STATE.positions if p.get('id') == position.get('id')), None)
@@ -1986,7 +2018,7 @@ class Monitor:
             if training_bridge.enabled():
                 training_bridge.observe(coin,STATE.live_flow(address,pair_address=pair),
                     safety=rug_guard.check(coin),validation=price_integrity.check(coin),
-                    context=self.market_context(coin,position),
+                    context=self.training_context(coin,position),
                     quotes={'mark':quote} if mark_valid else None, reasons=['exit_quote'] if not mark_valid else None,
                     now=now_ms())
             if not mark_valid:
@@ -2377,7 +2409,7 @@ class Monitor:
                 # cannot become an executed trade or reuse an older route.
                 training_bridge.observe(current, current_flow, safety=safety,
                     validation=validation, reasons=[reason, 'entry_quote'],
-                    context=self.market_context(current, {}), now=now_ms())
+                    context=self.training_context(current), now=now_ms())
                 training_bridge.note_quote_probe('ROUTE_REJECTED', reason=reason, at=now_ms())
                 return
             stamp = now_ms()
@@ -2387,7 +2419,7 @@ class Monitor:
                 return
             recorded = training_bridge.observe(
                 current, current_flow, safety=safety, validation=validation,
-                quotes=quotes, context=self.market_context(current, {}), now=stamp)
+                quotes=quotes, context=self.training_context(current), now=stamp)
             training_bridge.note_quote_probe(
                 'ROUTE_EVIDENCE_RECORDED' if recorded else 'RECORDING_REFUSED',
                 reason='' if recorded else 'observation_not_queued', at=stamp,
@@ -2553,7 +2585,8 @@ class Monitor:
             # latency without weakening known-risk vetoes.
             validation=price_integrity.check(coin)
             safety=rug_guard.check(coin)
-            training_bridge.observe(coin,flow,safety=safety,validation=validation,context=context,now=now_ms())
+            training_bridge.observe(coin,flow,safety=safety,validation=validation,
+                                    context=self.training_context(coin,context=context),now=now_ms())
             price_review=(
                 validation.get('status')=='review'
                 and validation.get('reason') in {
@@ -2758,7 +2791,7 @@ class Monitor:
                 quotes={'entry':dict(live_quote,entry_network_fee_usd=entry_network_fee,
                                      entry_account_reserve_usd=entry_rent),
                         'exit':dict(initial_exit,exit_network_fee_usd=entry_network_fee)},
-                context=context,now=now_ms())
+                context=self.training_context(coin,context=context),now=now_ms())
             with STATE.lock:
                 if STATE.demo_session_id!=session_at_check or not STATE.running or len(STATE.positions)>=MAX_POSITIONS:
                     return
@@ -3107,7 +3140,7 @@ class Monitor:
             if training_bridge.enabled():
                 for coin in feed:
                     training_bridge.observe(coin,STATE.live_flow(coin['address'],pair_address=coin.get('pairAddress')),
-                        context=self.market_context(coin,{}),now=now_ms())
+                        context=self.training_context(coin),now=now_ms())
             self.prewarm_entry_checks(feed)
             # Entry preparation and quotes must not hold the account/UI lock.
             self.maybe_open(feed)

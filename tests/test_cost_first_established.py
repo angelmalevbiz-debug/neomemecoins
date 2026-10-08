@@ -40,8 +40,17 @@ def coin(**changes):
 
 
 # The universe includes STRUCTURAL_RUG_GUARD_V1 (V2); the pure checks below use an
-# empty ticker registry at NOW, as a fresh engine would.
-REGISTRY = structural_rug_guard.TickerRegistry()
+# empty ticker registry at NOW that has watched the market for 48 h
+# (TICKER_REGISTRY_V2_COVERAGE: 'no other mint seen' counts only after 24 h of
+# coverage; tests/test_defensive_entry_layer.py covers that rule).
+def covered_registry(now=NOW):
+    registry = structural_rug_guard.TickerRegistry()
+    for stamp in range(now - 48 * 3_600_000, now + 1, 1_800_000):
+        registry.mark_observed(stamp)
+    return registry
+
+
+REGISTRY = covered_registry()
 
 
 def candidate(market, **kwargs):
@@ -197,9 +206,10 @@ class LabBookPairTests(unittest.TestCase):
         self.risk = {'status': 'pass', 'mint': MINT, 'pair': PAIR, 'checked_at': NOW}
         self.price = {'status': 'pass', 'mint': MINT, 'pair': PAIR}
         # A fresh, non-persistent Lab defensive layer per test: the ticker memory of
-        # one test (for example a second mint with this ticker) never leaks into the next.
+        # one test (for example a second mint with this ticker) never leaks into the next;
+        # its registry has watched the market for 48 h (no coverage warm-up here).
         for mock in (patch.object(lab, 'STATE', {'books': self.books}),
-                     patch.object(lab, 'DEFENSE', entry_defense.DefensiveEntryLayer()),
+                     patch.object(lab, 'DEFENSE', entry_defense.DefensiveEntryLayer(registry=covered_registry())),
                      patch.object(lab, 'now_ms', side_effect=lambda: self.clock),
                      patch.object(lab.rug_guard, 'check', return_value=self.risk),
                      patch.object(lab.price_integrity, 'check', return_value=self.price)):

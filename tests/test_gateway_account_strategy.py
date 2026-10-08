@@ -70,6 +70,24 @@ class GatewayAccountStrategy(unittest.TestCase):
         self.assertEqual(saved['user-b']['history'], [{'id': 'kept', 'pnl_usd': -12.5}])
         self.assertNotEqual(saved['user-a']['engine_port'], saved['user-b']['engine_port'])
 
+    def test_personal_engines_get_main_state_path_for_their_ticker_registry_seed(self):
+        # TICKER_REGISTRY_SEED_V2: a personal engine's NEO_MARKET_STATE_PATH is its own
+        # account; main's state path (the gateway's own) is passed separately.
+        main_state = str(Path(self.temp.name) / 'state.json')
+        with patch.dict(os.environ, {'NEO_MARKET_STATE_PATH': main_state}):
+            os.environ.pop('NEO_MAIN_MARKET_STATE_PATH', None)
+            self.start('user-b')
+        env = self.spawned[-1]
+        self.assertEqual(env['NEO_MAIN_MARKET_STATE_PATH'], main_state)
+        self.assertEqual(env['NEO_MARKET_STATE_PATH'], str(self.gateway.engine_state_path('user-b')))
+        self.assertNotEqual(env['NEO_MARKET_STATE_PATH'], main_state)
+        with patch.dict(os.environ, {}):
+            os.environ.pop('NEO_MARKET_STATE_PATH', None)
+            os.environ.pop('NEO_MAIN_MARKET_STATE_PATH', None)
+            self.gateway.ENGINE_PROCESSES.clear()
+            self.start('user-a')
+        self.assertNotIn('NEO_MAIN_MARKET_STATE_PATH', self.spawned[-1])
+
     def test_unknown_strategy_fails_closed_without_starting_an_engine(self):
         with self.assertRaisesRegex(RuntimeError, 'unsupported'):
             self.start('user-c')

@@ -9,13 +9,16 @@ front of **every** PAPER entry path:
 
 The vetoes run before any quote, flow promotion, RugCheck call or Jupiter price probe.
 The tape scheduler is the one exception to "all three": its seats serve every ledger, so
-it withholds a seat only on the structural guard (see [Where it runs](#where-it-runs)).
+it gives no seat to a structurally blocked pool and no new seat to a hot one, but applies
+no ledger's loss memory and does not wait for its own heat warm-up (see
+[Tape seats](#tape-seats-structural-guard-and-heat-for-new-seats)).
 
 The layer is PAPER only. It removes candidates. It never admits, sizes, prices or exits
 anything. Exits of open positions, cost caps, `engine_rug_guard` (`RUG_GUARD_V2`, the
 RugCheck report), every ledger and every balance are unchanged. Nothing is reset or
 rewritten. The companion score change is an entry change only: the ORDER_FLOW_ADAPTIVE
-exit context keeps reading the V1 score (see
+exit context and the isolated training learners (`PAPER_TRAINING_V1`, including the
+`GOLD_ADAPTIVE` book's exits) keep reading the V1 score (see
 [Exit context](#exit-context-the-v1-score-stays-the-exit-basis)).
 
 **No profitability claim.** The research behind this change found no strategy with
@@ -102,15 +105,16 @@ Reasons are evaluated in this order, and every reason that applies is recorded:
 
 | Reason | Rule |
 | --- | --- |
-| `rug_input_unknown` | Any input is missing, non-finite or ≤ 0: liquidity (`liquidityUsd`, else `liquidity.usd`), market cap (`marketCap`, else `fdv`), pair age (`pairCreatedAt` at `now`), mint, pool, normalized ticker, or the ticker registry itself. Evaluation stops here. |
+| `rug_input_unknown` | Any input is missing, non-finite or ≤ 0: liquidity (`liquidityUsd`, else `liquidity.usd`), market cap (`marketCap`, else `fdv`), pair age (`pairCreatedAt` at `now`), mint, pool, normalized ticker, or the ticker registry itself. The feed's placeholder for a missing symbol (`TOKEN`, written by `make_coin` and the Gecko early pools) is a missing ticker, and it is never registered. Evaluation stops here. |
 | `rug_lp_pullable` | liquidity / market cap ≥ 1.0 |
 | `rug_young_pool` | pair age < 720 min |
 | `rug_fake_market_cap` | market cap ≥ $20M, liquidity / market cap < 0.02, and age < 14 days |
 | `rug_ticker_reuse` | age < 14 days, and the normalized ticker (alphanumerics only, casefolded) was already seen at or before `now` on another pool with a **different** mint. A token's own second pool, with the same mint, is not a reuse. |
+| `rug_ticker_registry_warming` | age < 14 days, no reuse found, and the registry has observed the market continuously for less than 24 h at `now` (see [Coverage](#coverage-rug_ticker_registry_warming)). |
 
 The ticker check is past-only. `TickerRegistry` is fed with every scan's feed, as
 (mint, pool, normalized ticker, first seen, last seen). Each process keeps it as a small
-JSON sidecar next to its state file:
+JSON sidecar next to its state file (`TICKER_REGISTRY_V2_COVERAGE`):
 
 - `state.ticker_registry.json` for each engine account
 - `strategy_lab.ticker_registry.json` for the Lab
@@ -130,32 +134,77 @@ The sidecar has these properties:
   cap evicted at that time; this is the effective memory horizon, shorter than 14 days.
   `oldest_last_seen_days` is published too.
 - A missing, corrupt or unsupported file starts empty and never stops a service. A
-  failed save keeps the old file and is reported in `save_error`.
+  failed save keeps the old file and is reported in `save_error`. A `TICKER_REGISTRY_V1`
+  sidecar (written before coverage existed) still loads its sightings; its coverage
+  starts again at the next observation.
 
-#### Cold start
+#### Coverage (rug_ticker_registry_warming)
+
+"No other mint seen" only means something once the registry has watched the market. An
+empty registry cannot tell a relaunch from a first launch. Some family pools sit just
+above the 2% fake-cap line, where ticker reuse is the only rule that blocks them: the
+research rows USDF `EpugLBw1` (2.00%, $20.2M, 97 h old) and DOTF `5GaCcKLd` (2.01%,
+$20.3M, 135 h old). Before this rule they passed the guard and the cost-first universe
+with an empty registry, which is every registry on the first deploy, after a long outage
+or after the cap evicted sightings. The rule now fails closed instead:
+
+- The sidecar keeps `covered_since`, the start of the current continuous observation,
+  and `observed_until`, the newest market observation. Both survive restarts.
+- An observation is a non-empty scan. Its time is the feed's newest `updatedAt` (at most
+  5 s after the scan clock), so a stale published feed or an empty scan never extends
+  coverage.
+- A gap longer than 60 min restarts coverage (`coverage.resets`, `last_gap_minutes`). In
+  the research log the median other-mint sibling of a reused ticker was visible for
+  about 1 min, and 82% of the reuse candidates (liquidity ≥ $20k, 561 cases) had every
+  earlier sibling visible for less than 60 min, so a long gap can hide a whole relaunch.
+  Routine restarts (minutes) keep coverage.
+- When the 40,000-entry cap evicts, `covered_since` moves to the newest evicted
+  sighting: memory is complete only after it.
+- A pool younger than 14 days with no reuse found is blocked as
+  `rug_ticker_registry_warming` until coverage at `now` is at least 24 h (the research
+  log covered 22.8 h). Coverage is 0 when the registry's last observation is more than
+  60 min before `now`. Pools of 14 days or more are never judged by tickers, so they
+  never wait.
+
+`check()` publishes `registry_coverage_h`; `status()` publishes `coverage` with
+`covered_since`, `observed_until`, `coverage_hours`, `warming`, `resets`,
+`last_gap_minutes` and `adopted_from`.
+
+The cost: on the first deploy, every engine and Lab book enters no pool younger than
+14 days for 24 h unless the registries are seeded (below), and again after any outage
+longer than 60 min.
+
+#### Seeding (TICKER_REGISTRY_SEED_V2)
 
 A ticker registry is market memory, not account memory: every service sees the same
-market. A registry that is new or empty after loading its own sidecar is therefore
-seeded read-only from the sidecars of the other services, named by their state-file
-environment variables (`NEO_MARKET_STATE_PATH`, `NEO_STRATEGY_LAB_PATH`,
-`NEO_LIVE_TAPE_PATH`; `TICKER_REGISTRY_SEED_V1`):
+market. A registry whose own coverage is not current after loading its sidecar (new,
+empty, legacy, or last observation more than 60 min ago) therefore merges the sidecars
+of the other services read-only. They are named by their state-file environment
+variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STATE_PATH`,
+`NEO_STRATEGY_LAB_PATH`, `NEO_LIVE_TAPE_PATH`):
 
 - The main engine seeds from the Lab's and the tape's sidecars.
-- A new personal engine (its `NEO_MARKET_STATE_PATH` is its own account) seeds from the
-  Lab's and the tape's sidecars, so a new `COST_FIRST` account starts with their memory.
+- A personal engine (its `NEO_MARKET_STATE_PATH` is its own account) seeds from main's
+  sidecar, which the gateway passes as `NEO_MAIN_MARKET_STATE_PATH`, and from the Lab's
+  and the tape's. Main's registry is the only one fed the untrimmed feed with the Gecko
+  new pools, where relaunches show up first; the Lab and the tape see main's trimmed
+  published feed.
 - The Lab seeds from main's and the tape's; the tape from main's and the Lab's.
+- It adopts the earliest `covered_since` of a sibling whose own coverage is current (last
+  observation at most 60 min ago), because the merged sightings cover that span.
 - A seed only adds sightings, so it can only block more. Seed files are read with delete
   sharing and never written. A missing or corrupt seed is skipped (`seed.sources` in
   `status()` records `SEEDED`, `MISSING` or `CORRUPT` per file).
 
-What seeding cannot fix: on the first deploy of this layer no sidecar exists yet. Every
-registry then starts empty and learns only sibling mints that appear in a feed from then
-on; a sibling that was drained or delisted before the start is never learned. This
-matters because some family pools sit just above the 2% fake-cap line, where ticker
-reuse is the only rule that blocks them: the research rows USDF `EpugLBw1` (2.00%,
-$20.2M, 97 h old) and DOTF `5GaCcKLd` (2.01%, $20.3M, 135 h old) pass the cost-first
-universe with an empty registry and are blocked as `rug_ticker_reuse` once their 5 and
-4 earlier sibling mints are known (`tests/test_defensive_entry_layer.py` uses both).
+**First deploy.** No sidecar exists yet. `scripts/build_ticker_registry_seed.py` builds
+main's sidecar offline from a copy of the main training journal
+(`<runtime>/training/observations.jsonl`, which records every scan coin with its mint,
+pool, symbol and time; the research scan log was built from it). It replays the journal
+through the same registry code (normalization, placeholders, pruning, cap, 60-min gap
+rule), writes a `TICKER_REGISTRY_V2_COVERAGE` sidecar to a path that must not exist, and
+never writes the journal. Run it with the services stopped, then start them within
+60 min of the journal's last row; the Lab, the tape and personal engines then seed from
+main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md).
 
 ### HEAT_VETO_STACK_V1
 
@@ -215,7 +264,11 @@ process did not observe. The cost:
   is seen with a paid profile, which vetoes it anyway.
 - A pool first seen by a running process waits 15 min; a pool absent from the feed for
   more than 120 s waits 5 min (a new contiguous segment).
-- The tape seats are not affected: heat is log-only there.
+- The tape seats do not wait: the tape's own warm-up is log-only there.
+
+The engines' and the Lab's diagnostics label `heat_history_warming` as "the pool history
+does not cover the check windows yet (5/15 min, 60 min at ≥ 100 bps; after a restart)";
+`metrics.warming_windows` in each example names the uncovered window.
 
 Persisting `last_paid_at` and a compact 15-min high per pair would shorten the restart
 wait; it is not implemented.
@@ -224,7 +277,8 @@ In `log_only` mode a book receives the same flags with `vetoed` false. This mode
 pre-registered surge or dip hypothesis arm. `heat_veto.LOG_ONLY_BOOK_IDS` reserves the
 research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, which are not
 registered yet. Every registered Lab book, every engine account and the training probe
-enforce the veto. The tape scheduler records the flags log-only (see below).
+enforce the veto. The tape scheduler withholds new seats on every heat rule except its
+own warm-up (see below).
 
 ### Errors fail closed
 
@@ -257,28 +311,36 @@ Streak rules:
 | `COST_FIRST_ESTABLISHED_PAPER_V1` | Structural guard inside `cost_first_established.rejections` (universe V2), with the engine's registry; heat and loss memory as for the default | The universe is also rechecked at commit. |
 | Both `COST_FIRST` Lab books | Structural guard inside the same `cost_first_established.rejections`, with the Lab's registry | Plus the layer, as for every Lab book. |
 | Every Strategy Lab book | `strategy_lab.maybe_open`, right after the book's rule or universe match | Before the cost estimate, flow promotion, RugCheck, Jupiter price probes and modeled fills. Loss memory uses that book's own history. It is checked again at commit, on the commit clock and the book's history at that moment (`commit_recheck_blocked`). The Lab has no observation newer than its refresh, so this catches a stale pair history, a moved 5-min reference or a new loss; a pool that turns hot after the refresh is refused at the next refresh. |
-| Tape scheduler (all seat groups, including `COST_FIRST_UNIVERSE`) | `TapePoolScheduler.select`, per candidate pool | A pool the structural guard blocks gets no entry or exploration seat. Heat runs log-only and no loss memory applies (see below). Pins of held positions are never screened. |
+| Tape scheduler (all seat groups, including `COST_FIRST_UNIVERSE`) | `TapePoolScheduler.select`, per candidate pool | A pool the structural guard blocks gets no entry or exploration seat; a hot pool gets no new seat (a running lease runs out). The tape's own heat warm-up is log-only and no loss memory applies (see below). Pins of held positions are never screened. |
 | Training quote probe | `schedule_training_quote_probe` before the price and RugCheck calls; `run_training_quote_probe` again before `collect_exact_pool_quotes` | Loss memory uses the main account's history. |
 | Engine RugCheck prewarm | `prewarm_entry_checks` (`PREWARM_V2_DEFENSIVE_POPULATION`) | Warms only pools the layer can allow: pair age ≥ 720 min at now, the active strategy's market screen, liquidity ≥ $4k and an allowed layer decision; at most 4 per scan, by 5-min activity then score. The old population (`ageMinutes` ≤ 360) was entirely blocked by the young-pool rule, so an allowed pool's first RugCheck happened at entry and returned `pending` (`risk_check_pending`, one scan lost). |
 
-### Why the tape seat screen is structural only
+### Tape seats: structural guard and heat for new seats
 
 A tape seat is not an entry. It gives a pool the exact-pool flow coverage that every engine
 needs before it may enter (`promoted_entry_guard.flow_admission` requires a COMPLETE
-window, which only a seated pool has), and one seat serves every ledger.
+window, which only a seated pool has), and one seat serves every ledger. Spec item 4 asks
+that no seat be spent on a pool that every entry path blocks:
 
+- **The structural guard is durable**: an LP-pullable, young, fake-cap, reused-ticker or
+  registry-warming pool stays blocked for every engine, so it gets no seat.
+- **Heat withholds a new seat.** A hot or crashing pool (rules (a)–(g), or an unknown
+  price, judged with the scheduler's own pair history) gets no new entry or exploration
+  seat, since no engine would enter it now. A pool that already holds a running lease
+  keeps it until the 60 s lease expires: a buy share or turnover near its threshold
+  flickers, and dropping a lease on one hot 2 s poll would re-queue the pool and reset
+  its coverage. At expiry it competes again under the same screen.
+  (`heat_withheld_new_seats`, `heat_running_leases_kept`)
+- **The tape's own warm-up is log-only.** `heat_history_warming` describes the
+  scheduler's own history after a tape restart, not the pool, and a seat is how pool data
+  is gathered. Withholding seats then would leave the engines, whose own histories may be
+  warm, without a COMPLETE window. Each engine enforces its own warm-up at decision and
+  commit.
 - **Loss memory is per ledger.** Two losses in one Lab book (or in main) say nothing
   about another account. A withheld seat would leave every engine, including accounts
   with no losses there, without a COMPLETE window for up to 6 h. Each entry path applies
-  its own ledger's memory before quoting, so the seat adds nothing.
-- **Heat is short-lived.** A buy share or turnover near its threshold flickers. Dropping
-  a lease on one hot 2 s poll re-queued the pool behind others and could reset its
-  coverage, so when the heat cleared no engine had a COMPLETE window. Every engine
-  enforces heat with its own pair history at decision and again at commit. The tape
-  counts the flags (`log_only_flags`) and never withholds or drops a seat for them; after
-  a tape-only restart, seats are given without waiting for the tape's warm-up.
-- **The structural guard is durable**: an LP-pullable, young, fake-cap or reused-ticker
-  pool stays blocked for every engine, so it gets no seat.
+  its own ledger's memory before quoting, so the seat adds nothing. This part of spec
+  item 4 is a documented deviation that needs the owner's sign-off.
 
 Consequences, all visible in diagnostics:
 
@@ -289,6 +351,9 @@ Consequences, all visible in diagnostics:
 - After any restart, every pool waits 15 min and pools at a fee tier ≥ 100 bps wait
   60 min (heat window coverage). A pool absent from the feed for more than 2 min waits
   5 min; a pool first seen by a running process waits 15 min.
+- Pools younger than 14 days wait until the service's ticker registry has watched the
+  market for 24 h (first deploy without a seed, an outage longer than 60 min, a cap
+  eviction). Pools of 14 days or more are not affected.
 
 ## Score companion: NEO_MARKET_SCORE_V2_LIQ_MC_BAND
 
@@ -332,12 +397,39 @@ Exit decisions are therefore identical to the pre-change code for positions open
 and after this change; `tests/test_defensive_entry_layer.py` checks this for pools at
 liquidity/MC 0.7 and 1.1.
 
+#### The training learners stay on V1 too
+
+The isolated `PAPER_TRAINING_V1` learners (`paper_training.py`) read two things from the
+engine's observations:
+
+- The recorded `context`: the `GOLD_ADAPTIVE` book (`exit_policy: adaptive`) exits through
+  `engine_exit_policy.exit_reason` on its conviction and hold mode (`CONVICTION_EXIT`
+  below 35, `CONVICTION_PROFIT_LOCK` below 50, `ADAPTIVE_MAX_HOLD` below 72). The engine
+  recorded `market_context(coin, {})`, which is an entry context and would have carried
+  the V2 conviction. Example: a pool at liquidity/MC 0.7 with weak flow scores V1 91 and
+  V2 82, so its conviction is 38 on V1 and 34 on V2, and a `GOLD_ADAPTIVE` position at
+  net −1% would have closed with `CONVICTION_EXIT` where the pre-change code held it.
+- `coin.score` for every book's `min_score` and for the engine's training-probe candidate
+  signal (`training_candidate_signal`).
+
+Both stay on `NEO_MARKET_SCORE_V1`. Every `training_bridge.observe` call records
+`Monitor.training_context(...)`: an entry context gets the V1-basis conviction
+(`exit_basis_conviction`) and its hold mode, with `conviction_score_version`
+`NEO_MARKET_SCORE_V1` and the engine's own `entry_conviction` for reference; a held
+position's context already is V1-based and is only labelled. The learners' score is
+`paper_training.learner_score` (`coin.scoreV1`, else `score` for rows recorded before V2;
+`LEARNER_SCORE_VERSION`, published in the learner snapshot and in `/state` config as
+`training_score_version`). Learner decisions are therefore the pre-change ones, the
+validation sample (at least 5 days) stays one regime, and `PAPER_TRAINING_V1` keeps its
+version: bumping it would refuse the saved training state (an explicit reset), which this
+change must not do.
+
 ## Version strings
 
 | Item | Before | Now |
 | --- | --- | --- |
 | Defensive layer | — | `DEFENSIVE_ENTRY_LAYER_V1` |
-| Structural guard | — | `STRUCTURAL_RUG_GUARD_V1` (registry `TICKER_REGISTRY_V1`) |
+| Structural guard | — | `STRUCTURAL_RUG_GUARD_V1` (registry `TICKER_REGISTRY_V2_COVERAGE`; `TICKER_REGISTRY_V1` sidecars still load) |
 | Heat veto | — | `HEAT_VETO_STACK_V1` (history `PAIR_HISTORY_V1`) |
 | Loss memory | — | `POOL_LOSS_MEMORY_V1` |
 | Main entry policy | `WINNER_ENSEMBLE_VERIFIED_ENTRY_V4` | `WINNER_ENSEMBLE_VERIFIED_ENTRY_V5`. Learning still counts V4 closes, so a rule held on V4 evidence stays held and a version bump never releases a throttle. |
@@ -350,7 +442,12 @@ liquidity/MC 0.7 and 1.1.
 | Market score | (unversioned V1) | `NEO_MARKET_SCORE_V2_LIQ_MC_BAND` |
 | Lab retirement review | `LAB_STRATEGY_LIFECYCLE_V1` | `LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE` |
 | Engine RugCheck prewarm | (unversioned: `ageMinutes` ≤ 360) | `PREWARM_V2_DEFENSIVE_POPULATION` |
-| Ticker registry cold start | — | `TICKER_REGISTRY_SEED_V1` |
+| Ticker registry seeding | — | `TICKER_REGISTRY_SEED_V2` (seeds a registry without current coverage, adopts a sibling's current coverage, main's sidecar for personal engines, offline first-deploy builder) |
+| Training learners' score basis | (implicit V1) | `NEO_MARKET_SCORE_V1` (`paper_training.LEARNER_SCORE_VERSION`; `PAPER_TRAINING_V1` unchanged) |
+
+`STRUCTURAL_RUG_GUARD_V1` and the other layer names are unreleased (PR #23 is not
+merged). Changes made during its review keep the names; the definitions are published in
+`config()` and the effective config hashes below change with every one of them.
 
 The `effective_config_hash` of all three engine strategies changes. It now includes
 `entry_defense.config()` (with the heat window coverage and the registry bounds) and the
@@ -360,9 +457,9 @@ value in `tests/test_cost_first_engine_profile.py`:
 
 | Strategy | `effective_config_hash` |
 | --- | --- |
-| `WINNER_ENSEMBLE_PAPER_V1` (default) | `04d06c9a319aeb0130d50985fefd0d87f000f134d9cf01ab8cde1c8d5e584740` |
-| `ORDER_FLOW_ADAPTIVE` | `b7811a9683eba453ff617b6dcf8160c67bf197bb0e80268ab0497999861fe019` |
-| `COST_FIRST_ESTABLISHED_PAPER_V1` | `b29a6c5c772d6438dc14202f241eaa2071fbe48d56c63fbeee60cf9988b1cd12` |
+| `WINNER_ENSEMBLE_PAPER_V1` (default) | `8651943d32eabfbc1cee77a7779507ceda52e95b2477e05c4da44188a1511f2d` |
+| `ORDER_FLOW_ADAPTIVE` | `c2ccd104269f1719ebe6c1f43f1f44efccd1e7421c026471194662f263d8f185` |
+| `COST_FIRST_ESTABLISHED_PAPER_V1` | `a9c39b2609db177fa9b58256a9b4574c4f0c904b98b792094f0c5b11f1c48807` |
 
 The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 
@@ -386,12 +483,13 @@ The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 - versions
 - `checked` and `blocked`
 - `rejections` and `primary_rejections`
-- up to 5 examples, with liquidity/market cap, age, market cap, ticker reuse, heat
-  metrics and the loss-memory deadline
+- up to 5 examples, with liquidity/market cap, age, market cap, ticker reuse, registry
+  coverage (`registry_coverage_h`), heat metrics and the loss-memory deadline
 - `pool_loss_cooldown_pools`
 - `commit_recheck_blocked`
 - `layer`: the registry and history status, including sidecar load and save state, the
-  cold-start `seed` sources, `cap_evictions`, `cap_limited_horizon_days`,
+  registry `coverage` (`covered_since`, `coverage_hours`, `warming`, `resets`), the
+  `seed` sources, `cap_evictions`, `cap_limited_horizon_days`,
   `oldest_last_seen_days` and the history's `observing_since`
 
 Each rejection example's heat metrics include `warming_windows`, `pair_coverage_s` and
@@ -417,9 +515,11 @@ Lab positions carry `defensive_entry`, the decision on the commit clock.
 `live_tape_status.entry_scheduling.defensive_entry` contains:
 
 - counts and up to 6 examples
-- `blocked_pools_in_feed` (structurally blocked pools)
-- `log_only_flags` (heat flags counted, never a seat change) and
-  `heat_veto_mode: LOG_ONLY_AT_SEATS_ENFORCED_BY_EACH_ENGINE`
+- `blocked_pools_in_feed` (structurally blocked pools and hot pools without a lease)
+- `seat_rule: NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL`
+- `heat_veto_mode: NEW_SEATS_WITHHELD_RUNNING_LEASES_KEPT_WARMING_LOG_ONLY`,
+  `heat_withheld_new_seats`, `heat_running_leases_kept` and `log_only_flags` (the tape's
+  own `heat_history_warming`, and heat flags of pools that keep a running lease)
 - `pool_loss_memory_scope: NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY`
 - `layer`
 
@@ -455,7 +555,9 @@ research scan log, extracted read-only, with mint and pool abbreviated to 8 char
 
 - **Fake market cap:** USDP, IOF, WOSE, GOIF x2, SARP x2, DAWS. All are blocked.
 - **Just above the 2% line:** USDF `EpugLBw1` and DOTF `5GaCcKLd`. Only ticker reuse
-  blocks them, so they pass with an empty registry (the cold-start case).
+  blocks them; with an empty registry they are now blocked as
+  `rug_ticker_registry_warming` (the cold-start case), and as `rug_ticker_reuse` once
+  their sibling mints are known.
 - **LP-pullable:** SharkTank `CRGN2uGj` and knightcat `7puXhhDF`. Both are blocked.
 - **Young pool:** OGTRUMP `9rSmRH9w`, 6 min old, which drained later. It is blocked.
 - **Established:** ANSEM, CATE, TROLL, neet. All pass the structural guard.
@@ -466,10 +568,24 @@ series for heat warm-up, and one paid-profile observation.
 `tests/test_defensive_entry_layer.py` covers:
 
 - every rule, its boundaries and the reason order
-- registry persistence: restart, atomic replace, corrupt file, pruning, bounds, failed
-  replace, the engine and tape sidecars surviving a restart, the tape's clean-stop
-  flush, the 40,000-entry bound and its published horizon, and cold-start seeding from
-  sibling sidecars (read-only, missing or corrupt seeds skipped)
+- registry persistence: restart, atomic replace, corrupt file, a legacy V1 sidecar,
+  pruning, bounds, failed replace, the engine and tape sidecars surviving a restart, the
+  tape's clean-stop flush, the 40,000-entry bound and its published horizon, and seeding
+  from sibling sidecars (read-only, coverage adopted only from a current sibling, missing
+  or corrupt seeds skipped, main's sidecar for personal engines)
+- registry coverage: the USDF/DOTF relaunches blocked on an empty or 23.98 h registry
+  and judged after 24 h, a 61-minute gap restarting coverage, a lapsed coverage at
+  decision time, a stale published feed or an empty scan never extending it, coverage
+  surviving a restart, a cap eviction moving its start, the engine and the Lab's
+  `COST_FIRST` books blocking a pool under 14 days before any quote on a fresh registry;
+  the missing-symbol placeholder `TOKEN`; the offline seed builder on a synthetic journal
+  (covered sidecar, journal untouched, existing output refused, a journal gap)
+- the training learners' V1 basis: the recorded `GOLD_ADAPTIVE` context and its exit at
+  liquidity/MC 0.7 and 1.1, the learners' `min_score` and probe signal, the probe's
+  recorded context
+- account isolation: the suite's ledger paths are temporary, and a shell
+  `NEO_MARKET_STATE_PATH` pointing at a stand-in ledger survives an engine test run in a
+  fresh process (the setdefault-based module rewrote it)
 - each heat rule, warm-up (compared unrounded at 299.96 s, and fail closed without a
   reference price), the 15-min and 60-min window coverage after a restart, gaps,
   staleness, a crash during a feed gap, malformed inputs and `log_only`; a raising
@@ -482,8 +598,9 @@ series for heat warm-up, and one paid-profile observation.
   recheck of the engine (default and COST_FIRST: a surge or two losses appearing while
   quotes are prepared) and of the Lab (a loss booked during provider work); the RugCheck
   prewarm population, ranking and cap
-- tape seats: structural blocks withheld, another ledger's losses and heat flags never
-  withhold or drop a seat
+- tape seats: structural blocks withheld, hot pools get no new seat while a running
+  lease is kept until it expires, the tape's own warm-up and another ledger's losses
+  never withhold a seat, up to 6 examples
 - the Lab dashboard labels every defensive reason code
 
 `backend/tests/test_lab_strategy_lifecycle.py` covers the carried V6 and
@@ -498,13 +615,15 @@ The cost-first universe's structural guard is not patched in those tests.
 - `lab_paired_runner.py` and `astra6_brain.py` are experiment services that run only on
   the VPS. The local launcher does not start them. They are not wired in this change.
 - The isolated training learner books (`paper_training.py`, never promoted
-  automatically) are not gated here. They simulate from the observations they receive.
-  The route-quote probe that feeds them executable evidence is gated.
-- The scheduler applies no loss memory and only log-only heat at its seats; each engine,
-  personal engines included, applies its own loss memory and heat at entry.
+  automatically) are not gated here. They simulate from the observations they receive,
+  on the V1 score basis. The route-quote probe that feeds them executable evidence is
+  gated.
+- The scheduler applies no loss memory at its seats (pending the owner's sign-off on
+  that deviation) and does not wait for its own heat warm-up; each engine, personal
+  engines included, applies its own loss memory and heat at entry.
 - Heat history is per process and starts empty after a restart, which costs an engine or
   the Lab 15 min without entries, and 60 min for pools at a fee tier ≥ 100 bps (the tape
-  seats do not wait). Only the ticker registry persists.
+  seats do not wait). Only the ticker registry persists, with its coverage.
 - The archived research forensics (`research/edge_study_2026_10_08/forensics/`) reproduce
   the V1 universe through `cost_first_engine_profile.physical_universe_rejections`; the
   live V2 universe fails closed without a ticker registry and cannot reproduce them.

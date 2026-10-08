@@ -74,7 +74,7 @@ def entry_defense_layer():
     with DEFENSE_LOCK:
         if DEFENSE is None:
             path=entry_defense.registry_path_for(STATE_PATH)
-            # A new or empty registry starts from main's and the tape's ticker memory.
+            # A registry without current coverage merges main's and the tape's ticker memory.
             DEFENSE=entry_defense.DefensiveEntryLayer(
                 registry_path=path,seed_paths=entry_defense.sibling_registry_paths(path))
         return DEFENSE

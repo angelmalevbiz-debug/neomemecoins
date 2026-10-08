@@ -77,14 +77,14 @@ TOKENS_PER_USD = 1_000_000  # fixture route: 1 token (6 decimals) per quoted USD
 DEFAULT_HASH_AT_69BE225 = 'fe08e29c142e0675cfbde9c6d4728a0a4429a64797fdec4ef7532ca6a183e62c'
 ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c200156fdefaeae4f3666ecdc4'
 # effective_config_hash of the three engine strategies with DEFENSIVE_ENTRY_LAYER_V1
-# (PR #23 after its second review: heat window coverage, 40,000-entry registry with
-# cold-start seeding; code defaults, no NEO_* overrides). Positions record this hash as
+# (PR #23 after its third review: heat window coverage, 40,000-entry registry with
+# 24-hour coverage and TICKER_REGISTRY_SEED_V2; code defaults, no NEO_* overrides). Positions record this hash as
 # their audit identity, so an engine default, a profile field or a layer threshold may
 # only change together with these pins (and docs/DEFENSIVE_ENTRY_LAYER.md).
-DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '04d06c9a319aeb0130d50985fefd0d87f000f134d9cf01ab8cde1c8d5e584740'
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '8651943d32eabfbc1cee77a7779507ceda52e95b2477e05c4da44188a1511f2d'
 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
-    'b7811a9683eba453ff617b6dcf8160c67bf197bb0e80268ab0497999861fe019')
-COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'b29a6c5c772d6438dc14202f241eaa2071fbe48d56c63fbeee60cf9988b1cd12'
+    'c2ccd104269f1719ebe6c1f43f1f44efccd1e7421c026471194662f263d8f185')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'a9c39b2609db177fa9b58256a9b4574c4f0c904b98b792094f0c5b11f1c48807'
 
 
 def universe_coin(now, **overrides):
@@ -100,9 +100,20 @@ def universe_coin(now, **overrides):
 
 
 # The universe includes STRUCTURAL_RUG_GUARD_V1 (cost_first_established V2); the
-# pure checks run at a fixed clock with an empty ticker registry, as a fresh engine.
+# pure checks run at a fixed clock with an empty ticker registry that has watched
+# the market for 48 h (TICKER_REGISTRY_V2_COVERAGE: 'no other mint seen' counts only
+# after 24 h; tests/test_defensive_entry_layer.py covers that rule).
 FIXED_NOW = 1_800_000_000_000
-REGISTRY = structural_rug_guard.TickerRegistry()
+
+
+def covered_registry(now):
+    registry = structural_rug_guard.TickerRegistry()
+    for stamp in range(int(now) - 48 * 3_600_000, int(now) + 1, 1_800_000):
+        registry.mark_observed(stamp)
+    return registry
+
+
+REGISTRY = covered_registry(FIXED_NOW)
 
 
 def universe_rejections(coin, cap_usd):
@@ -170,11 +181,12 @@ class CostFirstEntryTests(unittest.TestCase):
         m.STATE_PATH.unlink(missing_ok=True)
         m.STATE = m.State()
         self.monitor = m.Monitor()
-        # A fresh, non-persistent defensive layer per test: no ticker memory
-        # leaks between tests through the sidecar next to the shared state path.
-        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer()
-        self.addCleanup(self.monitor.stop)
         now = m.now_ms()
+        # A fresh, non-persistent defensive layer per test: no ticker memory
+        # leaks between tests through the sidecar next to the shared state path;
+        # its registry has watched the market for 48 h (no coverage warm-up here).
+        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer(registry=covered_registry(now))
+        self.addCleanup(self.monitor.stop)
         self.coin = universe_coin(now)
         self.flow = confirmed_flow(now)
         self.buy_impact, self.sell_impact, self.roundtrip_loss = 0.4, 0.7, 0.008

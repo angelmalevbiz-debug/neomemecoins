@@ -111,8 +111,8 @@ def scheduler_registry_path(out=OUT):
 
 
 # The scheduler's DEFENSIVE_ENTRY_LAYER_V1 keeps its ticker registry in that
-# sidecar, so a tape restart keeps the ticker memory; a new or empty registry
-# starts from main's and the Lab's sidecars (read-only).
+# sidecar, so a tape restart keeps the ticker memory and its coverage; a registry
+# without current coverage merges main's and the Lab's sidecars (read-only).
 _POOL_SCHEDULER = TapePoolScheduler(
     registry_path=scheduler_registry_path(),
     registry_seed_paths=entry_defense.sibling_registry_paths(scheduler_registry_path()))

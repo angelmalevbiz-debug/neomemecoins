@@ -32,6 +32,19 @@ USDC = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 MODEL = "RECORDED_LIQUIDITY_MODEL"
 ADDRESS = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
 MAX_REJECTED_EPISODE_HISTORY = 2000
+# Score basis of every learner decision (min_score and the probe candidate
+# signal): NEO_MARKET_SCORE_V1. The engine's entry score moved to
+# NEO_MARKET_SCORE_V2_LIQ_MC_BAND on 2026-10-08 (DEFENSIVE_ENTRY_LAYER_V1);
+# observations carry the V1 score as coin scoreV1, and those recorded before
+# V2 carry it as score. Keeping V1 keeps one regime in the validation sample
+# (PAPER_TRAINING_V1 state cannot change version without a reset).
+LEARNER_SCORE_VERSION = "NEO_MARKET_SCORE_V1"
+
+
+def learner_score(coin):
+    """NEO_MARKET_SCORE_V1 score of an observation: coin scoreV1, else score (pre-V2 rows)."""
+    value = number((coin or {}).get("scoreV1"), math.nan)
+    return value if math.isfinite(value) else number((coin or {}).get("score"))
 
 
 def number(value, default=0.0):
@@ -236,7 +249,7 @@ def training_candidate_signal(coin, flow, *, now, config=None):
         return False
     minimum_score = min(params["min_score"] for params in HYPOTHESES.values())
     minimum_ratio = min(params["min_flow_ratio"] for params in HYPOTHESES.values())
-    return (number(coin.get("score")) >= minimum_score
+    return (learner_score(coin) >= minimum_score
             and number(flow.get("buy_sell_usd_ratio", flow.get("ratio"))) >= minimum_ratio)
 
 
@@ -473,7 +486,7 @@ class PaperTrainingEngine:
         ratio = number(flow.get("buy_sell_usd_ratio", flow.get("ratio")))
         if ratio < params["min_flow_ratio"]:
             result.append("flow_ratio")
-        if number(row["coin"].get("score")) < params["min_score"]:
+        if learner_score(row["coin"]) < params["min_score"]:
             result.append("score")
         if params.get("exit_policy") == "adaptive" and not self._adaptive_context(row):
             result.append("adaptive_context_unknown_or_future")
@@ -645,7 +658,7 @@ class PaperTrainingEngine:
                     "reasons": reasons, "params": copy.deepcopy(book["params"]),
                     "decision_features": copy.deepcopy(row.get("flow") or {}),
                     "execution_evidence": copy.deepcopy(row.get("execution") or {}),
-                    "price": price, "score": number(row["coin"].get("score")),
+                    "price": price, "score": learner_score(row["coin"]),
                     "outcome": "not_executed", "missed_opportunity": "unknown_until_future_observation"}
         book["rejected"].append(rejected)
         episode_index[episode] = rejected
@@ -1220,6 +1233,7 @@ class PaperTrainingEngine:
     def snapshot(self):
         books = [self.stats(b) for b in self.state["books"].values()]
         return {"version": VERSION, "paper_only": True, "status": self.state["status"],
+                "score_version": LEARNER_SCORE_VERSION,
                 "updated_at": self.state["updated_at"], "active_version": self.state["active_version"],
                 "simulation_count": self.state["simulations"], "unique_market_episodes": len(self.state["episodes"]),
                 "unique_observations": len(self.state["seen_ids"]),

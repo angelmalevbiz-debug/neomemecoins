@@ -3,9 +3,10 @@
 PAPER only. Every entry path (main engine signal strategies, the training
 quote probe and every Strategy Lab book) asks this layer before any quote,
 flow promotion or RugCheck call. The tape scheduler, whose seats serve every
-ledger, withholds entry seats only on the structural guard; it records heat
-flags log-only and applies no ledger's loss memory (each entry path applies
-its own ledger's memory and the heat veto at decision and commit):
+ledger, gives no seat to a structurally blocked pool and no new seat to a hot
+one (running leases expire; its own heat warm-up is log-only) and applies no
+ledger's loss memory (each entry path applies its own ledger's memory and the
+heat veto at decision and commit):
 
 - STRUCTURAL_RUG_GUARD_V1 (structural_rug_guard.py): LP-pullable, young,
   fake-market-cap and ticker-reuse pools, fail closed;
@@ -22,9 +23,11 @@ anything, and no research result shows positive expectancy after costs:
 these rules measurably cut losses, they do not create profit.
 
 One layer instance belongs to one process (engine, Lab, tape). It owns that
-process's ticker registry (persisted next to its state file; a new or empty
-one is seeded read-only from the other services' sidecars) and its pair
-history; the caller feeds both with every scan's feed via ``observe``.
+process's ticker registry (persisted next to its state file with its
+continuous coverage; one without current coverage is seeded read-only from
+the other services' sidecars, and until it has observed the market for 24 h
+pools under 14 days are blocked with rug_ticker_registry_warming) and its
+pair history; the caller feeds both with every scan's feed via ``observe``.
 Neither ``observe`` nor ``evaluate`` raises: an unexpected error blocks the
 candidate with ``defensive_entry_error`` (fail closed) and is counted.
 """
@@ -43,8 +46,12 @@ REASONS_IN_ORDER = rug.REASONS + (pool_loss_memory.REASON,) + heat_veto.REASONS 
 
 
 # State files of the PAPER services on this host (main engine, Lab, tape); each
-# service keeps its ticker registry next to its own state file.
-SERVICE_STATE_ENV = ('NEO_MARKET_STATE_PATH', 'NEO_STRATEGY_LAB_PATH', 'NEO_LIVE_TAPE_PATH')
+# service keeps its ticker registry next to its own state file. The gateway
+# passes main's state file to personal engines as NEO_MAIN_MARKET_STATE_PATH
+# (their NEO_MARKET_STATE_PATH is their own account): main's registry is the
+# only one fed the untrimmed feed with the Gecko new pools.
+SERVICE_STATE_ENV = ('NEO_MAIN_MARKET_STATE_PATH', 'NEO_MARKET_STATE_PATH', 'NEO_STRATEGY_LAB_PATH',
+                     'NEO_LIVE_TAPE_PATH')
 
 
 def registry_path_for(state_path):
@@ -55,12 +62,13 @@ def registry_path_for(state_path):
 
 
 def sibling_registry_paths(own_registry_path, environ=None) -> tuple:
-    """Ticker registry sidecars of the other PAPER services: read-only cold-start seeds.
+    """Ticker registry sidecars of the other PAPER services: read-only seeds (TICKER_REGISTRY_SEED_V2).
 
     Each service names its state file in its environment (SERVICE_STATE_ENV);
     unset variables are skipped and the caller's own sidecar is excluded. A
     personal engine's NEO_MARKET_STATE_PATH is its own account, so it seeds
-    from the Lab's and the tape's sidecars.
+    from main's (NEO_MAIN_MARKET_STATE_PATH, set by the gateway), the Lab's
+    and the tape's sidecars.
     """
     import os
     env = os.environ if environ is None else environ
@@ -202,6 +210,7 @@ def record(summary: dict, decision: dict, coin: dict | None = None, *, example_l
             'symbol': str(coin.get('symbol') or '')[:40], 'reasons': list(decision.get('reasons') or []),
             'liq_mcap': structural.get('liq_mcap'), 'age_min': structural.get('age_min'),
             'mcap': structural.get('mcap'), 'ticker_reused_by': structural.get('ticker_reused_by'),
+            'registry_coverage_h': structural.get('registry_coverage_h'),
             'heat_metrics': dict(heat.get('metrics') or {}),
             'pool_loss_blocked_until': loss.get('blocked_until'),
             **({'error': decision['error']} if decision.get('error') else {})})
@@ -215,6 +224,7 @@ def metrics(decision: dict) -> dict:
     return {'defensive_entry_version': VERSION, 'liq_mcap': structural.get('liq_mcap'),
             'age_min': structural.get('age_min'), 'mcap': structural.get('mcap'),
             'ticker_reused_by': structural.get('ticker_reused_by'),
+            'registry_coverage_h': structural.get('registry_coverage_h'),
             'heat': dict(heat.get('metrics') or {}), 'pool_loss_blocked_until': loss.get('blocked_until'),
             **({'error': decision['error']} if decision.get('error') else {})}
 

@@ -21,12 +21,20 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 _TEMP = tempfile.TemporaryDirectory(prefix='neo-defensive-entry-tests-')
-for _name, _file in (('NEO_MARKET_STATE_PATH', 'state.json'), ('NEO_MARKET_AUDIT_PATH', 'audit.jsonl'),
-                     ('NEO_LIVE_TAPE_PATH', 'tape.json'), ('NEO_STRATEGY_LAB_PATH', 'strategy_lab.json'),
-                     ('NEO_STRATEGY_LAB_COMPACT_PATH', 'strategy_lab_compact.json'),
-                     ('NEO_STRATEGY_LAB_RESET_FLAG', 'strategy_lab.reset')):
-    os.environ.setdefault(_name, str(Path(_TEMP.name) / _file))
-for _key in ('NEO_SIGNAL_STRATEGY', 'NEO_TRADE_NOTIONAL_USD', 'NEO_MAX_DAILY_LOSS_USD', 'NEO_STRICT_ENTRY_SCORE',
+# Always temporary (never setdefault): EngineHarness deletes and rewrites the
+# engine state file, so a shell that points NEO_MARKET_STATE_PATH at a real
+# PAPER account must never reach it. setUpModule also pins the module globals
+# of engines imported earlier in a discover run to these paths.
+_PATHS = (('NEO_MARKET_STATE_PATH', 'state.json'), ('NEO_MARKET_AUDIT_PATH', 'audit.jsonl'),
+          ('NEO_LIVE_TAPE_PATH', 'tape.json'), ('NEO_STRATEGY_LAB_PATH', 'strategy_lab.json'),
+          ('NEO_STRATEGY_LAB_COMPACT_PATH', 'strategy_lab_compact.json'),
+          ('NEO_STRATEGY_LAB_RESET_FLAG', 'strategy_lab.reset'), ('NEO_RISK_CACHE_DIR', 'risk'),
+          ('NEO_PRICE_CHECK_DIR', 'price-check'), ('NEO_TRAINING_ROOT', 'training'),
+          ('NEO_TAPE_DB_PATH', 'tape.sqlite3'))
+for _name, _file in _PATHS:
+    os.environ[_name] = str(Path(_TEMP.name) / _file)
+for _key in ('NEO_MAIN_MARKET_STATE_PATH', 'NEO_SIGNAL_STRATEGY', 'NEO_TRADE_NOTIONAL_USD', 'NEO_MAX_DAILY_LOSS_USD',
+             'NEO_STRICT_ENTRY_SCORE',
              'NEO_STRICT_MIN_CONVICTION', 'NEO_STRICT_MIN_LIQUIDITY_USD', 'NEO_STRICT_MAX_ENTRY_IMPACT_PCT',
              'NEO_STRICT_MAX_ROUNDTRIP_COST_PCT'):
     os.environ.pop(_key, None)
@@ -38,6 +46,7 @@ import heat_veto
 import market_monitor as m
 import order_flow_adaptive_oct4 as oct4
 import paper_market_feasibility as feasibility
+import paper_training as training
 import pool_loss_memory
 import promoted_entry_guard as promoted_guard
 import strategy_lab as lab
@@ -45,6 +54,32 @@ import structural_rug_guard as guard
 import tape_pool_scheduler as tape_scheduler
 import winner_ensemble
 from tape_pool_scheduler import TapePoolScheduler
+
+_MODULE_PATCHES = []
+
+
+def setUpModule():
+    """Pin the ledger paths of engines imported earlier in this process (a discover
+    run may import market_monitor or strategy_lab first) to this module's temp dir."""
+    for target, name, file in ((m, 'STATE_PATH', 'state.json'), (m, 'AUDIT_PATH', 'audit.jsonl'),
+                               (lab, 'STATE_PATH', 'strategy_lab.json'),
+                               (lab, 'COMPACT_PATH', 'strategy_lab_compact.json'),
+                               (lab, 'RESET_FLAG_PATH', 'strategy_lab.reset')):
+        pinned = patch.object(target, name, Path(_TEMP.name) / file)
+        pinned.start()
+        _MODULE_PATCHES.append(pinned)
+
+
+def tearDownModule():
+    while _MODULE_PATCHES:
+        _MODULE_PATCHES.pop().stop()
+
+
+def assert_temporary(path):
+    """Fail before any write or delete outside this module's temporary directory."""
+    if Path(_TEMP.name).resolve() not in Path(path).resolve().parents:
+        raise AssertionError(f'refusing to touch a non-test path: {path}')
+
 
 FIXTURES = json.loads((Path(__file__).resolve().parent / 'fixtures' / 'defensive_entry_obs_20261008.json')
                       .read_text(encoding='utf-8'))
@@ -61,13 +96,34 @@ def fixture(name):
     return copy.deepcopy(row['coin']), row['observed_at']
 
 
+def cover(registry, since, until, step=30 * MINUTE):
+    """Record continuous market observations from ``since`` to ``until`` (coverage only, no sightings)."""
+    stamp = since
+    while stamp < until:
+        registry.mark_observed(stamp)
+        stamp += step
+    registry.mark_observed(until)
+    return registry
+
+
+def covered_registry(now, hours=48):
+    """An empty registry that has watched the market for ``hours`` without a gap up to ``now``."""
+    return cover(guard.TickerRegistry(), now - hours * 60 * MINUTE, now)
+
+
 def research_registry():
-    """Ticker registry holding every research pool of the fixture tickers at its first sighting."""
+    """Ticker registry holding every research pool of the fixture tickers at its first sighting.
+
+    It is treated as covered from 25 h before the scan log to its end: these
+    tests check the rules on real sightings; the 24-hour coverage rule
+    (rug_ticker_registry_warming) has its own tests."""
     registry = guard.TickerRegistry()
     for row in FIXTURES['ticker_universe']:
         registry.observe_coin({'address': row['mint'], 'pairAddress': row['pair'], 'symbol': row['symbol']},
                               row['first_seen'])
-    return registry
+    first = min(row['first_seen'] for row in FIXTURES['ticker_universe'])
+    last = max(row['observed_at'] for row in FIXTURES['fixtures'].values())
+    return cover(registry, first - 25 * 60 * MINUTE, last)
 
 
 def established(now, **changes):
@@ -198,7 +254,9 @@ class StructuralRugGuardRuleTests(unittest.TestCase):
                  {'marketCap': None, 'fdv': None}, {'marketCap': 0, 'fdv': 0}, {'marketCap': -1, 'fdv': None},
                  {'pairCreatedAt': None}, {'pairCreatedAt': self.NOW}, {'pairCreatedAt': self.NOW + 1},
                  {'pairCreatedAt': 'x'}, {'symbol': None}, {'symbol': '\U0001f438\U0001f438'}, {'address': ''},
-                 {'pairAddress': None}, {'liquidityUsd': True}]
+                 {'pairAddress': None}, {'liquidityUsd': True},
+                 # The feed's placeholder for a missing symbol is a missing ticker.
+                 {'symbol': 'TOKEN'}, {'symbol': 'Token!'}]
         for change in cases:
             with self.subTest(change=change):
                 result = guard.check(self.coin(**change), self.NOW, registry)
@@ -218,7 +276,7 @@ class StructuralRugGuardRuleTests(unittest.TestCase):
         self.assertFalse(result['blocked'])
 
     def test_boundaries(self):
-        registry = guard.TickerRegistry()
+        registry = covered_registry(self.NOW)
         check = lambda **c: guard.check(self.coin(**c), self.NOW, registry)['reasons']
         self.assertEqual(check(liquidityUsd=5_000_000), ['rug_lp_pullable'])            # liq/mcap == 1.0
         self.assertEqual(check(liquidityUsd=4_999_999), [])
@@ -231,7 +289,7 @@ class StructuralRugGuardRuleTests(unittest.TestCase):
         self.assertEqual(check(marketCap=19_999_999, liquidityUsd=100_000, pairCreatedAt=self.NOW - DAY), [])
 
     def test_ticker_reuse_needs_a_different_mint_seen_at_or_before_now(self):
-        registry = guard.TickerRegistry()
+        registry = covered_registry(self.NOW)
         coin = self.coin(symbol='D O T F', pairCreatedAt=self.NOW - 3 * DAY)
         # The token's own second pool (same mint) is not a reuse.
         registry.observe_coin({'address': MINT, 'pairAddress': OTHER_PAIR, 'symbol': 'DOTF'}, self.NOW - DAY)
@@ -279,8 +337,9 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         self.assertEqual(first.status()['saves'], 1)
         self.assertEqual([p.name for p in self.path.parent.iterdir()], [self.path.name], 'no temp file left')
         data = json.loads(self.path.read_text(encoding='utf-8'))
-        self.assertEqual(data['version'], 'TICKER_REGISTRY_V1')
+        self.assertEqual(data['version'], 'TICKER_REGISTRY_V2_COVERAGE')
         self.assertEqual(data['entries'], [[OTHER_MINT, OTHER_PAIR, 'wose', self.NOW - DAY, self.NOW - DAY]])
+        self.assertEqual((data['covered_since'], data['observed_until']), (self.NOW - DAY, self.NOW - DAY))
         second = self.registry()
         self.assertEqual(second.load_status, 'LOADED')
         self.assertEqual(second.reusers('wose', MINT, PAIR, self.NOW), [(OTHER_MINT, OTHER_PAIR)])
@@ -297,16 +356,22 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
                 self.assertEqual(registry.load_status, 'CORRUPT_STARTED_EMPTY')
                 self.assertEqual(len(registry), 0)
                 registry.observe([self.coin(MINT, PAIR, 'X')], self.NOW)
-                self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['version'], 'TICKER_REGISTRY_V1')
+                self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['version'],
+                                 'TICKER_REGISTRY_V2_COVERAGE')
 
     def test_invalid_rows_are_skipped_and_stale_rows_pruned_on_load(self):
         rows = [[MINT, PAIR, 'good', self.NOW - DAY, self.NOW - DAY],
                 [OTHER_MINT, OTHER_PAIR, 'old', self.NOW - 30 * DAY, self.NOW - 15 * DAY],
-                ['', PAIR, 'bad', 1, 2], [MINT, PAIR, 'NotNormalized', 1, 2], [MINT, PAIR, 'x', 5, 1], 'junk']
+                ['', PAIR, 'bad', 1, 2], [MINT, PAIR, 'NotNormalized', 1, 2], [MINT, PAIR, 'x', 5, 1], 'junk',
+                # A placeholder registered before the placeholder rule is dropped.
+                ['P' * 44, 'Q' * 44, 'token', self.NOW - DAY, self.NOW - DAY]]
+        # A legacy V1 sidecar (no coverage) loads its sightings; coverage starts again.
         self.path.write_text(json.dumps({'version': 'TICKER_REGISTRY_V1', 'entries': rows}), encoding='utf-8')
         registry = self.registry()
         self.assertEqual(registry.load_status, 'LOADED')
-        self.assertEqual(registry.load_skipped_rows, 4)
+        self.assertEqual(registry.status()['loaded_version'], 'TICKER_REGISTRY_V1')
+        self.assertEqual(registry.coverage_ms(self.NOW), 0.0)
+        self.assertEqual(registry.load_skipped_rows, 5)
         self.assertEqual(len(registry), 1, 'last seen 15 days ago is pruned (14-day retention)')
         self.assertEqual(registry.reusers('good', 'Z' * 44, 'Y' * 44, self.NOW), [(MINT, PAIR)])
 
@@ -378,53 +443,75 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         self.assertEqual(small.reusers('t0', MINT, PAIR, self.NOW + 30 * hour), [])
 
     def sibling_sidecars(self):
-        """The Lab's sidecar knows every USDF mint, the tape's every DOTF mint (research sightings)."""
+        """The Lab's sidecar knows every USDF mint, the tape's every DOTF mint (research sightings).
+
+        The Lab has watched the market for 30 h up to 5 minutes ago (current
+        coverage); the tape's last observation is 3 h old (lapsed coverage)."""
         lab_sidecar = Path(self.tmp.name) / 'strategy_lab.ticker_registry.json'
         tape_sidecar = Path(self.tmp.name) / 'live_tape.ticker_registry.json'
-        for path, ticker in ((lab_sidecar, 'usdf'), (tape_sidecar, 'dotf')):
+        for path, ticker, until in ((lab_sidecar, 'usdf', self.clock - 5 * MINUTE),
+                                    (tape_sidecar, 'dotf', self.clock - 180 * MINUTE)):
             sibling = guard.TickerRegistry(path, clock=lambda: self.clock)
             for row in FIXTURES['ticker_universe']:
                 if row['ticker'] == ticker:
                     sibling.observe_coin({'address': row['mint'], 'pairAddress': row['pair'],
                                           'symbol': row['symbol']}, row['first_seen'])
+            cover(sibling, until - 30 * 60 * MINUTE, until)
             self.assertTrue(sibling.flush())
         return lab_sidecar, tape_sidecar
 
-    def test_a_new_or_empty_registry_is_seeded_read_only_from_sibling_sidecars(self):
+    def test_a_registry_without_current_coverage_is_seeded_read_only_from_sibling_sidecars(self):
         self.clock = 1_791_440_000_000                      # just after both research rows
         lab_sidecar, tape_sidecar = self.sibling_sidecars()
         seeds = (lab_sidecar, tape_sidecar)
         before = [path.read_bytes() for path in seeds]
-        # With an empty registry both threshold-edge family pools enter the cost-first universe.
+        # An empty registry (the first deploy) never passes the threshold-edge family pools
+        # (USDF 2.00%, DOTF 2.01% liquidity/market cap, 97 h and 135 h old): 'no other mint
+        # seen' means nothing yet, so the ticker rule fails closed.
         for name in ('USDF_EpugLBw1', 'DOTF_5GaCcKLd'):
             coin, observed_at = fixture(name)
             with self.subTest(name=name):
                 self.assertGreaterEqual(guard.check(coin, observed_at, guard.TickerRegistry())['liq_mcap'], 0.02)
                 self.assertEqual(cost_first.rejections(coin, cap_usd=200.0, now=observed_at,
-                                                       ticker_registry=guard.TickerRegistry()), [])
-        # A new engine registry (no sidecar yet) is seeded from both siblings and blocks them.
+                                                       ticker_registry=guard.TickerRegistry()),
+                                 ['rug_ticker_registry_warming'])
+                self.assertEqual(cost_first.physical_rejections(coin, cap_usd=200.0), [])
+        # A new engine registry (no sidecar yet) is seeded from both siblings and blocks them;
+        # it adopts the Lab's current coverage (30 h), not the tape's lapsed one.
         fresh = self.registry(seed_paths=seeds + (self.path,))
         self.assertEqual(fresh.load_status, 'MISSING_STARTED_EMPTY')
-        status = fresh.status()['seed']
-        self.assertEqual(status['sources'], {'strategy_lab.ticker_registry.json': 'SEEDED',
-                                             'live_tape.ticker_registry.json': 'SEEDED'})
-        self.assertEqual(status['entries'], 11)
+        status = fresh.status()
+        self.assertEqual(status['seed']['sources'], {'strategy_lab.ticker_registry.json': 'SEEDED',
+                                                     'live_tape.ticker_registry.json': 'SEEDED'})
+        self.assertEqual(status['seed']['entries'], 11)
+        self.assertEqual(status['coverage']['adopted_from'], 'strategy_lab.ticker_registry.json')
+        self.assertEqual(status['coverage']['covered_since'], self.clock - 5 * MINUTE - 30 * 60 * MINUTE)
+        self.assertFalse(status['coverage']['warming'])
         for name in ('USDF_EpugLBw1', 'DOTF_5GaCcKLd'):
             coin, observed_at = fixture(name)
             with self.subTest(name=name):
                 self.assertEqual(cost_first.rejections(coin, cap_usd=200.0, now=observed_at, ticker_registry=fresh),
                                  ['rug_ticker_reuse'])
         self.assertEqual([path.read_bytes() for path in seeds], before, 'seed files are never written')
-        self.assertTrue(fresh.flush(), 'the seeded memory is saved in its own sidecar')
-        # A registry that loads a non-empty sidecar of its own is not seeded again.
+        self.assertTrue(fresh.flush(), 'the seeded memory and coverage are saved in its own sidecar')
+        # A registry whose own coverage is current after loading its sidecar is not seeded again.
         loaded = self.registry(seed_paths=seeds)
         self.assertEqual((loaded.load_status, loaded.status()['seed']['sources'], len(loaded)), ('LOADED', {}, 11))
+        self.assertGreater(loaded.coverage_ms(self.clock), 24 * 60 * MINUTE)
+        # Three hours later every coverage has lapsed: the siblings are merged again
+        # (sightings only add), nothing is adopted and the registry warms.
+        self.clock += 180 * MINUTE
+        stale = self.registry(seed_paths=seeds)
+        self.assertEqual(stale.status()['seed']['sources'], {'strategy_lab.ticker_registry.json': 'SEEDED',
+                                                             'live_tape.ticker_registry.json': 'SEEDED'})
+        self.assertEqual((len(stale), stale.coverage_ms(self.clock)), (11, 0.0))
+        self.assertTrue(stale.status()['coverage']['warming'])
         # Missing or corrupt seeds start empty and never raise.
         corrupt = Path(self.tmp.name) / 'corrupt.ticker_registry.json'
         corrupt.write_text('{oops', encoding='utf-8')
         other = guard.TickerRegistry(Path(self.tmp.name) / 'other.json', clock=lambda: self.clock,
                                      seed_paths=(Path(self.tmp.name) / 'missing.json', corrupt))
-        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V1', 'entries': 0,
+        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V2', 'entries': 0,
                                                  'sources': {'missing.json': 'MISSING',
                                                              'corrupt.ticker_registry.json': 'CORRUPT'}})
         self.assertEqual(len(other), 0)
@@ -440,6 +527,15 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         self.assertEqual(entry_defense.sibling_registry_paths(engine, env), (lab_sidecar, tape_sidecar))
         self.assertEqual(entry_defense.sibling_registry_paths(tape_sidecar, env), (engine, lab_sidecar))
         self.assertEqual(entry_defense.sibling_registry_paths(engine, {}), ())
+        # A personal engine also reads main's sidecar (the gateway passes main's state path);
+        # main itself never lists its own sidecar twice.
+        main_state = root / 'state.json'
+        main_sidecar = entry_defense.registry_path_for(main_state)
+        personal_env = dict(env, NEO_MAIN_MARKET_STATE_PATH=str(main_state))
+        self.assertEqual(entry_defense.sibling_registry_paths(engine, personal_env),
+                         (main_sidecar, lab_sidecar, tape_sidecar))
+        main_env = dict(personal_env, NEO_MARKET_STATE_PATH=str(main_state))
+        self.assertEqual(entry_defense.sibling_registry_paths(main_sidecar, main_env), (lab_sidecar, tape_sidecar))
         # The services wire their own sidecar and the siblings named by the environment.
         import live_tape
         monitor = m.Monitor()
@@ -461,6 +557,189 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
             scheduler = tape_scheduler.TapePoolScheduler(
                 registry_path=tape_sidecar, registry_seed_paths=entry_defense.sibling_registry_paths(tape_sidecar))
         self.assertEqual(scheduler.defense.registry.seed_paths, (engine, lab_sidecar))
+
+
+class TickerRegistryCoverageTests(unittest.TestCase):
+    """rug_ticker_registry_warming: 'no other mint seen' counts only after 24 h of
+    continuous observation (TICKER_REGISTRY_V2_COVERAGE)."""
+    NOW = 1_800_000_000_000
+    HOUR = 60 * MINUTE
+
+    def young(self, symbol='NEWT', **changes):
+        coin = {'address': MINT, 'pairAddress': PAIR, 'symbol': symbol, 'liquidityUsd': 500_000,
+                'marketCap': 5_000_000, 'pairCreatedAt': self.NOW - 3 * DAY}
+        coin.update(changes)
+        return coin
+
+    def test_a_relaunch_just_above_the_fake_cap_line_waits_for_24_hours_of_coverage(self):
+        # The reviewed gap: with an empty registry the USDF/DOTF family pools (2.00% / 2.01%
+        # liquidity/market cap) passed the guard and the cost-first universe.
+        coin, at = fixture('DOTF_5GaCcKLd')
+        empty = guard.TickerRegistry()
+        result = guard.check(coin, at, empty)
+        self.assertEqual((result['reasons'], result['registry_coverage_h']), (['rug_ticker_registry_warming'], 0.0))
+        self.assertEqual(cost_first.rejections(coin, cap_usd=200.0, now=at, ticker_registry=empty),
+                         ['rug_ticker_registry_warming'])
+        short = cover(guard.TickerRegistry(), at - 24 * self.HOUR + MINUTE, at)
+        self.assertEqual(guard.check(coin, at, short)['reasons'], ['rug_ticker_registry_warming'])
+        self.assertEqual(guard.check(coin, at, short)['registry_coverage_h'], 23.98)
+        full = cover(guard.TickerRegistry(), at - 24 * self.HOUR, at)
+        self.assertEqual(guard.check(coin, at, full)['reasons'], [], 'no sibling seen in 24 h of watching')
+        # A sibling already seen is a reuse whatever the coverage; an established pool
+        # (>= 14 days) is never judged by tickers, so it never waits.
+        empty.observe_coin({'address': OTHER_MINT, 'pairAddress': OTHER_PAIR, 'symbol': 'DOTF'}, at - DAY)
+        self.assertEqual(guard.check(coin, at, empty)['reasons'], ['rug_ticker_reuse'])
+        ansem, ansem_at = fixture('ANSEM_FnzKY6x7')
+        self.assertEqual(guard.check(ansem, ansem_at, guard.TickerRegistry())['reasons'], [])
+        config = guard.config()
+        self.assertEqual(config['reasons_in_order'][-1], 'rug_ticker_registry_warming')
+        self.assertEqual(config['parameters']['ticker_registry_min_coverage_minutes'], 1440.0)
+        self.assertEqual(config['registry']['coverage']['max_gap_minutes'], 60)
+        self.assertEqual(config['registry_version'], 'TICKER_REGISTRY_V2_COVERAGE')
+
+    def test_a_gap_longer_than_60_minutes_restarts_coverage(self):
+        registry = cover(guard.TickerRegistry(), self.NOW - 30 * self.HOUR, self.NOW - 2 * self.HOUR)
+        registry.mark_observed(self.NOW - self.HOUR)                              # exactly 60 min: kept
+        self.assertEqual(registry.coverage_ms(self.NOW - self.HOUR), 29 * self.HOUR)
+        registry.mark_observed(self.NOW + MINUTE)                                 # 61 min later
+        coverage = registry.coverage_status(self.NOW + MINUTE)
+        self.assertEqual((coverage['covered_since'], coverage['resets'], coverage['last_gap_minutes']),
+                         (self.NOW + MINUTE, 1, 61.0))
+        self.assertEqual(registry.coverage_ms(self.NOW + MINUTE), 0.0)
+        self.assertEqual(guard.check(self.young(), self.NOW + MINUTE, registry)['reasons'],
+                         ['rug_ticker_registry_warming'])
+
+    def test_coverage_lapses_when_the_registry_stops_observing(self):
+        registry = cover(guard.TickerRegistry(), self.NOW - 30 * self.HOUR, self.NOW)
+        self.assertEqual(guard.check(self.young(), self.NOW + 60 * MINUTE, registry)['reasons'], [])
+        self.assertEqual(registry.coverage_ms(self.NOW + 61 * MINUTE), 0.0)
+        self.assertEqual(guard.check(self.young(), self.NOW + 61 * MINUTE, registry)['reasons'],
+                         ['rug_ticker_registry_warming'])
+
+    def test_a_stale_published_feed_or_an_empty_scan_never_extends_coverage(self):
+        registry = guard.TickerRegistry()
+        stale = dict(self.young(), updatedAt=self.NOW - 2 * self.HOUR)
+        for minutes in (0, 30, 60, 90):
+            registry.observe([stale], self.NOW + minutes * MINUTE)
+        self.assertEqual(registry.coverage_status(self.NOW)['observed_until'], self.NOW - 2 * self.HOUR)
+        self.assertEqual(registry.coverage_ms(self.NOW + 90 * MINUTE), 0.0)
+        registry.observe([], self.NOW + 95 * MINUTE)
+        self.assertEqual(registry.coverage_status(self.NOW)['observed_until'], self.NOW - 2 * self.HOUR)
+        # A fresh observation starts coverage again (the gap exceeded 60 min).
+        registry.observe([dict(stale, updatedAt=self.NOW + 100 * MINUTE)], self.NOW + 100 * MINUTE)
+        self.assertEqual(registry.coverage_status(self.NOW)['covered_since'], self.NOW + 100 * MINUTE)
+        # A stamp more than 5 s after the scan clock is skew: the scan clock counts.
+        self.assertEqual(guard.observation_time({'updatedAt': self.NOW + 6_000}, self.NOW), self.NOW)
+        self.assertEqual(guard.observation_time({'updatedAt': self.NOW + 4_000}, self.NOW), self.NOW)
+        self.assertEqual(guard.observation_time({}, self.NOW), self.NOW)
+
+    def test_coverage_survives_a_restart_and_a_cap_eviction_moves_its_start(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'state.ticker_registry.json'
+            first = guard.TickerRegistry(path, clock=lambda: self.NOW)
+            cover(first, self.NOW - 30 * self.HOUR, self.NOW)
+            self.assertTrue(first.flush())
+            restarted = guard.TickerRegistry(path, clock=lambda: self.NOW + 10 * MINUTE)
+            self.assertEqual(restarted.loaded_version, 'TICKER_REGISTRY_V2_COVERAGE')
+            self.assertEqual(restarted.coverage_ms(self.NOW + 10 * MINUTE), 30 * self.HOUR + 10 * MINUTE)
+            self.assertFalse(restarted.status()['coverage']['warming'])
+        # The 40,000-entry cap evicted sightings up to hour 11: memory is complete only after them.
+        small = guard.TickerRegistry(max_entries=20, prune_interval_ms=0)
+        for index in range(30):
+            small.observe([{'address': f'M{index:02d}' + 'A' * 40, 'pairAddress': f'P{index:02d}' + 'B' * 40,
+                            'symbol': f'T{index}'}], self.NOW + index * self.HOUR)
+        self.assertEqual(small.status()['cap_evictions'], 12)
+        self.assertEqual(small.coverage_status(self.NOW + 29 * self.HOUR)['covered_since'], self.NOW + 11 * self.HOUR)
+        self.assertEqual(small.coverage_ms(self.NOW + 29 * self.HOUR), 18 * self.HOUR)
+
+    def test_the_missing_symbol_placeholder_is_a_missing_ticker(self):
+        made = m.make_coin(MINT, {'pairAddress': PAIR, 'priceUsd': 1, 'baseToken': {},
+                                  'liquidity': {'usd': 500_000}, 'marketCap': 5_000_000,
+                                  'pairCreatedAt': self.NOW - 30 * DAY}, {})
+        self.assertEqual(made['symbol'], 'TOKEN')
+        registry = covered_registry(self.NOW)
+        self.assertEqual(guard.check(made, self.NOW, registry)['reasons'], ['rug_input_unknown'])
+        self.assertEqual(guard.check(self.young(symbol=None), self.NOW, registry)['reasons'], ['rug_input_unknown'])
+        # Placeholders are never registered, so two unnamed mints are not each other's reuse.
+        self.assertFalse(registry.observe_coin(made, self.NOW))
+        self.assertEqual(len(registry), 0)
+        self.assertEqual(guard.ticker_of({'symbol': 'TOKEN'}), '')
+        self.assertEqual(guard.ticker_of({'symbol': 'TOKENS'}), 'tokens')
+        self.assertEqual(guard.config()['unknown_ticker_placeholders'], ['token'])
+
+
+class TickerRegistrySeedBuilderTests(unittest.TestCase):
+    """scripts/build_ticker_registry_seed.py: first-deploy seed from a training journal copy."""
+    T0 = 1_800_000_000_000
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util
+        path = Path(__file__).resolve().parents[1] / 'scripts' / 'build_ticker_registry_seed.py'
+        spec = importlib.util.spec_from_file_location('build_ticker_registry_seed', path)
+        cls.tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.tool)
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix='neo-seed-builder-')
+        self.addCleanup(self.tmp.cleanup)
+        self.journal = Path(self.tmp.name) / 'observations.jsonl'
+        self.out = Path(self.tmp.name) / 'state.ticker_registry.json'
+
+    def write_journal(self, stamps, *, extra=()):
+        lines = []
+        for index, stamp in enumerate(stamps):
+            coin = {'address': f'M{index % 5}' + 'A' * 42, 'pairAddress': f'P{index % 5}' + 'B' * 42,
+                    'symbol': f'T{index % 5}', 'updatedAt': stamp}
+            lines.append(json.dumps({'observed_at': stamp, 'available_at': stamp, 'coin': coin}))
+        # A relaunch family: two other mints of DOTF seen early on.
+        lines.append(json.dumps({'observed_at': stamps[1], 'coin': {'address': OTHER_MINT, 'pairAddress': OTHER_PAIR,
+                                                                    'symbol': 'D.O.T.F', 'updatedAt': stamps[1]}}))
+        lines.extend(extra)
+        self.journal.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+        return self.journal.read_bytes()
+
+    def run_tool(self):
+        from contextlib import redirect_stderr, redirect_stdout
+        import io
+        buffer = io.StringIO()
+        with redirect_stdout(buffer), redirect_stderr(io.StringIO()):
+            code = self.tool.main(['--journal', str(self.journal), '--out', str(self.out)])
+        return code, json.loads(buffer.getvalue())
+
+    def test_a_continuous_journal_gives_a_covered_sidecar_and_the_journal_is_untouched(self):
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
+        before = self.write_journal(stamps, extra=('{broken', '[]', json.dumps({'observed_at': 1})))
+        code, summary = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertEqual(self.journal.read_bytes(), before, 'the journal is read only')
+        self.assertEqual((summary['rows'], summary['invalid_rows'], summary['entries']), (len(stamps) + 4, 3, 6))
+        self.assertEqual(summary['version'], 'TICKER_REGISTRY_SEED_V2')
+        self.assertEqual(summary['coverage']['covered_since'], self.T0)
+        self.assertEqual(summary['coverage']['coverage_hours'], 26.0)
+        last = stamps[-1]
+        loaded = guard.TickerRegistry(self.out, clock=lambda: last + 10 * MINUTE)
+        self.assertEqual((loaded.load_status, len(loaded)), ('LOADED', 6))
+        relaunch = {'address': MINT, 'pairAddress': PAIR, 'symbol': 'DOTF', 'liquidityUsd': 404_000,
+                    'marketCap': 20_100_000, 'pairCreatedAt': last - 3 * DAY}
+        self.assertEqual(guard.check(relaunch, last + 10 * MINUTE, loaded)['reasons'], ['rug_ticker_reuse'])
+        unseen = dict(relaunch, symbol='FRESH')
+        self.assertEqual(guard.check(unseen, last + 10 * MINUTE, loaded)['reasons'], [])
+        # An existing sidecar is never replaced.
+        written = self.out.read_bytes()
+        with self.assertRaises(SystemExit):
+            self.run_tool()
+        self.assertEqual(self.out.read_bytes(), written)
+
+    def test_a_journal_gap_longer_than_60_minutes_restarts_coverage(self):
+        stamps = ([self.T0 + index * 10 * MINUTE for index in range(12)]
+                  + [self.T0 + 4 * 60 * MINUTE + index * 10 * MINUTE for index in range(12)])
+        self.write_journal(stamps)
+        code, summary = self.run_tool()
+        self.assertEqual(code, 0)
+        self.assertEqual(summary['coverage']['covered_since'], self.T0 + 4 * 60 * MINUTE)
+        self.assertEqual(summary['coverage']['resets'], 1)
+        self.assertTrue(summary['coverage']['warming'])
 
 
 # ------------------------------------------------------------------ heat veto
@@ -829,7 +1108,7 @@ class DefensiveLayerTests(unittest.TestCase):
     NOW = 1_800_000_000_000
 
     def test_reasons_order_and_allowed(self):
-        layer = entry_defense.DefensiveEntryLayer()
+        layer = entry_defense.DefensiveEntryLayer(registry=covered_registry(self.NOW))
         coin = established(self.NOW)
         self.assertEqual(layer.evaluate(coin, self.NOW)['reasons'], ['heat_history_warming'])
         warm(layer.history, coin, self.NOW)
@@ -1025,6 +1304,97 @@ class ExitContextScoreTests(unittest.TestCase):
         self.assertEqual(config['exit_context_score_version'], 'NEO_MARKET_SCORE_V1')
 
 
+class TrainingScoreBasisTests(unittest.TestCase):
+    """The PAPER_TRAINING_V1 learners stay on NEO_MARKET_SCORE_V1: the context recorded for
+    them (GOLD_ADAPTIVE exits read its conviction and hold mode) and their min_score."""
+
+    # Weak flow: the conviction sits next to the CONVICTION_EXIT line (35), so the score
+    # model's neo_score term (V1 85-94: 0, V2 under 85: -4) decides the exit.
+    FAST = {'quality': 'COMPLETE', 'buy_sell_usd_ratio': 0.7}
+    SLOW = {'buy_sell_usd_ratio': 0.9, 'unique_wallets': 3, 'repeat_buy_wallets': 0,
+            'whale_buy_usd': 0, 'whale_sell_usd': 0}
+    HOLD_FIELDS = ('conviction', 'mode', 'max_hold_minutes', 'target_pct', 'trail_arm_pct', 'trail_pct')
+
+    def setUp(self):
+        self.monitor = m.Monitor()
+        self.addCleanup(self.monitor.stop)
+        flows = {30: self.FAST, 300: self.SLOW}
+        p = patch.object(m.STATE, 'live_flow', side_effect=lambda address, seconds, pair='': dict(flows[seconds]))
+        p.start()
+        self.addCleanup(p.stop)
+
+    @staticmethod
+    def pair(ratio):
+        cap = 1_000_000
+        return {'liquidity': {'usd': ratio * cap}, 'marketCap': cap, 'volume': {'h1': 300_000},
+                'priceChange': {'m5': 2, 'h1': 5}, 'txns': {'m5': {'buys': 50, 'sells': 50}},
+                'pairCreatedAt': m.now_ms() - 3 * DAY - 12 * 60 * MINUTE, 'pairAddress': PAIR, 'priceUsd': 1,
+                'baseToken': {'symbol': 'X'}}
+
+    @staticmethod
+    def gold_adaptive_exit(context):
+        """paper_training's GOLD_ADAPTIVE exit call for a position at net -1% after one minute."""
+        params = training.HYPOTHESES['GOLD_ADAPTIVE']
+        return training.adaptive_exit_reason({'address': MINT}, context, net_pct=-1.0, peak_net_pct=0.0,
+                                             hold_minutes=1.0, stop_pct=params['stop_pct'],
+                                             take_profit_pct=params['take_profit_pct'], policy='adaptive')
+
+    def test_gold_adaptive_context_keeps_the_v1_conviction_hold_mode_and_exit(self):
+        for ratio in (0.7, 1.1):
+            with self.subTest(liq_mc=ratio):
+                pair = self.pair(ratio)
+                coin = m.make_coin(MINT, pair, {})
+                before = ExitContextScoreTests.pre_change_score(pair)
+                self.assertEqual(coin['scoreV1'], before)
+                old_coin = {key: value for key, value in coin.items() if key != 'scoreV1'}
+                old_coin['score'] = before
+                # What the pre-change engine recorded for the learners: market_context(coin, {}).
+                recorded_before = self.monitor.market_context(old_coin, {})
+                recorded_now = self.monitor.training_context(coin)
+                for field in self.HOLD_FIELDS:
+                    self.assertEqual(recorded_now[field], recorded_before[field], field)
+                self.assertEqual(recorded_now['conviction_score_version'], 'NEO_MARKET_SCORE_V1')
+                # The engine's own V2 entry context differs here, and would have exited.
+                entry = self.monitor.market_context(coin, {})
+                self.assertLess(entry['conviction'], 35)
+                self.assertGreaterEqual(recorded_now['conviction'], 35)
+                self.assertEqual(recorded_now['entry_conviction'], entry['conviction'])
+                self.assertEqual(self.gold_adaptive_exit(entry), 'CONVICTION_EXIT')
+                self.assertEqual(self.gold_adaptive_exit(recorded_now), self.gold_adaptive_exit(recorded_before))
+                self.assertIsNone(self.gold_adaptive_exit(recorded_now))
+                # An entry context handed over by the engine is converted the same way.
+                self.assertEqual(self.monitor.training_context(coin, context=entry), recorded_now)
+                # A held position's context is already V1-based and only labelled.
+                position = {'address': MINT, 'pairAddress': PAIR, 'entry_liquidity_usd': coin['liquidityUsd']}
+                held = self.monitor.training_context(coin, position)
+                self.assertEqual(held['conviction'], self.monitor.market_context(coin, position)['conviction'])
+                self.assertEqual(held['conviction_score_version'], 'NEO_MARKET_SCORE_V1')
+        self.assertEqual(m.STATE.snapshot()['config']['training_score_version'], 'NEO_MARKET_SCORE_V1')
+
+    def test_learner_min_score_and_probe_signal_read_the_v1_score(self):
+        self.assertEqual(training.LEARNER_SCORE_VERSION, 'NEO_MARKET_SCORE_V1')
+        self.assertEqual(training.learner_score({'score': 66.0, 'scoreV1': 75.0}), 75.0)
+        self.assertEqual(training.learner_score({'score': 72.0}), 72.0, 'recorded before V2: score is V1')
+        self.assertEqual(training.learner_score({'score': 72.0, 'scoreV1': 'bad'}), 72.0)
+        # CONTROL (min_score 70) on a liq/MC-band pool: V2 66 would refuse, V1 75 does not.
+        engine = SimpleNamespace(config=training._config(None), _adaptive_context=lambda row: None)
+        now = 1_800_000_000_000
+
+        def reasons(coin):
+            row = {'available_at': now, 'observed_at': now, 'coin': coin, 'flow': {}}
+            return training.PaperTrainingEngine._flow_reasons(engine, row, training.HYPOTHESES['CONTROL'])
+        self.assertNotIn('score', reasons({'score': 66.0, 'scoreV1': 75.0}))
+        self.assertIn('score', reasons({'score': 75.0, 'scoreV1': 66.0}))
+        self.assertNotIn('score', reasons({'score': 75.0}))
+        # The engine's probe candidate signal (the cheapest hypothesis, min_score 60).
+        coin = established(now, score=55.0, scoreV1=62.0, liquidityUsd=100_000.0)
+        flow = {'fresh': True, 'quality': 'COMPLETE', 'latest_at': now,
+                'coverage': {'status': 'COMPLETE', 'address': MINT, 'pairAddress': PAIR}, 'trades': 3,
+                'unique_wallets': 2, 'buy_usd': 25, 'buy_sell_usd_ratio': 1.1}
+        self.assertTrue(training.training_candidate_signal(coin, flow, now=now))
+        self.assertFalse(training.training_candidate_signal(dict(coin, scoreV1=58.0), flow, now=now))
+
+
 # ------------------------------------------------------------------ engine entry paths
 
 class EngineHarness(unittest.TestCase):
@@ -1034,12 +1404,15 @@ class EngineHarness(unittest.TestCase):
     def setUp(self):
         m.activate_strategy(self.STRATEGY)
         self.addCleanup(m.activate_strategy, m.DEFAULT_SIGNAL_STRATEGY)
+        assert_temporary(m.STATE_PATH)
         m.STATE_PATH.unlink(missing_ok=True)
         m.STATE = m.State()
         self.monitor = m.Monitor()
-        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer()   # non-persistent per test
-        self.addCleanup(self.monitor.stop)
         self.now = m.now_ms()
+        # Non-persistent per test; its ticker registry has watched the market for 48 h
+        # (the 24-hour coverage rule has its own engine test).
+        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer(registry=covered_registry(self.now))
+        self.addCleanup(self.monitor.stop)
         self.coin = established(self.now)
         self.calls = {'quote': 0, 'rugcheck': 0, 'price': 0, 'flow_admission': 0}
         self.flow = {'quality': 'COMPLETE', 'fresh': True, 'trades': 4, 'buys': 3, 'sells': 1,
@@ -1163,6 +1536,17 @@ class DefaultEnginePathTests(EngineHarness):
         self.warm(daws)
         report = self.assert_blocked_before_any_quote('rug_fake_market_cap', daws)
         self.assertEqual(report['examples'][0]['reasons'], ['rug_fake_market_cap'])
+
+    def test_a_fresh_ticker_registry_blocks_a_pool_under_14_days_before_quotes(self):
+        # First deploy: the engine's registry has watched nothing yet, so a 4-day-old pool
+        # that matches an ensemble rule waits for 24 h of coverage; established pools do not.
+        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer()
+        recent = established(self.now, pairCreatedAt=self.now - 4 * DAY)
+        self.assertTrue(winner_ensemble.market_candidates(recent))
+        self.warm(recent)
+        report = self.assert_blocked_before_any_quote('rug_ticker_registry_warming', recent)
+        self.assertEqual(report['defensive_entry']['rejections'], {'rug_ticker_registry_warming': 1})
+        self.assertEqual(report['defensive_entry']['examples'][0]['registry_coverage_h'], 0.0)
 
     def test_young_pool_matching_an_ensemble_rule_is_blocked_before_quotes(self):
         young = established(self.now, ageMinutes=60, pairCreatedAt=self.now - 60 * MINUTE,
@@ -1398,6 +1782,10 @@ class TrainingProbePathTests(unittest.TestCase):
         self.state.history = []
         self.monitor.run_training_quote_probe(self.coin, self.flow, self.safety, self.price)
         self.mocks['collect_exact_pool_quotes'].assert_called_once()
+        # The refused preflight is recorded for the learners with the V1-basis context.
+        context = self.mocks['observe'].call_args.kwargs['context']
+        self.assertEqual(context['conviction_score_version'], 'NEO_MARKET_SCORE_V1')
+        self.assertEqual(context['conviction'], context['exit_basis_conviction'])
 
 
 # ------------------------------------------------------------------ Strategy Lab
@@ -1408,7 +1796,7 @@ class LabPathTests(unittest.TestCase):
     def setUp(self):
         lab.rush_brain._SAMPLE_BY_PAIR.clear()
         self.books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
-        self.layer = entry_defense.DefensiveEntryLayer()
+        self.layer = entry_defense.DefensiveEntryLayer(registry=covered_registry(self.NOW))
         self.calls = {'rugcheck': 0, 'price': 0, 'probe': 0}
 
         def rugcheck(coin):
@@ -1453,6 +1841,23 @@ class LabPathTests(unittest.TestCase):
                 self.assertEqual(diagnostics['blocked_reason'], 'rug_lp_pullable')
                 self.assertEqual(diagnostics['defensive_entry']['rejections']['rug_young_pool'], 1)
         self.assertEqual(self.calls, {'rugcheck': 0, 'price': 0, 'probe': 0})
+
+    def test_cost_first_books_wait_for_ticker_coverage_on_a_young_pool(self):
+        # First deploy: the Lab's registry has watched nothing yet. A USDF-like family pool
+        # (2.00% liquidity/market cap, 4 days old) passes every physical screen but must
+        # not enter the cost-first universe on an empty ticker memory.
+        usdf, _ = fixture('USDF_EpugLBw1')
+        self.layer.registry = guard.TickerRegistry()
+        coin = self.lab_coin(dexId='pumpswap', symbol='USDF', marketCap=usdf['marketCap'],
+                             liquidityUsd=usdf['liquidityUsd'], pairCreatedAt=self.NOW - 4 * DAY,
+                             priceUsd=.1, priceNative=.1 / 116.0)
+        self.assertEqual(cost_first.physical_rejections(coin, cap_usd=150.0), [])
+        lab.maybe_open([coin], {})
+        for book_id in cost_first.BOOK_IDS:
+            diagnostics = self.books[book_id]['entry_diagnostics']
+            self.assertEqual(diagnostics['cost_first']['universe_rejections'], {'rug_ticker_registry_warming': 1})
+            self.assertIsNone(self.books[book_id]['position'])
+        self.assertEqual(self.calls['rugcheck'], 0)
 
     def test_cost_first_books_screen_the_rug_family_in_the_universe(self):
         usdp, _ = fixture('USDP_8RCJrW94')
@@ -1540,7 +1945,8 @@ class LabPathTests(unittest.TestCase):
 # ------------------------------------------------------------------ tape scheduler
 
 class TapeSchedulerPathTests(unittest.TestCase):
-    """A seat serves every ledger: only the structural guard withholds one (V5)."""
+    """A seat serves every ledger: the structural guard withholds one, heat withholds a new
+    one (a running lease expires), loss memory and the tape's own warm-up never do (V5)."""
     NOW = 1_800_000_000_000
 
     def coin(self, name, **changes):
@@ -1554,6 +1960,7 @@ class TapeSchedulerPathTests(unittest.TestCase):
 
     def test_structurally_blocked_pools_get_no_seat_and_pins_are_untouched(self):
         scheduler = TapePoolScheduler()
+        cover(scheduler.defense.registry, self.NOW - 2 * DAY, self.NOW)
         safe = self.coin('Safe')
         young = self.coin('Young', pairCreatedAt=self.NOW - 30 * MINUTE)
         fake = self.coin('Wake', symbol='WOSE', marketCap=235_000_000.0, liquidityUsd=1_380_000.0,
@@ -1580,7 +1987,8 @@ class TapeSchedulerPathTests(unittest.TestCase):
         self.assertEqual(defensive['rejections'], {'rug_young_pool': 1, 'rug_fake_market_cap': 1})
         self.assertNotIn('pool_loss_cooldown', defensive['rejections'])
         self.assertEqual(defensive['pool_loss_memory_scope'], 'NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY')
-        self.assertEqual(defensive['heat_veto_mode'], 'LOG_ONLY_AT_SEATS_ENFORCED_BY_EACH_ENGINE')
+        self.assertEqual(defensive['heat_veto_mode'], 'NEW_SEATS_WITHHELD_RUNNING_LEASES_KEPT_WARMING_LOG_ONLY')
+        self.assertEqual(defensive['seat_rule'], 'NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL')
         # Without the pin the young pool is screened like any candidate.
         selected, report = scheduler.select(dict(state, positions=[]), now=self.NOW, max_tracked=4)
         self.assertEqual(sorted(row['symbol'] for row in selected), ['Lost', 'Safe'])
@@ -1607,7 +2015,7 @@ class TapeSchedulerPathTests(unittest.TestCase):
         self.assertEqual(report['defensive_entry']['blocked'], 0)
         self.assertNotIn('pool_loss_cooldown_pools', report['defensive_entry'])
 
-    def test_heat_is_log_only_at_seats(self):
+    def test_the_tape_warm_up_is_log_only_at_seats(self):
         # After a tape-only restart the scheduler's own history is empty: seats are still
         # given at once (the engines enforce their own warm-up), the flag is counted.
         scheduler = TapePoolScheduler()
@@ -1616,7 +2024,35 @@ class TapeSchedulerPathTests(unittest.TestCase):
         self.assertEqual([row['symbol'] for row in selected], ['Safe'])
         self.assertEqual(report['defensive_entry']['blocked'], 0)
         self.assertEqual(report['defensive_entry']['log_only_flags'], {'heat_history_warming': 1})
-        self.assertTrue(report['defensive_entry']['heat_log_only'])
+        self.assertEqual(report['defensive_entry']['heat_log_only_reasons'], ['heat_history_warming'])
+        self.assertFalse(report['defensive_entry']['heat_log_only'])
+
+    def test_a_hot_pool_gets_no_new_seat(self):
+        # Spec item 4: no seat for a pool every engine would refuse. A crashing pool and a
+        # pool with a 95% buy share get no entry or exploration seat; the calm one does.
+        scheduler = TapePoolScheduler()
+        calm, crash, hot = self.coin('Calm'), self.coin('Crsh'), self.coin('Hott')
+        for coin in (calm, crash, hot):
+            warm(scheduler.defense.history, coin, self.NOW)
+        crashing = dict(crash, priceUsd=crash['priceUsd'] * 0.7, priceNative=crash['priceNative'] * 0.7)
+        buying = dict(hot, txns={'m5': {'buys': 95, 'sells': 5}})
+        selected, report = scheduler.select({'feed': [calm, crashing, buying]}, now=self.NOW, max_tracked=3)
+        self.assertEqual([row['symbol'] for row in selected], ['Calm'])
+        defensive = report['defensive_entry']
+        self.assertEqual(defensive['heat_withheld_new_seats'], 2)
+        self.assertEqual(defensive['rejections'], {'heat_crash_in_progress': 1, 'heat_buy_share_5m': 1})
+        self.assertEqual(defensive['log_only_flags'], {}, 'an enforced flag is a rejection, not a log-only flag')
+        self.assertEqual(len(defensive['examples']), 2)
+
+    def test_the_seat_report_keeps_up_to_six_examples(self):
+        scheduler = TapePoolScheduler()
+        young = [self.coin(name, pairCreatedAt=self.NOW - 30 * MINUTE)
+                 for name in ('Ah', 'Bj', 'Ck', 'Dm', 'En', 'Fp', 'Gq')]
+        selected, report = scheduler.select({'feed': young}, now=self.NOW, max_tracked=8)
+        self.assertEqual(selected, [])
+        self.assertEqual(report['defensive_entry']['blocked'], 7)
+        self.assertEqual(len(report['defensive_entry']['examples']), tape_scheduler.DEFENSIVE_EXAMPLE_LIMIT)
+        self.assertEqual(tape_scheduler.DEFENSIVE_EXAMPLE_LIMIT, 6)
 
     def test_a_hot_poll_never_drops_a_running_lease(self):
         # One entry seat, two pools. The seated pool flickers hot for one 2 s poll (buy
@@ -1640,7 +2076,15 @@ class TapeSchedulerPathTests(unittest.TestCase):
                                             now=self.NOW + 2_000, max_tracked=1)
         self.assertEqual([row['symbol'] for row in selected], [seated])
         self.assertEqual(report['defensive_entry']['blocked'], 0)
+        self.assertEqual(report['defensive_entry']['heat_running_leases_kept'], 1)
         self.assertGreaterEqual(report['defensive_entry']['log_only_flags'].get('heat_buy_share_5m', 0), 1)
+        # Still hot when its 60 s lease runs out: no new seat, the calm pool gets it.
+        later = self.NOW + scheduler.lease_ms + 1_000
+        selected, report = scheduler.select({'feed': [dict(flicker, updatedAt=later), dict(other, updatedAt=later)]},
+                                            now=later, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], [other['symbol']])
+        self.assertEqual(report['defensive_entry']['heat_withheld_new_seats'], 1)
+        self.assertIn('heat_buy_share_5m', report['defensive_entry']['rejections'])
 
     def test_live_tape_registry_sidecar_lives_next_to_the_tape_file_and_survives_a_restart(self):
         import live_tape
@@ -1718,6 +2162,22 @@ class VersionAndReplayTests(unittest.TestCase):
         self.assertEqual(config['defensive_entry'], entry_defense.VERSIONS)
         self.assertEqual(config['score_version'], m.SCORE_VERSION)
 
+    def test_the_strategy_lock_records_the_published_definitions(self):
+        lock = json.loads((Path(__file__).resolve().parents[1] / 'strategy-lock.json').read_text(encoding='utf-8'))
+        defensive = lock['defensive_entry']
+        self.assertEqual(defensive['reasons_in_order'], list(entry_defense.REASONS_IN_ORDER))
+        structural = defensive['structural_rug_guard']
+        self.assertEqual(structural['reasons_in_order'], list(guard.REASONS))
+        self.assertEqual(structural['registry_version'], guard.REGISTRY_VERSION)
+        self.assertEqual(structural['registry_seed']['version'], guard.REGISTRY_SEED_VERSION)
+        self.assertEqual(structural['registry_coverage']['min_coverage_hours'],
+                         guard.PARAMS.ticker_registry_min_coverage_minutes / 60)
+        self.assertEqual(structural['registry_coverage']['max_gap_minutes'], guard.REGISTRY_MAX_GAP_MS // 60_000)
+        seats = lock['tape_seat_policy']['defensive_entry_seats']
+        self.assertEqual((seats['rule'], seats['heat_veto_mode']), (tape_scheduler.SEAT_RULE, tape_scheduler.HEAT_SEAT_MODE))
+        self.assertEqual(lock['learning']['score_version'], training.LEARNER_SCORE_VERSION)
+        self.assertIn('scripts/build_ticker_registry_seed.py', lock['support_files_sha256'])
+
     def test_replay_labels_the_recorded_policy_and_refuses_unknown_modes(self):
         from main_replay import MainReplay
         with tempfile.TemporaryDirectory() as tmp:
@@ -1734,6 +2194,37 @@ class VersionAndReplayTests(unittest.TestCase):
                 self.assertFalse(replay.monitor.defensive_entry_decision(established(1), 1)['allowed'])
                 result = replay.replay([])
             self.assertEqual(result['entry_defense']['label'], 'COUNTERFACTUAL_LAYER_ON_REPLAYED_ROWS_ONLY')
+
+
+class AccountIsolationTests(unittest.TestCase):
+    """The suite never touches a real PAPER account named by the shell's environment."""
+
+    def test_the_paths_are_temporary(self):
+        # Other test modules of a discover run may change os.environ after this module was
+        # imported; the module globals the tests write through are pinned by setUpModule.
+        for path in (m.STATE_PATH, m.AUDIT_PATH, lab.STATE_PATH, lab.COMPACT_PATH, lab.RESET_FLAG_PATH):
+            assert_temporary(path)
+        with self.assertRaises(AssertionError):
+            assert_temporary(Path(_TEMP.name).parent / 'state.json')
+
+    def test_a_shell_account_path_survives_an_engine_test(self):
+        # The reviewed reproduction: NEO_MARKET_STATE_PATH set to a stand-in ledger, then an
+        # engine test (which deletes and rewrites its state file) runs in a fresh process.
+        import subprocess
+        import sys
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory(prefix='neo-standin-account-') as tmp:
+            ledger = Path(tmp) / 'state.json'
+            ledger.write_text('{"sentinel": "real PAPER ledger stand-in"}', encoding='utf-8')
+            env = dict(os.environ, PYTHONUTF8='1', PYTHONPATH=str(root / 'backend'), NEO_ENGINE_MODE='PAPER',
+                       NEO_MARKET_STATE_PATH=str(ledger), NEO_MARKET_AUDIT_PATH=str(Path(tmp) / 'audit.jsonl'))
+            test = ('test_defensive_entry_layer.DefaultEnginePathTests.'
+                    'test_established_warmed_pool_without_losses_opens_and_records_the_layer')
+            result = subprocess.run([sys.executable, '-m', 'unittest', test], cwd=root / 'tests', env=env,
+                                    capture_output=True, text=True, timeout=600)
+            self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+            self.assertEqual(ledger.read_text(encoding='utf-8'), '{"sentinel": "real PAPER ledger stand-in"}')
+            self.assertEqual(sorted(path.name for path in Path(tmp).iterdir()), ['state.json'])
 
 
 if __name__ == '__main__':

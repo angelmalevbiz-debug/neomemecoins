@@ -77,16 +77,18 @@ TOKENS_PER_USD = 1_000_000  # fixture route: 1 token (6 decimals) per quoted USD
 DEFAULT_HASH_AT_69BE225 = 'fe08e29c142e0675cfbde9c6d4728a0a4429a64797fdec4ef7532ca6a183e62c'
 ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c200156fdefaeae4f3666ecdc4'
 # effective_config_hash of the three engine strategies with DEFENSIVE_ENTRY_LAYER_V1
-# (PR #23 after its fifth review: heat window coverage, 40,000-entry registry with
+# (PR #23 after its sixth review: heat window coverage, 40,000-entry registry with
 # 24-hour coverage from discovered market rows only (DISCOVERED_MARKET_ROWS_V2),
-# TICKER_REGISTRY_SEED_V3 (running seeds), TICKER_REGISTRY_SIDECAR_READ_V1, a ticker
-# required only under 14 days; code defaults, no NEO_* overrides). Positions record
-# this hash as their audit identity, so an engine default, a profile field or a layer
-# threshold may only change together with these pins (and docs/DEFENSIVE_ENTRY_LAYER.md).
-DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '6fabde936b8f978aef7117062f849feb15f0d8ae2b04f44dbe8aea49ab0f9918'
+# TICKER_COVERAGE_CLOCK_V1 (coverage stamped ahead of the clock never vouches),
+# TICKER_REGISTRY_SEED_V4 (running seeds, sibling sightings while vouching),
+# TICKER_REGISTRY_SIDECAR_READ_V1, a ticker required only under 14 days; code defaults,
+# no NEO_* overrides). Positions record this hash as their audit identity, so an engine
+# default, a profile field or a layer threshold may only change together with these pins
+# (and docs/DEFENSIVE_ENTRY_LAYER.md).
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9'
 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
-    'be874bd4fd4327f83a7b3eb309730a9c04a97f8e208699bc8a4d5a330a7745b7')
-COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '7ac1d917775a8b86359c85f8b5e977127696708b6e90770018de4320f6b84286'
+    '8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba'
 
 
 def universe_coin(now, **overrides):

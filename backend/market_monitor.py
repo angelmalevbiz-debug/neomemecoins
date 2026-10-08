@@ -571,6 +571,10 @@ class State:
         self.audit_status = 'ok'
         self.equity_peak_usd = STARTING_BALANCE_USD
         self.entry_diagnostics = {'status': 'starting', 'policy_version': ENTRY_POLICY_VERSION}
+        # DEFENSIVE_ENTRY_LAYER_V1 status (ticker registry and pair history) published by
+        # every scan, also while the account is paused (entry_diagnostics only refreshes
+        # when entries are evaluated). In memory only; never part of the ledger.
+        self.defensive_entry_layer: dict[str, Any] | None = None
         self.risk_day_key = time.strftime('%Y-%m-%d', time.gmtime())
         self.risk_day_start_balance_usd = STARTING_BALANCE_USD
         if load_state: self.load()
@@ -863,6 +867,8 @@ class State:
                 'events': self.events[:30],
                 'source_status': self.source_status,
                 'entry_diagnostics': self.entry_diagnostics,
+                # Refreshed by every scan, paused or running (ticker registry coverage, seeds).
+                'defensive_entry_layer': self.defensive_entry_layer,
                 'live_tape': [],
                 'live_tape_status': {k: tape.get(k) for k in ('status','tracked_pairs','updated_at','source','error','entry_scheduling')},
             'strategy_lab': read_strategy_lab(),
@@ -1670,11 +1676,19 @@ class Monitor:
             if self._entry_defense is None:
                 # A registry without current coverage is seeded read-only from the other
                 # services' sidecars (main's for a personal engine, the Lab's and the
-                # tape's; see sibling_registry_paths, TICKER_REGISTRY_SEED_V2).
+                # tape's; see sibling_registry_paths, TICKER_REGISTRY_SEED_V4: also while
+                # running, and their sightings every 5 min while it vouches).
                 path = entry_defense.registry_path_for(STATE_PATH)
                 self._entry_defense = entry_defense.DefensiveEntryLayer(
                     registry_path=path, seed_paths=entry_defense.sibling_registry_paths(path))
             return self._entry_defense
+
+    def defensive_layer_status(self) -> dict[str, Any]:
+        """The layer's status() for /state (never raises; an error is named, never hidden)."""
+        try:
+            return self.defense.status()
+        except Exception as exc:
+            return {'version': entry_defense.VERSION, 'status_error': type(exc).__name__}
 
     def observe_entry_defense(self, feed: list[dict[str, Any]], now: int | None = None) -> None:
         """Feed one scan into the ticker registry and pair history (never raises)."""
@@ -3095,6 +3109,9 @@ class Monitor:
             scan_at = now_ms()
             self.observe_entry_defense(feed, scan_at)
             registry = self.defense.registry
+            # Published on /state by every scan, also while the account is paused
+            # (maybe_open, which fills entry_diagnostics, returns at once then).
+            layer_status = self.defensive_layer_status()
             # Retain plausible market candidates before the bounded feed is
             # trimmed. Display order stays score-ranked; all entry gates still
             # run later and held pools are independently refreshed below.
@@ -3127,6 +3144,7 @@ class Monitor:
                     if held and held.get('pairAddress') == position.get('pairAddress'):
                         STATE.position_market[f"{position.get('address')}:{position.get('pairAddress')}"] = dict(held)
                 STATE.feed = feed
+                STATE.defensive_entry_layer = layer_status
                 STATE.last_scan_at = now_ms()
                 STATE.scan_count += 1
                 STATE.status = 'monitoring'

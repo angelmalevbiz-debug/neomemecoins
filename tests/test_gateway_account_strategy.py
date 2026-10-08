@@ -71,7 +71,7 @@ class GatewayAccountStrategy(unittest.TestCase):
         self.assertNotEqual(saved['user-a']['engine_port'], saved['user-b']['engine_port'])
 
     def test_personal_engines_get_main_state_path_for_their_ticker_registry_seed(self):
-        # TICKER_REGISTRY_SEED_V2: a personal engine's NEO_MARKET_STATE_PATH is its own
+        # TICKER_REGISTRY_SEED_V4: a personal engine's NEO_MARKET_STATE_PATH is its own
         # account; main's state path (the gateway's own) is passed separately.
         main_state = str(Path(self.temp.name) / 'state.json')
         with patch.dict(os.environ, {'NEO_MARKET_STATE_PATH': main_state}):

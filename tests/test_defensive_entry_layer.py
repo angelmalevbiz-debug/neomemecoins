@@ -111,19 +111,27 @@ def covered_registry(now, hours=48):
     return cover(guard.TickerRegistry(), now - hours * 60 * MINUTE, now)
 
 
-def research_registry():
+def research_registry(until=None):
     """Ticker registry holding every research pool of the fixture tickers at its first sighting.
 
-    It is treated as covered from 25 h before the scan log to its end: these
-    tests check the rules on real sightings; the 24-hour coverage rule
-    (rug_ticker_registry_warming) has its own tests."""
+    It is treated as covered from 25 h before the scan log to ``until`` (the
+    log's end when None): these tests check the rules on real sightings; the
+    24-hour coverage rule (rug_ticker_registry_warming) has its own tests. A
+    check at an observation time must use a registry covered up to that time:
+    coverage stamped more than 5 min after the decision clock never vouches
+    (TICKER_COVERAGE_CLOCK_V1)."""
     registry = guard.TickerRegistry()
     for row in FIXTURES['ticker_universe']:
         registry.observe_coin({'address': row['mint'], 'pairAddress': row['pair'], 'symbol': row['symbol']},
                               row['first_seen'])
     first = min(row['first_seen'] for row in FIXTURES['ticker_universe'])
-    last = max(row['observed_at'] for row in FIXTURES['fixtures'].values())
+    last = max(row['observed_at'] for row in FIXTURES['fixtures'].values()) if until is None else until
     return cover(registry, first - 25 * 60 * MINUTE, last)
+
+
+def research_check(coin, observed_at, **kwargs):
+    """guard.check of one research observation against the research registry as of its time."""
+    return guard.check(coin, observed_at, research_registry(until=observed_at), **kwargs)
 
 
 def established(now, **changes):
@@ -189,7 +197,7 @@ class StructuralRugGuardFixtureTests(unittest.TestCase):
         for name, expected in self.EXPECTED.items():
             with self.subTest(name=name):
                 coin, observed_at = fixture(name)
-                result = guard.check(coin, observed_at, self.registry)
+                result = research_check(coin, observed_at)
                 self.assertEqual(result['reasons'], expected)
                 self.assertEqual(result['blocked'], bool(expected))
                 self.assertEqual(result['version'], 'STRUCTURAL_RUG_GUARD_V1')
@@ -200,7 +208,7 @@ class StructuralRugGuardFixtureTests(unittest.TestCase):
         for name in ('ANSEM_FnzKY6x7', 'CATE_HMzvsEEm', 'TROLL_4w2cysot', 'neet_5wNu5Qhd'):
             with self.subTest(name=name):
                 coin, observed_at = fixture(name)
-                result = guard.check(coin, observed_at, self.registry)
+                result = research_check(coin, observed_at)
                 self.assertFalse(result['blocked'])
                 self.assertGreater(result['age_min'], 14 * 1440)
                 self.assertLess(result['liq_mcap'], 1.0)
@@ -213,7 +221,7 @@ class StructuralRugGuardFixtureTests(unittest.TestCase):
     def test_fake_market_cap_family_values_match_the_research(self):
         for name in ('USDP_8RCJrW94', 'IOF_FeCGDeqW', 'WOSE_GhBPuDpt', 'GOIF_D2pVedgH', 'SARP_AdvA19rg'):
             coin, observed_at = fixture(name)
-            result = guard.check(coin, observed_at, self.registry)
+            result = research_check(coin, observed_at)
             self.assertGreaterEqual(result['mcap'], 20_000_000, name)
             self.assertLess(result['liq_mcap'], 0.01, name)
             self.assertLess(result['age_min'], 14 * 1440, name)
@@ -223,18 +231,18 @@ class StructuralRugGuardFixtureTests(unittest.TestCase):
         for name in ('DAWS_BTSpnpim', 'GOIF_8ZMkMgWM'):
             with self.subTest(name=name):
                 coin, observed_at = fixture(name)
-                self.assertIn('rug_fake_market_cap', guard.check(coin, observed_at, self.registry)['reasons'])
+                self.assertIn('rug_fake_market_cap', research_check(coin, observed_at)['reasons'])
                 self.assertNotIn('rug_fake_market_cap',
-                                 guard.check(coin, observed_at, self.registry, params=one_percent)['reasons'])
+                                 research_check(coin, observed_at, params=one_percent)['reasons'])
         self.assertEqual(guard.PARAMS.fake_mcap_max_liq_to_mcap, 0.02)
 
     def test_lp_pullable_and_young_pool_values(self):
         coin, observed_at = fixture('SharkTank_CRGN2uGj')
-        result = guard.check(coin, observed_at, self.registry)
+        result = research_check(coin, observed_at)
         self.assertGreaterEqual(result['liq_mcap'], 1.0)
         self.assertGreaterEqual(result['ticker_reused_by'], 30)
         coin, observed_at = fixture('OGTRUMP_9rSmRH9w')
-        result = guard.check(coin, observed_at, self.registry)
+        result = research_check(coin, observed_at)
         self.assertLess(result['age_min'], 15)
         self.assertEqual(result['ticker_reused_by'], 0)
 
@@ -569,6 +577,133 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         registry.observe([dict(feed[0], updatedAt=later + 10 * MINUTE)], later + 10 * MINUTE)
         self.assertEqual(registry.status()['seed']['running_reseeds'], 1)
 
+    # ---- TICKER_COVERAGE_CLOCK_V1 (review finding: a future observed_until failed open) ----
+    def relaunch(self, now, mint='J' * 44, pool='K' * 44, symbol='DOTF'):
+        """A 3-day-old pool just above the 2% fake-cap line: only the ticker rules judge it."""
+        return established(now, address=mint, pairAddress=pool, symbol=symbol, liquidityUsd=404_000.0,
+                           marketCap=20_100_000.0, pairCreatedAt=now - 3 * DAY)
+
+    def main_sidecar(self, *, hours=30, until=None, extra=()):
+        """Main's sidecar: current coverage of ``hours`` ending 1 min before the clock."""
+        path = Path(self.tmp.name) / 'state.ticker_registry.json'
+        until = self.clock - MINUTE if until is None else until
+        main = guard.TickerRegistry(path, clock=lambda: self.clock)
+        main.observe_coin(self.coin('Q' * 44, 'R' * 44, 'MAIN'), until - 2 * self.HOUR_MS)
+        for mint, pool, symbol, seen in extra:
+            main.observe_coin(self.coin(mint, pool, symbol), seen)
+        cover(main, until - hours * self.HOUR_MS, until)
+        self.assertTrue(main.flush())
+        return path, main
+
+    HOUR_MS = 60 * MINUTE
+
+    def future_sidecar(self, path, stamp):
+        """A sidecar written by a test run with a fixed future clock (covered_since = observed_until)."""
+        writer = guard.TickerRegistry(path, clock=lambda: stamp)
+        writer.observe([dict(self.coin('S' * 44, 'T' * 44, 'TROLL'), updatedAt=stamp)], stamp)
+        writer.flush()
+        data = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual((data['covered_since'], data['observed_until']), (stamp, stamp))
+        return path
+
+    def test_an_own_sidecar_stamped_in_the_future_never_vouches_and_seeds_instead(self):
+        # The finding: the Lab's sidecar carried covered_since = observed_until = 1.8e12 (January
+        # 2027, written by a test with a fixed clock) while main's was current with 30 h. The Lab
+        # vouched through a 5 h outage (coverage 35 h, resets 0) and allowed a 3-day-old pool.
+        self.clock = self.NOW - 90 * DAY
+        lab_path = self.future_sidecar(Path(self.tmp.name) / 'strategy_lab.ticker_registry.json', self.NOW)
+        main_path, main = self.main_sidecar()
+        lab = guard.TickerRegistry(lab_path, clock=lambda: self.clock, seed_paths=(main_path,))
+        status = lab.status()
+        self.assertEqual(status['load_status'], 'LOADED')
+        self.assertEqual(len(lab), 2, "its own sightings still load, main's are merged")
+        coverage = status['coverage']
+        self.assertEqual((coverage['future_drops'], coverage['last_future_ahead_minutes']),
+                         (1, round(90 * DAY / MINUTE, 1)))
+        self.assertEqual(coverage['clock_version'], 'TICKER_COVERAGE_CLOCK_V1')
+        # Seeded from main, which honestly vouches: main's span, never the January 2027 stamp.
+        self.assertEqual((coverage['adopted_from'], coverage['covered_since'], coverage['observed_until']),
+                         ('state.ticker_registry.json', self.clock - MINUTE - 30 * self.HOUR_MS, self.clock - MINUTE))
+        self.assertFalse(coverage['warming'])
+        # A 5 h outage with no observation: the gap is seen and coverage restarts (main lapsed too).
+        later = self.clock + 5 * self.HOUR_MS
+        pool = self.relaunch(later)
+        lab.observe([dict(self.coin('U' * 44, 'V' * 44, 'OTHR'), updatedAt=later)], later)
+        coverage = lab.coverage_status(later)
+        self.assertEqual((coverage['resets'], coverage['warming']), (1, True))
+        self.assertGreater(coverage['last_gap_minutes'], 5 * 60)
+        self.assertEqual(guard.check(pool, later, lab)['reasons'], ['rug_ticker_registry_warming'])
+        lab.flush()
+        saved = json.loads(lab_path.read_text(encoding='utf-8'))
+        self.assertLessEqual(saved['observed_until'], later, 'the future stamp is never saved again')
+
+    def test_coverage_stamped_ahead_of_the_clock_is_never_current_and_is_dropped_at_the_next_scan(self):
+        registry = self.registry()
+        cover(registry, self.NOW - 30 * self.HOUR_MS, self.NOW)
+        self.assertTrue(registry.coverage_current(self.NOW - 4 * MINUTE), 'within the 5-minute tolerance')
+        self.assertFalse(registry.coverage_current(self.NOW - 6 * MINUTE))
+        self.assertEqual(registry.coverage_ms(self.NOW - self.HOUR_MS), 0.0)
+        # A backward wall-clock step of 2 h: the next scan drops the coverage it never observed
+        # and starts again (a gap can no longer hide behind the future stamp).
+        back = self.NOW - 2 * self.HOUR_MS
+        registry.observe([dict(self.coin(MINT, PAIR, 'MAIN'), updatedAt=back)], back)
+        coverage = registry.coverage_status(back)
+        self.assertEqual((coverage['covered_since'], coverage['observed_until']), (back, back))
+        self.assertEqual((coverage['future_drops'], coverage['warming']), (1, True))
+        self.assertEqual(guard.check(self.relaunch(back), back, registry)['reasons'], ['rug_ticker_registry_warming'])
+        # Without the scan clock (the offline builder's replay) the stamps alone are compared.
+        replayed = guard.TickerRegistry()
+        replayed.mark_observed(self.NOW)
+        replayed.mark_observed(self.NOW - self.HOUR_MS)
+        self.assertEqual(replayed.coverage_status(self.NOW)['future_drops'], 0)
+
+    def test_a_sibling_stamped_in_the_future_is_merged_but_never_adopted(self):
+        self.clock = self.NOW - 90 * DAY
+        tape_path = self.future_sidecar(Path(self.tmp.name) / 'live_tape.ticker_registry.json', self.NOW)
+        fresh = self.registry(seed_paths=(tape_path,))
+        status = fresh.status()
+        self.assertEqual(status['seed']['sources'], {'live_tape.ticker_registry.json': 'SEEDED_COVERAGE_AHEAD_IGNORED'})
+        self.assertEqual(len(fresh), 1, 'its sightings still count (they can only block more)')
+        self.assertIsNone(status['coverage']['adopted_from'])
+        self.assertTrue(status['coverage']['warming'])
+        self.assertEqual(guard.check(self.relaunch(self.clock), self.clock, fresh)['reasons'],
+                         ['rug_ticker_registry_warming'])
+
+    # ---- TICKER_REGISTRY_SEED_V4 (review finding: main's later sightings never reached the Lab) ----
+    def test_a_vouching_registry_merges_its_siblings_sightings_every_5_minutes(self):
+        main_path, main = self.main_sidecar()
+        lab = guard.TickerRegistry(Path(self.tmp.name) / 'strategy_lab.ticker_registry.json',
+                                   clock=lambda: self.clock, seed_paths=(main_path,))
+        self.assertEqual(lab.status()['coverage']['adopted_from'], 'state.ticker_registry.json')
+        adopted = lab.coverage_status(self.clock)['covered_since']
+        # Main sees a DOTF relaunch sibling among the Gecko new pools the bounded feed cuts:
+        # the Lab and the tape never see that row themselves. Main's sidecar now also carries
+        # a longer span (40 h) than the one the Lab adopted at its start.
+        rewritten = guard.TickerRegistry(None, clock=lambda: self.clock)
+        rewritten.observe_coin(self.coin(OTHER_MINT, OTHER_PAIR, 'DOTF'), self.clock)
+        cover(rewritten, self.clock - 40 * self.HOUR_MS, self.clock)
+        rewritten.path = main_path
+        self.assertTrue(rewritten.save(self.clock))
+        trimmed = [dict(self.coin('U' * 44, 'V' * 44, 'OTHR'), updatedAt=self.clock + MINUTE)]
+        lab.observe(trimmed, self.clock + MINUTE)
+        pool = self.relaunch(self.clock + MINUTE)
+        self.assertEqual(lab.status()['seed']['sighting_merges'], 0, 'not before 5 minutes')
+        self.assertEqual(guard.check(pool, self.clock + MINUTE, lab)['reasons'], [])
+        later = self.clock + 5 * MINUTE
+        lab.observe([dict(trimmed[0], updatedAt=later)], later)
+        status = lab.status()
+        self.assertEqual((status['seed']['sighting_merges'], status['seed']['sighting_merge_new_pools']), (1, 1))
+        self.assertEqual(status['seed']['sighting_merge_sources'], {'state.ticker_registry.json': 'MERGED'})
+        self.assertEqual(guard.check(self.relaunch(later), later, lab)['reasons'], ['rug_ticker_reuse'])
+        # Sightings only: the coverage stays the Lab's own (main's earlier start is not adopted).
+        self.assertEqual(lab.coverage_status(later)['covered_since'], adopted)
+        self.assertEqual(status['seed']['running_reseeds'], 0)
+        # At most every 5 minutes.
+        lab.observe([dict(trimmed[0], updatedAt=later + 4 * MINUTE)], later + 4 * MINUTE)
+        self.assertEqual(lab.status()['seed']['sighting_merges'], 1)
+        lab.observe([dict(trimmed[0], updatedAt=later + 5 * MINUTE)], later + 5 * MINUTE)
+        self.assertEqual(lab.status()['seed']['sighting_merges'], 2)
+
     def test_invalid_rows_are_skipped_and_stale_rows_pruned_on_load(self):
         rows = [[MINT, PAIR, 'good', self.NOW - DAY, self.NOW - DAY],
                 [OTHER_MINT, OTHER_PAIR, 'old', self.NOW - 30 * DAY, self.NOW - 15 * DAY],
@@ -725,10 +860,14 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         corrupt.write_text('{oops', encoding='utf-8')
         other = guard.TickerRegistry(Path(self.tmp.name) / 'other.json', clock=lambda: self.clock,
                                      seed_paths=(Path(self.tmp.name) / 'missing.json', corrupt))
-        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V3', 'entries': 0,
+        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V4', 'entries': 0,
                                                  'sources': {'missing.json': 'MISSING',
                                                              'corrupt.ticker_registry.json': 'CORRUPT'},
-                                                 'running_reseeds': 0, 'last_seed_at': self.clock})
+                                                 'running_reseeds': 0, 'last_seed_at': self.clock,
+                                                 # A seed counts as the first sighting merge.
+                                                 'sighting_merges': 0, 'sighting_merge_new_pools': 0,
+                                                 'sighting_merge_sources': {},
+                                                 'last_sighting_merge_at': self.clock})
         self.assertEqual(len(other), 0)
         self.assertEqual(corrupt.read_text(encoding='utf-8'), '{oops', 'a corrupt seed is never copied or written')
 
@@ -986,6 +1125,45 @@ class TickerRegistryCoverageTests(unittest.TestCase):
         self.assertIsNotNone(registry.coverage_status(m.now_ms())['observed_until'])
         self.assertEqual(len(registry), 2)
 
+    def test_a_paused_engine_publishes_its_registry_status_on_every_scan(self):
+        # Review finding: maybe_open returns at once while STATE.running is false, and
+        # entry_diagnostics (re-initialised as 'starting') was the only place of the layer
+        # status, so the paused cost-first account never showed its ticker coverage.
+        assert_temporary(m.STATE_PATH)
+        m.STATE_PATH.unlink(missing_ok=True)
+        m.STATE = m.State()
+        m.STATE.running = False
+        monitor = m.Monitor()
+        self.addCleanup(monitor.stop)
+        registry = guard.TickerRegistry()
+        monitor._entry_defense = entry_defense.DefensiveEntryLayer(registry=registry)
+        now = m.now_ms()
+        cover(registry, now - 30 * self.HOUR, now - MINUTE)
+        self.assertIsNone(m.STATE.snapshot()['defensive_entry_layer'], 'nothing before the first scan')
+        pair = {'chainId': 'solana', 'dexId': 'pumpswap', 'pairAddress': OTHER_PAIR,
+                'baseToken': {'address': OTHER_MINT, 'symbol': 'OTHR'}, 'quoteToken': {'address': SOL},
+                'priceUsd': '0.04', 'priceNative': '0.0003', 'liquidity': {'usd': 500_000},
+                'marketCap': 5_000_000, 'pairCreatedAt': now - 30 * DAY}
+        meta = {OTHER_MINT: {'sources': ['latest'], 'icon': '', 'header': '', 'description': '',
+                             'links': [], 'boost_amount': 0}}
+        with patch.object(m, 'gecko_new_pumpswap_pairs', return_value=[]), \
+                patch.object(monitor, 'prewarm_entry_checks'), \
+                patch.object(m.training_bridge, 'enabled', return_value=False), \
+                patch.object(monitor.discovery, 'get', return_value=([OTHER_MINT], meta)), \
+                patch.object(m, 'fetch_pairs', return_value=[pair]):
+            monitor.scan_once()
+        snapshot = m.STATE.snapshot()
+        self.assertFalse(snapshot['running'])
+        self.assertEqual(snapshot['entry_diagnostics']['status'], 'starting', 'no entry was evaluated')
+        layer = snapshot['defensive_entry_layer']
+        self.assertEqual(layer['version'], 'DEFENSIVE_ENTRY_LAYER_V1')
+        coverage = layer['ticker_registry']['coverage']
+        self.assertFalse(coverage['warming'])
+        self.assertGreaterEqual(coverage['coverage_hours'], 29.9)
+        self.assertEqual(layer['ticker_registry']['entries'], 1)
+        # In memory only: the ledger file never carries it.
+        self.assertNotIn('defensive_entry_layer', json.loads(m.STATE_PATH.read_text(encoding='utf-8')))
+
     def test_coverage_survives_a_restart_and_a_cap_eviction_moves_its_start(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'state.ticker_registry.json'
@@ -1095,8 +1273,10 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
         last_market = stamps[-1]
         held = self.held_rows(last_market + 10 * MINUTE, last_market + 3 * guard.HOUR_MS)
         self.write_journal(stamps, extra=held)
-        code, summary = self.run_tool()
-        self.assertEqual(code, 0)
+        code, summary = self.run_tool(clock=lambda: last_market + 3 * guard.HOUR_MS + MINUTE)
+        # Written (the sightings count) but not vouching at the end: exit 2.
+        self.assertEqual((code, summary['written'], summary['vouches_at_end']), (2, True, False))
+        self.assertIn('warning', summary)
         self.assertEqual((summary['market_rows'], summary['held_position_rows']), (len(stamps) + 1, len(held)))
         self.assertEqual(summary['coverage']['observed_until'], last_market)
         self.assertEqual(summary['last_observed_at'], last_market + 3 * guard.HOUR_MS)
@@ -1163,17 +1343,23 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
     def test_a_continuous_journal_gives_a_covered_sidecar_and_the_journal_is_untouched(self):
         stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
         before = self.write_journal(stamps, extra=('{broken', '[]', json.dumps({'observed_at': 1})))
-        code, summary = self.run_tool()
-        self.assertEqual(code, 0)
+        last = stamps[-1]
+        code, summary = self.run_tool(clock=lambda: last + MINUTE)
+        self.assertEqual((code, summary['vouches_at_end']), (0, True))
         self.assertEqual(self.journal.read_bytes(), before, 'the journal is read only')
         self.assertEqual((summary['rows'], summary['invalid_rows'], summary['entries']), (len(stamps) + 4, 3, 6))
-        self.assertEqual(summary['version'], 'TICKER_REGISTRY_SEED_V3')
+        self.assertEqual(summary['version'], 'TICKER_REGISTRY_SEED_V4')
         self.assertEqual(summary['services_stopped_check'], 'NO_UNSTOPPED_SERVICES_MANIFEST')
-        self.assertIn('entry_diagnostics.defensive_entry.layer.ticker_registry.load_status == LOADED',
-                      summary['verify_after_start'])
+        # Main's registry status is on /state after every scan, also while main is paused.
+        self.assertIn('defensive_entry_layer.ticker_registry.load_status == LOADED', summary['verify_after_start'])
         self.assertEqual(summary['coverage']['covered_since'], self.T0)
         self.assertEqual(summary['coverage']['coverage_hours'], 26.0)
-        last = stamps[-1]
+        # The start deadline is observed_until + 60 min, printed in UTC.
+        self.assertEqual(summary['start_services_before_utc'], self.tool.iso_utc(last + guard.HOUR_MS))
+        self.assertTrue(summary['start_services_before_utc'].endswith('Z'))
+        self.assertEqual(summary['clock']['elapsed_seconds'], 0.0)
+        self.assertEqual(summary['replay']['version'], 'SEED_REPLAY_WINDOW_V1')
+        self.assertEqual((summary['replay']['window_days'], summary['replay']['skipped_bytes']), (15.0, 0))
         loaded = guard.TickerRegistry(self.out, clock=lambda: last + 10 * MINUTE)
         self.assertEqual((loaded.load_status, len(loaded)), ('LOADED', 6))
         relaunch = {'address': MINT, 'pairAddress': PAIR, 'symbol': 'DOTF', 'liquidityUsd': 404_000,
@@ -1191,11 +1377,93 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
         stamps = ([self.T0 + index * 10 * MINUTE for index in range(12)]
                   + [self.T0 + 4 * 60 * MINUTE + index * 10 * MINUTE for index in range(12)])
         self.write_journal(stamps)
-        code, summary = self.run_tool()
-        self.assertEqual(code, 0)
+        code, summary = self.run_tool(clock=lambda: stamps[-1] + MINUTE)
+        # The sidecar is written (sightings count) but its 1.8 h coverage does not vouch: exit 2.
+        self.assertEqual((code, summary['written'], summary['vouches_at_end']), (2, True, False))
         self.assertEqual(summary['coverage']['covered_since'], self.T0 + 4 * 60 * MINUTE)
         self.assertEqual(summary['coverage']['resets'], 1)
         self.assertTrue(summary['coverage']['warming'])
+
+    def test_coverage_is_judged_at_the_clock_after_the_replay(self):
+        # Review finding: coverage_at_now used the clock read before the replay, which takes
+        # about 4 min per journal day; a replay that outlasts the 60-minute window printed
+        # warming false and exited 0 although coverage had lapsed.
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]            # 26 h
+        self.write_journal(stamps)
+        last = stamps[-1]
+        reads = iter([last + MINUTE, last + 62 * MINUTE])
+        code, summary = self.run_tool(clock=lambda: next(reads))
+        self.assertEqual((code, summary['written'], summary['vouches_at_end']), (2, True, False))
+        self.assertEqual((summary['clock']['started_at'], summary['clock']['finished_at']),
+                         (last + MINUTE, last + 62 * MINUTE))
+        self.assertEqual(summary['clock']['elapsed_seconds'], 61 * 60.0)
+        self.assertTrue(summary['coverage_at_now']['warming'])
+        self.assertEqual(summary['coverage_at_now']['coverage_hours'], 0.0)
+        self.assertEqual(summary['start_services_before_utc'], self.tool.iso_utc(last + guard.HOUR_MS))
+        self.assertTrue(self.out.exists(), 'the sightings are still written')
+
+    def test_the_replay_seeks_to_the_window_instead_of_the_first_byte(self):
+        # 20 days of rows every 30 min; the default window replays the last 15 days (+1 h slack).
+        stamps = [self.T0 + index * 30 * MINUTE for index in range(20 * 48 + 1)]
+        self.write_journal(stamps)
+        last = stamps[-1]
+        with patch.object(self.tool, 'SEEK_GRANULARITY_BYTES', 512):
+            window = self.tool.replay_window(self.journal, 15.0)
+            code, summary = self.run_tool(clock=lambda: last + MINUTE)
+        self.assertEqual(code, 0)
+        self.assertEqual(window['target_start_at'], last - 15 * DAY - guard.HOUR_MS)
+        self.assertGreater(window['skipped_bytes'], 0)
+        replay = summary['replay']
+        self.assertEqual((replay['start_offset'], replay['skipped_bytes']), (window['start_offset'],) * 2)
+        # Every row of the window is replayed, plus at most the 512-byte search granularity
+        # before it (and the relaunch row write_journal appends last).
+        in_window = sum(1 for stamp in stamps if stamp >= window['target_start_at'])
+        self.assertGreaterEqual(summary['rows'], in_window + 1)
+        self.assertLessEqual(summary['rows'], in_window + 1 + 6)
+        self.assertLess(summary['rows'], len(stamps))
+        self.assertGreaterEqual(summary['coverage']['coverage_hours'], 15 * 24)
+        # The skipped start of the journal is past the 14-day retention anyway: same sightings.
+        self.out.unlink()
+        code, full = self.run_tool('--full-journal', clock=lambda: last + MINUTE)
+        self.assertEqual(code, 0)
+        self.assertEqual((full['replay']['full_journal'], full['replay']['skipped_bytes']), (True, 0))
+        self.assertEqual((full['rows'], full['entries']), (len(stamps) + 1, summary['entries']))
+        self.assertFalse(summary['replay']['limited_by_replay_budget'])
+        # The window plus the 1 h slack (and at most the search granularity).
+        self.assertGreaterEqual(summary['replay']['effective_window_days'], 15.0)
+        self.assertLess(summary['replay']['effective_window_days'], 15.1)
+        # 15 journal days take about an hour at the reference rate: the replay budget starts it
+        # later when the window holds more journal than --max-replay-minutes replays in time.
+        size = self.journal.stat().st_size
+        budget = self.tool.replay_window(self.journal, 15.0, max_bytes=size // 4)
+        self.assertTrue(budget['limited_by_replay_budget'])
+        self.assertGreaterEqual(budget['skipped_bytes'], size - size // 4)
+        self.assertLess(budget['effective_window_days'], 15 / 3)
+        self.out.unlink()
+        with patch.object(self.tool, 'REFERENCE_REPLAY_BYTES_PER_S', size / 4 / 60):
+            code, capped = self.run_tool('--max-replay-minutes', '1', clock=lambda: last + MINUTE)
+        self.assertEqual((code, capped['replay']['limited_by_replay_budget']), (0, True))
+        self.assertEqual(capped['replay']['estimated_replay_minutes'], 1.0)
+        self.assertGreaterEqual(capped['coverage']['coverage_hours'], 24)
+        # A window shorter than 2 days could never reach 24 h of coverage: refused.
+        with self.assertRaises(SystemExit):
+            self.run_tool('--window-days', '1', clock=lambda: last + MINUTE)
+
+    def test_a_sidecar_stamped_ahead_of_the_wall_clock_is_replaceable(self):
+        # A sidecar written by a test with a fixed future clock (or a skewed host) carries
+        # coverage that was never observed: it reads as no coverage and may be replaced.
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]
+        self.write_journal(stamps)
+        last = stamps[-1]
+        now = last + 10 * MINUTE
+        self.old_sidecar(covered_since=now - 30 * guard.HOUR_MS, observed_until=now + 90 * DAY)
+        verdict = self.tool.existing_sidecar(self.out, now)
+        self.assertEqual((verdict['replaceable'], verdict['coverage_current'], verdict['observed_until']),
+                         (True, False, None))
+        self.assertEqual(verdict['coverage_ahead_minutes'], round(90 * DAY / MINUTE, 1))
+        code, summary = self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual((code, summary['replaced']['coverage_ahead_minutes']), (0, round(90 * DAY / MINUTE, 1)))
+        self.assertFalse(summary['coverage_at_now']['warming'])
 
     def test_the_tool_refuses_a_runtime_whose_services_were_not_stopped(self):
         # Review finding: --replace-stale under running services wrote the seed, and the running
@@ -2696,6 +2964,19 @@ class VersionAndReplayTests(unittest.TestCase):
         self.assertEqual((coverage['basis_version'], coverage['held_position_sources']),
                          (guard.REGISTRY_COVERAGE_BASIS, sorted(guard.HELD_POSITION_SOURCES)))
         self.assertIn('pair age < 14 days', structural['ticker_input_rule'])
+        # Sixth review: the coverage clock, the vouching sighting merge and the seed replay window.
+        self.assertEqual((coverage['clock']['version'], coverage['clock']['max_ahead_minutes'] * 60_000),
+                         (guard.COVERAGE_CLOCK_VERSION, guard.COVERAGE_MAX_AHEAD_MS))
+        self.assertEqual(structural['registry_seed']['vouching_sighting_merge_interval_minutes'] * 60_000,
+                         guard.REGISTRY_SIGHTING_MERGE_INTERVAL_MS)
+        tool_path = Path(__file__).resolve().parents[1] / 'scripts' / 'build_ticker_registry_seed.py'
+        self.assertIn("REPLAY_WINDOW_VERSION = 'SEED_REPLAY_WINDOW_V1'", tool_path.read_text(encoding='utf-8'))
+        self.assertEqual(structural['registry_seed']['first_deploy_replay']['version'], 'SEED_REPLAY_WINDOW_V1')
+        self.assertIn('defensive_entry_layer.ticker_registry.load_status == LOADED',
+                      structural['registry_seed']['verify_after_start'])
+        published = guard.config()['registry']
+        self.assertEqual((published['seed_version'], published['coverage']['clock']['version']),
+                         (guard.REGISTRY_SEED_VERSION, guard.COVERAGE_CLOCK_VERSION))
 
     def test_owner_decision_on_loss_memory_at_seats_is_recorded_as_accepted(self):
         # Owner decision (1), taken 2026-10-08 by the operator under the owner's delegation:
@@ -2810,6 +3091,40 @@ class AccountIsolationTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr[-3000:])
             self.assertEqual(ledger.read_text(encoding='utf-8'), '{"sentinel": "real PAPER ledger stand-in"}')
             self.assertEqual(sorted(path.name for path in Path(tmp).iterdir()), ['state.json'])
+
+    def test_gate_isolated_modules_run_alone_write_nothing_next_to_the_shells_runtime(self):
+        # Review finding: modules that patch only defensive_entry_decision still observed through
+        # strategy_lab.DEFENSE and live_tape._POOL_SCHEDULER, whose registries live next to
+        # NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH. Run alone (PYTHONPATH=backend, without
+        # scripts/run_python_checks.py) they wrote strategy_lab.ticker_registry.json with the fixed
+        # test clock (January 2027) and fixture sightings, or live_tape.ticker_registry.json, next to
+        # a shell's runtime. Every module that isolates the layer runs here in its own process with
+        # the state paths pointing at a sentinel directory, which must stay empty.
+        import subprocess
+        import sys
+        root = Path(__file__).resolve().parents[1]
+        modules = []
+        for suite in ('tests', 'backend/tests'):
+            for path in sorted((root / suite).glob('test_*.py')):
+                if path.resolve() != Path(__file__).resolve() and 'def _defensive_pass(' in path.read_text(
+                        encoding='utf-8'):
+                    modules.append((suite, path.stem))
+        self.assertIn(('tests', 'test_funded_candidate_alignment'), modules)
+        self.assertIn(('tests', 'test_tape_execution_repair'), modules)
+        self.assertIn(('backend/tests', 'test_momentum_rush_brain'), modules)
+        for suite, module in modules:
+            with self.subTest(module=f'{suite}/{module}'), \
+                    tempfile.TemporaryDirectory(prefix='neo-sentinel-runtime-') as tmp:
+                sentinel = Path(tmp)
+                env = dict(os.environ, PYTHONUTF8='1', PYTHONPATH=str(root / 'backend'), NEO_ENGINE_MODE='PAPER',
+                           NEO_MARKET_STATE_PATH=str(sentinel / 'state.json'),
+                           NEO_MAIN_MARKET_STATE_PATH=str(sentinel / 'state.json'),
+                           NEO_STRATEGY_LAB_PATH=str(sentinel / 'strategy_lab.json'),
+                           NEO_LIVE_TAPE_PATH=str(sentinel / 'live_tape.json'))
+                result = subprocess.run([sys.executable, '-m', 'unittest', module], cwd=root / suite, env=env,
+                                        capture_output=True, text=True, timeout=600)
+                self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+                self.assertEqual(sorted(str(path.relative_to(sentinel)) for path in sentinel.rglob('*')), [])
 
 
 if __name__ == '__main__':

@@ -14,14 +14,16 @@ The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default
 `ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
 With the layer, the `effective_config_hash` values (code defaults, no `NEO_*` overrides,
 pinned exactly by `tests/test_cost_first_engine_profile.py`) are:
-`COST_FIRST_ESTABLISHED_PAPER_V1` `7ac1d917775a8b86359c85f8b5e977127696708b6e90770018de4320f6b84286`,
-`WINNER_ENSEMBLE_PAPER_V1` `6fabde936b8f978aef7117062f849feb15f0d8ae2b04f44dbe8aea49ab0f9918`,
-`ORDER_FLOW_ADAPTIVE` `be874bd4fd4327f83a7b3eb309730a9c04a97f8e208699bc8a4d5a330a7745b7`.
+`COST_FIRST_ESTABLISHED_PAPER_V1` `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba`,
+`WINNER_ENSEMBLE_PAPER_V1` `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9`,
+`ORDER_FLOW_ADAPTIVE` `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890`.
 A new cost-first account's ticker registry is seeded from main's, the Lab's and the
 tape's sidecars and adopts their current coverage; until it has 24 h of coverage, pools
 younger than 14 days are blocked (`rug_ticker_registry_warming`). Check that the
-account's `layer.ticker_registry.coverage.warming` is false before relying on its entry
-frequency (see [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#seeding-ticker_registry_seed_v3)).
+account's `defensive_entry_layer.ticker_registry.coverage.warming` is false on its
+`/state` before relying on its entry frequency; that status is published after every
+scan, also while the account is paused (see
+[DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#seeding-ticker_registry_seed_v4)).
 
 ## What it is
 
@@ -226,7 +228,9 @@ On the account's engine port (`/state`) and through the authenticated dashboard
   `account_scope.strategy_matches_request = true`.
 - `entry_diagnostics.rejections` shows universe reasons with metrics in `examples`;
   `market_cost_feasibility.checked_market_candidates` counts universe candidates;
-  `entry_diagnostics.defensive_entry.layer.ticker_registry.coverage.warming` is false.
+  `defensive_entry_layer.ticker_registry.coverage.warming` is false (published after
+  every scan, paused or running; `entry_diagnostics.defensive_entry.layer` carries the
+  same status once the engine evaluates entries).
 - Compare `trade_seq`, history length, `demo_balance_usd` and `demo_session_id` with
   the values before the stop; the main engine and every other account still report
   `WINNER_ENSEMBLE_PAPER_V1` (or their own profile) with their previous

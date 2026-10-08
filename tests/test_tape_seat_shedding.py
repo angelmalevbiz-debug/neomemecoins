@@ -24,6 +24,7 @@ from tape_pool_scheduler import TapePoolScheduler
 from test_tape_execution_repair import META, NOW, non_swap, pubkey, transaction
 from test_tape_decoder_shadow_v2 import BODIES, real
 import entry_defense as _isolation_entry_defense
+import live_tape as _isolation_live_tape
 import tape_pool_scheduler as _isolation_tape
 
 _DEFENSIVE_ISOLATION = []
@@ -33,12 +34,28 @@ def _defensive_pass(*_args, **_kwargs):
     return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
 
 
+def _path_less_layers():
+    """Path-less layers for the module globals that otherwise build one from the env paths."""
+    return (
+        (_isolation_live_tape, '_POOL_SCHEDULER', _isolation_tape.TapePoolScheduler()),
+    )
+
+
 def setUpModule():
     """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
     guard, pool loss memory, heat veto and its warm-up) has its own suite in
     tests/test_defensive_entry_layer.py, which proves every path consults it."""
     for target, name in ((_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
         isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+    # The layer's ticker registry stays in memory here. Run on its own (without
+    # scripts/run_python_checks.py), this module must never write a ticker sidecar next
+    # to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (or the /var/lib/neo-market
+    # defaults): strategy_lab.maybe_open observes through lab.DEFENSE and
+    # live_tape.feed_snapshot through the module-level _POOL_SCHEDULER.
+    for target, name, value in _path_less_layers():
+        isolation = patch.object(target, name, value)
         isolation.start()
         _DEFENSIVE_ISOLATION.append(isolation)
 

@@ -25,9 +25,9 @@ these rules measurably cut losses, they do not create profit.
 One layer instance belongs to one process (engine, Lab, tape). It owns that
 process's ticker registry (persisted next to its state file with its
 continuous coverage; one whose coverage is not current or shorter than 24 h
-is seeded read-only from the other services' sidecars, and until it has
-observed the market for 24 h pools under 14 days are blocked with
-rug_ticker_registry_warming) and its
+is seeded read-only from the other services' sidecars, one that vouches still
+merges their sightings every 5 min, and until it has observed the market for
+24 h pools under 14 days are blocked with rug_ticker_registry_warming) and its
 pair history; the caller feeds both with every scan's feed via ``observe``.
 Neither ``observe`` nor ``evaluate`` raises: an unexpected error blocks the
 candidate with ``defensive_entry_error`` (fail closed) and is counted.
@@ -63,13 +63,16 @@ def registry_path_for(state_path):
 
 
 def sibling_registry_paths(own_registry_path, environ=None) -> tuple:
-    """Ticker registry sidecars of the other PAPER services: read-only seeds (TICKER_REGISTRY_SEED_V2).
+    """Ticker registry sidecars of the other PAPER services: read-only seeds (TICKER_REGISTRY_SEED_V4).
 
     Each service names its state file in its environment (SERVICE_STATE_ENV);
     unset variables are skipped and the caller's own sidecar is excluded. A
     personal engine's NEO_MARKET_STATE_PATH is its own account, so it seeds
     from main's (NEO_MAIN_MARKET_STATE_PATH, set by the gateway), the Lab's
-    and the tape's sidecars.
+    and the tape's sidecars. A registry seeds from them at start and while
+    running (after a coverage gap, every 5 min while under 24 h of coverage),
+    and merges their sightings, never their coverage, every 5 min while its
+    own coverage vouches (structural_rug_guard.TickerRegistry).
     """
     import os
     env = os.environ if environ is None else environ

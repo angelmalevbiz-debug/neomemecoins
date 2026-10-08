@@ -190,16 +190,36 @@ or after the cap evicted sightings. The rule now fails closed instead:
   log covered 22.8 h). Coverage is 0 when the registry's last observation is more than
   60 min before `now`. Pools of 14 days or more are never judged by tickers, so they
   never wait.
+- Coverage stamped in the future never vouches (`TICKER_COVERAGE_CLOCK_V1`). An
+  `observed_until` more than 5 min after the reference clock was never observed: a
+  sidecar written by a test run with a fixed clock (the suites use January 2027), a
+  sibling host with a skewed clock, or a backward wall-clock step. Such coverage is not
+  current (coverage 0), it is dropped when the own sidecar is loaded or re-read, it is
+  never adopted from a sibling at a seed (`seed.sources` then records
+  `SEEDED_COVERAGE_AHEAD_IGNORED`; the sightings are still merged), and a span in memory
+  is dropped at the next scan, which starts coverage again and seeds at once
+  (`coverage.future_drops`, `last_future_ahead_minutes`). Before this rule a future
+  stamp kept the coverage current for as long as the clock stayed behind it, and the
+  registry ignored every observation up to the stamp, so no gap was ever recorded: in a
+  review simulation the Lab, seeded from main after loading such a sidecar, reported
+  35 h of coverage and no reset after a 5 h outage and allowed a 3-day-old pool that an
+  honest sidecar blocked as `rug_ticker_registry_warming`; it also saved the stamp again,
+  and any sibling seeding from it after its own outage would have vouched at once. The
+  tolerance is 5 min, not the 5 s feed skew, because the engine's scan and entry threads
+  and the offline replay (entry-stage checks at the recorded preflight start) legitimately
+  look seconds to a minute behind the newest observation; a smaller backward step delays
+  gap detection by at most 5 min.
 
 `check()` publishes `registry_coverage_h`; `status()` publishes `coverage` with
 `covered_since`, `observed_until`, `coverage_hours`, `warming`, `resets`,
-`last_gap_minutes`, `adopted_from`, `basis` and `held_only_scans`.
+`last_gap_minutes`, `adopted_from`, `basis`, `held_only_scans`, `clock_version`,
+`future_drops` and `last_future_ahead_minutes`.
 
 The cost: on the first deploy, every engine and Lab book enters no pool younger than
 14 days for 24 h unless the registries are seeded (below), and again after any outage
 longer than 60 min.
 
-#### Seeding (TICKER_REGISTRY_SEED_V3)
+#### Seeding (TICKER_REGISTRY_SEED_V4)
 
 A ticker registry is market memory, not account memory: every service sees the same
 market. A registry whose own coverage does not vouch after loading its sidecar (new,
@@ -208,7 +228,20 @@ as after services that ran briefly before the first-deploy seed) therefore merge
 sidecars of the other services read-only. Since `TICKER_REGISTRY_SEED_V3` a running
 registry seeds the same way at its next observation when a gap over 60 min restarts its
 coverage, and at most every 5 min while its coverage is under 24 h
-(`seed.running_reseeds`, `seed.last_seed_at`). Under `TICKER_REGISTRY_SEED_V2` it seeded
+(`seed.running_reseeds`, `seed.last_seed_at`). Since `TICKER_REGISTRY_SEED_V4` a
+registry whose coverage vouches still merges the siblings' sightings, never their
+coverage, at most every 5 min (`seed.sighting_merges`, `sighting_merge_new_pools`,
+`sighting_merge_sources` `MERGED`/`MISSING`/`UNREADABLE`/`CORRUPT`,
+`last_sighting_merge_at`; a seed counts as a merge). Main observes the untrimmed feed,
+including the Gecko new pools that `bounded_feed` cuts at `MAX_FEED` = 90, and the Lab and
+the tape see only main's trimmed published feed. Under V3 the Lab and the tape adopted
+main's coverage at start, vouched, and from then on never picked up a sighting main made
+later: for up to 14 days a relaunch whose sibling appeared only among the cut Gecko pools
+(a 4-day-old DOTF pool at liquidity/MC 2.01%) was refused by main as `rug_ticker_reuse`
+while a COST_FIRST Lab book could enter it and the tape seated it. Main saves its sidecar
+at most every 5 min, so main's sightings now reach the Lab and the tape within about
+10 min. Sightings only add memory, so the merge can only block more. Under
+`TICKER_REGISTRY_SEED_V2` it seeded
 only when it was built: a tape process that kept running but completed no poll for over
 60 min (main's `/state` timing out while main kept scanning) restarted its coverage and
 withheld the seat of every pool under 14 days for 24 h, so main, the personal engines and
@@ -222,7 +255,7 @@ state-file environment variables (`NEO_MAIN_MARKET_STATE_PATH`, `NEO_MARKET_STAT
   sidecar, which the gateway passes as `NEO_MAIN_MARKET_STATE_PATH`, and from the Lab's
   and the tape's. Main's registry is the only one fed the untrimmed feed with the Gecko
   new pools, where relaunches show up first; the Lab and the tape see main's trimmed
-  published feed.
+  published feed and take main's sightings through the merges above.
 - The Lab seeds from main's and the tape's; the tape from main's and the Lab's.
 - It adopts the earliest `covered_since` of a sibling whose own coverage is current (last
   observation at most 60 min ago), because the merged sightings cover that span. When its
@@ -245,7 +278,8 @@ bound are not journalled, although main's live registry sees them in the untrimm
 feed, so the seed is a Lab/tape-grade memory: the same trimmed view the Lab, the tape and
 the research had. For up to 14 days after the deploy, a relaunch whose earlier sibling
 appeared only among the trimmed Gecko pools before the deploy can pass
-`rug_ticker_reuse`; the research reuse figures came from the same trimmed log.
+`rug_ticker_reuse`; the research reuse figures came from the same trimmed log. Sightings
+main makes after the deploy reach the Lab and the tape through the V4 merges.
 
 The tool replays the journal through the same registry code (normalization,
 placeholders, pruning, cap, 60-min gap rule). Every valid row registers its sighting;
@@ -259,10 +293,34 @@ has completed:
 .venv\Scripts\python.exe scripts\build_ticker_registry_seed.py --journal .runtime\accounts\training\observations.jsonl --out .runtime\accounts\state.ticker_registry.json
 ```
 
+Run time (`SEED_REPLAY_WINDOW_V1`). The replay parses every row it reads: about 4 min per
+journal day on the reference PC (54.6 MB/s on 4.5 KB rows; the journal grows about
+13.9 GB a day and only a PAPER reset starts it again). The tool therefore does not replay
+from the first byte: it seeks (a binary search on `observed_at` by byte offset; rows are
+appended in observation order, with 1 h of slack) to the first row of the last
+`--window-days` before the newest row (default 15: the 14-day retention plus the 24 h
+coverage span) and replays from there (`replay.start_offset`, `skipped_bytes`);
+`--full-journal` replays everything. Sightings older than the window would be pruned by
+the 14-day retention anyway. The window is a time span, and 15 journal days replay for
+about an hour, so the start is also capped by bytes: the replay starts no earlier than
+`--max-replay-minutes` (default 40) of journal at the reference 54.6 MB/s before its end
+(about 131 GB, about 9 journal days; `replay.limited_by_replay_budget`,
+`effective_window_days`, `estimated_replay_minutes`). The cap and a shorter
+`--window-days` (at least 2) trade older ticker memory for time; the replayed span must
+still give 24 h of coverage. Coverage is judged at the clock read after the
+replay and the write, not before it: the tool prints `coverage_at_now` at that clock,
+`clock.elapsed_seconds`, `start_services_before_utc` (`observed_until` + 60 min, ISO UTC)
+and `vouches_at_end`, and exits 2 when the sidecar was written but its coverage at the
+end is lapsed or under 24 h (it exits 0 only when it vouches, 1 when nothing was written).
+Before this, `coverage_at_now` used the clock read before a replay of the whole journal:
+once the journal was about 13 days old the replay alone outlasted the 60-minute window,
+and the tool printed warming false and exited 0 while every registry would warm for 24 h.
+
 Run it on the journal as it stands after the services stopped (or a copy taken then),
-check that the printed `coverage_at_now` is not warming, then start them within 60 min of
-the printed `coverage.observed_until`; the Lab, the tape and personal engines then seed
-from main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full procedure.
+check that it exits 0 (`vouches_at_end` true), then start the services before the printed
+`start_services_before_utc`; the Lab, the tape and personal engines then seed from main's
+sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full procedure, including when a
+rerun cannot help.
 
 The services must be stopped for every run of the tool, the first one and
 `--replace-stale` alike. A running main keeps its registry in memory and rewrites
@@ -273,9 +331,12 @@ simulation the sidecar showed 30.0 h of coverage right after the tool and 0.44 h
 entry 6.7 min later, and a Lab restarted afterwards adopted the 0.44 h and kept warming.
 The tool refuses a runtime directory (the output's folder or a parent) whose
 `services/processes.json` exists without `services/stop.request`; Stop writes that marker
-and Start removes it, so the refusal clears exactly when Stop has run. After Start, check
-on main's `/state` that main's `entry_diagnostics.defensive_entry.layer.ticker_registry`
-shows `load_status` `LOADED` and `coverage.warming` false, that the Lab's
+and Start removes it, so the refusal clears exactly when Stop has run. The marker proves
+that Stop ran, not that every process exited: when Stop reports that services are still
+flushing, wait until `-Action Status` shows none running before running the tool. After
+Start, check on main's `/state` that main's `defensive_entry_layer.ticker_registry`
+(published by every scan, also while main is paused) shows `load_status` `LOADED` and
+`coverage.warming` false, that the Lab's
 `strategy_lab.activity_config.defensive_entry_state.ticker_registry` shows
 `coverage.warming` false (with `seed.sources` `SEEDED` or `coverage.adopted_from` set), and
 that the tape's `live_tape_status.entry_scheduling.defensive_entry.layer.ticker_registry`
@@ -286,9 +347,15 @@ seed (main writes its sidecar on its first scan), a guarded deploy rolled back a
 new main ran, or a first try failed. Such a sidecar does not vouch yet, and the Lab and
 tape sidecars are no better, so every engine and Lab book would block pools under
 14 days for 24 h. `--replace-stale` (services stopped) replaces an existing sidecar only
-when it is corrupt (it reads but does not parse), carries no coverage, or its coverage at
-the wall clock is not current (last observation more than 60 min ago) or shorter than
-24 h; a sidecar with current coverage of 24 h or more is never replaced, and neither is
+when it is corrupt (it reads but does not parse), carries no coverage, its coverage is
+stamped more than 5 min after the wall clock (`TICKER_COVERAGE_CLOCK_V1`: never observed,
+`coverage_ahead_minutes`), or its coverage at the wall clock is not current (last
+observation more than 60 min ago) or shorter than 24 h. A rerun only helps when the seed
+was overwritten or never written: when the services started more than 60 min after
+`observed_until`, or the journal itself has a gap over 60 min in its last 24 h, the
+rebuilt sidecar has the same short coverage, the tool exits 2 again, and a rerun only adds
+a second outage; expect 24 h of warming instead. A sidecar with current coverage of 24 h or
+more is never replaced, and neither is
 one that cannot be read (an I/O error: no copy can be kept, and something may still hold
 it open). The old file is first copied to `<out>.replaced-<ms>` (no service reads that
 name) and its readable sightings are merged into the new sidecar. Moving the old file
@@ -416,9 +483,11 @@ that no seat be spent on a pool that every entry path blocks:
   registry-warming state follows the other services: when a gap over 60 min restarts the
   tape's coverage (its polls stalled while main kept scanning) it seeds from main's and
   the Lab's sidecars at its next poll and adopts a current sibling's coverage
-  (`TICKER_REGISTRY_SEED_V3`), so it withholds seats only while no service vouches. No
-  tape restart is needed; `live_tape_status.entry_scheduling.defensive_entry.layer.ticker_registry.seed.running_reseeds`
-  counts these seeds.
+  (`TICKER_REGISTRY_SEED_V3`, kept in V4), so it withholds seats only while no service
+  vouches. No tape restart is needed; `live_tape_status.entry_scheduling.defensive_entry.layer.ticker_registry.seed.running_reseeds`
+  counts these seeds. While it vouches it merges main's sightings every 5 min
+  (`TICKER_REGISTRY_SEED_V4`), so a relaunch main saw among the cut Gecko pools gets no
+  seat either.
 - **Heat withholds a new seat.** A hot or crashing pool (rules (a)–(g), or an unknown
   price, judged with the scheduler's own pair history) gets no new entry or exploration
   seat, since no engine would enter it now. A pool that already holds a running lease
@@ -451,9 +520,9 @@ Consequences, all visible in diagnostics:
   5 min; a pool first seen by a running process waits 15 min.
 - Pools younger than 14 days wait until the service's ticker registry has watched the
   market for 24 h (first deploy without a seed, an outage longer than 60 min of every
-  service, a cap eviction); a registry whose sibling vouches adopts that coverage at
-  start, after its own gap, or within 5 min while warming. Pools of 14 days or more are
-  not affected.
+  service, a cap eviction, coverage stamped ahead of the clock); a registry whose sibling
+  vouches adopts that coverage at start, after its own gap, or within 5 min while warming.
+  Pools of 14 days or more are not affected.
 
 ## Score companion: NEO_MARKET_SCORE_V2_LIQ_MC_BAND
 
@@ -519,10 +588,24 @@ Both stay on `NEO_MARKET_SCORE_V1`. Every `training_bridge.observe` call records
 position's context already is V1-based and is only labelled. The learners' score is
 `paper_training.learner_score` (`coin.scoreV1`, else `score` for rows recorded before V2;
 `LEARNER_SCORE_VERSION`, published in the learner snapshot and in `/state` config as
-`training_score_version`). Learner decisions are therefore the pre-change ones, the
-validation sample (at least 5 days) stays one regime, and `PAPER_TRAINING_V1` keeps its
-version: bumping it would refuse the saved training state (an explicit reset), which this
-change must not do.
+`training_score_version`). The learners' decision on any given row is therefore the
+pre-change one, and `PAPER_TRAINING_V1` keeps its version: bumping it would refuse the
+saved training state (an explicit reset), which this change must not do.
+
+The rows they see are not the pre-change population, though. `scan_once` sorts the
+discovered feed by the V2 `score` and `bounded_feed` keeps the 90 coins with the market
+candidates first (`market_candidate`: for the default strategy, the ensemble's
+`score >= threshold`, also V2); the journal records only that bounded feed, and the Lab
+and the tape read the same feed. A pool at liquidity/MC 0.6–1 loses 9 points and one at 1
+or above 19 (the +9 bonus is gone and the LP risk costs 10), so such pools drop out of
+the 90 more often from the deploy on. The learner sample is therefore not one regime
+across the deploy. Its boundary is the first journal row stamped `coin.scoreVersion`
+(`market_monitor.make_coin` writes it on every observation since the layer;
+`main_replay` publishes it as `entry_defense.rows_recorded_under_layer.earliest_at`):
+compare or validate learner books on rows before it or rows after it, never pooled, and
+count the validation days (at least 5) from the boundary for a post-deploy sample. Ranking
+the bounded feed's remainder by `scoreV1` would bring the population closer, but not back
+(the candidate set itself follows the V2 entry screen); it is not implemented.
 
 ## Version strings
 
@@ -542,7 +625,10 @@ change must not do.
 | Market score | (unversioned V1) | `NEO_MARKET_SCORE_V2_LIQ_MC_BAND` |
 | Lab retirement review | `LAB_STRATEGY_LIFECYCLE_V1` | `LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE` |
 | Engine RugCheck prewarm | (unversioned: `ageMinutes` ≤ 360) | `PREWARM_V2_DEFENSIVE_POPULATION` |
-| Ticker registry seeding | — | `TICKER_REGISTRY_SEED_V3` (seeds a registry whose coverage is not current or under 24 h at start, and a running one after a coverage gap or every 5 min while under 24 h; adopts a sibling's current coverage, main's sidecar for personal engines, offline first-deploy builder with `--replace-stale`, refused while the services run). `TICKER_REGISTRY_SEED_V2` (start only) was never released. |
+| Ticker registry seeding | — | `TICKER_REGISTRY_SEED_V4` (seeds a registry whose coverage is not current or under 24 h at start, and a running one after a coverage gap or every 5 min while under 24 h; a vouching registry merges its siblings' sightings, never their coverage, every 5 min; adopts a sibling's current coverage, main's sidecar for personal engines, offline first-deploy builder with `--replace-stale`, refused while the services run). `TICKER_REGISTRY_SEED_V2` (start only) and `TICKER_REGISTRY_SEED_V3` (no merge while vouching) were never released. |
+| Ticker coverage clock | — | `TICKER_COVERAGE_CLOCK_V1` (coverage stamped more than 5 min after the reference clock is never current and is dropped) |
+| First-deploy seed replay | (whole journal, clock read before the replay) | `SEED_REPLAY_WINDOW_V1` (last `--window-days`, default 15, capped at `--max-replay-minutes`, default 40, of journal at the reference rate; coverage judged at the clock after the replay; exit 2 when written but not vouching; `start_services_before_utc`) |
+| Engine layer status on `/state` | (only `entry_diagnostics.defensive_entry.layer`, refreshed by entry evaluations) | also `defensive_entry_layer`, refreshed by every scan, paused or running (in memory only, never in the ledger) |
 | Ticker sidecar read failures | — | `TICKER_REGISTRY_SIDECAR_READ_V1` (an unreadable own sidecar is kept and re-read, never overwritten during the run; a corrupt one is copied to `<sidecar>.corrupt-<ms>` before it is replaced) |
 | Ticker registry coverage basis | `ANY_FEED_ROW_V1` (any non-empty feed; never released) | `DISCOVERED_MARKET_ROWS_V2` (held-position rows never mark coverage) |
 | Training learners' score basis | (implicit V1) | `NEO_MARKET_SCORE_V1` (`paper_training.LEARNER_SCORE_VERSION`; `PAPER_TRAINING_V1` unchanged) |
@@ -559,9 +645,9 @@ value in `tests/test_cost_first_engine_profile.py`:
 
 | Strategy | `effective_config_hash` |
 | --- | --- |
-| `WINNER_ENSEMBLE_PAPER_V1` (default) | `6fabde936b8f978aef7117062f849feb15f0d8ae2b04f44dbe8aea49ab0f9918` |
-| `ORDER_FLOW_ADAPTIVE` | `be874bd4fd4327f83a7b3eb309730a9c04a97f8e208699bc8a4d5a330a7745b7` |
-| `COST_FIRST_ESTABLISHED_PAPER_V1` | `7ac1d917775a8b86359c85f8b5e977127696708b6e90770018de4320f6b84286` |
+| `WINNER_ENSEMBLE_PAPER_V1` (default) | `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9` |
+| `ORDER_FLOW_ADAPTIVE` | `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890` |
+| `COST_FIRST_ESTABLISHED_PAPER_V1` | `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba` |
 
 The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 
@@ -591,9 +677,16 @@ The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 - `commit_recheck_blocked`
 - `layer`: the registry and history status, including sidecar load and save state
   (`load_status`, `sidecar_read`), the registry `coverage` (`covered_since`,
-  `coverage_hours`, `warming`, `resets`), the `seed` sources and `running_reseeds`,
-  `cap_evictions`, `cap_limited_horizon_days`, `oldest_last_seen_days` and the history's
-  `observing_since`
+  `coverage_hours`, `warming`, `resets`, `future_drops`), the `seed` sources,
+  `running_reseeds` and `sighting_merges`, `cap_evictions`, `cap_limited_horizon_days`,
+  `oldest_last_seen_days` and the history's `observing_since`
+
+`entry_diagnostics` is refreshed only when entries are evaluated: `maybe_open` returns at
+once while the account is paused (`/control/stop`), and `entry_diagnostics` is not
+restored from `state.json` (it restarts as `starting`). The same layer status is therefore
+also published at the top level of `/state` as `defensive_entry_layer`, refreshed by every
+scan whether the engine is running or paused (in memory only; never written to the
+ledger). A paused account such as the cost-first account shows its ticker coverage there.
 
 Each rejection example's heat metrics include `warming_windows`, `pair_coverage_s` and
 `process_coverage_s`. `/state` config publishes `prewarm_version`.
@@ -711,7 +804,19 @@ series for heat warm-up, and one paid-profile observation.
   held-position and mark rows never extending coverage, `--replace-stale` recovering a
   sidecar left by an earlier attempt with a backup and merged sightings, refusing one
   that already vouches or cannot be read, and both runs refused while a runtime's
-  `services/processes.json` has no `services/stop.request`)
+  `services/processes.json` has no `services/stop.request`; coverage judged at the clock
+  after the replay, with exit 2 when a replay outlasts the 60-minute window or the journal
+  gives less than 24 h; `start_services_before_utc`; the replay seeking to the 15-day
+  window and `--full-journal`; a sidecar stamped ahead of the wall clock replaceable)
+- the coverage clock: an own sidecar stamped in January 2027 never vouching, seeding from
+  main instead and recording a later 5 h outage as a gap (`rug_ticker_registry_warming`),
+  with the future stamp never saved again; coverage ahead of the decision clock not
+  current and dropped at the next scan after a backward clock step; a sibling stamped in
+  the future merged but never adopted
+- `TICKER_REGISTRY_SEED_V4`: a vouching Lab registry taking main's later DOTF sighting at
+  its next 5-minute merge (`rug_ticker_reuse`), never main's coverage
+- a paused engine publishing `defensive_entry_layer` with its ticker coverage on every
+  scan, never in the ledger file
 - replay: `recorded_policy` refusing a journal with rows recorded under the layer,
   `without_layer` and `apply` labelled as counterfactuals; the ORDER_FLOW_ADAPTIVE profile
   publishing that its V4 checks read the V2 entry score
@@ -720,7 +825,10 @@ series for heat warm-up, and one paid-profile observation.
   recorded context
 - account isolation: the suite's ledger paths are temporary, and a shell
   `NEO_MARKET_STATE_PATH` pointing at a stand-in ledger survives an engine test run in a
-  fresh process (the setdefault-based module rewrote it)
+  fresh process (the setdefault-based module rewrote it); every gate test module that
+  isolates the layer, run alone in its own process with `NEO_MARKET_STATE_PATH`,
+  `NEO_MAIN_MARKET_STATE_PATH`, `NEO_STRATEGY_LAB_PATH` and `NEO_LIVE_TAPE_PATH` pointing
+  at a sentinel directory, leaves it empty
 - each heat rule, warm-up (compared unrounded at 299.96 s, and fail closed without a
   reference price), the 15-min and 60-min window coverage after a restart, gaps,
   staleness, a crash during a feed gap, malformed inputs and `log_only`; a raising
@@ -745,7 +853,15 @@ series for heat warm-up, and one paid-profile observation.
 physical-only V1 universe helper.
 
 Existing gate tests isolate the layer with a module-level patch (`TEST_GATE_ISOLATION`).
-The cost-first universe's structural guard is not patched in those tests.
+The cost-first universe's structural guard is not patched in those tests. The same
+setUpModule also replaces `strategy_lab.DEFENSE` and `live_tape._POOL_SCHEDULER` with
+path-less layers, because `strategy_lab.maybe_open` and `live_tape.feed_snapshot` still
+observe through them: run alone (with `PYTHONPATH=backend`, without
+`scripts/run_python_checks.py`, which points every path at a temp dir) six modules
+otherwise wrote `strategy_lab.ticker_registry.json` (fixed test clock, January 2027, and
+fixture sightings) or `live_tape.ticker_registry.json` next to the shell's
+`NEO_STRATEGY_LAB_PATH` / `NEO_LIVE_TAPE_PATH` (or the `/var/lib/neo-market` defaults),
+which a Lab started later would have loaded (see the coverage clock above).
 
 ## Limits and follow-ups
 
@@ -762,7 +878,12 @@ The cost-first universe's structural guard is not patched in those tests.
   at entry.
 - The first-deploy seed is built from the bounded, journalled feed, so it lacks the
   Gecko new pools main's live registry sees beyond `MAX_FEED`; journalling the identities
-  of trimmed-out coins would give it main's parity, and is not implemented.
+  of trimmed-out coins would give it main's parity, and is not implemented. After the
+  deploy the Lab and the tape take main's untrimmed-feed sightings through the 5-minute
+  merges (`TICKER_REGISTRY_SEED_V4`), lagging main by up to about 10 min.
+- The PAPER_TRAINING_V1 learner sample changes population at the deploy (the V2-ranked
+  bounded feed; see the training learners section): its boundary is the first journal row
+  with `coin.scoreVersion`.
 - Heat history is per process and starts empty after a restart, which costs an engine or
   the Lab 15 min without entries, and 60 min for pools at a fee tier ≥ 100 bps (the tape
   seats do not wait). Only the ticker registry persists, with its coverage.

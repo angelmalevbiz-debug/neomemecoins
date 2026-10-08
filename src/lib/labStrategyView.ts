@@ -52,6 +52,11 @@ const reasons: Record<string, string> = {
   insufficient_balance: 'Недостатъчен свободен баланс',
   retired_repeated_losses: 'Спряна след повтарящи се загуби',
   strategy_retired_observed_losses: 'Спряна след повтарящи се загуби',
+  // LAB_ACTIVE_V6: every Lab book reports cost-infeasible candidates instead of hiding them.
+  modeled_roundtrip_cost_limit: 'Няма вход: моделираните разходи надхвърлят лимита',
+  // COST_FIRST_ESTABLISHED_V1: every universe candidate refused only for size or re-entry cooldown.
+  cost_first_size_below_minimum: 'Размерът по ликвидност е под минималния вход',
+  reentry_cooldown: 'Пауза преди повторен вход в същия токен',
 };
 
 export type CostFeasibility = {
@@ -77,15 +82,39 @@ export function planningCostStatus(data?: CostFeasibility) {
 export type LabEntryViewDiagnostics = {
   blocked_reason?: string;
   signal_candidates?: number;
+  matched_candidates?: number;
+  cost_rejected?: number;
+  cost_infeasible_candidates?: number;
   affordable_candidates?: number;
+  max_entry_roundtrip_cost_pct?: number;
+  stop_loss_net_pct?: number;
+  // LAB_ACTIVE_V6: fee-and-buffer planning floor published for every book.
+  cost_feasibility?: CostFeasibility;
   promoted_cost_feasibility?: CostFeasibility;
 };
 
 type EntryViewBook = ViewBook & { entry_diagnostics?: LabEntryViewDiagnostics };
 type EntryView = { status: string; detail: string | null; costLimited: boolean };
 
-function allMatchedCostsExceedLimit(diagnostics: LabEntryViewDiagnostics) {
-  const data = diagnostics.promoted_cost_feasibility;
+const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
+
+function costCapView(diagnostics: LabEntryViewDiagnostics): EntryView | null {
+  // LAB_ACTIVE_V6: every checked candidate of this book exceeded the admission
+  // cap under the full modeled round trip (fees, impact, buffers, network).
+  if (diagnostics.blocked_reason !== 'modeled_roundtrip_cost_limit') return null;
+  const rejected = diagnostics.cost_infeasible_candidates ?? diagnostics.cost_rejected;
+  const cap = diagnostics.max_entry_roundtrip_cost_pct;
+  if (!finite(rejected) || rejected <= 0 || !finite(cap) || cap < 0) return null;
+  const stop = finite(diagnostics.stop_loss_net_pct) ? diagnostics.stop_loss_net_pct : cap * 2;
+  const signals = finite(diagnostics.signal_candidates) ? diagnostics.signal_candidates : rejected;
+  return {
+    status: `Няма вход: ${rejected} от ${signals} кандидата над лимита на разходите ${cap.toFixed(2)}%`,
+    detail: `Моделираният round-trip (DEX такса вход и изход, impact, slippage/забавяне, мрежа) при всеки проверен размер надхвърля лимита ${cap.toFixed(2)}% = 0.5 × нетен стоп ${stop.toFixed(2)}%. Кандидатите са отчетени като неизпълними по разходи, не са скрити; лимитът не се сваля, за да се отворят сделки. Не е изпълнима котировка.`,
+    costLimited: true,
+  };
+}
+
+function allMatchedCostsExceedLimit(diagnostics: LabEntryViewDiagnostics, data: CostFeasibility | undefined) {
   const checked = data?.checked_market_candidates;
   const minimum = data?.minimum_model_roundtrip_cost_pct;
   const maximum = data?.maximum_roundtrip_cost_pct;
@@ -111,11 +140,16 @@ export function labEntryView(book: EntryViewBook, backendAvailable = true): Entr
   if (!diagnostics) return { status: 'Чака данни за входа', detail: null, costLimited: false };
   const reason = diagnostics.blocked_reason;
   const genericWait = !reason || ['promoted_verified_flow_unavailable', 'promoted_verified_flow_stale',
-    'promoted_buy_pressure_unconfirmed', 'promoted_cost_headroom_insufficient'].includes(reason);
+    'promoted_buy_pressure_unconfirmed', 'promoted_cost_headroom_insufficient', 'modeled_roundtrip_cost_limit'].includes(reason);
   if (reason && reasons[reason] && !genericWait) return { status: reasons[reason], detail: null, costLimited: false };
   if (diagnostics.signal_candidates === 0) return { status: reasons.no_market_signal, detail: null, costLimited: false };
-  if (isFundedStrategy(book) && genericWait && allMatchedCostsExceedLimit(diagnostics)) {
-    const cost = diagnostics.promoted_cost_feasibility!;
+  const capped = costCapView(diagnostics);
+  if (capped) return capped;
+  // The funded-only planning summary stays funded-only; the V6 summary applies to every book.
+  const feasibility = diagnostics.cost_feasibility
+    ?? (isFundedStrategy(book) ? diagnostics.promoted_cost_feasibility : undefined);
+  if (genericWait && allMatchedCostsExceedLimit(diagnostics, feasibility)) {
+    const cost = feasibility!;
     const stopBudget = cost.maximum_roundtrip_cost_pct! * 2;
     const stopHeadroom = stopBudget - cost.minimum_model_roundtrip_cost_pct!;
     return {

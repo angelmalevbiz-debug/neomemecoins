@@ -18,6 +18,13 @@ MARK_TTL_MS=1_500
 BUFFER_BPS=10
 SIMULATED_DELAY_MS=max(0,int(os.getenv('NEO_PAPER_EXECUTION_DELAY_MS','250')))
 MAX_SIGNAL_AGE_MS=int(os.getenv('NEO_PAPER_MAX_SIGNAL_AGE_MS','8000'))
+# Preflight chain bounds. These are the existing admission thresholds, named
+# so offline replay adapters derive their freshness windows from the same
+# constants the live engine applies instead of carrying their own literals.
+PREFLIGHT_MAX_QUANTITY_DRIFT=.005
+FINAL_QUOTE_MAX_AGE_MS=750
+PREFLIGHT_PREVIEW_MAX_AGE_MS=4_000
+PREFLIGHT_MAX_SLOT_GAP=25
 _CACHE={}
 _LOCK=threading.Lock()
 _LOCAL=threading.local()
@@ -183,20 +190,20 @@ def preflight_failure(first,sell,final,now=None):
         old=int(first['token_raw_amount']);new=int(final['token_raw_amount'])
         if old<=0 or new<=0:return {'code':'PREFLIGHT_INVALID'}
         drift=new/old-1
-        if abs(drift)>.005:
+        if abs(drift)>PREFLIGHT_MAX_QUANTITY_DRIFT:
             return {'code':'PREFLIGHT_QUANTITY_DRIFT','quantity_change_pct':drift*100,
-                    'maximum_quantity_change_pct':.5}
+                    'maximum_quantity_change_pct':PREFLIGHT_MAX_QUANTITY_DRIFT*100}
         final_age=now-int(final['quoted_at'])
-        if not 0<=final_age<=750:
+        if not 0<=final_age<=FINAL_QUOTE_MAX_AGE_MS:
             return {'code':'FINAL_QUOTE_STALE','final_quote_age_ms':final_age,
-                    'maximum_final_quote_age_ms':750}
+                    'maximum_final_quote_age_ms':FINAL_QUOTE_MAX_AGE_MS}
         preview_age=int(final['quoted_at'])-int(sell['quoted_at'])
-        if not 0<=preview_age<=4000:
+        if not 0<=preview_age<=PREFLIGHT_PREVIEW_MAX_AGE_MS:
             return {'code':'PREFLIGHT_PREVIEW_STALE','preview_age_ms':preview_age,
-                    'maximum_preview_age_ms':4000}
+                    'maximum_preview_age_ms':PREFLIGHT_PREVIEW_MAX_AGE_MS}
         slot1=int(first.get('context_slot') or 0);slot2=int(final.get('context_slot') or 0)
-        if slot1 and slot2 and not 0<=slot2-slot1<=25:
-            return {'code':'PREFLIGHT_SLOT_DRIFT','slot_gap':slot2-slot1,'maximum_slot_gap':25}
+        if slot1 and slot2 and not 0<=slot2-slot1<=PREFLIGHT_MAX_SLOT_GAP:
+            return {'code':'PREFLIGHT_SLOT_DRIFT','slot_gap':slot2-slot1,'maximum_slot_gap':PREFLIGHT_MAX_SLOT_GAP}
         # A positive preflight can be price movement, not negative trading costs.
         initial=int(first['input_usdc_raw'])/1e6
         proceeds=float(sell['provider_expected_usdc'])

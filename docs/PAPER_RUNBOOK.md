@@ -18,7 +18,7 @@ Both Python suites use temporary state/audit/cache directories through the runne
 
 ## Local PAPER dashboard and free HTTPS tunnel
 
-The maintained Pages frontend can use the local PAPER services without Contabo. The local runtime is isolated under the ignored `.runtime/accounts` directory. It starts a $1,000 main PAPER account, nine separate $500 learning books, 34 independent strategy Lab books (29 TEST books at $500, Fast Scalper at $100, and the four `PROMOTED_PAPER` cohort books EARLY, MOMENTUM, PRECISION and ULTRA_PRECISION at $250 each), one shared market recorder, and a per-user gateway on loopback ports 8878/8879. It does not modify remote/server accounts.
+The maintained Pages frontend can use the local PAPER services without Contabo. The local runtime is isolated under the ignored `.runtime/accounts` directory. It starts a $1,000 main PAPER account, nine separate $500 learning books, 36 independent strategy Lab books (29 TEST books at $500, Fast Scalper at $100, the four `PROMOTED_PAPER` cohort books EARLY, MOMENTUM, PRECISION and ULTRA_PRECISION at $250 each, and the isolated `COST_FIRST_CONTROL`/`COST_FIRST_SCALED` TEST pair at $500 each; every Lab book admits at most a 1.5% modeled round trip, `LAB_ACTIVE_V6`, see STRATEGY_VALIDATION.md), one shared market recorder, and a per-user gateway on loopback ports 8878/8879. It does not modify remote/server accounts.
 
 ```powershell
 .\scripts\start_local_paper.ps1 -Action Start
@@ -61,6 +61,40 @@ For this layout, provide the private loopback diagnostic separately:
 
 The read-only Pages/backend check deliberately returns a nonzero exit code if the public gateway's CORS origin or shared backend schema is still old. It does not log in, bypass private account authentication, reset accounts, or certify financial results. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for the latest measured deployment boundary.
 
+## Watchdog scheduled task
+
+`scripts/local_paper_watchdog.ps1` keeps the four owned services (main, tape, lab, gateway) running and is itself run by the Windows scheduled task `NEO Local PAPER Watchdog`. Install or update the task from the checkout that owns the services (on this PC `C:\Users\Chavd\neomemecoins`, not the dev checkout), as the signed-in Windows user:
+
+```powershell
+.\scripts\install_local_paper_watchdog.ps1
+```
+
+The task is a limited interactive task without stored credentials. It has two triggers: at logon, and a `-Once` trigger that repeats every 5 minutes (`-RepeatMinutes`) with no end. `MultipleInstances IgnoreNew` makes a tick a no-op while the watchdog runs, and the watchdog's named mutex exits a second copy immediately, so the repeat only matters after the instance has died. Re-running the installer updates the definition and leaves a running instance alone. Remove it with `-Remove`.
+
+Verify from the owning checkout:
+
+```powershell
+Get-ScheduledTask -TaskName 'NEO Local PAPER Watchdog' | Select-Object State
+Get-ScheduledTaskInfo -TaskName 'NEO Local PAPER Watchdog' | Select-Object LastRunTime, LastTaskResult, NextRunTime
+.\scripts\local_paper_watchdog.ps1 -Probe
+```
+
+`State` must be `Running`, `NextRunTime` must be set, and the probe must list every manifest service as running with main/gateway listening. The probe is read-only: it writes no log line, takes no lock and starts nothing. It also lists the per-user engines (`owner = gateway`, one row per engine worker with its listening port). Those engines are spawned, health-checked and revived by the gateway itself (`ensure_engine` and `revive_known_engines` in `backend/user_gateway.py`); they carry no `--service` argument and no manifest record, so the watchdog reports them and never stops or starts one. The loop writes a `Per-user engines` line to `.runtime/accounts/services/watchdog.log` whenever the set of engine PIDs or ports changes.
+
+### 2026-10-07 outage of the watchdog task
+
+Observed on this PC on 2026-10-08: the task showed `State Ready`, `LastTaskResult 0xC000013A`, `LastRunTime 2026-10-07 17:32:44`, empty `NextRunTime`, and no watchdog process. The watchdog log ended at `23:15:53 Recovery: requesting Start.` without `Watchdog stopped.`, and the running cohort (started 23:15:54–23:16:03) was parented to the dead watchdog PID. Findings:
+
+- `0xC000013A` is `STATUS_CONTROL_C_EXIT`: the hidden PowerShell console received a close or Ctrl+C event. The `finally` block never ran, the PowerShell engine log has a start (event 400) but no stop (event 403) for that process, and the user stayed logged on (the services survived). The `NEO Local Gateway Tunnel` supervisor task shows the same result code while its `cloudflared` child kept running, so whatever closed the consoles targeted the PowerShell hosts, not their process trees. The exact sender is unknown because the `Microsoft-Windows-TaskScheduler/Operational` log is disabled on this PC, so no task history (events 110/111/330) exists. It was not a Task Scheduler timeout (`ExecutionTimeLimit PT0S`), not a logoff, and not a crash (no Application log entry).
+- The task had only an at-logon trigger, so nothing fired again after the instance died. Its `RestartOnFailure` (3 × 1 min) did not re-launch it either: `LastRunTime` stayed at 17:32:44. The fix above adds the repeating trigger instead of relying on restart-on-failure.
+- The same evening, cohorts that were started outside the watchdog (20:01, 22:24, 23:08) all ended within minutes without the normal `stopped with persistent state` line, each time while a tool sandbox session was starting or ending, and the watchdog restarted them (20:06, 22:40, 23:15). Start and stop the PAPER services through the watchdog or the installer, not from a tool job's console, so the services do not die with that console.
+
+To get task history for the next incident, an administrator can enable the log once (system setting, not done by the installer):
+
+```powershell
+wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
+```
+
 ## Start a separate PAPER account
 
 Set isolated paths and declared risk values before starting. The following creates a new $1,000 main account, with conservative explicit risk limits and independently funded $500 learning books. It changes no existing server account.
@@ -84,7 +118,7 @@ $env:NEO_MAX_DRAWDOWN_PCT='10'
 .venv/Scripts/python.exe backend/live_tape.py
 ```
 
-The main monitor and the 34-strategy Lab consume the same live tape and recent market snapshot. Position marks reuse that shared market snapshot; the Lab does not issue a separate price request for each open position. The main process launches its independent training worker and bounded writer. The worker has no provider client. Price/safety checks and tape must become valid before entries; UNKNOWN/DEGRADED data correctly stays WAIT. Start with an API budget appropriate to the actual authenticated provider plan.
+The main monitor and the 36-strategy Lab consume the same live tape and recent market snapshot. Position marks reuse that shared market snapshot; the Lab does not issue a separate price request for each open position. The main process launches its independent training worker and bounded writer. The worker has no provider client. Price/safety checks and tape must become valid before entries; UNKNOWN/DEGRADED data correctly stays WAIT. Start with an API budget appropriate to the actual authenticated provider plan.
 
 Primary repository defaults (`backend/market_monitor.py`, mirrored in `strategy-lock.json` with `primary_daily_and_drawdown_caps_enabled: true`) are a $100 daily loss cap, a 20% drawdown cap, maximum full-loss capital $250, exposure 100%, $200 notional and eight positions; these are explicitly visible and are **not** the conservative runbook settings above. Earlier revisions of this runbook recorded both caps as disabled (`0`); that was the 2026-10-05 default and is historical. New training default risk limits remain active. Do not silently change an existing account's limits.
 
@@ -109,6 +143,31 @@ Get-Content canonical-observations.jsonl | .venv/Scripts/python.exe scripts/pape
 ```
 
 Synthetic correctness reproduction uses `tests/fixtures/paper_gap_v9.jsonl`, not the real dataset paths. Financial evaluation needs recorded subsequent market data across enough independent days/episodes.
+
+### Replay identity (REPLAY_LIVE_DERIVED_WINDOWS_V1)
+
+The primary replay is only a measurement instrument if it books the trades the live engine booked from the same recorded rows. Until this reconciliation it rejected every genuine live entry: the adapter applied its own 4 s literal to the first preflight buy quote (the live three-step preflight makes it 4.6-4.7 s old at the recorded row), a 30 s literal to the cached risk pass (the live engine accepts `promoted_entry_guard.SAFETY_MAX_AGE_MS`), read the candidate snapshot at commit where the live commit reads the scanner-refreshed feed, and let rows without quote evidence arm the 15 s quote-retry cooldown. `backend/main_replay.py` now:
+
+- derives every freshness window from the replayed engine's constants and reports each window with its basis under `freshness_windows` (`engine_execution.MAX_AGE_MS`, `FINAL_QUOTE_MAX_AGE_MS`, `PREFLIGHT_PREVIEW_MAX_AGE_MS`, `engine_rug_guard.TTL_MS`, `promoted_entry_guard.SAFETY_MAX_AGE_MS`/`FLOW_MAX_AGE_MS`, `pair_price_integrity.TTL_MS`, `engine_entry_policy.MAX_ENTRY_QUOTE_AGE_MS`); the first preflight buy quote has no wall-clock bound at commit in the live engine, only landing freshness, chronology and the engine's own slot-drift check, so the adapter applies none either;
+- evaluates the entry-stage checks of an entry-evidence row at the recorded `preflight_started_at`, the preflight consistency chain (final-quote age, `consistent_preflight`) at the recorded prepare clock `min(row available_at, final buy raw_quote _simulated_fill_at)` so a recording lag after the final quote landed is never counted as quote age, and the commit at the row's availability, exactly as the live quote sequence consumed that time (each clock's basis is reported under `freshness_windows.clock_basis`);
+- gives the commit the newest exact-pool feed snapshot and flow computation recorded at or before the row (the live commit re-reads `STATE.feed` and `live_flow`); when the engine recorded a commit-stage rejection milliseconds after the evidence row (same pool, `execution.buy_verified_at`/`sell_verified_at` equal to the bundle's quote times, a commit-stage reason), that row is the same live decision and its flow is used for the commit;
+- ticks positions only on recorded position-guard rows (a mark, or an `exit_quote` rejection) and only for the row's pool; scanner snapshots between marks are not failed sell quotes;
+- never arms the quote-retry cooldown from a row that carries no quote attempt (`decision_summary.cooldown_arms_suppressed`);
+- reports unknown valuation for a position still held past its last recorded mark (`positions_unvalued_at_end`), never a modeled value beyond the last recorded sell quote.
+
+`tests/test_main_replay_identity_v1.py` with `tests/fixtures/replay_identity_v1.jsonl` is the versioned identity check: recorded-schema rows with the measured live timing must book the live trade (pnl within $0.01, same exit reason, same raw quantity) and WAIT with the recorded rejection reasons elsewhere. Regenerate the fixture with `python tests/test_main_replay_identity_v1.py --write` after an intentional schema change only. On the 2026-10-07 main journal slice (23,452 rows, two pools) the reconciled replay reproduces the live ledger: three closes (-6.957, -1.638 EXIT_IMPACT_EMERGENCY; -10.181 STOP_LOSS_NET_TARGET) and the open position at -3.39, with 14,161 of 14,484 recorded rejection rows reproduced; that is measurement identity, not evidence of any edge. `tests/test_main_replay_journal_20261007.py` keeps that check in the suite: `tests/fixtures/replay_main_20261007_slice.jsonl.gz` (1,339 byte-identical recorded journal lines, 26.8 MB uncompressed, pinned by SHA-256) holds the 10 entry-evidence rows, the mark rows of those episodes, exit_quote guard rows, linked commit-outcome rows and the exact-pool rows of the 10 s before each preflight, and `tests/fixtures/replay_main_20261007.expected.json` the booked live pnl values; the replay must reproduce each within $0.01. A commit-stage rejection the engine records after the quote bundle, including the Jupiter price tiebreak (`price_tiebreak_failed`), is linked to that bundle as the same live decision.
+
+### Offline exit variants (REPLAY_EXIT_VARIANT_V1)
+
+`--exit-variant` applies an alternative exit rule set to the same recorded episodes. Supported keys: `stop_pct`, `take_profit_pct`, `disable_exit_impact_emergency`, `max_hold_minutes`. It changes exit decisions only: entry admission, sizing, `planned_stop_net_pct` and `planned_risk_usd` keep the baseline rules, a `max_hold_minutes` override labels its fixed-policy hold exit `MAX_HOLD_<limit>` (for example `MAX_HOLD_30`; the live label stays `MAX_HOLD_60`) while every other exit label is unchanged, and the report is marked `report_kind: EXIT_VARIANT` with the rules, the baseline rules and a label. No run (baseline or variant) overwrites an existing `--output`: replacing one needs `--overwrite` and an existing report of the same `report_kind`, so a baseline is never replaced by a variant or the reverse.
+
+```powershell
+.venv/Scripts/python.exe scripts/replay_main.py --input .runtime/datasets/market.jsonl --output .runtime/main-replay/baseline.json --state-dir .runtime/main-replay/baseline-state
+.venv/Scripts/python.exe scripts/replay_main.py --input .runtime/datasets/market.jsonl --output .runtime/main-replay/variant-stop3.json --state-dir .runtime/main-replay/variant-stop3-state --exit-variant "stop_pct=3" --variant-label stop3
+.venv/Scripts/python.exe scripts/replay_main.py --input .runtime/datasets/market.jsonl --output .runtime/main-replay/variant-no-impact.json --state-dir .runtime/main-replay/variant-no-impact-state --exit-variant "disable_exit_impact_emergency=1,max_hold_minutes=30"
+```
+
+Limits: recorded sell quotes exist only while the live engine held the position and stop at the live exit, so a variant that holds longer than the live exit ends with an unvalued position (unknown risk, `liquidation_unavailable` for later entries); only variants that exit no later than the live exit can be valued, and non-entered candidates have no quotes at all. Three closes on one pool in 14 hours are not a sample; no variant result is a profitability claim.
 
 ## Reset every PAPER account and restore
 
@@ -166,7 +225,7 @@ The original repair was reviewed in PR #2 of the legacy repository. The maintain
 
 Production backend installation has not happened because no administrative host session is available. At 2026-10-05 19:07 UTC its gateway still allowed only the legacy Pages origin; the shared backend still reported `ORDER_FLOW_GOLD_SIGNAL_VERIFIED_V7` and had no `paper_training` object. Updating a web build cannot restart or update its Python services. The shared primary reset does not satisfy the requested all-account reset.
 
-### 2026-10-08 documentation re-verification (current)
+### 2026-10-08 documentation re-verification
 
 Executed in a clean worktree on `main` at `54fec89` plus this documentation change, with the repository `.venv` and `npm ci`:
 
@@ -177,4 +236,15 @@ Executed in a clean worktree on `main` at `54fec89` plus this documentation chan
 | `npm run check:strategy` | PASS: `WINNER_ENSEMBLE_PAPER_V1` strategy hash and all 48 support-file hashes on the `UTF8_LF` basis |
 | `npm run build` | PASS, strategy/extension guards, Vite and extension archive; nonfatal Vite chunk-size warning |
 
-Facts that supersede the older blocks: the shared PAPER account publishes `entry_policy_version = WINNER_ENSEMBLE_VERIFIED_ENTRY_V4` and `exit_policy_version = HONEST_NET_EXIT_V1` (`strategy-lock.json`); `scripts/check_pages_backend.py` accepts that label, the opt-in `ORDER_FLOW_BALANCED_V4` label and the two earlier labels; the Lab registers 34 books; the latest successful Pages deployment is recorded in [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md). `backend/engine_entry_policy.py` still defines the internal constant `POLICY_VERSION = 'ORDER_FLOW_VALIDATED_THRESHOLDS_V9'`; nothing publishes it (the engine reports `winner_ensemble.ENTRY_POLICY_VERSION`), and renaming it would change a locked support-file hash, so it is left unchanged and recorded here as a stale label.
+Facts that supersede the older blocks: the shared PAPER account publishes `entry_policy_version = WINNER_ENSEMBLE_VERIFIED_ENTRY_V4` and `exit_policy_version = HONEST_NET_EXIT_V1` (`strategy-lock.json`); `scripts/check_pages_backend.py` accepts that label, the opt-in `ORDER_FLOW_BALANCED_V4` label and the two earlier labels; the Lab registers 36 books (34 plus the `COST_FIRST_*` pair added 2026-10-08); the latest successful Pages deployment is recorded in [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md). `backend/engine_entry_policy.py` still defines the internal constant `POLICY_VERSION = 'ORDER_FLOW_VALIDATED_THRESHOLDS_V9'`; nothing publishes it (the engine reports `winner_ensemble.ENTRY_POLICY_VERSION`), and renaming it would change a locked support-file hash, so it is left unchanged and recorded here as a stale label.
+
+### 2026-10-08 tape decoder shadow path and seat shedding (current)
+
+Executed in a worktree on `main` at `2ee0df1` plus this change, with the repository `.venv` and `npm ci`. See [tape-decoder-shadow-and-seat-shedding.md](tape-decoder-shadow-and-seat-shedding.md) for the evidence; the tape service must be restarted by the owner for the change to take effect, and the shadow decoder path stays DEGRADED until `NEO_TAPE_VALIDATED_DECODER_VERSIONS` lists it after the 24 h comparison.
+
+| Executed command | Result |
+| --- | --- |
+| `.venv/Scripts/python.exe scripts/run_python_checks.py` | PASS: `tests/` 670 tests and `backend/tests/` 148 tests (after the review follow-up: separate `shadow_events` table, shedding on zero decoded swaps, retry floor across feed gaps, body budget limited to the current selection); temporary account paths, both child exit codes 0 |
+| `npm run lint` | PASS, TypeScript noEmit |
+| `npm run check:strategy` | PASS: unchanged `WINNER_ENSEMBLE_PAPER_V1` strategy hash and 50 support-file hashes on the `UTF8_LF` basis |
+| `npm run build` | PASS, strategy/extension guards, 32 frontend tests, Vite and extension archive; nonfatal Vite chunk-size warning |

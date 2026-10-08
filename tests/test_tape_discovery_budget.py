@@ -22,14 +22,17 @@ class TapeDiscoveryBudgetTests(unittest.TestCase):
         self.rec.close()
         self.directory.cleanup()
 
-    def pending(self, count, *, timestamp=None, retry=0):
+    def pending(self, count, *, timestamp=None, retry=0, metadata=None):
+        # Due bodies reserve capacity only for pools in the current selection
+        # (the feed), because process() services only those pools.
         timestamp = NOW if timestamp is None else timestamp
+        metadata = self.feed[0] if metadata is None else metadata
         with self.rec.db:
             for i in range(count):
                 self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,
                     event_time,observed,metadata,state,next_retry)
                     VALUES(?,?,1,?,?,?,'pending',?)''',
-                    (f'retry-{i}',META['pair'],timestamp,timestamp,json.dumps(META),retry))
+                    (f'retry-{i}',metadata['pair'],timestamp,timestamp,json.dumps(metadata),retry))
 
     def limits(self):
         calls = []
@@ -54,6 +57,11 @@ class TapeDiscoveryBudgetTests(unittest.TestCase):
 
     def test_historical_queue_does_not_reserve_current_capacity(self):
         self.pending(48, timestamp=NOW-tape.WINDOW_MS-1)
+        self.assertEqual(self.limits(), [12]*4)
+
+    def test_due_bodies_of_pools_outside_the_selection_do_not_reserve_capacity(self):
+        self.pending(48, metadata=META)
+        self.assertNotIn(META['pair'], {m['pair'] for m in self.feed})
         self.assertEqual(self.limits(), [12]*4)
 
     def test_full_retry_queue_keeps_every_pool_progressing_and_rows_durable(self):

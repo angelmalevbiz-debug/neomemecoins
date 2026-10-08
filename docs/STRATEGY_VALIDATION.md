@@ -30,6 +30,43 @@ Default acceptance: 30 future episode clusters, 20 completed trades, five calend
 
 The approximate confidence intervals are diagnostics, not a guarantee. Shared tokens, a shared market and multiple candidate searches can remain correlated. `paired_episode_count` counts common market episode coverage, not necessarily matched executed trades. The evidence panel displays this limitation. A finer independent-market study and multiple-testing correction are needed before any edge claim.
 
+## Strategy Lab cost cap: LAB_ACTIVE_V6 (2026-10-08)
+
+Defect: TEST books admitted a modeled round-trip cost of up to 2.75% against the same 3% net stop that the funded books protect with a 1.5% cap (`promoted_guard.max_entry_cost_pct(STOP_LOSS)` = 0.5 x stop). The 2026-10-06/07 ledgers (1,596 Lab closes, research `analyst-losses.md`) show the consequence: median gross headroom before the stop 0.28%, and 40.4% of 1,398 `STOP_LOSS_3_NET` closes fired with the mark down less than 1%. That is a measurement-validity defect, not a profit lever: a book that pays 2.7% to enter cannot tell a good entry rule from a bad one at a 3% stop.
+
+`lab_activity.POLICY_VERSION = LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP`: every Lab book (TEST, Rush, Scalper, funded and the cost-first pair) admits through `lab_activity.admission_cost_cap_pct(STOP_LOSS)`, which is `promoted_guard.max_entry_cost_pct(STOP_LOSS)` (1.5%) bounded by the unchanged model ceiling `MAX_ENTRY_COST_PCT = 2.75`. Each new position and close records `entry_cost_cap_pct`, `stop_loss_net_pct` and `stop_headroom_pct` (= stop + modeled immediate-exit result, so 1.5% or more at admission). Existing books, balances, histories and open positions are untouched; earlier rows keep `LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN`, and only new closes carry V6. The lifecycle retirement heuristic counts evidence per entry-policy version, so a V6 book starts with a clean evidence window while any earlier retirement marker stays in place.
+
+Expected effect: far fewer Lab entries (17 of the 1,596 historical closes would have passed). Every book publishes `max_entry_roundtrip_cost_pct`, `cost_infeasible_candidates`, `cost_feasibility` and the blocked reason `modeled_roundtrip_cost_limit`; the dashboard shows "cost-infeasible candidates" with the cap and stop. Fewer trades are the finding, never a reason to raise the cap, remove impact, or shrink the stop. Tiny notionals (for example the Scalper's 25%-of-balance cap near $5) are now correctly infeasible because fixed network fees dominate them.
+
+Evaluation of V6 itself (engineering, not performance): on the next >= 30 V6 closes, median `stop_headroom_pct` >= 1.5% (from 0.28%) and the share of `STOP_LOSS_3_NET` closes with |gross mark move| < 1% <= 10% (from 40.4%). No return claim follows from either number.
+
+## COST_FIRST_ESTABLISHED_V1: isolated Lab book pair (2026-10-08)
+
+Hypothesis (research cost-first lens, judged "test as isolated book"): the only observed universe whose fee+impact round trip leaves several percentage points of gross headroom before a 3% net stop is PumpSwap pools in fee tiers <= 50 bps with >= $250,000 liquidity (92 of 100 engine closes and 96% of Lab closes were in 90-125 bps tiers at a 2.4-2.7% round trip; the 30 bps tier paid about 1.1%). Whether that universe has positive expectancy is unknown: the only such pool traded so far went 0W/8L on the engine and n=17 Lab trades at <= 1.5% round trip had PF 0.43.
+
+Definition (`backend/cost_first_established.py`, pure, importable by a later per-account engine profile):
+
+- Universe `COST_FIRST_UNIVERSE_V1`: `dexId == pumpswap`, quote token SOL, PumpSwap fee tier from market cap in SOL (`marketCap / (priceUsd / priceNative)` against `PUMP_FEE_TIERS`) <= 50 bps, liquidity >= $250,000, modeled fee + constant-product impact round trip <= 1.2% at the sized entry. Score, age and momentum are not gates. Unknown denomination, market cap or liquidity is a rejection, never the cheapest tier.
+- Size: `min(book entry cap, liquidity x 0.001)`, where the book entry cap is the Lab's standard `min($150, balance)`; the rule only shrinks a size.
+- Admission in `strategy_lab.py` is otherwise the funded path unchanged: `promoted_guard.flow_admission` (CONFIRMED_PUMPSWAP_WINDOW, 30 s, >= 3 trades, >= 2 wallets, buys >= 1.2 x sells, 12 s freshness), `risk_admission` (fresh full exact-pool safety), exact mint/pool price identity, the shared V6 1.5% cost cap under the full model (fees, impact, slippage/latency buffers, network) and the commit-time recheck. A tier-50 pool therefore still needs enough liquidity for the full model to fit 1.5%.
+- Book A `COST_FIRST_CONTROL`: -3% net stop / +10% net target / 60 min max hold (the Lab standard, `LAB_STANDARD_3_10_60`). Book B `COST_FIRST_SCALED`: -3% net stop / +4% net target / 60 min max hold (`COST_SCALED_3_4_60`). Same universe, same evidence gates, both at $500, `portfolio_group TEST`, `entry_policy_version COST_FIRST_ESTABLISHED_V1`, `promotion_eligible false`, never promoted automatically; gaps below the stop are recorded in full.
+- Lifecycle: the shared repeated-loss retirement heuristic (`lab_strategy_lifecycle.py`) applies to both books exactly as to every other TEST book, counted on their own closes stamped `COST_FIRST_ESTABLISHED_V1` (`strategy_lab.lifecycle_activity_versions()`; the other TEST books count `LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP`). A retirement only stops new entries; it never touches balance, history or the exits of an open position, and the acceptance block below stays the only promotion criterion.
+- Coverage caveat: the pair can only enter pools the shared tape observes with COMPLETE coverage. The tape scheduler is unchanged in this change set, so cost-first pools that match neither the main nor the funded screens compete for exploration seats only. The diagnostics separate `universe_candidates` from `flow_rejected`/`safety_rejected`; a frequency failure must be attributed to coverage or to the universe before any follow-up, and a scheduler seat rule for this universe would be its own versioned change.
+
+Acceptance criteria for the pair (fixed before the run; evaluated on future observations only; no retune on the same holdout):
+
+| Gate | Threshold |
+| --- | --- |
+| Sample | >= 20 closed trades per book across >= 30 distinct `(mint, pool, hour)` clusters and >= 5 calendar days, within 7 days of the first close |
+| Net result | net PnL > 0 and expectancy per trade > 0 after a +50 bps per leg cost stress recomputed on the same closes |
+| Uncertainty | cluster-bootstrap lower bound of expectancy (clustered by `(mint, pool, hour)`) > 0 |
+| Profit factor | > 1; null (fewer than 10 losses) means inconclusive, not a pass |
+| Drawdown | maximum drawdown <= 10% of the $500 book |
+| Frequency | >= 1 closed trade per calendar day on average |
+| Failure | any gate missed = "inconclusive" (or "rejected on frequency" when the sample gate fails); the books stay TEST, nothing is retuned, no default account changes |
+
+Passing the gates on book B (or A) is the precondition for a Stage 2 per-account engine profile that imports the same module; it is not a profitability claim, and the 80% win-rate target is not an acceptance criterion.
+
 ## Dataset provenance and measurements
 
 | Dataset | Scope | Valid conclusion |
@@ -38,12 +75,15 @@ The approximate confidence intervals are diagnostics, not a guarantee. Shared to
 | `tests/fixtures/paper_gap_v9.jsonl` | Explicit synthetic two-observation correctness case; no real token or market period | Old loss clamp reproduction versus honest gap accounting. |
 | Controlled unittest streams | Future timestamps, failed routes, losses, blocked entries, accepted/rejected candidates and restart | Decision/persistence/no-look-ahead correctness, not empirical profitability. |
 | New bridge `observations.jsonl` | Actual captured provider proofs and timestamps once repaired code runs | Eligible for subsequent causal replay; raw missing evidence must stay missing. No such complete multi-day production dataset was available during this audit. |
+| `tests/fixtures/replay_identity_v1.jsonl` (REPLAY_IDENTITY_V1) | Synthetic recorded-schema rows with the live timing measured on 2026-10-07 (4.65 s preflight, 47 s cached risk pass, 8.3 s candidate snapshot refreshed at commit) | Replay identity only: the primary replay must book the live trade within $0.01 and WAIT with the recorded reasons; labelled exit variants change exits only. |
+| Main journal slice 2026-10-07 (23,452 rows, two pools; not committed) | Three live closes and one open position on one pool in 14 h | Reproduced by the reconciled replay (see `PAPER_RUNBOOK.md`); a measurement check, not a sample for any expectancy statement. |
+| `tests/fixtures/replay_main_20261007_slice.jsonl.gz` (1,339 recorded lines of that journal, SHA-256 pinned) with `replay_main_20261007.expected.json` | The 10 entry-evidence rows, their episodes' marks, guard and linked commit-outcome rows, and the pre-preflight exact-pool context; the booked live pnl values | Replay identity on real data: the three closes and the open position within $0.01 of the booked ledger. |
 
 Synthetic same-input comparison: frozen HEAD one completed trade, -$10; repaired fixed and adaptive each one completed trade, -$40.195. This proves removal of fabricated stop accounting and consistent cost treatment. It offers no ranking of economic performance between fixed/adaptive strategies. A two-point path contains no reliable MFE/MAE or dependence-adjusted confidence interval.
 
 `simulation_count`, unique observation IDs and `(mint,pool,hour)` episode clusters are distinct counters. Duplicate observations are skipped across restart. Replaying the same dataset does not add independent observations; repeated outcomes are not presented as new evidence. Episode clustering is a conservative accounting convention, not proof that clusters are independent.
 
-The primary replay is separate from the multi-book learner, runs the actual main engine and checks raw quotes, exact quantities, initial/final preflight chronology, mint/pool and source timestamps. All arms receive the identical evidence stream and hash. Unequal/sparse exact-quantity coverage can block an arm; such missing trades are coverage limitations rather than economic superiority.
+The primary replay is separate from the multi-book learner, runs the actual main engine and checks raw quotes, exact quantities, initial/final preflight chronology, mint/pool and source timestamps. All arms receive the identical evidence stream and hash. Unequal/sparse exact-quantity coverage can block an arm; such missing trades are coverage limitations rather than economic superiority. Its freshness windows are derived from the live engine/guard constants and reported per run (`REPLAY_LIVE_DERIVED_WINDOWS_V1`); a replay that books the recorded ledger proves the instrument, nothing about the strategy. Exit hypotheses are run as labelled offline variants (`REPLAY_EXIT_VARIANT_V1`) and can only be valued up to the live exit, because recorded sell quotes stop there.
 
 ## Checks and reporting
 

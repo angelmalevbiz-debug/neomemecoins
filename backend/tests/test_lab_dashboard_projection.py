@@ -93,6 +93,67 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertEqual(entry['promoted_max_entry_roundtrip_cost_pct'], 1.5)
         self.assertFalse(state['activity_config']['promoted_entry_policy']['profitability_proven'])
 
+    def test_projects_lab_active_v6_cost_cap_headroom_and_cost_first_diagnostics(self):
+        state = compact_strategy_lab({'books': {
+            'TREND': {
+                'portfolio_group': 'TEST',
+                'position': {'symbol': 'T', 'entry_roundtrip_pnl_pct': -1.1,
+                             'entry_cost_cap_pct': 1.5, 'stop_loss_net_pct': 3.0,
+                             'stop_headroom_pct': 1.9, 'entry_features': {'private': 1}},
+                'history': [{'trade_no': 1, 'entry_cost_cap_pct': 1.5, 'stop_headroom_pct': 1.7,
+                             'entry_policy_version': 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP'}],
+                'entry_diagnostics': {
+                    'signal_candidates': 3, 'cost_rejected': 3, 'cost_infeasible_candidates': 3,
+                    'max_entry_roundtrip_cost_pct': 1.5, 'stop_loss_net_pct': 3.0,
+                    'entry_policy_version': 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP',
+                    'blocked_reason': 'modeled_roundtrip_cost_limit',
+                    'cost_feasibility': {'checked_market_candidates': 3,
+                                         'fixed_cost_infeasible_candidates': 3,
+                                         'minimum_model_roundtrip_cost_pct': 2.7,
+                                         'maximum_roundtrip_cost_pct': 1.5}}},
+            'COST_FIRST_SCALED': {'portfolio_group': 'TEST', 'entry_diagnostics': {
+                'cost_first': {'universe_candidates': 2, 'universe_rejections': {'fee_tier_above_maximum': 9}},
+                'evidence_guard_version': 'PROMOTED_EVIDENCE_COST_V1'}},
+        }})
+        trend = state['books']['TREND']
+        self.assertEqual(trend['position']['stop_headroom_pct'], 1.9)
+        self.assertEqual(trend['position']['entry_cost_cap_pct'], 1.5)
+        self.assertNotIn('entry_features', trend['position'])
+        self.assertEqual(trend['history'][0]['stop_headroom_pct'], 1.7)
+        diagnostics = trend['entry_diagnostics']
+        self.assertEqual(diagnostics['cost_infeasible_candidates'], 3)
+        self.assertEqual(diagnostics['max_entry_roundtrip_cost_pct'], 1.5)
+        self.assertEqual(diagnostics['blocked_reason'], 'modeled_roundtrip_cost_limit')
+        self.assertEqual(diagnostics['cost_feasibility']['minimum_model_roundtrip_cost_pct'], 2.7)
+        scaled = state['books']['COST_FIRST_SCALED']['entry_diagnostics']
+        self.assertEqual(scaled['cost_first']['universe_rejections'], {'fee_tier_above_maximum': 9})
+        self.assertEqual(scaled['evidence_guard_version'], 'PROMOTED_EVIDENCE_COST_V1')
+
+    def test_test_books_publish_scalar_cost_feasibility_and_funded_books_keep_candidates(self):
+        summary = {'basis': 'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL', 'is_execution_quote': False,
+                   'profitability_proven': False, 'excluded_costs': ['price_impact'],
+                   'checked_market_candidates': 40, 'fixed_cost_infeasible_candidates': 40,
+                   'maximum_roundtrip_cost_pct': 1.5, 'minimum_model_roundtrip_cost_pct': 2.4,
+                   'best_candidates': [{'symbol': 'C%d' % index, 'model_cost_feasible': False}
+                                       for index in range(5)]}
+        source = {'books': {
+            'TREND': {'portfolio_group': 'TEST', 'entry_diagnostics': {'cost_feasibility': summary}},
+            'COST_FIRST_CONTROL': {'portfolio_group': 'TEST',
+                                   'entry_diagnostics': {'cost_feasibility': summary}},
+            'EARLY': {'portfolio_group': 'PROMOTED_PAPER', 'entry_diagnostics': {
+                'cost_feasibility': summary, 'promoted_cost_feasibility': summary}},
+        }}
+        state = compact_strategy_lab(source)
+        for key in ('TREND', 'COST_FIRST_CONTROL'):
+            projected = state['books'][key]['entry_diagnostics']['cost_feasibility']
+            self.assertNotIn('best_candidates', projected)
+            self.assertEqual(projected, {k: v for k, v in summary.items() if k != 'best_candidates'})
+        early = state['books']['EARLY']['entry_diagnostics']
+        self.assertEqual(len(early['cost_feasibility']['best_candidates']), 5)
+        self.assertEqual(len(early['promoted_cost_feasibility']['best_candidates']), 5)
+        # The projection never mutates the source state.
+        self.assertEqual(len(source['books']['TREND']['entry_diagnostics']['cost_feasibility']['best_candidates']), 5)
+
     def test_projects_legacy_exit_book_without_internal_position_fields(self):
         state = compact_strategy_lab({'portfolio_setup': {
             'version': 'PROMOTED_PAPER_COHORT_V1',

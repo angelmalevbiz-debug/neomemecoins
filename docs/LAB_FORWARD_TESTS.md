@@ -494,14 +494,16 @@ runs out of cash. When it stops, its control's continuity ends at the same revie
 review reports `lab_forward_kill_rule_deferred_ids` and
 `lab_forward_zero_capital_control_ids`. No balance or history is ever rewritten.
 
-**Owner sign-off required.** This protocol departs from the task's literal "kill rule per
-book" in two ways: a control's met kill rule does not retire it while its hypothesis can
-enter, and a control past its funding keeps entering at zero capital. It is versioned
-(`LAB_FORWARD_CONTROL_CONTINUITY_V1`, part of every book's config hash) and listed as a
-decision for the owner in the pull request. If the owner declines it, the alternative is
-to retire each control on its own kill rule and cash as specified. Then expect
-`control_coverage` near 0.2–0.3 and a gate that cannot pass while the control behaves as
-the research expects. That is a new test with new, versioned book ids (see
+**Owner decision (2), ACCEPTED 2026-10-08 by the operator under the owner's delegation:**
+the random control books keep observing via zero-capital entries and a deferred control
+kill rule, so the promotion gate stays evaluable. This protocol departs from the task's
+literal "kill rule per book" in two ways: a control's met kill rule does not retire it
+while its hypothesis can enter, and a control past its funding keeps entering at zero
+capital. It is versioned (`LAB_FORWARD_CONTROL_CONTINUITY_V1`, part of every book's
+config hash). The declined alternative was to retire each control on its own kill rule
+and cash as specified, with `control_coverage` near 0.2–0.3 and a gate that cannot pass
+while the control behaves as the research expects. Reverting to it would be a new test
+with new, versioned book ids (see
 [Changing the test](#changing-the-test-new-book-ids-not-a-new-hash-in-the-old-ledger)).
 
 ## Cash state (LAB_FORWARD_CASH_STATE_V1)

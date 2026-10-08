@@ -149,9 +149,11 @@ Rules fixed before the run:
   or is retired at 50 closes, while LAB_A needs ≥ 150 closes over ≥ 3 days and LAB_B
   longer; `control_coverage` would have stayed near 0.2–0.3 and the gate could never
   pass, even for a hypothesis with a true edge. This departs from the literal per-book
-  kill rule and needs the owner's explicit sign-off (it is a decision in the pull
-  request); declining it means retiring each control on its own kill rule and cash, with
-  new book ids. Zero-capital closes never enter realized P&L, the equity path or the
+  kill rule; owner decision (2) on it was ACCEPTED 2026-10-08 by the operator under the
+  owner's delegation: random control books keep observing via zero-capital entries and a
+  deferred control kill rule, so the promotion gate stays evaluable. The declined
+  alternative, retiring each control on its own kill rule and cash, would need new book
+  ids. Zero-capital closes never enter realized P&L, the equity path or the
   drawdown of the ledger tools (`paper_lab_metrics`, `paper_edge_report`); they are
   reported separately and counted per trade.
 - **Cash state (`LAB_FORWARD_CASH_STATE_V1`).** A $500 book at a fixed $200 entry has
@@ -189,8 +191,9 @@ Rules fixed before the run:
   **Caveats.** Both bases are DexScreener prints with modeled costs, not the executable
   quotes the research's run protocol asks for: the booked basis fills at the decision print
   and the triggering mark, the research-fill basis at the next refresh. A pass on the
-  booked basis alone is not a pass. The control-continuity protocol above needs the owner's
-  sign-off before any gate result is read.
+  booked basis alone is not a pass. Gate results are read under the control-continuity
+  protocol above (owner decision (2), ACCEPTED 2026-10-08 by the operator under the
+  owner's delegation).
 - **Expected failure.** The research expects both hypotheses to fail the gate: about −3%
   per trade for LAB_A, and wide, regime-dependent uncertainty for LAB_B. A retirement
   under the kill rule is a valid result, not a reason to loosen filters, the cost cap or

@@ -16,23 +16,23 @@ PAIR = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 RESEARCH = 'LIQUIDITY'
 
 
-def history(pnls, strategy_id=RESEARCH):
+def history(pnls, strategy_id=RESEARCH, version=None):
     return [{
         'trade_no': index + 1, 'strategy_id': strategy_id,
         'address': MINT, 'pairAddress': PAIR, 'pnl_usd': pnl,
         'opened_at': NOW - 100_000 + index * 1000,
         'closed_at': NOW - 99_000 + index * 1000,
-        'entry_policy_version': lab.activity.POLICY_VERSION,
+        'entry_policy_version': version or lab.activity.POLICY_VERSION,
         'execution_mode': lab.EXECUTION_MODEL_VERSION,
         'price_crosscheck': {'status': 'pass', 'mint': MINT, 'pair': PAIR},
         'quote_status': 'fresh',
     } for index, pnl in enumerate(pnls)]
 
 
-def book(pnls, strategy_id=RESEARCH):
+def book(pnls, strategy_id=RESEARCH, version=None):
     source = next(s for s in lab.STRATEGIES if s['id'] == strategy_id)
     result = lab.empty_book(source)
-    result['history'] = history(pnls, strategy_id)
+    result['history'] = history(pnls, strategy_id, version)
     result['balance'] = result['starting_balance'] + sum(pnls)
     result['trade_seq'] = len(pnls)
     return result
@@ -141,6 +141,72 @@ class LifecycleEvidenceTests(unittest.TestCase):
         review({RESEARCH: restarted})
         self.assertEqual(restarted['strategy_lifecycle'], marker)
         self.assertFalse(lifecycle.entry_enabled(restarted))
+
+
+class CostFirstLifecycleParityTests(unittest.TestCase):
+    """The COST_FIRST pair is judged by the same rules on its own policy rows."""
+    SAMPLES = ([], [-4] * 8, [-4] * 9, [-4] * 8 + [0], [-4] * 12, [1, 1, -5] * 8,
+               [-4] * 5 + [1] + [-4] * 4 + [1], [10, -1] * 12,
+               [10] * 6 + [-5] * 18, [-5] * 18 + [10] * 6, [-4] * 30)
+
+    def test_production_review_counts_each_book_on_its_accepted_policy_version(self):
+        versions = lab.lifecycle_activity_versions()
+        self.assertEqual(versions, {key: 'COST_FIRST_ESTABLISHED_V1' for key in lab.cost_first.BOOK_IDS})
+        for strategy_id in lab.cost_first.BOOK_IDS:
+            with self.subTest(strategy_id=strategy_id):
+                books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
+                books[strategy_id] = book([-4] * 12, strategy_id, 'COST_FIRST_ESTABLISHED_V1')
+                books[RESEARCH] = book([-4] * 12)
+                with patch.object(lab, 'now_ms', return_value=NOW):
+                    report = lab.review_strategy_lifecycle(books)
+                self.assertEqual(sorted(report['retired_strategy_ids']), sorted([strategy_id, RESEARCH]))
+                for key, version in ((strategy_id, 'COST_FIRST_ESTABLISHED_V1'),
+                                     (RESEARCH, lab.activity.POLICY_VERSION)):
+                    evidence = books[key]['strategy_lifecycle']['evidence']
+                    self.assertEqual(evidence['closed_trades'], 12)
+                    self.assertEqual(evidence['activity_version'], version)
+                self.assertEqual(report['policy']['activity_version'], lab.activity.POLICY_VERSION)
+                self.assertEqual(report['policy']['activity_versions_by_strategy'], versions)
+
+    def test_documented_rules_give_identical_decisions_and_evidence(self):
+        versions = lab.lifecycle_activity_versions()
+        for strategy_id in lab.cost_first.BOOK_IDS:
+            for pnls in self.SAMPLES:
+                with self.subTest(strategy_id=strategy_id, pnls=pnls):
+                    pair = book(pnls, strategy_id, versions[strategy_id])
+                    research = book(pnls)
+                    pair_report = lifecycle.apply_lifecycle(
+                        {strategy_id: pair}, registered_ids={strategy_id}, promoted_ids=set(),
+                        activity_version=lab.activity.POLICY_VERSION, activity_versions=versions,
+                        execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
+                    research_report = review({RESEARCH: research})
+                    self.assertEqual(bool(pair_report['retired_strategy_ids']),
+                                     bool(research_report['retired_strategy_ids']))
+                    pair_evidence = dict(pair['strategy_lifecycle']['evidence'])
+                    research_evidence = dict(research['strategy_lifecycle']['evidence'])
+                    self.assertEqual(pair_evidence.pop('activity_version'), versions[strategy_id])
+                    research_evidence.pop('activity_version')
+                    self.assertEqual(pair_evidence, research_evidence)
+
+    def test_other_policy_rows_never_count_for_either_side(self):
+        versions = lab.lifecycle_activity_versions()
+        pair_id = lab.cost_first.SCALED_BOOK_ID
+        pair = book([-4] * 12, pair_id)  # LAB_ACTIVE rows in a COST_FIRST book.
+        research = book([-4] * 12, RESEARCH, 'COST_FIRST_ESTABLISHED_V1')
+        report = lifecycle.apply_lifecycle(
+            {pair_id: pair, RESEARCH: research}, registered_ids={pair_id, RESEARCH},
+            promoted_ids=set(), activity_version=lab.activity.POLICY_VERSION,
+            activity_versions=versions, execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
+        self.assertEqual(report['retired_strategy_ids'], [])
+        for stored in (pair, research):
+            self.assertEqual(stored['strategy_lifecycle']['evidence']['closed_trades'], 0)
+            self.assertEqual(stored['strategy_lifecycle']['evidence']['excluded_rows'], 12)
+
+    def test_missing_or_malformed_version_map_keeps_the_shared_version(self):
+        for versions in (None, {}, {RESEARCH: ''}, {RESEARCH: None}, [RESEARCH]):
+            with self.subTest(versions=versions):
+                self.assertEqual(lifecycle.accepted_activity_version(
+                    RESEARCH, lab.activity.POLICY_VERSION, versions), lab.activity.POLICY_VERSION)
 
 
 class LifecycleIntegrationTests(unittest.TestCase):

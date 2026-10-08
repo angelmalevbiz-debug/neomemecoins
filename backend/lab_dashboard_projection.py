@@ -1,5 +1,21 @@
 """Small read-only dashboard projection of Strategy Lab state."""
 
+# Scalar planning fields of a cost feasibility summary. The per-candidate
+# best_candidates list stays only on funded (PROMOTED_PAPER) books, so the
+# compact payload does not grow with every TEST book's sample rows.
+COST_FEASIBILITY_SCALAR_FIELDS = (
+    'basis', 'is_execution_quote', 'profitability_proven', 'excluded_costs',
+    'checked_market_candidates', 'fixed_cost_infeasible_candidates', 'unknown_candidates',
+    'maximum_roundtrip_cost_pct', 'minimum_model_roundtrip_cost_pct',
+)
+
+
+def compact_cost_feasibility(summary, *, keep_candidates):
+    if not isinstance(summary, dict) or keep_candidates:
+        return summary
+    return {field: summary[field] for field in COST_FEASIBILITY_SCALAR_FIELDS if field in summary}
+
+
 def compact_strategy_lab(data):
     if not isinstance(data, dict):
         return {'status': 'offline', 'books': {}, 'stats': {}}
@@ -19,7 +35,10 @@ def compact_strategy_lab(data):
                               'estimated_exit_fee_usd', 'estimated_exit_impact_pct', 'execution_mode',
                               'execution_source', 'entry_policy_version', 'entry_evidence_guard_version',
                               'entry_candidate_rule', 'updated_at', 'mark_received_at', 'mark_source',
-                              'quote_status', 'quote_age_ms', 'quote_unavailable_reason')
+                              'quote_status', 'quote_age_ms', 'quote_unavailable_reason',
+                              'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
+                              'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label',
+                              'exit_parameters')
             }
         else:
             position = None
@@ -37,7 +56,9 @@ def compact_strategy_lab(data):
                               'entry_policy_version', 'entry_evidence_guard_version', 'entry_candidate_rule',
                               'entry_dex_fee_usd', 'exit_dex_fee_usd', 'entry_network_fee_usd',
                               'exit_network_fee_usd', 'entry_price_impact_pct', 'exit_price_impact_pct',
-                              'entry_slippage_pct', 'exit_slippage_pct')
+                              'entry_slippage_pct', 'exit_slippage_pct',
+                              'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
+                              'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label')
             })
         books[key] = {
             'id': raw.get('id', key),
@@ -66,11 +87,19 @@ def compact_strategy_lab(data):
                     'promoted_safety_rejected', 'promoted_price_rejected',
                     'promoted_cost_rejected', 'promoted_block_reasons',
                     'promoted_max_entry_roundtrip_cost_pct', 'promoted_cost_feasibility', 'profitability_proven',
+                    # LAB_ACTIVE_V6: every book publishes its cap and cost-infeasible count.
+                    'entry_policy_version', 'max_entry_roundtrip_cost_pct', 'stop_loss_net_pct',
+                    'cost_infeasible_candidates', 'cost_feasibility', 'cost_first', 'evidence_guard_version',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']
             } if isinstance(raw.get('entry_diagnostics'), dict) else {},
         }
+        diagnostics = books[key]['entry_diagnostics']
+        if 'cost_feasibility' in diagnostics:
+            diagnostics['cost_feasibility'] = compact_cost_feasibility(
+                diagnostics['cost_feasibility'],
+                keep_candidates=books[key]['portfolio_group'] == 'PROMOTED_PAPER')
 
     raw_setup = data.get('portfolio_setup') or {}
     setup_fields = (

@@ -1,6 +1,7 @@
 """Synthetic-ledger tests for the read-only PAPER edge report. No real ledgers, no network."""
 import copy
 import importlib.util
+import io
 import json
 from pathlib import Path
 import tempfile
@@ -293,6 +294,235 @@ class LabAndCliTests(unittest.TestCase):
         self.assertEqual(edge.parse_stamp('1791417600000'), 1791417600000)
         with self.assertRaises(ValueError):
             edge.parse_stamp('yesterday')
+
+
+SESSION_DIR = '94cc15b2-1111-4222-8333-944455556666'   # a UUID-named scratch directory, like the research copies
+OTHER_UUID = '42d3192d-5678-4def-8abc-0123456789cd'
+
+
+def run_cli(argv):
+    """Run main() capturing stderr; returns (exit code, stderr text)."""
+    err = io.StringIO()
+    with patch('sys.stderr', err):
+        try:
+            code = edge.main(argv)
+        except SystemExit as exc:
+            code = exc.code
+    return code, err.getvalue()
+
+
+class AccountLabelTests(unittest.TestCase):
+    def test_uuid_named_ancestor_is_not_an_account(self):
+        research = Path('/scratch') / SESSION_DIR / 'research' / 'exit-audit' / 'ledgers'
+        for name in ('main_state.json', 'user_3aa07b45_state.json', 'user_42d3192d_state.json'):
+            self.assertEqual(edge.derive_account_label(research / name), 'main')
+        # Only the component directly under the last 'users' directory names an account, and it must be a pure UUID.
+        self.assertEqual(edge.derive_account_label(Path('/scratch') / SESSION_DIR / 'users' / UUID / 'state.json'),
+                         'user_3aa07b45')
+        self.assertEqual(edge.derive_account_label(Path('/b/users') / OTHER_UUID / 'archive' / SESSION_DIR / 'state.json'),
+                         'user_42d3192d')
+        self.assertIsNone(edge.derive_account_label(Path('/b/users/3aa07b4512345678abcd/state.json')))
+        self.assertIsNone(edge.derive_account_label(Path('/b/users/state.json')))
+        self.assertIsNone(edge.derive_account_label(Path('/b/users') / (UUID + 'x') / 'state.json'))
+        self.assertEqual(edge.derive_account_label(Path('/b/Users/someone/backup/state.json')), 'main')
+
+    def research_copies(self, root):
+        ledgers = root / SESSION_DIR / 'research' / 'exit-audit' / 'ledgers'
+        main_archive = write(ledgers / 'archive_code-repair-1_state.json',
+                             engine_state('20261006-210327', [engine_trade('20261006-210327', n, -1.0) for n in range(3)]))
+        user_archive = write(ledgers / 'archive_code-repair-1_user_3aa07b45_state.json',
+                             engine_state('USER-3aa07b45-607879', [engine_trade('USER-3aa07b45-607879', n, 2.0) for n in range(3)]))
+        main_live = write(ledgers / 'main_state.json',
+                          engine_state('PAPER-RESET-1791362408708-ce67', [engine_trade('PAPER-RESET-1791362408708-ce67', 1, 1.0)]))
+        user_live = write(ledgers / 'user_42d3192d_state.json',
+                          engine_state('PAPER-RESET-1791362427723-36b0', [engine_trade('PAPER-RESET-1791362427723-36b0', 1, 4.0)]))
+        return main_archive, user_archive, main_live, user_live
+
+    def test_research_copies_without_labels_are_refused_not_pooled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            main_archive, user_archive, main_live, user_live = self.research_copies(Path(tmp))
+            # A USER-<8> session found outside users/<uuid>/ cannot silently become 'main'.
+            collector = edge.LedgerCollector()
+            with self.assertRaisesRegex(ValueError, 'names "user_3aa07b45"'):
+                collector.add_engine_ledger(user_archive)
+            # Two reset-era ledgers of different accounts both fall back to 'main' with different sessions.
+            collector = edge.LedgerCollector()
+            collector.add_engine_ledger(main_live)
+            with self.assertRaisesRegex(ValueError, 'explicit label'):
+                collector.add_engine_ledger(user_live)
+            code, err = run_cli(['--state', str(main_archive), '--state', str(main_live), '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('label', err)
+            self.assertNotIn(SESSION_DIR, err)   # UUID path components are shortened in messages
+            self.assertIn(SESSION_DIR[:8] + '...', err)
+
+    def test_explicit_labels_keep_research_accounts_separate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            main_archive, user_archive, main_live, user_live = self.research_copies(Path(tmp))
+            collector = edge.LedgerCollector()
+            collector.add_engine_ledger(main_archive, 'main')
+            collector.add_engine_ledger(main_live, 'main')
+            collector.add_engine_ledger(user_archive, 'user_3aa07b45')
+            collector.add_engine_ledger(user_live, 'user_42d3192d')
+            report = edge.build_report(collector, iterations=10, seed=1)
+            by_account = report['engine']['by_account']
+            self.assertEqual({name: row['closed_trades'] for name, row in by_account.items()},
+                             {'main': 4, 'user_3aa07b45': 3, 'user_42d3192d': 1})
+            self.assertEqual(by_account['main']['drawdown']['segments'], 2)
+            pooled = report['engine']['by_exit_reason']['STOP_LOSS_NET_TARGET']
+            self.assertEqual(pooled['account_count'], 3)
+            self.assertEqual(pooled['accounts'], ['main', 'user_3aa07b45', 'user_42d3192d'])
+            self.assertIn('cross-account aggregates', report['engine']['note'])
+            markdown = edge.render_markdown(report)
+            self.assertIn('3: main, user_3aa07b45, user_42d3192d', markdown)
+            self.assertIn('pooled across the listed accounts', markdown)
+            self.assertNotIn(SESSION_DIR, json.dumps(report) + markdown)
+
+    def test_users_dir_without_uuid_and_archive_dir_labels(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / 'bad' / 'users' / 'someone' / 'state.json', engine_state('S1', [engine_trade('S1', 1, 1.0)]))
+            code, err = run_cli(['--archive-dir', str(root / 'bad'), '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('not an account UUID', err)
+            # Several main sessions plus a user tree: unlabelled is refused, LABEL=DIR is accepted and the
+            # users/<uuid>/ ledgers keep their own account (archives of one user may span sessions).
+            backup = root / 'backup'
+            write(backup / 'archive' / 'reset-1' / 'state.json', engine_state('S1', [engine_trade('S1', 1, -1.0)]))
+            write(backup / 'state.json', engine_state('S2', [engine_trade('S2', 1, -2.0)]))
+            write(backup / 'users' / UUID / 'state.json', engine_state('U2', [engine_trade('U2', 1, 3.0)]))
+            write(backup / 'users' / UUID / 'archive' / 'reset-1' / 'state.json',
+                  engine_state('USER-3aa07b45-607879', [engine_trade('USER-3aa07b45-607879', 1, 3.0)]))
+            code, err = run_cli(['--archive-dir', str(backup), '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('both resolve to account "main"', err)
+            output = root / 'out' / 'edge'
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--output', str(output), '--bootstrap', '5', '--quiet'])
+            self.assertEqual(code, 0, err)
+            report = json.loads((root / 'out' / 'edge.json').read_text(encoding='utf-8'))
+            self.assertEqual({name: row['closed_trades'] for name, row in report['engine']['by_account'].items()},
+                             {'main': 2, 'user_3aa07b45': 2})
+            # A directory label never overrides a ledger whose session names another user.
+            write(backup / 'stray' / 'state.json',
+                  engine_state('USER-42d3192d-607879', [engine_trade('USER-42d3192d-607879', 1, 1.0)]))
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('user_42d3192d', err)
+
+
+class SegmentedDrawdownTests(unittest.TestCase):
+    def test_engine_sessions_are_separate_equity_paths(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            first = [engine_trade('S1', 0, -300.0), engine_trade('S1', 1, -100.0)]
+            second = [engine_trade('S2', 10, -50.0), engine_trade('S2', 11, 20.0), engine_trade('S2', 12, -200.0)]
+            collector = edge.LedgerCollector()
+            collector.add_engine_ledger(write(root / 'a' / 'state.json', engine_state('S1', first)), 'main')
+            collector.add_engine_ledger(write(root / 'b' / 'state.json', engine_state('S2', second)), 'main')
+            report = edge.build_report(collector, iterations=10, seed=1)
+            dd = report['engine']['by_account']['main']['drawdown']
+            # Concatenated, the path would fall 630 from $1,000 (63%); per session the worst is S1: 400 of 1,000.
+            self.assertEqual(dd['segments'], 2)
+            self.assertEqual(dd['max_drawdown_usd'], 400.0)
+            self.assertEqual(dd['max_drawdown_pct_of_peak'], 40.0)
+            self.assertEqual(dd['worst_segment'], 'main|S1')
+            self.assertEqual(dd['max_drawdown_pct_of_peak_any_segment'], 40.0)
+            # S2 alone: peak 0, trough -230 -> 230 of 1,000.
+            reason = report['engine']['by_exit_reason']['STOP_LOSS_NET_TARGET']['drawdown']
+            self.assertEqual(reason['segments'], 2)
+            self.assertEqual(reason['max_drawdown_usd'], 400.0)
+
+    def lab_rows(self, with_trade_no=True):
+        rows = []
+        balance = 500.0
+        for n, pnl in enumerate([-200.0, -150.0, -100.0], start=1):
+            balance += pnl
+            row = lab_trade('ALPHA', n, pnl)
+            row['balance_after'] = balance
+            rows.append(row)
+        balance = 500.0   # reset: the book restarts at its starting balance
+        for n, pnl in enumerate([-100.0, -63.0], start=1):
+            balance += pnl
+            row = lab_trade('ALPHA', n, pnl, opened=START + DAY + n * MINUTE)
+            row['balance_after'] = balance
+            if not with_trade_no:
+                row['trade_no'] = 100 + n   # still increasing: only the balance restart reveals the reset
+            rows.append(row)
+        return rows
+
+    def test_lab_reset_segments_by_trade_no_and_by_balance_restart(self):
+        for with_trade_no in (True, False):
+            with self.subTest(with_trade_no=with_trade_no), tempfile.TemporaryDirectory() as tmp:
+                path = write(Path(tmp) / 'strategy_lab.json', lab_state({'ALPHA': ('TEST', self.lab_rows(with_trade_no))}))
+                collector = edge.LedgerCollector()
+                collector.add_lab_ledger(path)
+                report = edge.build_report(collector, iterations=10, seed=1)
+                dd = report['lab']['by_book']['ALPHA']['drawdown']
+                # Concatenated against one $500 balance this was 613 / 500 = 122.6%.
+                self.assertEqual(dd['segments'], 2)
+                self.assertEqual(dd['max_drawdown_usd'], 450.0)
+                self.assertEqual(dd['max_drawdown_pct_of_peak'], 90.0)
+                self.assertEqual(dd['worst_segment'], 'LAB:ALPHA|segment-1')
+                self.assertLessEqual(dd['max_drawdown_pct_of_peak_any_segment'], 100.0)
+                self.assertIn('(90.00%, 2 seg)', edge.render_markdown(report))
+
+    def test_lab_window_gap_does_not_split_a_segment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            rows = self.lab_rows()[:3]
+            path = write(Path(tmp) / 'strategy_lab.json', lab_state({'ALPHA': ('TEST', rows)}))
+            collector = edge.LedgerCollector(since=rows[1]['closed_at'])
+            collector.add_lab_ledger(path)
+            dd = edge.build_report(collector, iterations=10, seed=1)['lab']['by_book']['ALPHA']['drawdown']
+            # Starts at the implied balance before trade 2 ($300) and continues as one segment.
+            self.assertEqual(dd['segments'], 1)
+            self.assertEqual(dd['max_drawdown_usd'], 250.0)
+            self.assertEqual(dd['max_drawdown_pct_of_peak'], round(250 / 300 * 100, 6))
+
+
+class CostIdentityAndRuntimeTests(unittest.TestCase):
+    def test_negative_mark_cost_is_flagged_with_implied_gross(self):
+        stale = engine_trade('S', 0, 5.0, move_pct=-3.0, exit_reason='STALE_MARKET_EXIT', entry_rt_pct=-2.0)
+        stats = edge.measure(edge_rows([stale]), starting_balance=1000, iterations=10, seed=1)
+        costs = stats['costs']
+        self.assertEqual(costs['total_modeled_cost_usd'], -8.0)
+        self.assertFalse(costs['mark_identity_reliable'])
+        self.assertTrue(costs['mark_identity_status'].startswith('unreliable'))
+        self.assertEqual(costs['stale_exit_trades_in_identity'], 1)
+        self.assertEqual(costs['implied_gross_usd'], 7.0)   # net 5 minus entry round trip (-2% of $100)
+        self.assertEqual(costs['implied_gross_trades'], 1)
+        row = edge._row('S', stats)
+        self.assertIn('-8.00 / -3.00 UNRELIABLE', row)
+        self.assertIn('| 7.00 |', row)
+        self.assertEqual(row.count('|'), edge.TABLE_HEADER.splitlines()[0].count('|'))
+        normal = edge.measure(edge_rows([engine_trade('S', 1, -8.0, move_pct=-6.0)]), starting_balance=None,
+                              iterations=10, seed=1)
+        self.assertTrue(normal['costs']['mark_identity_reliable'])
+        self.assertNotIn('UNRELIABLE', edge._row('S', normal))
+
+    def test_inputs_and_outputs_under_a_live_runtime_are_refused_before_reading(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = root / 'live'
+            write(runtime / 'user_accounts.json', {'accounts': {}})
+            state = write(runtime / 'users' / UUID / 'state.json', engine_state('S1', [engine_trade('S1', 1, 1.0)]))
+            archive = write(runtime / 'archive' / 'reset-1' / 'state.json', engine_state('S0', [engine_trade('S0', 1, 1.0)]))
+            copy_dir = root / 'copy'
+            copied = write(copy_dir / 'state.json', engine_state('S1', [engine_trade('S1', 1, 1.0)]))
+            with patch.object(edge, 'load_json', side_effect=AssertionError('read a runtime file')):
+                for argv in (['--state', str(state)], ['--archive-dir', str(runtime / 'archive')],
+                             ['--archive-dir', str(root)], ['--lab', str(archive)],
+                             ['--state', str(copied), '--output', str(runtime / 'reports' / 'edge')],
+                             ['--state', str(copied), '--output', str(root / '.runtime' / 'reports' / 'edge')]):
+                    code, err = run_cli(argv + ['--quiet'])
+                    self.assertEqual(code, 2, argv)
+                    self.assertIn('live runtime', err)
+                    self.assertIn('--allow-runtime', err)
+                    self.assertNotIn(UUID, err)
+            code, err = run_cli(['--state', str(state), '--allow-runtime', '--quiet'])
+            self.assertEqual(code, 0, err)
+            code, err = run_cli(['--state', str(copied), '--output', str(root / 'reports' / 'edge'), '--quiet'])
+            self.assertEqual(code, 0, err)
+            self.assertNotIn(UUID, err)
 
 
 if __name__ == '__main__':

@@ -38,7 +38,11 @@ def compact_strategy_lab(data):
                               'quote_status', 'quote_age_ms', 'quote_unavailable_reason',
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
                               'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label',
-                              'exit_parameters')
+                              'exit_parameters',
+                              # LAB_FORWARD_TESTS_V1: frozen config identity, log-only heat flags,
+                              # the uncalibrated model mark and the CALIB_V1 extra per leg.
+                              'lab_forward_version', 'lab_config_hash', 'heat_log_only_flags',
+                              'model_pnl_pct', 'calib_bps_per_leg', 'booked_entry_roundtrip_pnl_pct')
             }
         else:
             position = None
@@ -58,7 +62,12 @@ def compact_strategy_lab(data):
                               'exit_network_fee_usd', 'entry_price_impact_pct', 'exit_price_impact_pct',
                               'entry_slippage_pct', 'exit_slippage_pct',
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
-                              'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label')
+                              'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label',
+                              # LAB_FORWARD_TESTS_V1 closes: net50 (booked minus the research
+                              # stress), the model result and the frozen config identity.
+                              'net50_usd', 'net50_pct', 'model_pnl_usd', 'model_pnl_pct',
+                              'calibration_cost_usd', 'lab_forward_version', 'lab_config_hash',
+                              'heat_log_only_flags')
             })
         books[key] = {
             'id': raw.get('id', key),
@@ -92,6 +101,8 @@ def compact_strategy_lab(data):
                     'cost_infeasible_candidates', 'cost_feasibility', 'cost_first', 'evidence_guard_version',
                     # DEFENSIVE_ENTRY_LAYER_V1: counts only (examples stay in the full ledger).
                     'defensive_rejected', 'defensive_entry',
+                    # LAB_FORWARD_TESTS_V1: universe/signal counts and the LAB_B regime.
+                    'lab_forward',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']

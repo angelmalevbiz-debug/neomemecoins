@@ -1,9 +1,61 @@
+export type LabForwardGate = {
+  all_evaluable_pass?: boolean;
+  automatic_promotion?: boolean;
+  not_evaluated?: string[];
+  criteria?: Record<string, { value?: number | null; threshold?: string; pass?: boolean | null }>;
+};
+
 export type StrategyLifecycle = {
+  version?: string;
   status?: string;
+  reason?: string;
   entry_enabled?: boolean;
   position_management_enabled?: boolean;
-  evidence?: { closed_trades?: number; wins?: number; net_pnl_usd?: number; note?: string };
+  evidence?: {
+    closed_trades?: number; wins?: number; net_pnl_usd?: number; note?: string;
+    // LAB_FORWARD_KILL_RULE_V1 evidence (net50 basis, frozen config only).
+    min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
+    ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
+  };
+  promotion_gate?: LabForwardGate;
 };
+
+// LAB_FORWARD_TESTS_V1: pre-registered research hypotheses and their random controls.
+export const LAB_FORWARD_KILL_RULE_VERSION = 'LAB_FORWARD_KILL_RULE_V1';
+const forwardNotes: Record<string, string> = {
+  LAB_A_SURGE_EST_GUARD: 'Форуърд тест (предварително регистрирана хипотеза): свеж скок на покупките за 5 мин. (≥ 30 и ≥ 3× часовото темпо) в PumpSwap/SOL pool с такса ≤ 95 bps и ликвидност ≥ $50k; изход −5/+10 нето, 60 мин., $200.',
+  RND_LAB_A: 'Случайна контрола на Lab A: детерминиран жребий p = 0.0005 на наблюдение в същия универсум, същите изходи.',
+  LAB_B_DIP_MKTDIP_GUARD: 'Форуърд тест (предварително регистрирана хипотеза): спад ≥ 10% за 15 мин., докато медианата на пазара за 15 мин. е под −0.2%; ликвидност ≥ $50k; изход −15/+20 нето, 60 мин., $200.',
+  RND_LAB_B: 'Случайна контрола на Lab B: детерминиран жребий p = 0.0007 на наблюдение, без филтър за спад и пазар, същите изходи.',
+};
+
+export const isForwardTestBook = (book: { id: string; strategy_lifecycle?: StrategyLifecycle }) =>
+  book.id in forwardNotes || book.strategy_lifecycle?.version === LAB_FORWARD_KILL_RULE_VERSION;
+
+export function labForwardNote(id: string) {
+  return forwardNotes[id] ?? null;
+}
+
+const usd = (value: number) => `${value < 0 ? '−' : ''}$${Math.abs(value).toFixed(2)}`;
+
+export function labForwardSummary(book: { id: string; strategy_lifecycle?: StrategyLifecycle }) {
+  if (!isForwardTestBook(book)) return null;
+  const lifecycle = book.strategy_lifecycle;
+  const evidence = lifecycle?.evidence;
+  const closed = evidence?.closed_trades ?? 0;
+  const minimum = evidence?.min_closes ?? 50;
+  const mean = evidence?.mean_net50_usd;
+  const [low, high] = evidence?.ci95_mean_net50_usd ?? [];
+  const parts = [`Затворени ${closed}/${minimum} до правилото за спиране`];
+  if (typeof mean === 'number' && Number.isFinite(mean)) parts.push(`средно net50 ${usd(mean)}/сделка`);
+  if (typeof low === 'number' && typeof high === 'number') parts.push(`CI95 [${usd(low)}, ${usd(high)}]`);
+  if (lifecycle?.status === 'retired') parts.push('спряна: средно net50 < 0 и горна граница на CI95 < 0');
+  const gate = lifecycle?.promotion_gate;
+  if (gate) parts.push(gate.all_evaluable_pass
+    ? 'гейтът за промоция е изпълнен: само за преглед от собственика, без автоматична промоция'
+    : 'гейтът за промоция не е изпълнен (≥ 150 сделки, ≥ 25 pool-а, ≥ 3 дни, CI95 > 0, по-добра от контролата)');
+  return parts.join(' · ');
+}
 
 type ViewBook = {
   id: string; starting_balance: number; balance: number;
@@ -77,6 +129,8 @@ const reasons: Record<string, string> = {
   heat_crash_in_progress: 'Срив в ход (<= 75% от 15-мин. връх или -20% за 5 мин.)',
   heat_turnover_5m: 'Оборот за 5 мин. / ликвидност >= 0.095',
   defensive_entry_error: 'Грешка в защитната проверка: входът е блокиран',
+  // LAB_FORWARD_TESTS_V1: the pre-registered kill rule stopped new entries of this forward-test book.
+  lab_forward_kill_rule_retired: 'Спряна по предварително регистрираното правило (≥ 50 сделки, net50 < 0, CI95 < 0)',
 };
 
 export type CostFeasibility = {

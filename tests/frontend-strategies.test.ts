@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabEntryStatus from '../src/components/LabEntryStatus';
-import { isArchivedStrategy, labEntryStatus, labEntryView, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { isArchivedStrategy, isForwardTestBook, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -228,4 +228,37 @@ test('DEFENSIVE_ENTRY_LAYER_V1: every defensive block reason is named in Bulgari
   assert.equal(statuses.size, codes.length, 'each reason has its own label');
   assert.equal(labEntryStatus({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
     signal_candidates: 1, blocked_reason: 'rug_young_pool' } }), 'Pool-ът е по-млад от 12 часа');
+});
+
+test('LAB_FORWARD_TESTS_V1: the four forward-test books are described, report their kill rule and never auto-promote', () => {
+  for (const id of ['LAB_A_SURGE_EST_GUARD', 'RND_LAB_A', 'LAB_B_DIP_MKTDIP_GUARD', 'RND_LAB_B']) {
+    assert.ok(labForwardNote(id), id);
+    assert.equal(isForwardTestBook(book(id, 500, 500)), true, id);
+  }
+  assert.equal(labForwardNote('TREND'), null);
+  assert.equal(labForwardSummary(book('TREND', 500, 500)), null);
+  const active = { ...book('LAB_A_SURGE_EST_GUARD', 480, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', entry_enabled: true,
+    evidence: { closed_trades: 12, min_closes: 50, mean_net50_usd: -3.5, ci95_mean_net50_usd: [-6.1, -0.9] },
+    promotion_gate: { all_evaluable_pass: false, automatic_promotion: false } } };
+  const summary = labForwardSummary(active) ?? '';
+  assert.match(summary, /Затворени 12\/50/);
+  assert.match(summary, /−\$3\.50/);
+  assert.match(summary, /CI95 \[−\$6\.10, −\$0\.90\]/);
+  assert.match(summary, /гейтът за промоция не е изпълнен/);
+  assert.equal(partitionLabStrategies([active]).research.length, 1);
+  const retired = { ...active, strategy_lifecycle: { ...active.strategy_lifecycle, status: 'retired', entry_enabled: false,
+    reason: 'pre_registered_kill_rule' } };
+  assert.deepEqual(partitionLabStrategies([retired]).archived.map(row => row.id), ['LAB_A_SURGE_EST_GUARD']);
+  assert.match(labForwardSummary(retired) ?? '', /спряна: средно net50 < 0/);
+  const passing = { ...active, strategy_lifecycle: { ...active.strategy_lifecycle,
+    promotion_gate: { all_evaluable_pass: true, automatic_promotion: false } } };
+  assert.match(labForwardSummary(passing) ?? '', /без автоматична промоция/);
+  const view = labEntryView({ ...book('RND_LAB_A', 500, 500), entry_diagnostics: { signal_candidates: 1,
+    blocked_reason: 'lab_forward_kill_rule_retired' } });
+  assert.doesNotMatch(view.status, /Входът изчаква/);
+  assert.match(view.status, /предварително регистрираното правило/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /labForwardSummary\(book\)/);
+  assert.match(source, /trade\.net50_usd != null/);
 });

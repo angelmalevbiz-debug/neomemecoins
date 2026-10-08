@@ -431,9 +431,11 @@ wait; it is not implemented.
 
 In `log_only` mode a book receives the same flags with `vetoed` false. This mode is for a
 pre-registered surge or dip hypothesis arm. `heat_veto.LOG_ONLY_BOOK_IDS` reserves the
-research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, which are not
-registered yet. Every registered Lab book, every engine account and the training probe
-enforce the veto. The tape scheduler withholds new seats on every heat rule except its
+research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, registered as Lab
+books by `LAB_FORWARD_TESTS_V1` (`backend/lab_forward_tests.py`), which also runs their
+random controls `RND_LAB_A` and `RND_LAB_B` log-only (`strategy_lab.heat_log_only_book`);
+the reserved set itself, and so every engine's effective config hash, is unchanged. Every
+other Lab book, every engine account and the training probe enforce the veto. The tape scheduler withholds new seats on every heat rule except its
 own warm-up (see below).
 
 ### Errors fail closed

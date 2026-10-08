@@ -82,6 +82,55 @@ Every entry path now runs `STRUCTURAL_RUG_GUARD_V1`, `HEAT_VETO_STACK_V1` and `P
 - Retirement is not acceptance: `LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE` counts V6 (and `COST_FIRST_ESTABLISHED_V1`) closes next to V7 (V2) closes only to stop new entries sooner. The acceptance evidence above remains the new-version sample alone.
 - After every engine or Lab restart the heat veto waits for its windows (15 min for every pool, 60 min for pools at a fee tier ≥ 100 bps); entry frequency right after a restart is not a property of the strategy. Likewise, pools younger than 14 days wait until the service's ticker registry has watched the market for 24 h without a gap over 60 min (`rug_ticker_registry_warming`: the first deploy without a seed, a long outage).
 
+## Lab forward tests (LAB_FORWARD_TESTS_V1, 2026-10-08)
+
+Four $500 TEST books forward-test the two hypotheses that the 2026-10-08 edge study
+pre-registered (`research/edge_study_2026_10_08/synthesis/strategies.py`, prereg sha256
+`786e01fd…0189`), each next to its random control:
+
+- `LAB_A_SURGE_EST_GUARD` with control `RND_LAB_A`;
+- `LAB_B_DIP_MKTDIP_GUARD` with control `RND_LAB_B`.
+
+The research found both hypotheses negative in absolute terms: LAB_A −3.21% per trade on
+holdout against −6.14% for random entries, and LAB_B −1.27% (n = 12) against −4.48%. The
+books test whether the relative edge survives on new data. Definitions, costs and the
+known filtering by the Lab's cost cap are in [LAB_FORWARD_TESTS.md](LAB_FORWARD_TESTS.md).
+
+Rules fixed before the run:
+
+- **Frozen configuration.** Every position and close records `lab_config_hash` (sha256 of
+  the book's canonical parameter JSON, pinned in the tests and in `strategy-lock.json`)
+  and `LAB_FORWARD_TESTS_V1`. A changed parameter is a new test: its closes never pool
+  with an earlier hash. Nothing is retuned on the forward sample.
+- **Basis.** Booked P&L is the Lab's shared spot model plus CALIB_V1 per leg. Every close
+  also records `net50` = booked net − 50 bps per leg − 200 bps more on stop exits − 100 bps
+  on trailing exits. The kill rule and the gate below use net50.
+- **Kill rule (`LAB_FORWARD_KILL_RULE_V1`, each of the four books).** After ≥ 50 closes of
+  the frozen config, the book is retired when mean net50 < 0 and the upper bound of the
+  pair-bootstrap CI95 of mean net50 $/trade is < 0 (2,000 resamples, fixed seed; a
+  per-trade normal approximation under 3 pools). Retirement stops new entries only;
+  balance, history and open exits are untouched, and it is never undone automatically.
+  These books are not subject to the shared 12-close lifecycle heuristic.
+- **Promotion gate (never automatic).** `strategy_lifecycle.promotion_gate` reports it
+  for LAB_A and LAB_B for the owner's review. A hypothesis is a promotion candidate only
+  when **all** of these hold on trades entered after the Lab start:
+  - n ≥ 150 closed trades over ≥ 25 pairs and ≥ 3 days covering every UTC hour;
+  - mean net50 > 0 and the pair-bootstrap CI95 lower bound of mean $/trade > 0;
+  - it beats the same-period random control by more than the control's CI half-width;
+  - top pair share ≤ 0.20, it stays positive with the best pair removed, and no single day
+    supplies more than 50% of the P&L;
+  - a 3-slot $1000 book has a max drawdown ≤ 20% (an offline replay; the Lab books hold
+    one position);
+  - zero entries on pools flagged by the structural rug guard;
+  - vanished or unpriced closes < 10% of trades.
+
+  Passing makes a book eligible for review only. Promotion to any engine account is a
+  separate, reviewed and versioned change; the books stay TEST.
+- **Expected failure.** The research expects both hypotheses to fail the gate: about −3%
+  per trade for LAB_A, and wide, regime-dependent uncertainty for LAB_B. A retirement
+  under the kill rule is a valid result, not a reason to loosen filters, the cost cap or
+  the exits.
+
 ## Dataset provenance and measurements
 
 | Dataset | Scope | Valid conclusion |

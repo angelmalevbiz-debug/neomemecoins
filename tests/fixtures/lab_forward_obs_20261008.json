@@ -1,0 +1,1670 @@
+{
+ "addresses": "mint and pair abbreviated to 8 characters; updatedAt is the research point time (observed_at)",
+ "lab_a_crossings": [
+  {
+   "fee_bps": 85.0,
+   "name": "CRAWL_2B8tftZ5",
+   "points": [
+    {
+     "address": "BXoHJdds",
+     "ageMinutes": 5413.3,
+     "dexId": "pumpswap",
+     "fdv": 2555245.0,
+     "liquidityUsd": 207655.6,
+     "marketCap": 2555245.0,
+     "pairAddress": "2B8tftZ5",
+     "pairCreatedAt": 1791065290000,
+     "priceChange": {
+      "h1": -5.94,
+      "h24": -45.69,
+      "h6": -22.34,
+      "m5": -3.19
+     },
+     "priceNative": 2.265e-05,
+     "priceUsd": 0.00265,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 77.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "CRAWL",
+     "txns": {
+      "h1": {
+       "buys": 118,
+       "sells": 125
+      },
+      "m5": {
+       "buys": 25,
+       "sells": 21
+      }
+     },
+     "updatedAt": 1791390087101,
+     "volume": {
+      "h1": 28603.5,
+      "h24": 1944774.42,
+      "h6": 428968.76,
+      "m5": 4446.72
+     }
+    },
+    {
+     "address": "BXoHJdds",
+     "ageMinutes": 5413.4,
+     "dexId": "pumpswap",
+     "fdv": 2494900.0,
+     "liquidityUsd": 205177.55,
+     "marketCap": 2494900.0,
+     "pairAddress": "2B8tftZ5",
+     "pairCreatedAt": 1791065290000,
+     "priceChange": {
+      "h1": -6.87,
+      "h24": -47.05,
+      "h6": -24.18,
+      "m5": -5.81
+     },
+     "priceNative": 2.211e-05,
+     "priceUsd": 0.002587,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 77.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "CRAWL",
+     "txns": {
+      "h1": {
+       "buys": 172,
+       "sells": 136
+      },
+      "m5": {
+       "buys": 79,
+       "sells": 35
+      }
+     },
+     "updatedAt": 1791390092640,
+     "volume": {
+      "h1": 34144.89,
+      "h24": 1951038.05,
+      "h6": 434715.53,
+      "m5": 10496.46
+     }
+    },
+    {
+     "address": "BXoHJdds",
+     "ageMinutes": 5413.5,
+     "dexId": "pumpswap",
+     "fdv": 2494900.0,
+     "liquidityUsd": 205177.55,
+     "marketCap": 2494900.0,
+     "pairAddress": "2B8tftZ5",
+     "pairCreatedAt": 1791065290000,
+     "priceChange": {
+      "h1": -6.87,
+      "h24": -47.05,
+      "h6": -24.18,
+      "m5": -5.81
+     },
+     "priceNative": 2.211e-05,
+     "priceUsd": 0.002587,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 77.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "CRAWL",
+     "txns": {
+      "h1": {
+       "buys": 172,
+       "sells": 136
+      },
+      "m5": {
+       "buys": 79,
+       "sells": 35
+      }
+     },
+     "updatedAt": 1791390097942,
+     "volume": {
+      "h1": 34144.89,
+      "h24": 1951038.05,
+      "h6": 434715.53,
+      "m5": 10496.46
+     }
+    }
+   ],
+   "research_surge": [
+    false,
+    true,
+    true
+   ],
+   "research_universe": [
+    true,
+    true,
+    true
+   ],
+   "signal_index": 1
+  },
+  {
+   "fee_bps": 30.0,
+   "name": "neet_5wNu5Qhd",
+   "points": [
+    {
+     "address": "Ce2gx9KG",
+     "ageMinutes": 761391.4,
+     "dexId": "pumpswap",
+     "fdv": 34446177.0,
+     "liquidityUsd": 2004723.72,
+     "marketCap": 34446194.0,
+     "pairAddress": "5wNu5Qhd",
+     "pairCreatedAt": 1745715491000,
+     "priceChange": {
+      "h1": -0.82,
+      "h24": -13.86,
+      "h6": -2.86,
+      "m5": -0.25
+     },
+     "priceNative": 0.0002962,
+     "priceUsd": 0.03445,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 43.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "neet",
+     "txns": {
+      "h1": {
+       "buys": 91,
+       "sells": 24
+      },
+      "m5": {
+       "buys": 1,
+       "sells": 3
+      }
+     },
+     "updatedAt": 1791398976834,
+     "volume": {
+      "h1": 30338.07,
+      "h24": 471388.35,
+      "h6": 167809.44,
+      "m5": 1905.65
+     }
+    },
+    {
+     "address": "Ce2gx9KG",
+     "ageMinutes": 761391.5,
+     "dexId": "pumpswap",
+     "fdv": 35410104.0,
+     "liquidityUsd": 2032695.48,
+     "marketCap": 35410122.0,
+     "pairAddress": "5wNu5Qhd",
+     "pairCreatedAt": 1745715491000,
+     "priceChange": {
+      "h1": 2.9,
+      "h24": -11.9,
+      "h6": -0.14,
+      "m5": 2.39
+     },
+     "priceNative": 0.0003045,
+     "priceUsd": 0.03541,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 88.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "neet",
+     "txns": {
+      "h1": {
+       "buys": 311,
+       "sells": 198
+      },
+      "m5": {
+       "buys": 248,
+       "sells": 179
+      }
+     },
+     "updatedAt": 1791398981059,
+     "volume": {
+      "h1": 76077.3,
+      "h24": 529198.83,
+      "h6": 225819.14,
+      "m5": 58478.85
+     }
+    },
+    {
+     "address": "Ce2gx9KG",
+     "ageMinutes": 761391.6,
+     "dexId": "pumpswap",
+     "fdv": 35410104.0,
+     "liquidityUsd": 2032695.48,
+     "marketCap": 35410122.0,
+     "pairAddress": "5wNu5Qhd",
+     "pairCreatedAt": 1745715491000,
+     "priceChange": {
+      "h1": 2.9,
+      "h24": -11.9,
+      "h6": -0.14,
+      "m5": 2.39
+     },
+     "priceNative": 0.0003045,
+     "priceUsd": 0.03541,
+     "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+     "score": 88.0,
+     "sources": [
+      "pumpswap-address-catalog"
+     ],
+     "symbol": "neet",
+     "txns": {
+      "h1": {
+       "buys": 311,
+       "sells": 198
+      },
+      "m5": {
+       "buys": 248,
+       "sells": 179
+      }
+     },
+     "updatedAt": 1791398988009,
+     "volume": {
+      "h1": 76077.3,
+      "h24": 529198.83,
+      "h6": 225819.14,
+      "m5": 58478.85
+     }
+    }
+   ],
+   "research_surge": [
+    false,
+    true,
+    true
+   ],
+   "research_universe": [
+    true,
+    true,
+    true
+   ],
+   "signal_index": 1
+  }
+ ],
+ "lab_b_dip": {
+  "decision": {
+   "address": "5VnbrKp2",
+   "ageMinutes": 5116.1,
+   "dexId": "pumpswap",
+   "fdv": 1054046.0,
+   "liquidityUsd": 116054.14,
+   "marketCap": 1054066.0,
+   "pairAddress": "53W7r4XU",
+   "pairCreatedAt": 1791078359000,
+   "priceChange": {
+    "h1": -8.2,
+    "h24": 12.51,
+    "h6": -18.07,
+    "m5": -7.84
+   },
+   "priceNative": 9.608e-06,
+   "priceUsd": 0.001112,
+   "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+   "score": 55.0,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "symbol": "darwin",
+   "txns": {
+    "h1": {
+     "buys": 107,
+     "sells": 223
+    },
+    "m5": {
+     "buys": 8,
+     "sells": 16
+    }
+   },
+   "updatedAt": 1791385327485,
+   "volume": {
+    "h1": 33766.81,
+    "h24": 2002582.53,
+    "h6": 448808.72,
+    "m5": 5668.15
+   }
+  },
+  "minute_T": 1791385320000,
+  "name": "darwin_53W7r4XU",
+  "reference": {
+   "address": "5VnbrKp2",
+   "ageMinutes": 5101.1,
+   "dexId": "pumpswap",
+   "fdv": 1171561.0,
+   "liquidityUsd": 122412.28,
+   "marketCap": 1171570.0,
+   "pairAddress": "53W7r4XU",
+   "pairCreatedAt": 1791078359000,
+   "priceChange": {
+    "h1": 9.68,
+    "h24": 39.75,
+    "h6": -13.15,
+    "m5": -2.43
+   },
+   "priceNative": 1.068e-05,
+   "priceUsd": 0.001236,
+   "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+   "score": 55.0,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "symbol": "darwin",
+   "txns": {
+    "h1": {
+     "buys": 136,
+     "sells": 267
+    },
+    "m5": {
+     "buys": 8,
+     "sells": 16
+    }
+   },
+   "updatedAt": 1791384425884,
+   "volume": {
+    "h1": 40575.94,
+    "h24": 2132640.96,
+    "h6": 449333.27,
+    "m5": 2985.4
+   }
+  },
+  "regime_pools": [
+   {
+    "mint": "HMYd9tos",
+    "now": [
+     1791385315012,
+     0.0003194,
+     51490.42
+    ],
+    "pair": "12jc1DzJ",
+    "ref": [
+     1791384419517,
+     0.0003395,
+     53129.08
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "85WdpEBN",
+    "now": [
+     1791385314684,
+     0.0001303,
+     34333.56
+    ],
+    "pair": "28CJf2tS",
+    "ref": [
+     1791384419642,
+     0.0001186,
+     32599.47
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "BXoHJdds",
+    "now": [
+     1791385315348,
+     0.002954,
+     218161.81
+    ],
+    "pair": "2B8tftZ5",
+    "ref": [
+     1791384419742,
+     0.003268,
+     229479.06
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "8RU4Ug69",
+    "now": [
+     1791384721845,
+     4.559191915952933e-05,
+     19754.7426
+    ],
+    "pair": "2DCysKTU",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "CsCPttDS",
+    "now": [
+     1791385316103,
+     2.65e-06,
+     3147.63
+    ],
+    "pair": "2J9Av4La",
+    "ref": [
+     1791384414710,
+     2.688e-06,
+     3185.87
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "GfawjB4F",
+    "now": [
+     1791385315553,
+     6.481e-06,
+     5283.21
+    ],
+    "pair": "2cRT2N5A",
+    "ref": [
+     1791384414377,
+     1.355e-05,
+     8538.18
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "2VYvcfZN",
+    "now": [
+     1791385316170,
+     2.206e-06,
+     2295.56
+    ],
+    "pair": "2or8ATkU",
+    "ref": [
+     1791384414737,
+     2.206e-06,
+     2295.56
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "HzYCHqAN",
+    "now": [
+     1791385319987,
+     0.001672,
+     153554.51
+    ],
+    "pair": "3NBq9zyn",
+    "ref": [
+     1791384419564,
+     0.001863,
+     161858.45
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "5qAhLg4Q",
+    "now": [
+     1791384924341,
+     7.902e-08,
+     73.13
+    ],
+    "pair": "3iitzMXY",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "6mEULKR6",
+    "now": [
+     1791385315976,
+     2.316e-06,
+     2450.53
+    ],
+    "pair": "3ygmS5ka",
+    "ref": [
+     1791384414696,
+     2.31e-06,
+     2445.18
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "3wYAt6Bc",
+    "now": [
+     1791385315651,
+     1.091e-05,
+     7406.44
+    ],
+    "pair": "41iSW1xo",
+    "ref": [
+     1791384414569,
+     1.523e-05,
+     9118.89
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "7c9cTiz5",
+    "now": [
+     1791384067842,
+     4.507861529570816e-05,
+     20014.9704
+    ],
+    "pair": "4J1DeLQy",
+    "ref": [
+     1791384067842,
+     4.507861529570816e-05,
+     20014.9704
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "GTBxUiw6",
+    "now": [
+     1791385315574,
+     0.004291,
+     319983.83
+    ],
+    "pair": "4R8CiMnJ",
+    "ref": [
+     1791384414395,
+     0.004307,
+     320484.61
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "FbiZknTe",
+    "now": [
+     1791385146758,
+     3.924e-06,
+     3630.15
+    ],
+    "pair": "4gHCanVp",
+    "ref": [
+     1791384414644,
+     4.122e-06,
+     3770.51
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "5VnbrKp2",
+    "now": [
+     1791385315617,
+     0.001192,
+     120195.14
+    ],
+    "pair": "53W7r4XU",
+    "ref": [
+     1791384414303,
+     0.001236,
+     122412.28
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "2hmLYGK7",
+    "now": [
+     1791384129230,
+     0.0003988,
+     55005.22
+    ],
+    "pair": "56Ry8StF",
+    "ref": [
+     1791384129230,
+     0.0003988,
+     55005.22
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "DnPWJhBG",
+    "now": [
+     1791384561650,
+     3.91e-06,
+     3613.18
+    ],
+    "pair": "5Aj8SwQQ",
+    "ref": [
+     1791384414546,
+     4.177e-06,
+     3802.86
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "7NjZ9BNT",
+    "now": [
+     1791385197829,
+     4.393133965645119e-05,
+     19823.6917225395
+    ],
+    "pair": "5sgwMTqJ",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "98kfF7rm",
+    "now": [
+     1791385315631,
+     0.005879,
+     535841.4
+    ],
+    "pair": "6e3jZLtf",
+    "ref": [
+     1791384419944,
+     0.006022,
+     542196.64
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "7jywFCFQ",
+    "now": [
+     1791384580964,
+     4.580476338836986e-05,
+     19725.4505185874
+    ],
+    "pair": "6eXBy6RV",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "FhMern1t",
+    "now": [
+     1791385208859,
+     0.0004076,
+     55623.17
+    ],
+    "pair": "6xP8cqkU",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "2jcvq8Qc",
+    "now": [
+     1791385315437,
+     6.199e-05,
+     23715.27
+    ],
+    "pair": "72tZoSAH",
+    "ref": [
+     1791384419786,
+     6.311e-05,
+     23938.94
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "HbPDWSqu",
+    "now": [
+     1791385314714,
+     0.0002745,
+     50641.98
+    ],
+    "pair": "745ATaSS",
+    "ref": [
+     1791384419720,
+     0.0002498,
+     48190.1
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "76fqgEtH",
+    "now": [
+     1791383998380,
+     4.6674305354234825e-05,
+     20352.5724
+    ],
+    "pair": "78yQUcKk",
+    "ref": [
+     1791383998380,
+     4.6674305354234825e-05,
+     20352.5724
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "Fa7yZLtX",
+    "now": [
+     1791385314755,
+     3.545e-05,
+     14967.0
+    ],
+    "pair": "79yQTA3u",
+    "ref": [
+     1791384419665,
+     3.708e-05,
+     15341.82
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "DGcUfGof",
+    "now": [
+     1791385315463,
+     3.34e-05,
+     17636.42
+    ],
+    "pair": "7BzskuDb",
+    "ref": [
+     1791384419968,
+     3.459e-05,
+     17940.79
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "9yfiomKJ",
+    "now": [
+     1791384431343,
+     8.007e-05,
+     25413.35
+    ],
+    "pair": "7KYba5Lh",
+    "ref": [
+     1791384419600,
+     8.373e-05,
+     26033.56
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "9aqmJjCn",
+    "now": [
+     1791385315495,
+     0.001188,
+     150448.97
+    ],
+    "pair": "7Nj7mBE7",
+    "ref": [
+     1791384419824,
+     0.00119,
+     150539.33
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "HANUR9Tr",
+    "now": [
+     1791384444543,
+     2.642e-06,
+     2612.95
+    ],
+    "pair": "7beBmSmG",
+    "ref": [
+     1791384414691,
+     2.642e-06,
+     2612.95
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "ADPN2aqz",
+    "now": [
+     1791385319823,
+     0.001935,
+     132727.7
+    ],
+    "pair": "7mQDGtei",
+    "ref": [
+     1791384419525,
+     0.001993,
+     134639.04
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "49gr2VBv",
+    "now": [
+     1791385315314,
+     3.237e-05,
+     15003.35
+    ],
+    "pair": "7vXSFb9t",
+    "ref": [
+     1791384419694,
+     3.015e-05,
+     14404.48
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "2T6Wg3ur",
+    "now": [
+     1791385314920,
+     8.833e-05,
+     26645.88
+    ],
+    "pair": "8J42or3k",
+    "ref": [
+     1791384419545,
+     7.094e-05,
+     23651.4
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "BaqDcVAR",
+    "now": [
+     1791385316133,
+     2.289e-06,
+     2438.72
+    ],
+    "pair": "8JZiCe7y",
+    "ref": [
+     1791384414722,
+     2.289e-06,
+     2438.72
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "FmybF8WB",
+    "now": [
+     1791385315900,
+     4.376e-06,
+     4650.51
+    ],
+    "pair": "8LXqhybM",
+    "ref": [
+     1791384414616,
+     4.451e-06,
+     4708.28
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "5GefefPX",
+    "now": [
+     1791385314843,
+     0.001049,
+     95791.94
+    ],
+    "pair": "8NVFB1un",
+    "ref": [
+     1791384419610,
+     0.00103,
+     94895.2
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "5tCju6YN",
+    "now": [
+     1791385314868,
+     0.002075,
+     186913.69
+    ],
+    "pair": "8ewuF2o8",
+    "ref": [
+     1791384414322,
+     0.002332,
+     198159.0
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "Bz2y164z",
+    "now": [
+     1791384859336,
+     4.601575357637654e-05,
+     19745.8428
+    ],
+    "pair": "8qV1SQHz",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "9BkorQ9b",
+    "now": [
+     1791385319965,
+     0.0002411,
+     42838.71
+    ],
+    "pair": "8sbe1R1t",
+    "ref": [
+     1791384419538,
+     0.0002308,
+     41815.6
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "HQJA4Qcn",
+    "now": [
+     1791384437347,
+     5.889e-05,
+     19890.64
+    ],
+    "pair": "8vw8ssaQ",
+    "ref": [
+     1791384419555,
+     5.245e-05,
+     18653.69
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "CscZaq5t",
+    "now": [
+     1791385315101,
+     0.0006992,
+     89806.05
+    ],
+    "pair": "9GBXHym9",
+    "ref": [
+     1791384419990,
+     0.0007222,
+     91255.87
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "D9MY25yE",
+    "now": [
+     1791385316057,
+     2.323e-06,
+     2480.23
+    ],
+    "pair": "9GHMXBUs",
+    "ref": [
+     1791384414634,
+     2.323e-06,
+     2480.23
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "Bh1Wx4Gu",
+    "now": [
+     1791384979780,
+     7.135019188509339e-05,
+     21871.3875
+    ],
+    "pair": "9R6Z9Vcd",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "9yXqev3L",
+    "now": [
+     1791384118691,
+     5.027e-05,
+     19107.44
+    ],
+    "pair": "9okRiw1a",
+    "ref": [
+     1791384118691,
+     5.027e-05,
+     19107.44
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "45VHsie7",
+    "now": [
+     1791385314789,
+     0.002196,
+     140972.24
+    ],
+    "pair": "A2ASUorC",
+    "ref": [
+     1791384419653,
+     0.002223,
+     141742.25
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "D7W5JMXQ",
+    "now": [
+     1791385279405,
+     9.616e-09,
+     4.25
+    ],
+    "pair": "A4XwptZp",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "5zkj7ptE",
+    "now": [
+     1791385316031,
+     3.182e-06,
+     3131.3
+    ],
+    "pair": "A8yMHEXm",
+    "ref": [
+     1791384414730,
+     3.14e-06,
+     3098.42
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "8Zbrw6Qa",
+    "now": [
+     1791383895072,
+     4.908752176454475e-05,
+     20172.4004
+    ],
+    "pair": "A9ioACNK",
+    "ref": [
+     1791383895072,
+     4.908752176454475e-05,
+     20172.4004
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "AzEb8XfN",
+    "now": [
+     1791384682099,
+     3.091e-08,
+     0.0
+    ],
+    "pair": "AbcUWi2y",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "G3qBoUnu",
+    "now": [
+     1791385316078,
+     2.314e-06,
+     2447.19
+    ],
+    "pair": "B5wm8Qn2",
+    "ref": [
+     1791384414707,
+     2.314e-06,
+     2447.19
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "DoVAVzVi",
+    "now": [
+     1791385315289,
+     0.001715,
+     170681.5
+    ],
+    "pair": "BFrSZake",
+    "ref": [
+     1791384419799,
+     0.001845,
+     177088.99
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "55Vr2VpS",
+    "now": [
+     1791385314965,
+     0.000418,
+     70262.62
+    ],
+    "pair": "BNG5962Z",
+    "ref": [
+     1791384419847,
+     0.0004447,
+     72500.5
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "CBcjQNdt",
+    "now": [
+     1791385315191,
+     0.0003193,
+     61366.52
+    ],
+    "pair": "BaiHzFqn",
+    "ref": [
+     1791384419679,
+     0.000351,
+     64437.24
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "7LSCX6SG",
+    "now": [
+     1791384859233,
+     0.00017220040172899524,
+     24853.7033
+    ],
+    "pair": "BjAfctQF",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "8oHGDC3x",
+    "now": [
+     1791385315728,
+     0.0006955,
+     75911.22
+    ],
+    "pair": "BmFtnNsk",
+    "ref": [
+     1791384414522,
+     0.0006955,
+     75911.22
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "GyMw9CjX",
+    "now": [
+     1791384681581,
+     0.01686,
+     121637.16
+    ],
+    "pair": "CNhwwjWn",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "3C5PCM7t",
+    "now": [
+     1791385315958,
+     3.698e-06,
+     3462.97
+    ],
+    "pair": "CQiAHFkY",
+    "ref": [
+     1791384414596,
+     4.242e-06,
+     3857.14
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "3UPK6zLo",
+    "now": [
+     1791385315406,
+     2.201e-05,
+     11676.98
+    ],
+    "pair": "CRvE2Thp",
+    "ref": [
+     1791384368669,
+     4.361e-05,
+     16892.16
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "D98ZV29k",
+    "now": [
+     1791384859338,
+     4.361282719207652e-05,
+     19767.4404262586
+    ],
+    "pair": "CS7f8TYk",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "CzJiF8Gj",
+    "now": [
+     1791384478707,
+     4.5254060035404386e-05,
+     19672.8501139115
+    ],
+    "pair": "CYAotDqw",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "7VertkgF",
+    "now": [
+     1791385315155,
+     0.007023,
+     399198.6
+    ],
+    "pair": "CyJwKnLi",
+    "ref": [
+     1791384419776,
+     0.00674,
+     390860.66
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "MukLDtJ8",
+    "now": [
+     1791385315598,
+     0.007866,
+     563798.9
+    ],
+    "pair": "DA4pM4xS",
+    "ref": [
+     1791384414481,
+     0.007878,
+     564040.42
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "FT8jLbnM",
+    "now": [
+     1791385146568,
+     4.62704977411743e-05,
+     19848.2461
+    ],
+    "pair": "DbtyP4TN",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "GG838Vyr",
+    "now": [
+     1791383827534,
+     2.42e-05,
+     12041.93
+    ],
+    "pair": "Dq1aHJe8",
+    "ref": [
+     1791383827534,
+     2.42e-05,
+     12041.93
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "BZ8pkWUs",
+    "now": [
+     1791385315880,
+     7.991e-06,
+     6704.39
+    ],
+    "pair": "Dx8T9F6H",
+    "ref": [
+     1791384414603,
+     8.076e-06,
+     6750.88
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "JcpM1faP",
+    "now": [
+     1791384260726,
+     1.036e-06,
+     185977.17
+    ],
+    "pair": "ELn16EP1",
+    "ref": [
+     1791384260726,
+     1.036e-06,
+     185977.17
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "MuagMnPm",
+    "now": [
+     1791385315989,
+     4.248e-06,
+     3851.38
+    ],
+    "pair": "ENcVHXxN",
+    "ref": [
+     1791384414622,
+     4.547e-06,
+     4053.9
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "FAopSovS",
+    "now": [
+     1791385319934,
+     0.0008848,
+     91940.05
+    ],
+    "pair": "F2P22Sfc",
+    "ref": [
+     1791384419487,
+     0.0008721,
+     91178.89
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "2bi3bpW8",
+    "now": [
+     1791384358926,
+     4.359390701825463e-05,
+     19724.8643
+    ],
+    "pair": "FK9fWPCC",
+    "ref": [
+     1791384358926,
+     4.359390701825463e-05,
+     19724.8643
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "E6vtwCUt",
+    "now": [
+     1791385315255,
+     0.005843,
+     232459.24
+    ],
+    "pair": "FcfEJ9uJ",
+    "ref": [
+     1791384419621,
+     0.005949,
+     234485.81
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "2j5SaS7x",
+    "now": [
+     1791385315039,
+     0.000734,
+     91741.0
+    ],
+    "pair": "Fe7bpDYC",
+    "ref": [
+     1791384419753,
+     0.0006502,
+     86061.27
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "9cRCn9rG",
+    "now": [
+     1791385315711,
+     0.1366,
+     2372095.69
+    ],
+    "pair": "FnzKY6x7",
+    "ref": [
+     1791384414556,
+     0.1368,
+     2373002.21
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "FCv7SSrp",
+    "now": [
+     1791384924299,
+     3.669e-08,
+     30.06
+    ],
+    "pair": "G2n4fpFu",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "APxxh2tW",
+    "now": [
+     1791385315757,
+     0.0001732,
+     35756.92
+    ],
+    "pair": "G4ac6W2s",
+    "ref": [
+     1791384414563,
+     0.0001765,
+     36114.18
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "BtnK2SPR",
+    "now": [
+     1791385302223,
+     4.541186168695732e-05,
+     19679.9775
+    ],
+    "pair": "G6HBNA8s",
+    "ref": null,
+    "research_counted": false
+   },
+   {
+    "mint": "8nnaeWCw",
+    "now": [
+     1791385315380,
+     0.001831,
+     154640.2
+    ],
+    "pair": "GLL3Czyb",
+    "ref": [
+     1791384419892,
+     0.001951,
+     159591.45
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "2SpEqbKK",
+    "now": [
+     1791384077999,
+     0.0004506,
+     58602.84
+    ],
+    "pair": "GeDxZseF",
+    "ref": [
+     1791384077999,
+     0.0004506,
+     58602.84
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "3VPoXaRc",
+    "now": [
+     1791385315742,
+     0.0008236,
+     98015.26
+    ],
+    "pair": "Gnpvosia",
+    "ref": [
+     1791382971446,
+     0.0008018,
+     96677.96
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "Ai66LHZG",
+    "now": [
+     1791385315540,
+     0.05907,
+     2885095.71
+    ],
+    "pair": "HMzvsEEm",
+    "ref": [
+     1791384414349,
+     0.05929,
+     2889593.08
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "J9qzFhTL",
+    "now": [
+     1791385319856,
+     0.0003991,
+     63850.69
+    ],
+    "pair": "HU22UBaT",
+    "ref": [
+     1791384419498,
+     0.0004199,
+     65406.86
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "AqtBBsqs",
+    "now": [
+     1791384077566,
+     1.508e-05,
+     24624.58
+    ],
+    "pair": "HZmAqCVu",
+    "ref": [
+     1791384077566,
+     1.508e-05,
+     24624.58
+    ],
+    "research_counted": false
+   },
+   {
+    "mint": "F6EDRhRz",
+    "now": [
+     1791385319878,
+     7.295e-05,
+     22501.29
+    ],
+    "pair": "UCWmMumV",
+    "ref": [
+     1791384419508,
+     7.389e-05,
+     22641.27
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "5sLHWDe5",
+    "now": [
+     1791385315124,
+     0.0002009,
+     44709.9
+    ],
+    "pair": "XDTrVqPD",
+    "ref": [
+     1791384419707,
+     0.0001977,
+     44316.18
+    ],
+    "research_counted": true
+   },
+   {
+    "mint": "EFF9HZqr",
+    "now": [
+     1791385315783,
+     1.743e-05,
+     9895.3
+    ],
+    "pair": "zrPbSddh",
+    "ref": [
+     1791384414589,
+     1.749e-05,
+     9915.51
+    ],
+    "research_counted": false
+   }
+  ],
+  "research_counted_pools": 33,
+  "research_med15_pct": -1.2721613208823923
+ },
+ "random_draws": [
+  {
+   "firing_t": [
+    1791455850000,
+    1791463270000,
+    1791494765000,
+    1791498730000
+   ],
+   "pair": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+   "points": 20000,
+   "probability": 0.0005,
+   "salt": "synA",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  },
+  {
+   "firing_t": [
+    1791480830000,
+    1791519345000
+   ],
+   "pair": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+   "points": 20000,
+   "probability": 0.0005,
+   "salt": "synA",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  },
+  {
+   "firing_t": [
+    1791447420000,
+    1791455105000,
+    1791458100000,
+    1791463130000,
+    1791474365000,
+    1791480090000,
+    1791488700000,
+    1791490505000,
+    1791497290000
+   ],
+   "pair": "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+   "points": 20000,
+   "probability": 0.0005,
+   "salt": "synA",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  },
+  {
+   "firing_t": [
+    1791426700000,
+    1791436995000,
+    1791444375000,
+    1791445080000,
+    1791452380000,
+    1791462715000,
+    1791466680000,
+    1791481805000,
+    1791495860000,
+    1791507765000
+   ],
+   "pair": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD",
+   "points": 20000,
+   "probability": 0.0007,
+   "salt": "synB",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  },
+  {
+   "firing_t": [
+    1791422755000,
+    1791430595000,
+    1791432680000,
+    1791443870000,
+    1791455215000,
+    1791460145000,
+    1791460460000,
+    1791460805000,
+    1791463760000,
+    1791500110000,
+    1791502640000,
+    1791510125000,
+    1791511355000,
+    1791513825000
+   ],
+   "pair": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+   "points": 20000,
+   "probability": 0.0007,
+   "salt": "synB",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  },
+  {
+   "firing_t": [
+    1791426955000,
+    1791439295000,
+    1791442940000,
+    1791447190000,
+    1791448310000,
+    1791450505000,
+    1791454235000,
+    1791457165000,
+    1791493920000,
+    1791517720000
+   ],
+   "pair": "HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+   "points": 20000,
+   "probability": 0.0007,
+   "salt": "synB",
+   "step_ms": 5000,
+   "t0": 1791420000000
+  }
+ ],
+ "random_draws_note": "reference draws of the research hashed_coin (blake2b-64 of \"salt|pair|int(t)\" / 2**64 < p) on synthetic pool ids, 20,000 points 5 s apart each",
+ "research_prereg_sha256": "786e01fd1a07ab421d78ffe88a6067cf92ccabcd7719ab908e444db18b630189",
+ "source": "research scan log obs.sqlite3 table o (engine DexScreener observations, 2026-10-07/08, 22.8 h, PAPER research); read-only extraction with the frozen synthesis/strategies.py signals under leaderboard/harness_final.py"
+}

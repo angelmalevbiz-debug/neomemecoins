@@ -70,9 +70,10 @@ REASONS = ('heat_history_warming', 'heat_input_unknown', 'heat_return_5m_surge',
            'heat_crash_in_progress', 'heat_turnover_5m')
 PAID_PROFILE_SOURCE = 'latest'
 # Reserved ids of the pre-registered surge (LAB_A) and dip (LAB_B) hypothesis
-# arms of the research. They are not registered Lab books yet; a book listed
-# here records the heat flags without being blocked. Every registered book,
-# the engine accounts and the training probe enforce. The tape scheduler
+# arms of the research, registered as Lab books by LAB_FORWARD_TESTS_V1
+# (lab_forward_tests.py, which also runs their random controls log-only); a
+# book listed here records the heat flags without being blocked. Every other
+# book, the engine accounts and the training probe enforce. The tape scheduler
 # withholds new seats on every flag except its own warm-up and lets running
 # leases expire; see tape_pool_scheduler.TapePoolScheduler.defensive_entry_decision.
 LOG_ONLY_BOOK_IDS = frozenset({'LAB_A_SURGE_EST_GUARD', 'LAB_B_DIP_MKTDIP_GUARD'})

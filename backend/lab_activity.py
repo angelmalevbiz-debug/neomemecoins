@@ -139,6 +139,13 @@ RULES = {
     # supply the shared cooldown/notional policy. Score is not a gate.
     'COST_FIRST_CONTROL': EntryRule(0, 250000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
     'COST_FIRST_SCALED': EntryRule(0, 250000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
+    # LAB_FORWARD_TESTS_V1 books (lab_forward_tests.BOOK_IDS). Universe and signal are
+    # evaluated by that module on each observation; these registry rules only restate
+    # the $50k liquidity floor. Score is not a gate.
+    'LAB_A_SURGE_EST_GUARD': EntryRule(0, 50000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
+    'RND_LAB_A': EntryRule(0, 50000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
+    'LAB_B_DIP_MKTDIP_GUARD': EntryRule(0, 50000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
+    'RND_LAB_B': EntryRule(0, 50000, (-100, 1e6), 0, 0, (0, 1e7), (-100, 1e6), (0, 1e7)),
 }
 
 

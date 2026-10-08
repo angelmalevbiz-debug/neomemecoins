@@ -75,9 +75,10 @@ class ActivityTests(unittest.TestCase):
         lab.rush_brain._SAMPLE_BY_PAIR.clear()
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_36_rules_exist(self):
-        # 34 original books plus the COST_FIRST_ESTABLISHED_V1 pair.
-        self.assertEqual(len(a.RULES),36)
+    def test_all_40_rules_exist(self):
+        # 34 original books, the COST_FIRST_ESTABLISHED_V1 pair and the four
+        # LAB_FORWARD_TESTS_V1 books (two hypotheses and their random controls).
+        self.assertEqual(len(a.RULES),40)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
         self.assertTrue(set(lab.cost_first.BOOK_IDS)<=set(a.RULES))
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
@@ -280,7 +281,9 @@ class ActivityTests(unittest.TestCase):
                 self.assertNotIn('strategy_lifecycle',b)
             else:
                 marker=b.pop('strategy_lifecycle')
-                self.assertEqual(marker['version'],lab.lifecycle.VERSION)
+                # LAB_FORWARD_TESTS_V1 books carry their pre-registered kill rule instead.
+                self.assertEqual(marker['version'],lab.lab_forward.KILL_RULE_VERSION
+                                 if key in lab.lab_forward.BOOK_IDS else lab.lifecycle.VERSION)
                 self.assertEqual(marker['status'],'active')
                 self.assertTrue(marker['entry_enabled'])
                 self.assertTrue(marker['position_management_enabled'])

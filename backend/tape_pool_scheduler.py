@@ -2,7 +2,15 @@
 
 This decides what to observe, never whether to trade. Actual flow completeness,
 safety checks and executable quotes retain their existing admission authority.
+
+Seat shedding: a pool whose fetched transaction bodies yielded no engine-usable
+swap after a bounded number of bodies cannot become admissible while it keeps
+failing to decode, so it releases its entry/exploration seat for a cooldown.
+Pinned exit pools are never shed. Shedding changes what is observed at zero
+RPC cost; it never admits, sizes or exits anything.
 """
+import os
+
 import lab_activity
 import funded_market_candidates
 import paper_market_feasibility as feasibility
@@ -11,6 +19,11 @@ import winner_ensemble
 
 FUNDED_RULES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 LEASE_MS = 60_000
+POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V3_YIELD_SHED'
+SHED_MIN_BODIES = max(1, int(os.getenv('NEO_TAPE_SHED_MIN_BODIES', '40')))
+SHED_COOLDOWN_MS = max(60_000, int(os.getenv('NEO_TAPE_SHED_COOLDOWN_MS', '1800000')))
+SHED_REASON = 'ZERO_USABLE_SWAPS_AFTER_BODIES'
+SHED_LIST_LIMIT = 64
 
 
 def _identity(coin):
@@ -46,12 +59,44 @@ def _held_coins(state, market):
 
 
 class TapePoolScheduler:
-    def __init__(self, lease_ms=LEASE_MS):
+    def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
+                 shed_cooldown_ms=SHED_COOLDOWN_MS):
         self.lease_ms = max(30_000, int(lease_ms))
         self.leases = {}
         self.last_selected = {}
+        self.shed_min_bodies = max(1, int(shed_min_bodies))
+        self.shed_cooldown_ms = max(60_000, int(shed_cooldown_ms))
+        self.shed = {}
+        self.yield_since = {}
 
-    def select(self, state, *, now, max_tracked):
+    def _shed_record(self, identity, coin, now, decode_yield):
+        """Return the active shed record for a supported entry candidate, if any."""
+        record = self.shed.get(identity)
+        if record is not None:
+            if now < record['retry_at']:
+                return record
+            # The cooldown ended: the next attempt counts only bodies fetched
+            # from now on, so a retried pool gets a fresh bounded chance.
+            self.yield_since[identity] = record['retry_at']
+            del self.shed[identity]
+        if decode_yield is None:
+            return None
+        stats = decode_yield(identity[1], self.yield_since.get(identity, 0))
+        bodies = int(feasibility.number(stats.get('bodies')))
+        usable = int(feasibility.number(stats.get('usable_swaps')))
+        if bodies < self.shed_min_bodies or usable > 0:
+            return None
+        record = {'symbol': coin.get('symbol'), 'address': identity[0],
+                  'pairAddress': identity[1], 'reason': SHED_REASON,
+                  'bodies': bodies, 'usable_swaps': usable,
+                  'shadow_swaps': int(feasibility.number(stats.get('shadow_swaps'))),
+                  'first_body_at': stats.get('first_body_at'),
+                  'last_body_at': stats.get('last_body_at'),
+                  'shed_at': now, 'retry_at': now + self.shed_cooldown_ms}
+        self.shed[identity] = record
+        return record
+
+    def select(self, state, *, now, max_tracked, decode_yield=None):
         market = {}
         for coin in state.get('feed') or []:
             if not isinstance(coin, dict):
@@ -69,8 +114,20 @@ class TapePoolScheduler:
         model_possible = model_excluded = model_unknown = 0
         main_cost_cap = feasibility.number((state.get('config') or {}).get(
             'strict_max_roundtrip_cost_pct'), 1.5)
+        # Expired shed records of pools that left the feed or are now held
+        # (pinned, therefore never shed) are forgotten; an expired record of a
+        # feed candidate is converted into a fresh bounded attempt below.
+        self.shed = {identity: record for identity, record in self.shed.items()
+                     if now < record['retry_at'] or (identity in market and identity not in pinned)}
+        self.yield_since = {identity: since for identity, since in self.yield_since.items()
+                            if identity in market}
+        shed_now = []
         for identity, coin in market.items():
             if not _supported(coin) or identity in pinned:
+                continue
+            shed = self._shed_record(identity, coin, now, decode_yield)
+            if shed is not None:
+                shed_now.append(shed)
                 continue
             features = lab_activity.market_features(coin)
             main_rules = winner_ensemble.market_candidates(coin)
@@ -146,7 +203,8 @@ class TapePoolScheduler:
             keep = sorted(self.last_selected, key=self.last_selected.get, reverse=True)[:2048]
             self.last_selected = {identity: self.last_selected[identity] for identity in keep}
 
-        diagnostics = {'policy_version': 'STABLE_COST_AWARE_TAPE_DISCOVERY_V2',
+        shed_records = sorted(self.shed.values(), key=lambda row: (-int(row['shed_at']), row['pairAddress']))
+        diagnostics = {'policy_version': POLICY_VERSION,
                        'funded_candidate_policy_version':funded_market_candidates.VERSION,
                        'checked_at': now, 'model_is_execution_quote': False,
                        'cost_estimates_are_planning_hints': True,
@@ -154,6 +212,14 @@ class TapePoolScheduler:
                        'entry_capacity': entry_capacity, 'pinned_exit_pools': len(pins),
                        'unsupported_held_pools': len(unsupported_pins),
                        'supported_candidate_pools': len(candidates),
+                       'shed_policy': {'reason': SHED_REASON, 'min_bodies': self.shed_min_bodies,
+                                       'cooldown_ms': self.shed_cooldown_ms,
+                                       'counts_engine_usable_swaps_only': True,
+                                       'pinned_exit_pools_exempt': True,
+                                       'yield_source': 'RECORDER_IN_MEMORY' if decode_yield is not None else 'UNAVAILABLE'},
+                       'shed_pool_count': len(self.shed),
+                       'shed_pools_in_feed': len(shed_now),
+                       'shed_pools': [dict(row) for row in shed_records[:SHED_LIST_LIMIT]],
                        'estimated_feasible_market_candidates': model_possible,
                        'estimated_fixed_cost_over_budget': model_excluded,
                        'estimated_cost_unknown': model_unknown,

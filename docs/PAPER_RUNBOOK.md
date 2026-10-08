@@ -166,7 +166,7 @@ The original repair was reviewed in PR #2 of the legacy repository. The maintain
 
 Production backend installation has not happened because no administrative host session is available. At 2026-10-05 19:07 UTC its gateway still allowed only the legacy Pages origin; the shared backend still reported `ORDER_FLOW_GOLD_SIGNAL_VERIFIED_V7` and had no `paper_training` object. Updating a web build cannot restart or update its Python services. The shared primary reset does not satisfy the requested all-account reset.
 
-### 2026-10-08 documentation re-verification (current)
+### 2026-10-08 documentation re-verification
 
 Executed in a clean worktree on `main` at `54fec89` plus this documentation change, with the repository `.venv` and `npm ci`:
 
@@ -178,3 +178,14 @@ Executed in a clean worktree on `main` at `54fec89` plus this documentation chan
 | `npm run build` | PASS, strategy/extension guards, Vite and extension archive; nonfatal Vite chunk-size warning |
 
 Facts that supersede the older blocks: the shared PAPER account publishes `entry_policy_version = WINNER_ENSEMBLE_VERIFIED_ENTRY_V4` and `exit_policy_version = HONEST_NET_EXIT_V1` (`strategy-lock.json`); `scripts/check_pages_backend.py` accepts that label, the opt-in `ORDER_FLOW_BALANCED_V4` label and the two earlier labels; the Lab registers 34 books; the latest successful Pages deployment is recorded in [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md). `backend/engine_entry_policy.py` still defines the internal constant `POLICY_VERSION = 'ORDER_FLOW_VALIDATED_THRESHOLDS_V9'`; nothing publishes it (the engine reports `winner_ensemble.ENTRY_POLICY_VERSION`), and renaming it would change a locked support-file hash, so it is left unchanged and recorded here as a stale label.
+
+### 2026-10-08 tape decoder shadow path and seat shedding (current)
+
+Executed in a worktree on `main` at `2ee0df1` plus this change, with the repository `.venv` and `npm ci`. See [tape-decoder-shadow-and-seat-shedding.md](tape-decoder-shadow-and-seat-shedding.md) for the evidence; the tape service must be restarted by the owner for the change to take effect, and the shadow decoder path stays DEGRADED until `NEO_TAPE_VALIDATED_DECODER_VERSIONS` lists it after the 24 h comparison.
+
+| Executed command | Result |
+| --- | --- |
+| `.venv/Scripts/python.exe scripts/run_python_checks.py` | PASS: `tests/` 661 tests and `backend/tests/` 148 tests; temporary account paths, both child exit codes 0 |
+| `npm run lint` | PASS, TypeScript noEmit |
+| `npm run check:strategy` | PASS: unchanged `WINNER_ENSEMBLE_PAPER_V1` strategy hash and 50 support-file hashes on the `UTF8_LF` basis |
+| `npm run build` | PASS, strategy/extension guards, 32 frontend tests, Vite and extension archive; nonfatal Vite chunk-size warning |

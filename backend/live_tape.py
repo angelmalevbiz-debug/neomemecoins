@@ -57,6 +57,17 @@ SWAP_DISCRIMINATORS = {bytes([102,6,61,18,1,218,235,234]):'BUY',
 EVENT_DISCRIMINATORS = {bytes([103,244,82,31,44,245,119,119]):'BUY',
                         bytes([62,47,55,10,165,3,220,42]):'SELL'}
 ANCHOR_EVENT_CPI = bytes([228,69,165,46,81,203,154,29])
+# Every decoded event names the decoder path that produced it. The default
+# path is the validated one. A newer path stays a shadow path: its events are
+# recorded with a DECODER_PATH_UNVALIDATED quality flag, which every consumer
+# already treats as DEGRADED flow, until the owner lists the version in
+# NEO_TAPE_VALIDATED_DECODER_VERSIONS after a shadow comparison.
+DECODER_VERSION = 'PUMP_SWAP_EVENT_DECODER_V1'
+REVERSED_CASH_LEG_DECODER_VERSION = 'PUMP_SWAP_REVERSED_CASH_LEG_EVENT_V2'
+SHADOW_DECODER_VERSIONS = (REVERSED_CASH_LEG_DECODER_VERSION,)
+UNVALIDATED_DECODER_FLAG = 'DECODER_PATH_UNVALIDATED'
+# In-memory decode-yield window used by seat shedding; never a journal query.
+YIELD_WINDOW_MS = max(60_000,int(os.getenv('NEO_TAPE_YIELD_WINDOW_MS','7200000')))
 _B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 NON_SWAP_DISCRIMINATORS = {hashlib.sha256(('global:'+name).encode()).digest()[:8]
                           for name in ('create_pool','deposit','withdraw','collect_coin_creator_fee','extend_account',
@@ -65,8 +76,21 @@ INFRA_PROGRAMS = {'11111111111111111111111111111111','TokenkegQfeZyiNwAJbNbGKPFX
                   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb','ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'}
 SESSION = requests.Session()
 SESSION.headers.update({'content-type':'application/json','user-agent':'NEO-LiveTape/3.0'})
+
+
+def validated_decoder_versions():
+    """The default path is always validated; shadow paths need explicit listing."""
+    configured = {v.strip() for v in os.getenv('NEO_TAPE_VALIDATED_DECODER_VERSIONS','').split(',') if v.strip()}
+    return frozenset({DECODER_VERSION}|configured)
+
+
+VALIDATED_DECODER_VERSIONS = validated_decoder_versions()
 STATUS = {'status':'starting','tracked_pairs':0,'updated_at':0,
-          'source':'solana-mainnet-http-live','poll_seconds':POLL_SECONDS,'schema_version':3}
+          'source':'solana-mainnet-http-live','poll_seconds':POLL_SECONDS,'schema_version':3,
+          'decoder':{'default_version':DECODER_VERSION,'shadow_versions':list(SHADOW_DECODER_VERSIONS),
+                     'validated_versions':sorted(VALIDATED_DECODER_VERSIONS),
+                     'unvalidated_event_flag':UNVALIDATED_DECODER_FLAG,
+                     'unvalidated_flow_quality':'DEGRADED'}}
 _RECORDER = None
 _NEXT_REFERENCE_AT = 0
 _POOL_SCHEDULER = TapePoolScheduler()
@@ -121,7 +145,11 @@ def feed_snapshot():
     response.raise_for_status()
     state = response.json()
     rows,observed = {},now_ms()
-    coins, scheduling = _POOL_SCHEDULER.select(state, now=observed, max_tracked=MAX_TRACKED)
+    # Seat shedding reads the recorder's in-memory decode yield only; the
+    # scheduler still never decides whether to trade.
+    decode_yield = _RECORDER.decode_yield if _RECORDER is not None else None
+    coins, scheduling = _POOL_SCHEDULER.select(state, now=observed, max_tracked=MAX_TRACKED,
+                                               decode_yield=decode_yield)
     STATUS['entry_scheduling'] = scheduling
     shared_reference=shared_quote_reference()
     for coin in coins:
@@ -205,6 +233,28 @@ def _instruction_records(tx):
         except (KeyError,IndexError,ValueError,TypeError):
             continue
     return keys,records
+
+
+def _token_account_closed_in_transaction(tx,account):
+    """True only when a parsed spl-token closeAccount targets ``account``.
+
+    A wrapped SOL/USDC account that is created and closed inside one
+    transaction appears in neither preTokenBalances nor postTokenBalances.
+    This is the only accepted explanation for a missing cash-leg balance entry.
+    """
+    message = (tx.get('transaction') or {}).get('message') or {}
+    instructions = list(message.get('instructions') or [])
+    for group in (tx.get('meta') or {}).get('innerInstructions') or []:
+        instructions += list(group.get('instructions') or [])
+    for instruction in instructions:
+        if not isinstance(instruction,dict):
+            continue
+        parsed = instruction.get('parsed')
+        if (isinstance(parsed,dict) and parsed.get('type')=='closeAccount'
+                and instruction.get('program')=='spl-token'
+                and (parsed.get('info') or {}).get('account')==account):
+            return True
+    return False
 
 
 def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
@@ -309,10 +359,21 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         if cash_mint not in (USDC,WSOL):
             return 'unclassified',[],'UNSUPPORTED_QUOTE_ASSET'
         quote_decimals = 6 if cash_mint==USDC else 9
-        # The reversed base leg must have exact transaction balance metadata.
-        # Its quantity cannot be valued by treating the tracked quote token as
-        # a stable asset or by falling back to the scanner's token price.
-        if reversed_pool and cash_info!=(cash_mint,quote_decimals):
+        decoder_version = DECODER_VERSION
+        if reversed_pool and cash_info is None:
+            # Real bodies (2026-10-08, TWEETCRAFT/SHITCOIN pools) show the
+            # user's wrapped SOL base account created and closed inside the
+            # swap transaction, so it has no pre/post balance entry. The cash
+            # mint is the instruction's base mint, already restricted to
+            # USDC/WSOL, and the event's base leg equals the pool vault delta;
+            # the same wrapped-account pattern is tolerated on the quote side
+            # of TRACKED_BASE pools. No scanner price or stable-asset
+            # assumption is used. This path carries its own decoder version
+            # and stays an unvalidated shadow path until listed as validated.
+            if not _token_account_closed_in_transaction(tx,base_account):
+                return 'unclassified',[],'BASE_DECIMALS_OR_MINT_MISSING'
+            decoder_version = REVERSED_CASH_LEG_DECODER_VERSION
+        elif reversed_pool and cash_info!=(cash_mint,quote_decimals):
             return 'unclassified',[],'BASE_DECIMALS_OR_MINT_MISSING'
         if cash_info and cash_info!=(cash_mint,quote_decimals):
             return 'unclassified',[],'QUOTE_DECIMALS_OR_MINT_MISMATCH'
@@ -339,6 +400,9 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                     flags.append('QUOTE_ASSET_USD_REFERENCE_ESTIMATE')
             else:
                 flags.append('QUOTE_USD_UNKNOWN')
+        decoder_validated = decoder_version in VALIDATED_DECODER_VERSIONS
+        if not decoder_validated:
+            flags.append(UNVALIDATED_DECODER_FLAG)
         # One event proves one instruction. Duplicate events cannot compensate
         # for a different unmatched BUY/SELL in the same transaction.
         matched_swap_indexes.add(matches[0][0])
@@ -352,6 +416,8 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                         'pool_orientation':'TRACKED_QUOTE' if reversed_pool else 'TRACKED_BASE',
                         'onchain_direction':direction,'onchain_base_mint':base_mint,'onchain_quote_mint':quote_mint,
                         'onchain_base_raw_amount':str(base_raw),'onchain_quote_raw_amount':str(quote_raw),
+                        'decoder_version':decoder_version,'decoder_validated':decoder_validated,
+                        'cash_leg_balance_metadata':'PRESENT' if cash_info else 'WRAPPED_ACCOUNT_CLOSED_IN_TRANSACTION' if reversed_pool else 'ABSENT',
                         'provider':metadata.get('provider','solana-rpc'),'note':token_direction,'confirmed_swap':True})
         fee_evidence=decode_fee_evidence(payload,matches[0][3])
         if fee_evidence is not None:
@@ -367,7 +433,10 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
     if flags:
         # Preserve the coverage failure and the raw event, while naming the
         # actual defect. Missing signer evidence is not a missing FX quote.
+        # A shadow decoder path alone is named as such; any other defect keeps
+        # its existing name so the default path's reasons are unchanged.
         reason = ('SWAP_ACTOR_NOT_TRANSACTION_SIGNER' if 'SWAP_ACTOR_NOT_TRANSACTION_SIGNER' in flags
+                  else UNVALIDATED_DECODER_FLAG if flags=={UNVALIDATED_DECODER_FLAG}
                   else 'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE')
         return 'unclassified',decoded,reason
     for event in decoded:
@@ -388,10 +457,15 @@ def parse_trade(tx,metadata):
 
 class TapeRecorder:
     def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET,
-                 historical_tx_budget=HISTORICAL_TX_BUDGET):
+                 historical_tx_budget=HISTORICAL_TX_BUDGET,yield_window_ms=YIELD_WINDOW_MS):
         self.path,self.clock = Path(path),clock
         self.page_size,self.page_budget,self.tx_budget = page_size,page_budget,tx_budget
         self.historical_tx_budget = max(0,int(historical_tx_budget))
+        # Per pool, one in-memory row per poll: (classified_at, bodies,
+        # engine-usable swaps, shadow-path swaps). Restart starts from zero,
+        # so shedding is conservative and never touches the durable journal.
+        self.yield_window_ms = max(60_000,int(yield_window_ms))
+        self._yield = {}
         self.path.parent.mkdir(parents=True,exist_ok=True)
         self.db = sqlite3.connect(self.path)
         self.db.row_factory = sqlite3.Row
@@ -418,6 +492,32 @@ class TapeRecorder:
 
     def close(self):
         self.db.close()
+
+    def _record_yield(self,classified_at,counts):
+        for pair,(bodies,usable,shadow) in counts.items():
+            if bodies:
+                self._yield.setdefault(pair,[]).append((int(classified_at),bodies,usable,shadow))
+
+    def decode_yield(self,pair,since=0):
+        """Bodies classified for one pool and the swaps they yielded.
+
+        ``usable_swaps`` counts events without quality flags, i.e. the only
+        events the engine and the Lab accept as flow. ``shadow_swaps`` counts
+        events recorded by an unvalidated decoder path. Only rows at or after
+        ``since`` (and within the in-memory window) are counted.
+        """
+        current = self.clock()
+        floor = max(int(since or 0),current-self.yield_window_ms)
+        rows = [row for row in self._yield.get(pair,[]) if row[0]>=current-self.yield_window_ms]
+        if rows:
+            self._yield[pair] = rows
+        else:
+            self._yield.pop(pair,None)
+        rows = [row for row in rows if row[0]>=floor]
+        return {'bodies':sum(r[1] for r in rows),'usable_swaps':sum(r[2] for r in rows),
+                'shadow_swaps':sum(r[3] for r in rows),
+                'first_body_at':rows[0][0] if rows else None,'last_body_at':rows[-1][0] if rows else None,
+                'window_ms':self.yield_window_ms,'since':floor}
 
     def discover(self,feed,rpc):
         active = []
@@ -582,6 +682,7 @@ class TapeRecorder:
                     pass
         owner_proofs = collect_pool_owner_proofs(owner_candidates,rpc,clock=self.clock,
             tx_budget=self.tx_budget,bodies_received_at=bodies_received_at,infra_programs=INFRA_PROGRAMS)
+        yield_counts = {}
         for signature,answer in zip(groups,answers):
             tx = answer.get('result') if not answer.get('error') else None
             for row in groups[signature]:
@@ -597,6 +698,12 @@ class TapeRecorder:
                         classification,events,reason = classify_transaction(tx,metadata,observed_at=row['observed'],ingested_at=self.clock())
                     except (ValueError,TypeError,KeyError,IndexError,AttributeError,OverflowError):
                         classification,events,reason = 'unclassified',[],'TRANSACTION_SCHEMA_MISMATCH'
+                if classification!='retry':
+                    bodies,usable,shadow = yield_counts.get(row['pair'],(0,0,0))
+                    yield_counts[row['pair']] = (
+                        bodies+1,
+                        usable+sum(1 for event in events if not event.get('quality_flags')),
+                        shadow+sum(1 for event in events if UNVALIDATED_DECODER_FLAG in (event.get('quality_flags') or [])))
                 with self.db:
                     for event in events:
                         event.update(signature=signature,slot=event.get('slot') or row['slot'])
@@ -608,6 +715,7 @@ class TapeRecorder:
                     delay = min(60_000,1000*2**min(attempts-1,6))
                     self.db.execute('UPDATE signatures SET state=?,attempts=?,next_retry=?,reason=? WHERE signature=? AND pair=?',
                         ('pending' if classification=='retry' else classification,attempts,self.clock()+delay if classification=='retry' else 0,reason,signature,row['pair']))
+        self._record_yield(self.clock(),yield_counts)
 
     def snapshot(self,feed):
         current,cutoff = self.clock(),self.clock()-WINDOW_MS

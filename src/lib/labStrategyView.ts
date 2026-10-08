@@ -23,7 +23,7 @@ export type StrategyLifecycle = {
     min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
     ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
     vanished_closes?: number; drained_closes?: number; zero_capital_closes?: number;
-    // LAB_FORWARD_FILL_BASIS_V1: net50 re-priced at the research fills (next DexScreener refresh).
+    // LAB_FORWARD_FILL_BASIS_V2: net50 re-priced at the research fills (next DexScreener refresh).
     kill_rule_met_bases?: string[];
     research_fill?: { closed_trades?: number; pending?: number; mean_net50_usd?: number | null;
       ci95_mean_net50_usd?: (number | null)[]; unobserved_leg_share?: number | null };
@@ -90,7 +90,7 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   const parts = [`Затворени ${closed}/${minimum} до правилото за спиране`];
   if (typeof mean === 'number' && Number.isFinite(mean)) parts.push(`средно net50 ${usd(mean)}/сделка`);
   if (typeof low === 'number' && typeof high === 'number') parts.push(`CI95 [${usd(low)}, ${usd(high)}]`);
-  // LAB_FORWARD_FILL_BASIS_V1: the same closes re-priced at the research fills (next DexScreener refresh).
+  // LAB_FORWARD_FILL_BASIS_V2: the same closes re-priced at the research fills (next DexScreener refresh).
   const research = evidence?.research_fill;
   if (research && (research.closed_trades ?? 0) > 0) {
     const [researchLow, researchHigh] = research.ci95_mean_net50_usd ?? [];

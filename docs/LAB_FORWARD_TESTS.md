@@ -46,10 +46,10 @@ The frozen hashes, with the Lab's default cost model:
 
 | Book | `lab_config_hash` |
 |---|---|
-| `LAB_A_SURGE_EST_GUARD` | `c3cb986d9d94fdf553e33b77ffe881c29fe62da7c5d15070ae0f71c390c98158` |
-| `RND_LAB_A` | `b3899110e80fe0e4251accc8856d0e106631e96532886717736e3a3c257975a5` |
-| `LAB_B_DIP_MKTDIP_GUARD` | `45caa1ff70562f1020ad7da531ac8f9c4d03aedd237d915fc9c1fc31b5ab0e94` |
-| `RND_LAB_B` | `9d47aece480a0d5c38d08b06b64253f272ebced7d8e87779280a88c94ddf61e5` |
+| `LAB_A_SURGE_EST_GUARD` | `1845c6c6c90225380dcffd47fdffbadf8db35ea25e4bd6eba35752621bf29d72` |
+| `RND_LAB_A` | `003d015ee0d96bf8dc8470761bb1c2efc10b2a4c3c95711f219d0084a35a955c` |
+| `LAB_B_DIP_MKTDIP_GUARD` | `8ff5871bb43888aca5cf8e23861e4c7b0c7cca1d5c6bc320a4fdf63d5d92ccae` |
+| `RND_LAB_B` | `ad0a8683e4d4e350b0654790a0dc349ecb32bbbe3781511377efcbf2b3d3c591` |
 
 The same four values are pinned in `tests/test_lab_forward_tests.py` and in
 `strategy-lock.json` (`lab_forward_tests.config_hashes`); a test checks that this table,
@@ -59,7 +59,7 @@ The canonical parameters of every book include the signal carry
 (`LAB_FORWARD_SIGNAL_CARRY_V1`, including that these books never request the Lab's
 Jupiter price probe), the hypothesis-control protocol
 (`LAB_FORWARD_CONTROL_CONTINUITY_V1`), the research-fill basis
-(`LAB_FORWARD_FILL_BASIS_V1`, with the kill rule's two bases and its bootstrap minimum)
+(`LAB_FORWARD_FILL_BASIS_V2`, with the kill rule's two bases and its bootstrap minimum)
 and the close policy (`LAB_FORWARD_CLOSE_POLICY_V1`, including
 `LAB_FORWARD_MARK_LIQUIDITY_V2`), described below. No close exists under the earlier
 hashes: the PR had not run when they changed.
@@ -162,6 +162,8 @@ The carry treats all four books alike:
 
 A carried entry records `lab_forward.observed_at` (the signal observation),
 `lab_forward.entry_observed_at` and `lab_forward.carry` (signal times, attempts, window).
+Its research-fill entry leg is decided at the signal observation, not at the entry
+observation (`research_fill.entry_decision = carried_signal_observation`; see Fill basis).
 The cumulative counters are stored in the book's ledger per config hash
 (`lab_forward_signal_carry.by_config_hash`). They are published in
 `entry_diagnostics.lab_forward.signal_carry` (with `pending_now`), in the
@@ -371,10 +373,11 @@ The research's feed-gap rule (a pool absent for more than 10 min that returns is
 at the lower of the pre-gap and return prices) is not replicated. Here a returning pool
 resumes, and its exits are decided on the returning mark.
 
-### Fill basis (LAB_FORWARD_FILL_BASIS_V1)
+### Fill basis (LAB_FORWARD_FILL_BASIS_V2)
 
-**Booked fills are not the research's fills.** A forward entry is booked at the decision
-observation's DexScreener print (the price the signal saw), and a close at the mark that
+**Booked fills are not the research's fills.** A forward entry is booked at the entry
+observation's DexScreener print (the price the signal saw, or for a carried signal the
+pool's price when the check passed), and a close at the mark that
 triggered it. The research judged every book on net50 with the audited fills of
 `harness_final` F1: an order decided at one point fills at the **next DexScreener
 refresh**, the first later point within 60 s whose price differs from the decision
@@ -398,8 +401,21 @@ The booking is kept (positions, exits, balances and `net50_usd` are unchanged). 
 forward position and close also carries a research-fill **shadow**, `research_fill`, with
 one leg per side:
 
-- **Entry leg.** Decided at the entry observation (`decision_at`, `decision_price`, and a
-  snapshot of the model inputs: price, native price, liquidity, market cap, quote).
+- **Entry leg.** Decided where the harness decided, at the matched signal observation the
+  entry acts on (`decision_at`, `decision_price`, and a snapshot of the model inputs:
+  price, native price, liquidity, market cap, quote). For most entries that is the entry
+  observation itself (`research_fill.entry_decision = entry_observation`). A signal
+  carried past a pending price check (`LAB_FORWARD_SIGNAL_CARRY_V1`) enters at a later
+  observation; its leg is decided at the signal observation, kept by the carry and
+  advanced with every observation of the pool the carry retried on, then with the entry
+  observation (`carried_signal_observation`). This is the harness's `fill_index(s, i)` at
+  the signal point `i`: if the price refreshed between the signal and the entry, the
+  research fill is that refresh, usually the entry print itself. Under V1 (never
+  released, no close under it) the leg was decided at the entry observation, so such an
+  entry was shadow-filled one refresh after the harness's fill and the research-fill
+  basis counted the carry's latency twice; that affected single-observation signals
+  (LAB_A, RND_LAB_A, RND_LAB_B) much more than LAB_B, whose persistent dip re-matches on
+  a fresh observation.
 - **Exit leg.** Decided at the mark that triggered the close.
 - **Fill.** The first later observation of the exact pool, within 60 s
   (`max_fill_lag_ms`, the harness's `MAX_FILL_LAG_MS`), whose `priceUsd` differs from the
@@ -481,7 +497,7 @@ After at least 50 such closes, the book is retired when both of these hold:
 - the upper bound of the 95% CI of mean net50 $/trade < 0.
 
 It is evaluated on the booked net50 and on the research-fill net50
-(`LAB_FORWARD_FILL_BASIS_V1`), each on the closes that have it; met on either basis
+(`LAB_FORWARD_FILL_BASIS_V2`), each on the closes that have it; met on either basis
 retires the book. A close whose research-fill shadow is still pending is not evidence on
 that basis yet.
 
@@ -660,9 +676,9 @@ and an offline 3-slot replay. Promotion to an engine account would be a separate
 versioned change.
 
 **Caveat for any reading of the gate.** Both bases are DexScreener prints with modeled
-costs, not executable quotes: the booked basis fills at the decision print and the
-triggering mark, the research-fill basis at the next refresh
-([Fill basis](#fill-basis-lab_forward_fill_basis_v1)). A hypothesis that passes only on
+costs, not executable quotes: the booked basis fills at the entry print and the
+triggering mark, the research-fill basis at the next refresh after the signal and the
+trigger ([Fill basis](#fill-basis-lab_forward_fill_basis_v2)). A hypothesis that passes only on
 the booked basis has not passed.
 
 ## Restarts

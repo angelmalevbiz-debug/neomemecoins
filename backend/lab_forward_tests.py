@@ -98,14 +98,18 @@ lost whenever the price reference was cold, while LAB_B's persistent dip was
 not. Episodes are counted per book and config hash: entered, lost to a still
 pending price check, dropped by another gate, superseded.
 
-Fill basis (LAB_FORWARD_FILL_BASIS_V1): the books book their entry at the
-decision observation's DexScreener print and their exit at the triggering mark.
+Fill basis (LAB_FORWARD_FILL_BASIS_V2): the books book their entry at the
+entry observation's DexScreener print and their exit at the triggering mark.
 The research judged every book on fills at the next DexScreener refresh
 (harness_final F1: the first later exact-pool observation within 60 s whose
 price differs from the decision print, else the next observation). Each forward
 position and close therefore carries a research-fill shadow ('research_fill',
 one leg per side) that is completed once both legs are known, at most about
-90 s after the close; booked fields never change. The close gets
+90 s after the close; booked fields never change. The entry leg is decided
+where the research decided: at the matched signal observation, which for a
+signal carried past a pending price check is earlier than the entry
+observation (V1, never released, anchored it at the entry observation and so
+filled such an entry one refresh after the research would have). The close gets
 net50_research_fill_usd / _pct: the same booked model re-run at the research
 fill observations, minus the same net50 stress. The kill rule is evaluated on
 both bases (met on either retires) and the gate's expectancy, CI and control
@@ -151,7 +155,9 @@ CLOSE_POLICY_VERSION = 'LAB_FORWARD_CLOSE_POLICY_V1'
 CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
 CONTROL_CONTINUITY_VERSION = 'LAB_FORWARD_CONTROL_CONTINUITY_V1'
 SIGNAL_CARRY_VERSION = 'LAB_FORWARD_SIGNAL_CARRY_V1'
-FILL_BASIS_VERSION = 'LAB_FORWARD_FILL_BASIS_V1'
+# V2: a carried signal's entry leg is decided at its signal observation. V1 (never
+# released, no close under it) decided it at the later entry observation.
+FILL_BASIS_VERSION = 'LAB_FORWARD_FILL_BASIS_V2'
 # Part of the close policy's parameters (and so of every config hash): a mark that omits
 # the pool liquidity is a reported 0, on the exact-pair refresh as in the shared feed.
 # V1 (never released, no close under it) ignored such a mark's price.
@@ -323,9 +329,9 @@ class KillRuleParameters:
     # approximation (the bootstrap only runs where a decision can depend on it).
     bootstrap_min_closes: int = 50
     action: str = 'retire_new_entries_only'
-    # LAB_FORWARD_FILL_BASIS_V1: the rule is evaluated on the booked net50 and on the
+    # LAB_FORWARD_FILL_BASIS_V2: the rule is evaluated on the booked net50 and on the
     # research-fill net50 (each on its own closes); met on either basis retires.
-    bases: str = 'booked and research_fill (LAB_FORWARD_FILL_BASIS_V1); met on either retires'
+    bases: str = 'booked and research_fill (LAB_FORWARD_FILL_BASIS_V2); met on either retires'
 
 
 @dataclass(frozen=True)
@@ -342,7 +348,7 @@ class GateParameters:
     # least this share of the hypothesis's evaluated trades and of its time window.
     min_control_coverage: float = 0.90
     max_drawdown_pct_3slot_1000: float = 20.0
-    # LAB_FORWARD_FILL_BASIS_V1: expectancy, CI and control criteria pass on both bases,
+    # LAB_FORWARD_FILL_BASIS_V2: expectancy, CI and control criteria pass on both bases,
     # and fewer than this share of the research-fill legs fell back to the decision print.
     max_research_fill_unobserved_leg_share: float = 0.10
     met_rule: str = ('gate_met only when every criterion was evaluated and passes; the 3-slot $1000 '
@@ -456,22 +462,36 @@ class SignalCarryParameters:
 
 @dataclass(frozen=True)
 class FillBasisParameters:
-    """LAB_FORWARD_FILL_BASIS_V1: a research-fill shadow next to the booked fills (research harness_final F1).
+    """LAB_FORWARD_FILL_BASIS_V2: a research-fill shadow next to the booked fills (research harness_final F1).
 
-    The books keep booking at the decision print (entry) and at the triggering
-    mark (exit). Each side also records where the research harness would have
-    filled: the first later observation of the exact pool, within 60 s of the
-    decision observation, whose priceUsd differs from the decision print (the
-    next DexScreener refresh); with no differing price in the window, the first
-    later observation in it (a quiet market, the harness's i + 1). With no later
+    The books keep booking at the entry observation's print (entry) and at the
+    triggering mark (exit). Each side also records where the research harness
+    would have filled an order decided at its decision observation: the first
+    later observation of the exact pool, within 60 s of the decision
+    observation, whose priceUsd differs from the decision print (the next
+    DexScreener refresh); with no differing price in the window, the first later
+    observation in it (a quiet market, the harness's i + 1). With no later
     observation in the window at all the leg is 'no_next_observation' and is
     valued at the decision print (the harness would have skipped such an entry
     and taken a later point for such an exit); those legs are counted, not hidden.
     A VANISHED close has no exit fill (the harness values it at the last price
     minus the haircut, as booked).
+
+    The entry's decision observation is the matched signal observation the entry
+    acts on, as in the harness (fill_index(s, i) at the signal point i). For a
+    signal carried past a pending price check (LAB_FORWARD_SIGNAL_CARRY_V1) that
+    is the signal observation, not the later entry observation: the carry keeps
+    the leg and advances it with each observation of the pool it retries on, and
+    the entry observation advances it last. V1 (never released, no close under
+    it) decided a carried entry's leg at the entry observation, so the shadow
+    filled such an entry one refresh after the harness and counted the carry's
+    latency twice on the research-fill basis.
     """
     version: str = FILL_BASIS_VERSION
     source: str = 'research harness_final F1 (fill_index, FILL_RULE next_refresh, MAX_FILL_LAG_MS)'
+    entry_decision: str = ('the matched signal observation the entry acts on (evaluation observed_at): a carried '
+                           "signal's own observation, its leg advanced by the carry's retries and then by the "
+                           'entry observation; otherwise the entry observation itself')
     max_fill_lag_ms: int = 60_000
     # A leg with no observation beyond the window resolves on time this long after it.
     resolve_grace_ms: int = 30_000
@@ -666,6 +686,13 @@ def _identity(coin):
     if not isinstance(mint, str) or not isinstance(pair, str) or not mint.strip() or not pair.strip():
         return None
     return mint.strip(), pair.strip()
+
+
+def _pool_key(key):
+    """A (mint, pair) key in _identity's form, or None."""
+    if not isinstance(key, (tuple, list)) or len(key) != 2:
+        return None
+    return _identity({'address': key[0], 'pairAddress': key[1]})
 
 
 def _txn(coin, window, side):
@@ -1251,7 +1278,7 @@ def unpriced_past_max_hold(position, now) -> bool:
             and current - opened >= position_exits(position).max_hold_minutes * 60_000)
 
 
-# ------------------------------------------------------------------ research-fill shadow (LAB_FORWARD_FILL_BASIS_V1)
+# ------------------------------------------------------------------ research-fill shadow (LAB_FORWARD_FILL_BASIS_V2)
 
 FILL_PENDING = 'pending'
 FILL_NEXT_REFRESH = 'next_refresh'
@@ -1259,6 +1286,12 @@ FILL_QUIET = 'quiet'
 FILL_NO_NEXT = 'no_next_observation'
 FILL_VANISHED = 'not_applicable_vanished'
 FILL_LEG_STATUSES = (FILL_PENDING, FILL_NEXT_REFRESH, FILL_QUIET, FILL_NO_NEXT, FILL_VANISHED)
+# LAB_FORWARD_FILL_BASIS_V2: the evaluation field through which a carried signal hands
+# position_record the entry leg decided at its signal observation.
+CARRIED_FILL_LEG = 'research_fill_entry'
+# research_fill.entry_decision of a position: where its entry leg was decided.
+ENTRY_DECISION_SIGNAL = 'carried_signal_observation'
+ENTRY_DECISION_ENTRY = 'entry_observation'
 # Bumped whenever a close's research-fill shadow is completed in place, so cached
 # history digests (statistics, kill rule, gate) are rebuilt.
 _SHADOW_REVISION = [0]
@@ -1628,6 +1661,12 @@ class SignalCarry:
     ``max_age_ms`` after its latest signal observation. Outcomes are counted in
     the book's ledger per config hash (``lab_forward_signal_carry``); pending
     episodes are not persisted (a restart drops them uncounted).
+
+    LAB_FORWARD_FILL_BASIS_V2: an episode also keeps the research-fill entry leg
+    decided at its latest signal observation (when ``hold`` is given that
+    observation) and advances it with the pool's observation at every retry, so
+    a carried entry is shadow-filled where the research harness would have
+    filled the signal, not one refresh after its own entry.
     """
 
     def __init__(self, params: SignalCarryParameters = SIGNAL_CARRY):
@@ -1669,22 +1708,55 @@ class SignalCarry:
             self._counters(book)['lost_price_pending'] += len(stale)
         return len(stale)
 
-    def carried_evaluation(self, book_id, key, now):
-        """The pool's live carried signal as an evaluation with its 'carry' record, or None."""
+    def carried_evaluation(self, book_id, key, now, coin=None):
+        """The pool's live carried signal as an evaluation with its 'carry' record, or None.
+
+        ``coin`` is the pool's current observation: it first advances the episode's
+        research-fill entry leg (LAB_FORWARD_FILL_BASIS_V2), which the evaluation then
+        carries as ``research_fill_entry`` for position_record.
+        """
         with self._lock:
             entry = (self._pending.get(book_id) or {}).get(key)
             if entry is None or self._expired(entry, now):
                 return None
+            leg = entry.get('fill_leg')
+            pool = _pool_key(key)
+            if isinstance(leg, dict) and isinstance(coin, dict) and pool is not None:
+                advance_fill_leg(leg, coin, now, key=pool)
             evaluation = copy.deepcopy(entry['evaluation'])
             carry = {'version': SIGNAL_CARRY_VERSION, 'signal_observed_at': int(entry['observed_at']),
                      'first_signal_observed_at': int(entry['first_observed_at']),
                      'first_pending_at': int(entry['first_pending_at']), 'attempts': entry['attempts'],
                      'signals': entry['signals'], 'max_age_ms': self.params.max_age_ms}
+            if isinstance(leg, dict):
+                evaluation[CARRIED_FILL_LEG] = copy.deepcopy(leg)
         evaluation['carry'] = carry
         return evaluation
 
-    def hold(self, book, key, evaluation, now) -> bool:
-        """A matched signal of this pool waits only on the price cross-check: start or refresh its episode."""
+    @staticmethod
+    def _signal_fill_leg(evaluation, key, coin, now):
+        """The research-fill entry leg decided at this signal's own observation, or None.
+
+        A carried evaluation brings its leg; otherwise ``coin`` must be the signal
+        observation itself (same exact pool, same stamp as observed_at).
+        """
+        leg = evaluation.get(CARRIED_FILL_LEG)
+        if isinstance(leg, dict):
+            return copy.deepcopy(leg)
+        pool = _pool_key(key)
+        if not isinstance(coin, dict) or pool is None or _identity(coin) != pool:
+            return None
+        stamp, signal = _finite(observation_ms(coin, now)), _finite(evaluation.get('observed_at'))
+        if stamp is None or signal is None or int(stamp) != int(signal):
+            return None
+        return new_fill_leg(coin, now)
+
+    def hold(self, book, key, evaluation, now, coin=None) -> bool:
+        """A matched signal of this pool waits only on the price cross-check: start or refresh its episode.
+
+        ``coin`` is the observation the signal matched on; with it the episode keeps
+        the research-fill entry leg decided there (LAB_FORWARD_FILL_BASIS_V2).
+        """
         book_id = book.get('id')
         stamp = _finite((evaluation or {}).get('observed_at'))
         current = _finite(now)
@@ -1695,17 +1767,22 @@ class SignalCarry:
             entries = self._pending.setdefault(book_id, OrderedDict())
             entry = entries.get(key)
             if entry is None:
-                fresh = {name: value for name, value in evaluation.items() if name != 'carry'}
+                fresh = {name: value for name, value in evaluation.items()
+                         if name not in ('carry', CARRIED_FILL_LEG)}
                 entry = {'evaluation': copy.deepcopy(fresh), 'observed_at': stamp, 'first_observed_at': stamp,
-                         'first_pending_at': current, 'attempts': 0, 'signals': 1}
+                         'first_pending_at': current, 'attempts': 0, 'signals': 1,
+                         'fill_leg': self._signal_fill_leg(evaluation, key, coin, now)}
                 entries[key] = entry
                 created = 1
                 while len(entries) > self.params.max_pending_per_book:
                     entries.popitem(last=False)
                     evicted += 1
             elif 'carry' not in evaluation and stamp > entry['observed_at']:
-                # A newer matched observation of the same pool: the window restarts from it.
-                entry.update(evaluation=copy.deepcopy(evaluation), observed_at=stamp, signals=entry['signals'] + 1)
+                # A newer matched observation of the same pool: the window, and the research
+                # fill of the entry it may become, restart from it.
+                fresh = {name: value for name, value in evaluation.items() if name != CARRIED_FILL_LEG}
+                entry.update(evaluation=copy.deepcopy(fresh), observed_at=stamp, signals=entry['signals'] + 1,
+                             fill_leg=self._signal_fill_leg(evaluation, key, coin, now))
             entry['attempts'] += 1
         counters = self._counters(book)
         counters['pending_signals'] += created
@@ -1743,14 +1820,40 @@ class SignalCarry:
                 **asdict(self.params)}
 
 
+def entry_fill_leg(evaluation, entry_coin, entry_at):
+    """LAB_FORWARD_FILL_BASIS_V2: (research-fill entry leg, where it was decided) of a new forward position.
+
+    A carried signal (its 'carry' record and the leg SignalCarry decided at the
+    signal observation, ``research_fill_entry``) keeps that leg, advanced by the
+    entry observation like any later observation of the pool. Any other entry,
+    or a carried one without a consistent leg, is decided at the entry
+    observation (which is then the signal observation, or the fallback).
+    """
+    evaluation = evaluation if isinstance(evaluation, dict) else {}
+    carried = evaluation.get(CARRIED_FILL_LEG) if isinstance(evaluation.get('carry'), dict) else None
+    signal_at = _finite(evaluation.get('observed_at'))
+    if (isinstance(carried, dict) and carried.get('status') in FILL_LEG_STATUSES and signal_at is not None
+            and _finite(carried.get('decision_at')) == signal_at):
+        leg = copy.deepcopy(carried)
+        key = _identity(entry_coin) if isinstance(entry_coin, dict) else None
+        if key is not None:
+            advance_fill_leg(leg, entry_coin, entry_at, key=key)
+        return leg, ENTRY_DECISION_SIGNAL
+    if isinstance(entry_coin, dict):
+        return new_fill_leg(entry_coin, entry_at), ENTRY_DECISION_ENTRY
+    return new_fill_leg(None, None), ENTRY_DECISION_ENTRY
+
+
 def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defensive_flags,
                     entry_coin=None, entry_at=None, capital_mode=FUNDED) -> dict:
     """Fields every forward-test position carries (and every close inherits).
 
     ``evaluation`` is the matched signal; a signal carried past a pending price
-    cross-check (LAB_FORWARD_SIGNAL_CARRY_V1) also has its 'carry' record, and the
-    entry observation is the pool's current one (``entry_coin``).
+    cross-check (LAB_FORWARD_SIGNAL_CARRY_V1) also has its 'carry' record and the
+    research-fill entry leg decided at its signal observation, and the entry
+    observation is the pool's current one (``entry_coin``).
     """
+    entry_leg, entry_decision = entry_fill_leg(evaluation, entry_coin, entry_at)
     lab_forward = {'version': VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
                    'role': 'random_control' if book_id in HYPOTHESIS_OF else 'hypothesis',
                    'hypothesis': HYPOTHESIS_OF.get(book_id, book_id),
@@ -1773,11 +1876,10 @@ def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defe
         'model_quantity': model_entry['quantity'],
         'model_entry_roundtrip_pnl_pct': round(model_mark, 6),
         'exit_policy_label': EXITS[book_id].label, 'exit_parameters': asdict(EXITS[book_id]),
-        # LAB_FORWARD_FILL_BASIS_V1: where the research would have filled this entry (shadow only).
-        'research_fill': {'version': FILL_BASIS_VERSION,
-                          'entry': new_fill_leg(entry_coin, entry_at) if isinstance(entry_coin, dict)
-                          else new_fill_leg(None, None),
-                          'exit': None, 'result': None},
+        # LAB_FORWARD_FILL_BASIS_V2: where the research would have filled this entry's signal
+        # (shadow only).
+        'research_fill': {'version': FILL_BASIS_VERSION, 'entry_decision': entry_decision,
+                          'entry': entry_leg, 'exit': None, 'result': None},
         'promotion_eligible': False,
     }
 
@@ -1790,7 +1892,7 @@ def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_
     capped impact; the difference to the booked exit is the drain valuation of
     LAB_FORWARD_CLOSE_POLICY_V1 (0 unless the sale exceeds 12.5% of liquidity).
     ``exit_coin`` is the mark the close was booked at: the exit leg of the
-    research-fill shadow (LAB_FORWARD_FILL_BASIS_V1) is decided there.
+    research-fill shadow (LAB_FORWARD_FILL_BASIS_V2) is decided there.
     """
     notional = _finite(position.get('notional_usd'))
     # The model leg's cost basis equals the booked one: calibration changes prices, not capital.
@@ -1838,7 +1940,7 @@ def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_
 # ------------------------------------------------------------------ statistics, kill rule, promotion gate
 
 # The two net50 bases of every forward close: the booked fills and the research
-# fills of LAB_FORWARD_FILL_BASIS_V1 (each on the closes that have it).
+# fills of LAB_FORWARD_FILL_BASIS_V2 (each on the closes that have it).
 BASES = ('booked', 'research_fill')
 BASIS_FIELDS = {'booked': ('net50_usd', 'net50_pct'),
                 'research_fill': ('net50_research_fill_usd', 'net50_research_fill_pct')}
@@ -2056,7 +2158,7 @@ def _basis_stats(digest, basis, count) -> dict:
 
 
 def _research_coverage(digest, count) -> dict:
-    """LAB_FORWARD_FILL_BASIS_V1 coverage of the first ``count`` evaluated closes."""
+    """LAB_FORWARD_FILL_BASIS_V2 coverage of the first ``count`` evaluated closes."""
     def build():
         legs = {'entry': {status: 0 for status in FILL_LEG_STATUSES},
                 'exit': {status: 0 for status in FILL_LEG_STATUSES}}
@@ -2156,7 +2258,7 @@ def evidence(book, book_id, now) -> dict:
             'first_closed_at': int(_finite(rows[0]['closed_at'])) if rows else None,
             'last_closed_at': int(_finite(rows[-1]['closed_at'])) if rows else None,
             'min_closes': KILL_RULE.min_closes,
-            # LAB_FORWARD_FILL_BASIS_V1: met on either basis retires (each on its own closes).
+            # LAB_FORWARD_FILL_BASIS_V2: met on either basis retires (each on its own closes).
             'kill_rule_met': bool(met_bases), 'kill_rule_met_bases': met_bases,
             'kill_rule_met_booked': booked['kill_rule_met'],
             'kill_rule_met_research_fill': research['kill_rule_met'],
@@ -2244,7 +2346,7 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
     """The research PROMOTION GATE on the hypothesis book's closes (owner review only, never automatic).
 
     Expectancy, CI and the same-period control comparison are evaluated on both
-    net50 bases (booked fills and the research fills of LAB_FORWARD_FILL_BASIS_V1)
+    net50 bases (booked fills and the research fills of LAB_FORWARD_FILL_BASIS_V2)
     and must pass on both. ``gate_met`` needs every criterion evaluated: the
     3-slot $1000 drawdown needs an offline replay, so the Lab reports at most
     'evaluable_criteria_pass_replay_pending'.
@@ -2319,7 +2421,7 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
     share = (shape['unpriced'] + pending) / (number + pending) if number + pending else None
     put('vanished_or_unpriced_share', _round(share), f'< {GATE.max_vanished_or_unpriced_share}',
         bool(share is not None and share < GATE.max_vanished_or_unpriced_share))
-    # LAB_FORWARD_FILL_BASIS_V1: research-fill legs valued at the decision print (no later
+    # LAB_FORWARD_FILL_BASIS_V2: research-fill legs valued at the decision print (no later
     # observation in 60 s) or closes without a valued shadow; pending shadows are excluded.
     unobserved = coverage_rf['unobserved_leg_share']
     put('research_fill_unobserved_leg_share', _round(unobserved),

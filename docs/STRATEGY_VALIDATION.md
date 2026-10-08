@@ -118,10 +118,12 @@ Rules fixed before the run:
 - **Basis.** Booked P&L is the Lab's shared spot model plus CALIB_V1 per leg. Every close
   also records `net50` = booked net − 50 bps per leg − 200 bps more on stop exits − 100 bps
   on trailing exits. The kill rule and the gate below use net50.
-- **Fill basis (`LAB_FORWARD_FILL_BASIS_V1`).** The books book an entry at the decision
+- **Fill basis (`LAB_FORWARD_FILL_BASIS_V2`).** The books book an entry at the entry
   observation's DexScreener print and an exit at the triggering mark. The research judged
   every book on fills at the next DexScreener refresh (`harness_final` F1: the first later
-  exact-pool observation within 60 s whose price differs from the decision print). That
+  exact-pool observation within 60 s whose price differs from the decision print, the
+  decision being the signal observation; for a signal carried past a pending price check
+  that is earlier than the entry observation, and V2 anchors the shadow there). That
   difference is not neutral: on the research data the next refresh averaged +0.335% above
   the print at LAB_B signals and −0.171% at RND_LAB_B draws, so booked fills favour LAB_B
   against its control (measured read-only by the code review). Each position and close
@@ -194,7 +196,7 @@ Rules fixed before the run:
   separate, reviewed and versioned change; the books stay TEST.
 
   **Caveats.** Both bases are DexScreener prints with modeled costs, not the executable
-  quotes the research's run protocol asks for: the booked basis fills at the decision print
+  quotes the research's run protocol asks for: the booked basis fills at the entry print
   and the triggering mark, the research-fill basis at the next refresh. A pass on the
   booked basis alone is not a pass. Gate results are read under the control-continuity
   protocol above (owner decision (2), ACCEPTED 2026-10-08 by the operator under the

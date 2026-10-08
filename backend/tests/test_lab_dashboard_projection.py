@@ -129,6 +129,31 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertEqual(scaled['cost_first']['universe_rejections'], {'fee_tier_above_maximum': 9})
         self.assertEqual(scaled['evidence_guard_version'], 'PROMOTED_EVIDENCE_COST_V1')
 
+    def test_test_books_publish_scalar_cost_feasibility_and_funded_books_keep_candidates(self):
+        summary = {'basis': 'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL', 'is_execution_quote': False,
+                   'profitability_proven': False, 'excluded_costs': ['price_impact'],
+                   'checked_market_candidates': 40, 'fixed_cost_infeasible_candidates': 40,
+                   'maximum_roundtrip_cost_pct': 1.5, 'minimum_model_roundtrip_cost_pct': 2.4,
+                   'best_candidates': [{'symbol': 'C%d' % index, 'model_cost_feasible': False}
+                                       for index in range(5)]}
+        source = {'books': {
+            'TREND': {'portfolio_group': 'TEST', 'entry_diagnostics': {'cost_feasibility': summary}},
+            'COST_FIRST_CONTROL': {'portfolio_group': 'TEST',
+                                   'entry_diagnostics': {'cost_feasibility': summary}},
+            'EARLY': {'portfolio_group': 'PROMOTED_PAPER', 'entry_diagnostics': {
+                'cost_feasibility': summary, 'promoted_cost_feasibility': summary}},
+        }}
+        state = compact_strategy_lab(source)
+        for key in ('TREND', 'COST_FIRST_CONTROL'):
+            projected = state['books'][key]['entry_diagnostics']['cost_feasibility']
+            self.assertNotIn('best_candidates', projected)
+            self.assertEqual(projected, {k: v for k, v in summary.items() if k != 'best_candidates'})
+        early = state['books']['EARLY']['entry_diagnostics']
+        self.assertEqual(len(early['cost_feasibility']['best_candidates']), 5)
+        self.assertEqual(len(early['promoted_cost_feasibility']['best_candidates']), 5)
+        # The projection never mutates the source state.
+        self.assertEqual(len(source['books']['TREND']['entry_diagnostics']['cost_feasibility']['best_candidates']), 5)
+
     def test_projects_legacy_exit_book_without_internal_position_fields(self):
         state = compact_strategy_lab({'portfolio_setup': {
             'version': 'PROMOTED_PAPER_COHORT_V1',

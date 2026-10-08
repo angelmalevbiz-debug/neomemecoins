@@ -492,10 +492,19 @@ def registry_compatibility(books):
             key for key in preserved if books[key].get('position') or books[key].get('positions')),
     }
 
+def lifecycle_activity_versions():
+    """Entry-policy version each TEST book stamps on its own closes.
+
+    The COST_FIRST pair records COST_FIRST_ESTABLISHED_V1, every other TEST book
+    the shared LAB_ACTIVE policy; retirement evidence is counted on exactly those.
+    """
+    return {book_id:cost_first.ENTRY_POLICY_VERSION for book_id in cost_first.BOOK_IDS}
+
 def review_strategy_lifecycle(books):
     return lifecycle.apply_lifecycle(
         books,registered_ids={s['id'] for s in STRATEGIES},
         promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.POLICY_VERSION,
+        activity_versions=lifecycle_activity_versions(),
         execution_version=EXECUTION_MODEL_VERSION,now=now_ms())
 
 def load_state():
@@ -792,6 +801,7 @@ def maybe_open(feed,flows):
         promoted_candidate_branches={}
         cost_first_rejections={}
         cost_first_universe=0
+        cost_first_size_only=0
         rule=activity.RULES[strategy['id']]
         is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
         is_cost_first=strategy['id'] in cost_first.BOOK_IDS
@@ -806,6 +816,8 @@ def maybe_open(feed,flows):
                 matched=not universe_rejections
                 for reason in universe_rejections:
                     cost_first_rejections[reason]=cost_first_rejections.get(reason,0)+1
+                # Passed every physical screen and failed only the size rule.
+                cost_first_size_only+=int(universe_rejections==['size_below_minimum'])
                 cost_first_universe+=int(matched)
             else:
                 matched=bool(branches) if is_promoted else rule.matches(features)
@@ -962,6 +974,14 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']='no_market_signal'
             elif not eligible and promoted_block_reasons:
                 book['entry_diagnostics']['blocked_reason']=next(iter(promoted_block_reasons))
+            # Name the actual block when every universe candidate was refused
+            # only for size or a same-address re-entry cooldown.
+            universe_total=signal_candidates+cost_first_size_only
+            size_total=cost_first_size_only+candidate_risk_rejected
+            if (not eligible and universe_total>0
+                    and size_total+blocked_cooldown==universe_total):
+                book['entry_diagnostics']['blocked_reason']=(
+                    'reentry_cooldown' if blocked_cooldown else 'cost_first_size_below_minimum')
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             book['entry_diagnostics'].update({
                 'promoted_policy_version':promoted_guard.FUNDED_POLICY_VERSION,

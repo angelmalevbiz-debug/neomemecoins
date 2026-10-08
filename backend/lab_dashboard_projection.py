@@ -1,5 +1,21 @@
 """Small read-only dashboard projection of Strategy Lab state."""
 
+# Scalar planning fields of a cost feasibility summary. The per-candidate
+# best_candidates list stays only on funded (PROMOTED_PAPER) books, so the
+# compact payload does not grow with every TEST book's sample rows.
+COST_FEASIBILITY_SCALAR_FIELDS = (
+    'basis', 'is_execution_quote', 'profitability_proven', 'excluded_costs',
+    'checked_market_candidates', 'fixed_cost_infeasible_candidates', 'unknown_candidates',
+    'maximum_roundtrip_cost_pct', 'minimum_model_roundtrip_cost_pct',
+)
+
+
+def compact_cost_feasibility(summary, *, keep_candidates):
+    if not isinstance(summary, dict) or keep_candidates:
+        return summary
+    return {field: summary[field] for field in COST_FEASIBILITY_SCALAR_FIELDS if field in summary}
+
+
 def compact_strategy_lab(data):
     if not isinstance(data, dict):
         return {'status': 'offline', 'books': {}, 'stats': {}}
@@ -79,6 +95,11 @@ def compact_strategy_lab(data):
                 and field in raw['entry_diagnostics']
             } if isinstance(raw.get('entry_diagnostics'), dict) else {},
         }
+        diagnostics = books[key]['entry_diagnostics']
+        if 'cost_feasibility' in diagnostics:
+            diagnostics['cost_feasibility'] = compact_cost_feasibility(
+                diagnostics['cost_feasibility'],
+                keep_candidates=books[key]['portfolio_group'] == 'PROMOTED_PAPER')
 
     raw_setup = data.get('portfolio_setup') or {}
     setup_fields = (

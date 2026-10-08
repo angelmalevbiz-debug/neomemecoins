@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -177,4 +178,32 @@ test('collapsed strategy row exposes modeled cost limits and their provenance wi
   const stale = renderToStaticMarkup(createElement(LabEntryStatus, { book: costlyBook(), backendAvailable: false }));
   assert.match(stale, /Изчаква актуални данни от backend/);
   assert.doesNotMatch(stale, /2.78%/);
+});
+
+test('COST_FIRST: size-only and cooldown-only blocks are named, not shown as a generic wait', () => {
+  const diagnostics = { signal_candidates: 0, affordable_candidates: 0 };
+  assert.equal(labEntryStatus({ ...book('COST_FIRST_CONTROL', 500, 500, 'TEST'), entry_diagnostics: {
+    ...diagnostics, blocked_reason: 'cost_first_size_below_minimum',
+  } }), 'Размерът по ликвидност е под минималния вход');
+  const cooldown = labEntryView({ ...book('COST_FIRST_SCALED', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 1, affordable_candidates: 0, blocked_reason: 'reentry_cooldown',
+  } });
+  assert.equal(cooldown.status, 'Пауза преди повторен вход в същия токен');
+  assert.equal(cooldown.costLimited, false);
+});
+
+test('TEST books explain the cost floor from the scalar summary alone (best_candidates is funded-only in the compact payload)', () => {
+  const view = labEntryView({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 3, affordable_candidates: 0,
+    cost_feasibility: { checked_market_candidates: 3, fixed_cost_infeasible_candidates: 3,
+      minimum_model_roundtrip_cost_pct: 2.4, maximum_roundtrip_cost_pct: 1.5 } } });
+  assert.equal(view.costLimited, true);
+  assert.match(view.status, /2\.40% > лимит 1\.50%/);
+});
+
+test('funded rows with the published V6 cap do not repeat the strict cost limit segment', () => {
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const segment = source.indexOf('строг лимит разходи');
+  assert.ok(segment > 0);
+  assert.match(source.slice(segment - 200, segment), /diagnostics\.max_entry_roundtrip_cost_pct == null \?/);
 });

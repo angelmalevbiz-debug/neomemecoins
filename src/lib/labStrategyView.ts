@@ -54,6 +54,9 @@ const reasons: Record<string, string> = {
   strategy_retired_observed_losses: 'Спряна след повтарящи се загуби',
   // LAB_ACTIVE_V6: every Lab book reports cost-infeasible candidates instead of hiding them.
   modeled_roundtrip_cost_limit: 'Няма вход: моделираните разходи надхвърлят лимита',
+  // COST_FIRST_ESTABLISHED_V1: every universe candidate refused only for size or re-entry cooldown.
+  cost_first_size_below_minimum: 'Размерът по ликвидност е под минималния вход',
+  reentry_cooldown: 'Пауза преди повторен вход в същия токен',
 };
 
 export type CostFeasibility = {

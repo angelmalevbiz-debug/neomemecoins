@@ -313,6 +313,101 @@ class LabBookPairTests(unittest.TestCase):
             self.assertEqual(lab.STATE['books'][key]['portfolio_group'], 'TEST')
             self.assertIn(key, lab.STATE['strategy_lifecycle']['active_registered_strategy_ids'])
 
+    def test_every_universe_candidate_size_rejected_names_the_size_block(self):
+        self.assertGreater(activity.entry_minimum_notional(cf.CONTROL_BOOK_ID), .5)
+        with patch.object(lab.cost_first, 'size_for', return_value=.5):
+            lab.maybe_open([coin()], verified_flows())
+        for book in (self.control, self.scaled):
+            self.assertIsNone(book['position'])
+            diagnostics = book['entry_diagnostics']
+            self.assertEqual(diagnostics['signal_candidates'], 0)
+            self.assertEqual(diagnostics['cost_first']['universe_rejections'], {'size_below_minimum': 1})
+            self.assertEqual(diagnostics['blocked_reason'], 'cost_first_size_below_minimum')
+        # A physical rejection elsewhere in the feed is not a size block.
+        with patch.object(lab.cost_first, 'size_for', return_value=.5):
+            lab.maybe_open([coin(), coin(address=MINT[:-4] + 'aaaa', pairAddress=PAIR[:-4] + 'aaaa',
+                                         dexId='raydium')], verified_flows())
+        self.assertEqual(self.control['entry_diagnostics']['blocked_reason'], 'cost_first_size_below_minimum')
+
+    def test_every_universe_candidate_in_reentry_cooldown_names_the_cooldown(self):
+        self.mark(10.5)
+        for book in (self.control, self.scaled):
+            self.assertIsNone(book['position'])
+        lab.maybe_open([coin()], verified_flows())
+        for book in (self.control, self.scaled):
+            self.assertIsNone(book['position'])
+            diagnostics = book['entry_diagnostics']
+            self.assertEqual(diagnostics['cooldown_rejected'], 1)
+            self.assertEqual(diagnostics['blocked_reason'], 'reentry_cooldown')
+
+    def losing_rows(self, book, count, *, first_trade_no, version=cf.ENTRY_POLICY_VERSION):
+        return [{'trade_no': first_trade_no + index, 'strategy_id': book['id'],
+                 'address': MINT, 'pairAddress': PAIR, 'pnl_usd': -4.5,
+                 'opened_at': NOW - 900_000 + index * 10_000,
+                 'closed_at': NOW - 899_000 + index * 10_000,
+                 'entry_policy_version': version,
+                 'execution_mode': lab.EXECUTION_MODEL_VERSION,
+                 'price_crosscheck': {'status': 'pass', 'mint': MINT, 'pair': PAIR},
+                 'quote_status': 'fresh', 'exit_reason': 'STOP_LOSS_3_NET'}
+                for index in range(count)]
+
+    def test_twelve_losing_cost_first_closes_retire_entries_but_keep_exits_and_ledger(self):
+        lab.maybe_open([coin()], verified_flows())
+        for book in (self.control, self.scaled):
+            self.assertIsNotNone(book['position'])
+            book['history'] = self.losing_rows(book, 12, first_trade_no=2) + book['history']
+            book['balance'] -= 4.5 * 12
+        before = copy.deepcopy(self.books)
+        report = lab.review_strategy_lifecycle(self.books)
+        for book in (self.control, self.scaled):
+            marker = book['strategy_lifecycle']
+            self.assertEqual(marker['status'], 'retired', book['id'])
+            self.assertEqual(marker['reason'], 'repeated_observed_paper_losses')
+            self.assertEqual(marker['evidence']['closed_trades'], 12)
+            self.assertEqual(marker['evidence']['activity_version'], 'COST_FIRST_ESTABLISHED_V1')
+            self.assertEqual(marker['evidence']['net_pnl_usd'], -54.0)
+            self.assertIn(book['id'], report['retired_strategy_ids'])
+            self.assertIn(book['id'], report['retired_open_position_ids'])
+            for field, value in before[book['id']].items():
+                if field != 'strategy_lifecycle':
+                    self.assertEqual(book[field], value, field)
+        self.assertEqual(report['policy']['activity_versions_by_strategy'],
+                         {key: 'COST_FIRST_ESTABLISHED_V1' for key in cf.BOOK_IDS})
+        # Retirement stops new entries only; the open positions still exit normally.
+        quotes = {book['id']: book['position']['remaining_cost_basis_usd'] * .925
+                  for book in (self.control, self.scaled)}
+        def exit_execution(market, quantity):
+            book = next(b for b in (self.control, self.scaled)
+                        if b['position'] and abs(b['position']['quantity'] - quantity) < 1e-12)
+            return {'fill_price': .1, 'net_proceeds_usd': quotes[book['id']], 'dex_fee_usd': .3,
+                    'network_fee_usd': .01, 'impact_pct': .1, 'slippage_pct': .1, 'latency_pct': .1}
+        with patch.object(lab, 'exit_execution', side_effect=exit_execution):
+            lab.update_positions({}, [coin(updatedAt=NOW)])
+        for book in (self.control, self.scaled):
+            self.assertIsNone(book['position'])
+            self.assertEqual(book['history'][0]['exit_reason'], 'STOP_LOSS_3_NET')
+            self.assertEqual(len(book['history']), 13)
+        # The real close is counted like the synthetic ones; the marker keeps its evidence.
+        evidence = lab.lifecycle.observed_evidence(
+            self.control, activity_version=cf.ENTRY_POLICY_VERSION,
+            execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
+        self.assertEqual(evidence['closed_trades'], 13)
+        self.clock = NOW + 24 * 3_600_000
+        lab.maybe_open([coin(updatedAt=self.clock)], verified_flows())
+        for book in (self.control, self.scaled):
+            self.assertIsNone(book['position'])
+            self.assertEqual(book['entry_diagnostics']['blocked_reason'], 'strategy_retired_observed_losses')
+
+    def test_pair_evidence_counts_only_its_own_entry_policy_version(self):
+        for book in (self.control, self.scaled):
+            book['history'] = self.losing_rows(book, 12, first_trade_no=1, version=activity.POLICY_VERSION)
+        lab.review_strategy_lifecycle(self.books)
+        for book in (self.control, self.scaled):
+            marker = book['strategy_lifecycle']
+            self.assertEqual(marker['status'], 'active')
+            self.assertEqual(marker['evidence']['closed_trades'], 0)
+            self.assertEqual(marker['evidence']['excluded_rows'], 12)
+
 
 if __name__ == '__main__':
     unittest.main()

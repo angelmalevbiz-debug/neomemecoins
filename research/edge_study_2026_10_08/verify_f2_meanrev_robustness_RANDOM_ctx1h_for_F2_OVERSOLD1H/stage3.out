@@ -1,0 +1,30 @@
+universe seed {'salt': 'f2r1', 'train_mean_usd': -3.794, 'holdout_mean_usd': -15.448, 'holdout_n': 58}
+universe seed {'salt': 'rob00', 'train_mean_usd': -4.935, 'holdout_mean_usd': -15.787, 'holdout_n': 56}
+universe seed {'salt': 'rob01', 'train_mean_usd': -10.246, 'holdout_mean_usd': -12.252, 'holdout_n': 55}
+universe seed {'salt': 'rob02', 'train_mean_usd': -11.93, 'holdout_mean_usd': -8.898, 'holdout_n': 50}
+universe seed {'salt': 'rob03', 'train_mean_usd': -8.792, 'holdout_mean_usd': -8.778, 'holdout_n': 50}
+universe seed {'salt': 'rob04', 'train_mean_usd': -9.454, 'holdout_mean_usd': -13.369, 'holdout_n': 53}
+universe seed {'salt': 'rob05', 'train_mean_usd': -13.877, 'holdout_mean_usd': -7.811, 'holdout_n': 52}
+universe seed {'salt': 'rob06', 'train_mean_usd': -12.418, 'holdout_mean_usd': -9.571, 'holdout_n': 53}
+universe seed {'salt': 'rob07', 'train_mean_usd': -13.133, 'holdout_mean_usd': -8.068, 'holdout_n': 45}
+universe seed {'salt': 'rob08', 'train_mean_usd': -13.156, 'holdout_mean_usd': -13.926, 'holdout_n': 51}
+univ blk {'block': 0, 'h_from': 0.0, 'h_to': 3.0, 'n': 56, 'pairs': 10, 'mean_usd': -10.747, 'sum_usd': -601.85}
+univ blk {'block': 1, 'h_from': 3.0, 'h_to': 6.0, 'n': 64, 'pairs': 22, 'mean_usd': -1.227, 'sum_usd': -78.55}
+univ blk {'block': 2, 'h_from': 6.0, 'h_to': 9.0, 'n': 135, 'pairs': 29, 'mean_usd': -14.533, 'sum_usd': -1962.0}
+univ blk {'block': 3, 'h_from': 9.0, 'h_to': 12.0, 'n': 138, 'pairs': 29, 'mean_usd': -6.298, 'sum_usd': -869.17}
+univ blk {'block': 4, 'h_from': 12.0, 'h_to': 15.0, 'n': 139, 'pairs': 31, 'mean_usd': -12.867, 'sum_usd': -1788.52}
+univ blk {'block': 5, 'h_from': 15.0, 'h_to': 18.0, 'n': 215, 'pairs': 31, 'mean_usd': -7.96, 'sum_usd': -1711.39}
+univ blk {'block': 6, 'h_from': 18.0, 'h_to': 21.0, 'n': 166, 'pairs': 27, 'mean_usd': -16.881, 'sum_usd': -2802.32}
+univ blk {'block': 7, 'h_from': 21.0, 'h_to': 22.76, 'n': 100, 'pairs': 23, 'mean_usd': -11.907, 'sum_usd': -1190.67}
+universe pooled train -10.146 holdout -11.535
+universe p=0.005 train -14.132 holdout -11.673
+univ p.005 blk {'block': 0, 'h_from': 0.0, 'h_to': 3.0, 'n': 18, 'pairs': 10, 'mean_usd': -16.541, 'sum_usd': -297.73}
+univ p.005 blk {'block': 1, 'h_from': 3.0, 'h_to': 6.0, 'n': 27, 'pairs': 19, 'mean_usd': -9.329, 'sum_usd': -251.89}
+univ p.005 blk {'block': 2, 'h_from': 6.0, 'h_to': 9.0, 'n': 39, 'pairs': 30, 'mean_usd': -14.229, 'sum_usd': -554.92}
+univ p.005 blk {'block': 3, 'h_from': 9.0, 'h_to': 12.0, 'n': 39, 'pairs': 28, 'mean_usd': -14.251, 'sum_usd': -555.8}
+univ p.005 blk {'block': 4, 'h_from': 12.0, 'h_to': 15.0, 'n': 37, 'pairs': 30, 'mean_usd': -15.349, 'sum_usd': -567.93}
+univ p.005 blk {'block': 5, 'h_from': 15.0, 'h_to': 18.0, 'n': 54, 'pairs': 30, 'mean_usd': -11.423, 'sum_usd': -616.85}
+univ p.005 blk {'block': 6, 'h_from': 18.0, 'h_to': 21.0, 'n': 49, 'pairs': 27, 'mean_usd': -12.486, 'sum_usd': -611.81}
+univ p.005 blk {'block': 7, 'h_from': 21.0, 'h_to': 22.76, 'n': 21, 'pairs': 19, 'mean_usd': -11.048, 'sum_usd': -232.0}
+2026-10-08 02:00 17.32 [{'pair': '745ATaSS', 'sym': 'Frank', 'entry_utc': '02:14', 'reason': 'TP', 'usd50': 71.76}, {'pair': '8ewuF2o8', 'sym': 'swordcat', 'entry_utc': '02:16', 'reason': 'TP', 'usd50': 40.85}, {'pair': '867dKvaC', 'sym': 'MISTAKE', 'entry_utc': '02:57', 'reason': 'TP', 'usd50': 44.59}]
+done 20.1s 2026-10-07 08:41 2026-10-08 07:26 2026-10-07 22:20

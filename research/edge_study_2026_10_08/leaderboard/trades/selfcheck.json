@@ -1,0 +1,26 @@
+{
+ "rug_guard_copy": {
+  "points_checked": 28868,
+  "mismatches": 0,
+  "share_blocked": 0.5196,
+  "source_version": "RUG_GUARD_V1_RESEARCH_2026_10_08",
+  "copy_version": "RUG_GUARD_V1_RESEARCH_2026_10_08"
+ },
+ "calibration_copy": {
+  "grid_points": 4702,
+  "mismatches": 0,
+  "source_version": "CALIB_V1_2026-10-08",
+  "copy_version": "CALIB_V1_2026-10-08"
+ },
+ "v2_parity": {
+  "trades": 1061,
+  "calib_off_identical_to_v2": true,
+  "calib_on_same_trades_as_v2": true,
+  "net50_v2_field_equals_v2_net50": true,
+  "mean_net50_shift_pct": -1.7869,
+  "min_net50_shift_pct": -3.1829,
+  "max_net50_shift_pct": 0.0,
+  "posthoc_vs_exact_mean_abs_err_pct": 0.04708,
+  "posthoc_vs_exact_max_abs_err_pct": 0.52085
+ }
+}

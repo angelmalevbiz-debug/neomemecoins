@@ -1,0 +1,60 @@
+loaded 0.4s
+reproduce {'family_module_trades': 51, 'my_reimpl_trades': 51, 'identical': True}
+== MAIN f2r1 p=0.005: n=51  train n=30 mean$=-7.518 | holdout n=21 pairs=13 mean$=7.443 mean%=3.721 CI=[-6.852, 22.755]
+net100 exact holdout 5.381 train -9.433 approx err 0.007
+== MAIN + rug_guard_v1: n=49  train n=29 mean$=-5.957 | holdout n=20 pairs=12 mean$=5.974 mean%=2.987 CI=[-9.475, 21.517]
+seed f2r1  n= 51 train   30   -7.518 | holdout  21    7.443 pairs 13
+seed rob00 n= 53 train   33    -5.76 | holdout  20   -2.379 pairs 12
+seed rob01 n= 54 train   33   -6.906 | holdout  21   -0.053 pairs 14
+seed rob02 n= 50 train   30   -9.593 | holdout  20    3.935 pairs 12
+seed rob03 n= 48 train   33   -6.552 | holdout  15    0.203 pairs 12
+seed rob04 n= 56 train   35   -8.345 | holdout  21    1.338 pairs 13
+seed rob05 n= 46 train   27    -6.06 | holdout  19    6.022 pairs 11
+seed rob06 n= 59 train   38  -15.027 | holdout  21   -7.155 pairs 13
+seed rob07 n= 51 train   31    0.002 | holdout  20   -6.486 pairs 14
+seed rob08 n= 48 train   30  -14.248 | holdout  18    -5.27 pairs 12
+seed rob09 n= 54 train   36   -8.742 | holdout  18    3.425 pairs 11
+seed rob10 n= 48 train   29   -1.908 | holdout  19   -3.904 pairs 13
+seed rob11 n= 51 train   33  -13.196 | holdout  18    3.437 pairs 10
+seed rob12 n= 49 train   32   -0.176 | holdout  17   -2.828 pairs 12
+seed rob13 n= 54 train   33     0.47 | holdout  21   -2.599 pairs 12
+seed rob14 n= 47 train   28  -14.524 | holdout  19   -2.077 pairs 12
+seed rob15 n= 51 train   31   -12.12 | holdout  20    -6.21 pairs 11
+seed rob16 n= 46 train   28  -12.947 | holdout  18    -8.74 pairs 12
+seed rob17 n= 49 train   29   -6.371 | holdout  20   -2.366 pairs 13
+seed rob18 n= 51 train   32  -19.864 | holdout  19    0.714 pairs 13
+seed rob19 n= 53 train   30   -7.569 | holdout  23    0.438 pairs 15
+seed rob20 n= 55 train   36   -9.632 | holdout  19   -0.141 pairs 12
+seed rob21 n= 47 train   29   -0.291 | holdout  18    0.591 pairs 12
+seed rob22 n= 60 train   38   -7.423 | holdout  22    8.359 pairs 13
+seed rob23 n= 55 train   34   -5.867 | holdout  21   -3.878 pairs 13
+seed rob24 n= 49 train   29   -1.918 | holdout  20   -4.122 pairs 12
+seed rob25 n= 49 train   33  -13.261 | holdout  16   -5.025 pairs 11
+seed rob26 n= 47 train   28    7.097 | holdout  19   -0.348 pairs 13
+seed rob27 n= 50 train   30  -10.421 | holdout  20   -5.028 pairs 14
+seed rob28 n= 54 train   34   -11.99 | holdout  20   -0.798 pairs 12
+seed rob29 n= 52 train   31  -16.336 | holdout  21   -2.233 pairs 13
+seed rob30 n= 48 train   27   -0.819 | holdout  21   -3.516 pairs 12
+seed rob31 n= 53 train   36  -11.178 | holdout  17  -11.076 pairs 12
+seed rob32 n= 49 train   28   -7.111 | holdout  21   -3.873 pairs 11
+seed rob33 n= 46 train   27   -9.853 | holdout  19   -3.003 pairs 11
+seed rob34 n= 47 train   28   -8.842 | holdout  19   -3.106 pairs 13
+seed rob35 n= 51 train   31    0.688 | holdout  20   -3.734 pairs 14
+seed rob36 n= 47 train   28   -9.661 | holdout  19     1.12 pairs 11
+seed rob37 n= 52 train   31   -6.096 | holdout  21   -4.041 pairs 14
+seed rob38 n= 56 train   35   -7.965 | holdout  21   -0.868 pairs 13
+seed rob39 n= 43 train   26  -10.658 | holdout  17   -5.776 pairs 11
+seed rob40 n= 50 train   29    1.105 | holdout  21    0.923 pairs 12
+seed rob41 n= 56 train   32   -2.342 | holdout  24    -1.13 pairs 13
+seed rob42 n= 48 train   32   -7.457 | holdout  16   -8.215 pairs 12
+seed rob43 n= 55 train   33   -6.814 | holdout  22    2.377 pairs 12
+seed rob44 n= 44 train   28  -14.058 | holdout  16   -7.115 pairs 12
+seed rob45 n= 47 train   28  -15.971 | holdout  19   -4.873 pairs 12
+seed rob46 n= 50 train   27  -13.618 | holdout  23   -2.337 pairs 13
+seed rob47 n= 51 train   32    0.069 | holdout  19   -6.567 pairs 13
+seed rob48 n= 47 train   27   -6.149 | holdout  20     3.37 pairs 12
+seed summary {'n_seeds': 50, 'f2r1_holdout_rank_of_50 (1=best)': 2, 'holdout_mean_usd_median_over_seeds': -2.366, 'holdout_mean_usd_mean_over_seeds': -1.944, 'holdout_mean_usd_min_max': [-11.076, 8.359], 'share_seeds_holdout_pos': 0.3, 'share_seeds_train_pos': 0.12, 'share_seeds_train_and_holdout_pos': 0.02, 'share_seeds_pass_gate_shape': 0.02, 'share_seeds_ho50_pos': 0.24, 'share_seeds_ho30_pos': 0.86, 'share_seeds_holdout_net100_pos': 0.16, 'share_seeds_holdout_drop_best_pair_pos': 0.16, 'share_seeds_holdout_drop_best_hour_pos': 0.02, 'first5_other_seeds': [{'salt': 'rob00', 'train_mean_usd': -5.76, 'holdout_n': 20, 'holdout_pairs': 12, 'holdout_mean_usd': -2.379}, {'salt': 'rob01', 'train_mean_usd': -6.906, 'holdout_n': 21, 'holdout_pairs': 14, 'holdout_mean_usd': -0.053}, {'salt': 'rob02', 'train_mean_usd': -9.593, 'holdout_n': 20, 'holdout_pairs': 12, 'holdout_mean_usd': 3.935}, {'salt': 'rob03', 'train_mean_usd': -6.552, 'holdout_n': 15, 'holdout_pairs': 12, 'holdout_mean_usd': 0.203}, {'salt': 'rob04', 'train_mean_usd': -8.345, 'holdout_n': 21, 'holdout_pairs': 13, 'holdout_mean_usd': 1.338}]}
+pooled train -7.725 holdout -1.82
+== DENSE p=0.05: n=86  train n=55 mean$=-11.53 | holdout n=31 pairs=16 mean$=-4.754 mean%=-2.377 CI=[-13.962, 5.024]
+== DENSE p=1: n=101  train n=67 mean$=-11.442 | holdout n=34 pairs=16 mean$=-8.437 mean%=-4.219 CI=[-19.267, 2.511]
+done 109.1s

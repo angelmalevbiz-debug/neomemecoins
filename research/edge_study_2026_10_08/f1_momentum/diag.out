@@ -1,0 +1,30 @@
+== F1_TREND_PULLBACK_HI30_PC1H35_R5M-4_S8_TP15_H60 n 86
+  modeled entry RT cost % mean 4.20  (+1.0 stress)  fee bps mean 111  liq median $52278
+  STOP exits 63: mean net50 -17.35 (stop level -8), median -12.45, worst [-98.1, -97.7, -43.5, -41.4, -30.9], share below 2x stop 0.27
+  worst trades [('BATONPASS', 'BERQeJZD', -98.1, 'STOP', '', 0.4, 'ho'), ('DIAMONDANT', '6B4sAoGv', -97.7, 'STOP', '', 1.0, 'ho'), ('MIMI', 'AwyD93B1', -43.5, 'STOP', '', 0.6, 'ho'), ('OGTRUMP', '9rSmRH9w', -41.4, 'STOP', '', 0.5, 'tr')]
+  best trades [('LOBBY', 'FkfDrvbz', 407.9, 'TP', 'tr'), ('Gamby', 'AFsEwPX1', 61.4, 'TP', 'tr'), ('CALL', 'njgy96vd', 40.8, 'TP', 'tr')]
+== F1_TREND_PULLBACK_HI30_PC1H20_R5M-4_S8_TP40_TRAIL15/8_H120 n 109
+  modeled entry RT cost % mean 4.10  (+1.0 stress)  fee bps mean 111  liq median $53985
+  STOP exits 80: mean net50 -15.53 (stop level -8), median -10.79, worst [-98.1, -97.7, -43.5, -41.4, -30.9], share below 2x stop 0.21
+  worst trades [('BATONPASS', 'BERQeJZD', -98.1, 'STOP', '', 0.4, 'ho'), ('DIAMONDANT', '6B4sAoGv', -97.7, 'STOP', '', 1.0, 'ho'), ('MIMI', 'AwyD93B1', -43.5, 'STOP', '', 0.6, 'ho'), ('OGTRUMP', '9rSmRH9w', -41.4, 'STOP', '', 0.5, 'tr')]
+  best trades [('LOBBY', 'FkfDrvbz', 407.9, 'TP', 'tr'), ('Gamby', 'AFsEwPX1', 61.4, 'TP', 'tr'), ('peakmale', '6kSizKgA', 50.8, 'TP', 'tr')]
+== F1_SPIKE_HI50_R5M+8_BUY55_VACC1_S5_TP20_H15 n 73
+  modeled entry RT cost % mean 3.72  (+1.0 stress)  fee bps mean 106  liq median $61893
+  STOP exits 55: mean net50 -9.05 (stop level -5), median -7.49, worst [-37.5, -20.8, -19.9, -19.4, -16.1], share below 2x stop 0.24
+  worst trades [('SI276', '12jc1DzJ', -37.5, 'STOP', '', 0.5, 'tr'), ('OGTRUMP', '9rSmRH9w', -20.8, 'STOP', '', 0.2, 'tr'), ('SNDWITCH', 'HU22UBaT', -19.9, 'STOP', '', 2.1, 'tr'), ('peakmale', '6kSizKgA', -19.4, 'STOP', '', 1.1, 'tr')]
+  best trades [('LOOT', 'XDTrVqPD', 47.6, 'TP', 'tr'), ('SNDWITCH', 'HU22UBaT', 24.2, 'TP', 'tr'), ('phubber', 'BaiHzFqn', 22.8, 'TP', 'tr')]
+== RANDOM_HI30_S8_TP15_H60 n 91
+  modeled entry RT cost % mean 3.91  (+1.0 stress)  fee bps mean 110  liq median $59257
+  STOP exits 54: mean net50 -11.44 (stop level -8), median -10.54, worst [-20.8, -19.9, -17.9, -17.6, -16.6], share below 2x stop 0.09
+  worst trades [('knightcat', '7puXhhDF', -20.8, 'STOP', '', 16.3, 'ho'), ('slopcannon', 'BNG5962Z', -19.9, 'STOP', '', 5.5, 'tr'), ('UI', '8sbe1R1t', -17.9, 'STOP', '', 0.7, 'tr'), ('slopcannon', 'BNG5962Z', -17.6, 'STOP', '', 6.7, 'tr')]
+  best trades [('ZKDARK', 'CR5dTgvT', 60.0, 'TP', 'ho'), ('PPAV', '2or8ATkU', 42.1, 'TP', 'tr'), ('darwin', '53W7r4XU', 39.0, 'TP', 'tr')]
+== RANDOM_HI30_S8_TP40_TRAIL15/8_H120 n 85
+  modeled entry RT cost % mean 3.97  (+1.0 stress)  fee bps mean 109  liq median $57754
+  STOP exits 58: mean net50 -13.75 (stop level -8), median -10.16, worst [-98.8, -44.9, -41.8, -21.6, -17.3], share below 2x stop 0.10
+  worst trades [('CHILL', '9sTi8f8m', -98.8, 'STOP', '', 0.9, 'tr'), ('peakmale', '6kSizKgA', -44.9, 'STOP', '', 0.7, 'tr'), ('JOIN', '7WnYD8Wb', -41.8, 'STOP', '', 0.5, 'ho'), ('MINER', '8J42or3k', -21.6, 'STOP', '', 4.5, 'tr')]
+  best trades [('ZKDARK', 'CR5dTgvT', 63.3, 'TP', 'ho'), ('CATCRAFT', '7mQDGtei', 47.9, 'TP', 'tr'), ('phubber', 'BaiHzFqn', 45.8, 'TP', 'tr')]
+== RANDOM_HI50_S5_TP20_H15 n 63
+  modeled entry RT cost % mean 3.48  (+1.0 stress)  fee bps mean 104  liq median $76723
+  STOP exits 35: mean net50 -9.10 (stop level -5), median -7.15, worst [-46.0, -20.2, -13.0, -12.4, -11.7], share below 2x stop 0.23
+  worst trades [('REF', 'FsojuJgS', -46.0, 'STOP', '', 0.4, 'tr'), ('knightcat', '7puXhhDF', -20.2, 'STOP', '', 13.6, 'ho'), ('Apple', '3XnAfSn6', -14.0, 'OPEN_AT_END', 'VANISHED', 0.2, 'tr'), ('darwin', '53W7r4XU', -13.0, 'STOP', '', 13.0, 'ho')]
+  best trades [('UNKNOWN', '3RAFMXR7', 31.3, 'TP', 'ho'), ('ZKDARK', 'CR5dTgvT', 19.1, 'TP', 'ho'), ('SNDWITCH', 'HU22UBaT', 10.7, 'HOLD', 'tr')]

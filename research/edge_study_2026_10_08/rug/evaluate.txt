@@ -1,0 +1,111 @@
+train ALL G1 n_pos=2237 n_neg=25708 recall=0.725 fpr=0.332 precision=0.160 events=95 ev_recall_any=0.937 ev_recall_all=0.937 ev_recall_mean=0.937 ev_recall_last=0.937 pool_fpr=0.408 pools_ever_flagged=0.439 neg_pools=98
+train ALL G2 n_pos=2237 n_neg=25708 recall=0.192 fpr=0.234 precision=0.067 events=95 ev_recall_any=0.168 ev_recall_all=0.168 ev_recall_mean=0.168 ev_recall_last=0.168 pool_fpr=0.257 pools_ever_flagged=0.265 neg_pools=98
+train ALL G3 n_pos=2237 n_neg=25708 recall=0.718 fpr=0.140 precision=0.309 events=95 ev_recall_any=0.926 ev_recall_all=0.926 ev_recall_mean=0.926 ev_recall_last=0.926 pool_fpr=0.233 pools_ever_flagged=0.276 neg_pools=98
+train ALL INTERIM n_pos=2237 n_neg=25708 recall=0.554 fpr=0.326 precision=0.129 events=95 ev_recall_any=0.611 ev_recall_all=0.547 ev_recall_mean=0.586 ev_recall_last=0.611 pool_fpr=0.440 pools_ever_flagged=0.469 neg_pools=98
+train ALL ENG_IMBAL n_pos=2237 n_neg=25708 recall=0.126 fpr=0.144 precision=0.070 events=95 ev_recall_any=0.168 ev_recall_all=0.116 ev_recall_mean=0.138 ev_recall_last=0.147 pool_fpr=0.177 pools_ever_flagged=0.571 neg_pools=98
+train ALL ENG_WEAKLMC n_pos=2237 n_neg=25708 recall=0.056 fpr=0.161 precision=0.029 events=95 ev_recall_any=0.042 ev_recall_all=0.042 ev_recall_mean=0.042 ev_recall_last=0.042 pool_fpr=0.255 pools_ever_flagged=0.255 neg_pools=98
+
+train LIQ20 G1 n_pos=1482 n_neg=21195 recall=0.625 fpr=0.224 precision=0.163 events=55 ev_recall_any=0.891 ev_recall_all=0.891 ev_recall_mean=0.891 ev_recall_last=0.891 pool_fpr=0.335 pools_ever_flagged=0.361 neg_pools=83
+train LIQ20 G2 n_pos=1482 n_neg=21195 recall=0.290 fpr=0.132 precision=0.133 events=55 ev_recall_any=0.291 ev_recall_all=0.291 ev_recall_mean=0.291 ev_recall_last=0.291 pool_fpr=0.193 pools_ever_flagged=0.193 neg_pools=83
+train LIQ20 G3 n_pos=1482 n_neg=21195 recall=0.615 fpr=0.124 precision=0.257 events=55 ev_recall_any=0.873 ev_recall_all=0.873 ev_recall_mean=0.873 ev_recall_last=0.873 pool_fpr=0.215 pools_ever_flagged=0.265 neg_pools=83
+train LIQ20 INTERIM n_pos=1482 n_neg=21195 recall=0.565 fpr=0.363 precision=0.098 events=55 ev_recall_any=0.636 ev_recall_all=0.582 ev_recall_mean=0.621 ev_recall_last=0.636 pool_fpr=0.481 pools_ever_flagged=0.506 neg_pools=83
+train LIQ20 ENG_IMBAL n_pos=1482 n_neg=21195 recall=0.185 fpr=0.174 precision=0.069 events=55 ev_recall_any=0.218 ev_recall_all=0.127 ev_recall_mean=0.166 ev_recall_last=0.182 pool_fpr=0.209 pools_ever_flagged=0.614 neg_pools=83
+train LIQ20 ENG_WEAKLMC n_pos=1482 n_neg=21195 recall=0.084 fpr=0.196 precision=0.029 events=55 ev_recall_any=0.055 ev_recall_all=0.055 ev_recall_mean=0.055 ev_recall_last=0.055 pool_fpr=0.301 pools_ever_flagged=0.301 neg_pools=83
+
+train LIQ50 G1 n_pos=925 n_neg=17677 recall=0.549 fpr=0.206 precision=0.123 events=21 ev_recall_any=0.810 ev_recall_all=0.810 ev_recall_mean=0.810 ev_recall_last=0.810 pool_fpr=0.296 pools_ever_flagged=0.324 neg_pools=71
+train LIQ50 G2 n_pos=925 n_neg=17677 recall=0.452 fpr=0.159 precision=0.130 events=21 ev_recall_any=0.476 ev_recall_all=0.476 ev_recall_mean=0.476 ev_recall_last=0.476 pool_fpr=0.211 pools_ever_flagged=0.211 neg_pools=71
+train LIQ50 G3 n_pos=925 n_neg=17677 recall=0.533 fpr=0.086 precision=0.245 events=21 ev_recall_any=0.762 ev_recall_all=0.762 ev_recall_mean=0.762 ev_recall_last=0.762 pool_fpr=0.156 pools_ever_flagged=0.211 neg_pools=71
+train LIQ50 INTERIM n_pos=925 n_neg=17677 recall=0.743 fpr=0.379 precision=0.093 events=21 ev_recall_any=0.667 ev_recall_all=0.667 ev_recall_mean=0.667 ev_recall_last=0.667 pool_fpr=0.493 pools_ever_flagged=0.521 neg_pools=71
+train LIQ50 ENG_IMBAL n_pos=925 n_neg=17677 recall=0.243 fpr=0.206 precision=0.058 events=21 ev_recall_any=0.286 ev_recall_all=0.143 ev_recall_mean=0.197 ev_recall_last=0.190 pool_fpr=0.233 pools_ever_flagged=0.592 neg_pools=71
+train LIQ50 ENG_WEAKLMC n_pos=925 n_neg=17677 recall=0.134 fpr=0.235 precision=0.029 events=21 ev_recall_any=0.143 ev_recall_all=0.143 ev_recall_mean=0.143 ev_recall_last=0.143 pool_fpr=0.352 pools_ever_flagged=0.352 neg_pools=71
+
+train LIQ250 G1 n_pos=333 n_neg=7748 recall=1.000 fpr=0.364 precision=0.106 events=7 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.362 pools_ever_flagged=0.375 neg_pools=40
+train LIQ250 G2 n_pos=333 n_neg=7748 recall=1.000 fpr=0.360 precision=0.107 events=7 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.350 pools_ever_flagged=0.350 neg_pools=40
+train LIQ250 G3 n_pos=333 n_neg=7748 recall=0.955 fpr=0.092 precision=0.310 events=7 ev_recall_any=0.857 ev_recall_all=0.857 ev_recall_mean=0.857 ev_recall_last=0.857 pool_fpr=0.113 pools_ever_flagged=0.175 neg_pools=40
+train LIQ250 INTERIM n_pos=333 n_neg=7748 recall=1.000 fpr=0.513 precision=0.077 events=7 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.588 pools_ever_flagged=0.600 neg_pools=40
+train LIQ250 ENG_IMBAL n_pos=333 n_neg=7748 recall=0.372 fpr=0.400 precision=0.038 events=7 ev_recall_any=0.429 ev_recall_all=0.429 ev_recall_mean=0.429 ev_recall_last=0.429 pool_fpr=0.362 pools_ever_flagged=0.675 neg_pools=40
+train LIQ250 ENG_WEAKLMC n_pos=333 n_neg=7748 recall=0.372 fpr=0.535 precision=0.029 events=7 ev_recall_any=0.429 ev_recall_all=0.429 ev_recall_mean=0.429 ev_recall_last=0.429 pool_fpr=0.625 pools_ever_flagged=0.625 neg_pools=40
+
+train CF G1 n_pos=124 n_neg=5232 recall=1.000 fpr=0.519 precision=0.044 events=3 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.436 pools_ever_flagged=0.452 neg_pools=31
+train CF G2 n_pos=124 n_neg=5232 recall=1.000 fpr=0.515 precision=0.044 events=3 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.419 pools_ever_flagged=0.419 neg_pools=31
+train CF G3 n_pos=124 n_neg=5232 recall=0.879 fpr=0.115 precision=0.153 events=3 ev_recall_any=0.667 ev_recall_all=0.667 ev_recall_mean=0.667 ev_recall_last=0.667 pool_fpr=0.115 pools_ever_flagged=0.194 neg_pools=31
+train CF INTERIM n_pos=124 n_neg=5232 recall=1.000 fpr=0.689 precision=0.033 events=3 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.726 pools_ever_flagged=0.742 neg_pools=31
+train CF ENG_IMBAL n_pos=124 n_neg=5232 recall=1.000 fpr=0.552 precision=0.041 events=3 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.448 pools_ever_flagged=0.677 neg_pools=31
+train CF ENG_WEAKLMC n_pos=124 n_neg=5232 recall=1.000 fpr=0.792 precision=0.029 events=3 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.806 pools_ever_flagged=0.806 neg_pools=31
+
+train HF50 G1 n_pos=661 n_neg=5406 recall=0.567 fpr=0.048 precision=0.592 events=18 ev_recall_any=0.778 ev_recall_all=0.778 ev_recall_mean=0.778 ev_recall_last=0.778 pool_fpr=0.280 pools_ever_flagged=0.280 neg_pools=25
+train HF50 G2 n_pos=661 n_neg=5406 recall=0.445 fpr=0.021 precision=0.726 events=18 ev_recall_any=0.389 ev_recall_all=0.389 ev_recall_mean=0.389 ev_recall_last=0.389 pool_fpr=0.080 pools_ever_flagged=0.080 neg_pools=25
+train HF50 G3 n_pos=661 n_neg=5406 recall=0.567 fpr=0.048 precision=0.592 events=18 ev_recall_any=0.778 ev_recall_all=0.778 ev_recall_mean=0.778 ev_recall_last=0.778 pool_fpr=0.280 pools_ever_flagged=0.280 neg_pools=25
+train HF50 INTERIM n_pos=661 n_neg=5406 recall=0.681 fpr=0.314 precision=0.209 events=18 ev_recall_any=0.611 ev_recall_all=0.611 ev_recall_mean=0.611 ev_recall_last=0.611 pool_fpr=0.400 pools_ever_flagged=0.400 neg_pools=25
+train HF50 ENG_IMBAL n_pos=661 n_neg=5406 recall=0.047 fpr=0.032 precision=0.152 events=18 ev_recall_any=0.167 ev_recall_all=0.056 ev_recall_mean=0.087 ev_recall_last=0.056 pool_fpr=0.056 pools_ever_flagged=0.400 neg_pools=25
+train HF50 ENG_WEAKLMC n_pos=661 n_neg=5406 recall=0.000 fpr=0.000 precision=nan events=18 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=25
+
+train MF50 G1 n_pos=140 n_neg=6864 recall=0.064 fpr=0.097 precision=0.013 events=3 ev_recall_any=0.333 ev_recall_all=0.333 ev_recall_mean=0.333 ev_recall_last=0.333 pool_fpr=0.086 pools_ever_flagged=0.167 neg_pools=24
+train MF50 G2 n_pos=140 n_neg=6864 recall=0.000 fpr=0.000 precision=nan events=3 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=24
+train MF50 G3 n_pos=140 n_neg=6864 recall=0.064 fpr=0.097 precision=0.013 events=3 ev_recall_any=0.333 ev_recall_all=0.333 ev_recall_mean=0.333 ev_recall_last=0.333 pool_fpr=0.086 pools_ever_flagged=0.167 neg_pools=24
+train MF50 INTERIM n_pos=140 n_neg=6864 recall=0.807 fpr=0.179 precision=0.084 events=3 ev_recall_any=0.667 ev_recall_all=0.667 ev_recall_mean=0.667 ev_recall_last=0.667 pool_fpr=0.304 pools_ever_flagged=0.333 neg_pools=24
+train MF50 ENG_IMBAL n_pos=140 n_neg=6864 recall=0.500 fpr=0.083 precision=0.109 events=3 ev_recall_any=0.333 ev_recall_all=0.000 ev_recall_mean=0.224 ev_recall_last=0.333 pool_fpr=0.056 pools_ever_flagged=0.542 neg_pools=24
+train MF50 ENG_WEAKLMC n_pos=140 n_neg=6864 recall=0.000 fpr=0.000 precision=nan events=3 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=24
+
+holdout ALL G1 n_pos=1854 n_neg=17651 recall=0.743 fpr=0.147 precision=0.347 events=60 ev_recall_any=0.933 ev_recall_all=0.917 ev_recall_mean=0.933 ev_recall_last=0.917 pool_fpr=0.273 pools_ever_flagged=0.282 neg_pools=71
+holdout ALL G2 n_pos=1854 n_neg=17651 recall=0.484 fpr=0.122 precision=0.294 events=60 ev_recall_any=0.317 ev_recall_all=0.300 ev_recall_mean=0.317 ev_recall_last=0.300 pool_fpr=0.183 pools_ever_flagged=0.183 neg_pools=71
+holdout ALL G3 n_pos=1854 n_neg=17651 recall=0.519 fpr=0.052 precision=0.510 events=60 ev_recall_any=0.833 ev_recall_all=0.833 ev_recall_mean=0.833 ev_recall_last=0.833 pool_fpr=0.174 pools_ever_flagged=0.183 neg_pools=71
+holdout ALL INTERIM n_pos=1854 n_neg=17651 recall=0.700 fpr=0.482 precision=0.132 events=60 ev_recall_any=0.683 ev_recall_all=0.650 ev_recall_mean=0.671 ev_recall_last=0.683 pool_fpr=0.557 pools_ever_flagged=0.563 neg_pools=71
+holdout ALL ENG_IMBAL n_pos=1854 n_neg=17651 recall=0.257 fpr=0.155 precision=0.148 events=60 ev_recall_any=0.283 ev_recall_all=0.183 ev_recall_mean=0.225 ev_recall_last=0.200 pool_fpr=0.173 pools_ever_flagged=0.592 neg_pools=71
+holdout ALL ENG_WEAKLMC n_pos=1854 n_neg=17651 recall=0.289 fpr=0.310 precision=0.089 events=60 ev_recall_any=0.167 ev_recall_all=0.167 ev_recall_mean=0.167 ev_recall_last=0.167 pool_fpr=0.314 pools_ever_flagged=0.324 neg_pools=71
+
+holdout LIQ20 G1 n_pos=1636 n_neg=17536 recall=0.709 fpr=0.148 precision=0.309 events=39 ev_recall_any=0.897 ev_recall_all=0.872 ev_recall_mean=0.897 ev_recall_last=0.872 pool_fpr=0.277 pools_ever_flagged=0.286 neg_pools=70
+holdout LIQ20 G2 n_pos=1636 n_neg=17536 recall=0.547 fpr=0.123 precision=0.294 events=39 ev_recall_any=0.436 ev_recall_all=0.410 ev_recall_mean=0.436 ev_recall_last=0.410 pool_fpr=0.186 pools_ever_flagged=0.186 neg_pools=70
+holdout LIQ20 G3 n_pos=1636 n_neg=17536 recall=0.455 fpr=0.052 precision=0.448 events=39 ev_recall_any=0.744 ev_recall_all=0.744 ev_recall_mean=0.744 ev_recall_last=0.744 pool_fpr=0.176 pools_ever_flagged=0.186 neg_pools=70
+holdout LIQ20 INTERIM n_pos=1636 n_neg=17536 recall=0.702 fpr=0.485 precision=0.119 events=39 ev_recall_any=0.718 ev_recall_all=0.718 ev_recall_mean=0.718 ev_recall_last=0.718 pool_fpr=0.565 pools_ever_flagged=0.571 neg_pools=70
+holdout LIQ20 ENG_IMBAL n_pos=1636 n_neg=17536 recall=0.288 fpr=0.156 precision=0.147 events=39 ev_recall_any=0.333 ev_recall_all=0.205 ev_recall_mean=0.260 ev_recall_last=0.231 pool_fpr=0.175 pools_ever_flagged=0.586 neg_pools=70
+holdout LIQ20 ENG_WEAKLMC n_pos=1636 n_neg=17536 recall=0.325 fpr=0.312 precision=0.089 events=39 ev_recall_any=0.179 ev_recall_all=0.179 ev_recall_mean=0.179 ev_recall_last=0.179 pool_fpr=0.319 pools_ever_flagged=0.329 neg_pools=70
+
+holdout LIQ50 G1 n_pos=1244 n_neg=16477 recall=0.766 fpr=0.139 precision=0.293 events=22 ev_recall_any=0.818 ev_recall_all=0.773 ev_recall_mean=0.818 ev_recall_last=0.773 pool_fpr=0.277 pools_ever_flagged=0.277 neg_pools=65
+holdout LIQ50 G2 n_pos=1244 n_neg=16477 recall=0.715 fpr=0.131 precision=0.293 events=22 ev_recall_any=0.636 ev_recall_all=0.591 ev_recall_mean=0.636 ev_recall_last=0.591 pool_fpr=0.200 pools_ever_flagged=0.200 neg_pools=65
+holdout LIQ50 G3 n_pos=1244 n_neg=16477 recall=0.432 fpr=0.038 precision=0.463 events=22 ev_recall_any=0.545 ev_recall_all=0.545 ev_recall_mean=0.545 ev_recall_last=0.545 pool_fpr=0.169 pools_ever_flagged=0.169 neg_pools=65
+holdout LIQ50 INTERIM n_pos=1244 n_neg=16477 recall=0.766 fpr=0.484 precision=0.107 events=22 ev_recall_any=0.727 ev_recall_all=0.727 ev_recall_mean=0.727 ev_recall_last=0.727 pool_fpr=0.578 pools_ever_flagged=0.585 neg_pools=65
+holdout LIQ50 ENG_IMBAL n_pos=1244 n_neg=16477 recall=0.371 fpr=0.165 precision=0.145 events=22 ev_recall_any=0.409 ev_recall_all=0.318 ev_recall_mean=0.387 ev_recall_last=0.364 pool_fpr=0.188 pools_ever_flagged=0.600 neg_pools=65
+holdout LIQ50 ENG_WEAKLMC n_pos=1244 n_neg=16477 recall=0.428 fpr=0.332 precision=0.089 events=22 ev_recall_any=0.318 ev_recall_all=0.318 ev_recall_mean=0.318 ev_recall_last=0.318 pool_fpr=0.343 pools_ever_flagged=0.354 neg_pools=65
+
+holdout LIQ250 G1 n_pos=873 n_neg=9965 recall=0.867 fpr=0.204 precision=0.271 events=12 ev_recall_any=0.917 ev_recall_all=0.833 ev_recall_mean=0.916 ev_recall_last=0.833 pool_fpr=0.289 pools_ever_flagged=0.289 neg_pools=38
+holdout LIQ250 G2 n_pos=873 n_neg=9965 recall=0.867 fpr=0.202 precision=0.274 events=12 ev_recall_any=0.917 ev_recall_all=0.833 ev_recall_mean=0.916 ev_recall_last=0.833 pool_fpr=0.263 pools_ever_flagged=0.263 neg_pools=38
+holdout LIQ250 G3 n_pos=873 n_neg=9965 recall=0.391 fpr=0.036 precision=0.484 events=12 ev_recall_any=0.417 ev_recall_all=0.417 ev_recall_mean=0.417 ev_recall_last=0.417 pool_fpr=0.104 pools_ever_flagged=0.105 neg_pools=38
+holdout LIQ250 INTERIM n_pos=873 n_neg=9965 recall=0.863 fpr=0.505 precision=0.130 events=12 ev_recall_any=0.917 ev_recall_all=0.917 ev_recall_mean=0.917 ev_recall_last=0.917 pool_fpr=0.605 pools_ever_flagged=0.605 neg_pools=38
+holdout LIQ250 ENG_IMBAL n_pos=873 n_neg=9965 recall=0.477 fpr=0.252 precision=0.142 events=12 ev_recall_any=0.500 ev_recall_all=0.417 ev_recall_mean=0.499 ev_recall_last=0.417 pool_fpr=0.298 pools_ever_flagged=0.711 neg_pools=38
+holdout LIQ250 ENG_WEAKLMC n_pos=873 n_neg=9965 recall=0.609 fpr=0.549 precision=0.089 events=12 ev_recall_any=0.583 ev_recall_all=0.583 ev_recall_mean=0.583 ev_recall_last=0.583 pool_fpr=0.587 pools_ever_flagged=0.605 neg_pools=38
+
+holdout CF G1 n_pos=532 n_neg=6789 recall=0.782 fpr=0.298 precision=0.170 events=7 ev_recall_any=0.857 ev_recall_all=0.714 ev_recall_mean=0.856 ev_recall_last=0.714 pool_fpr=0.357 pools_ever_flagged=0.357 neg_pools=28
+holdout CF G2 n_pos=532 n_neg=6789 recall=0.782 fpr=0.295 precision=0.172 events=7 ev_recall_any=0.857 ev_recall_all=0.714 ev_recall_mean=0.856 ev_recall_last=0.714 pool_fpr=0.321 pools_ever_flagged=0.321 neg_pools=28
+holdout CF G3 n_pos=532 n_neg=6789 recall=0.000 fpr=0.052 precision=0.000 events=7 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.106 pools_ever_flagged=0.107 neg_pools=28
+holdout CF INTERIM n_pos=532 n_neg=6789 recall=1.000 fpr=0.686 precision=0.103 events=7 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.750 pools_ever_flagged=0.750 neg_pools=28
+holdout CF ENG_IMBAL n_pos=532 n_neg=6789 recall=0.782 fpr=0.346 precision=0.150 events=7 ev_recall_any=0.857 ev_recall_all=0.714 ev_recall_mean=0.856 ev_recall_last=0.714 pool_fpr=0.389 pools_ever_flagged=0.643 neg_pools=28
+holdout CF ENG_WEAKLMC n_pos=532 n_neg=6789 recall=1.000 fpr=0.806 precision=0.089 events=7 ev_recall_any=1.000 ev_recall_all=1.000 ev_recall_mean=1.000 ev_recall_last=1.000 pool_fpr=0.796 pools_ever_flagged=0.821 neg_pools=28
+
+holdout HF50 G1 n_pos=592 n_neg=3138 recall=0.907 fpr=0.086 precision=0.665 events=14 ev_recall_any=0.857 ev_recall_all=0.857 ev_recall_mean=0.857 ev_recall_last=0.857 pool_fpr=0.400 pools_ever_flagged=0.400 neg_pools=20
+holdout HF50 G2 n_pos=592 n_neg=3138 recall=0.801 fpr=0.048 precision=0.757 events=14 ev_recall_any=0.571 ev_recall_all=0.571 ev_recall_mean=0.571 ev_recall_last=0.571 pool_fpr=0.200 pools_ever_flagged=0.200 neg_pools=20
+holdout HF50 G3 n_pos=592 n_neg=3138 recall=0.907 fpr=0.086 precision=0.665 events=14 ev_recall_any=0.857 ev_recall_all=0.857 ev_recall_mean=0.857 ev_recall_last=0.857 pool_fpr=0.400 pools_ever_flagged=0.400 neg_pools=20
+holdout HF50 INTERIM n_pos=592 n_neg=3138 recall=0.711 fpr=0.532 precision=0.201 events=14 ev_recall_any=0.643 ev_recall_all=0.643 ev_recall_mean=0.643 ev_recall_last=0.643 pool_fpr=0.578 pools_ever_flagged=0.600 neg_pools=20
+holdout HF50 ENG_IMBAL n_pos=592 n_neg=3138 recall=0.078 fpr=0.051 precision=0.224 events=14 ev_recall_any=0.214 ev_recall_all=0.143 ev_recall_mean=0.180 ev_recall_last=0.214 pool_fpr=0.043 pools_ever_flagged=0.400 neg_pools=20
+holdout HF50 ENG_WEAKLMC n_pos=592 n_neg=3138 recall=0.000 fpr=0.000 precision=nan events=14 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=20
+
+holdout MF50 G1 n_pos=120 n_neg=6102 recall=0.000 fpr=0.000 precision=nan events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=22
+holdout MF50 G2 n_pos=120 n_neg=6102 recall=0.000 fpr=0.000 precision=nan events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=22
+holdout MF50 G3 n_pos=120 n_neg=6102 recall=0.000 fpr=0.000 precision=nan events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=22
+holdout MF50 INTERIM n_pos=120 n_neg=6102 recall=0.000 fpr=0.197 precision=0.000 events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.273 pools_ever_flagged=0.273 neg_pools=22
+holdout MF50 ENG_IMBAL n_pos=120 n_neg=6102 recall=0.000 fpr=0.035 precision=0.000 events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.030 pools_ever_flagged=0.682 neg_pools=22
+holdout MF50 ENG_WEAKLMC n_pos=120 n_neg=6102 recall=0.000 fpr=0.000 precision=nan events=1 ev_recall_any=0.000 ev_recall_all=0.000 ev_recall_mean=0.000 ev_recall_last=0.000 pool_fpr=0.000 pools_ever_flagged=0.000 neg_pools=22
+
+== pool-level (liq >= $50k points only), per part of the FIRST such point
+  train G1          drained pools  34 flagged-ever  28 flagged-always  26 | never-drained pools 179 flagged-ever 131 mean share flagged 0.731
+  train G2          drained pools  34 flagged-ever  16 flagged-always  16 | never-drained pools 179 flagged-ever  53 mean share flagged 0.296
+  train G3          drained pools  34 flagged-ever  22 flagged-always  19 | never-drained pools 179 flagged-ever 128 mean share flagged 0.708
+  train INTERIM     drained pools  34 flagged-ever  22 flagged-always  19 | never-drained pools 179 flagged-ever  85 mean share flagged 0.471
+  train ENG_IMBAL   drained pools  34 flagged-ever  13 flagged-always  10 | never-drained pools 179 flagged-ever  85 mean share flagged 0.318
+  train ENG_WEAKLMC drained pools  34 flagged-ever  10 flagged-always  10 | never-drained pools 179 flagged-ever  36 mean share flagged 0.201
+  holdout G1          drained pools  22 flagged-ever  18 flagged-always  17 | never-drained pools 152 flagged-ever 104 mean share flagged 0.684
+  holdout G2          drained pools  22 flagged-ever  14 flagged-always  13 | never-drained pools 152 flagged-ever  46 mean share flagged 0.299
+  holdout G3          drained pools  22 flagged-ever  12 flagged-always  12 | never-drained pools 152 flagged-ever  98 mean share flagged 0.643
+  holdout INTERIM     drained pools  22 flagged-ever  16 flagged-always  16 | never-drained pools 152 flagged-ever  99 mean share flagged 0.649
+  holdout ENG_IMBAL   drained pools  22 flagged-ever  10 flagged-always   7 | never-drained pools 152 flagged-ever  91 mean share flagged 0.347
+  holdout ENG_WEAKLMC drained pools  22 flagged-ever   7 flagged-always   7 | never-drained pools 152 flagged-ever  40 mean share flagged 0.252

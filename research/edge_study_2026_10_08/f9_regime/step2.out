@@ -1,0 +1,171 @@
+== (a) base trades, TRAIN only, by regime tercile (thresholds from the same train trades)
+-- ('RANDOM', 'E1') n=267 hrs=14 pairs=43 mean50= -4.63 win=16.9
+   n      lo<35.000 | mid | hi>=60.000   n= 80 hrs=10 pairs=26 mean50= -4.38 win=17.5 || n= 94 hrs= 7 pairs=26 mean50= -4.77 win=13.8 || n= 92 hrs= 5 pairs=31 mean50= -4.85 win=18.5
+   br15   lo<0.462 | mid | hi>=0.545   n= 81 hrs=11 pairs=29 mean50= -2.69 win=24.7 || n= 77 hrs=12 pairs=32 mean50= -5.96 win=15.6 || n= 87 hrs=12 pairs=30 mean50= -4.97 win=11.5
+   br60   lo<0.406 | mid | hi>=0.583   n= 70 hrs= 8 pairs=29 mean50= -4.59 win=17.1 || n= 69 hrs=12 pairs=27 mean50= -3.56 win=21.7 || n= 73 hrs= 9 pairs=27 mean50= -4.44 win=16.4
+   med15  lo<-0.081 | mid | hi>=0.287   n= 81 hrs=11 pairs=29 mean50= -3.30 win=23.5 || n= 82 hrs=13 pairs=31 mean50= -5.23 win=15.9 || n= 82 hrs=12 pairs=30 mean50= -5.05 win=12.2
+   med60  lo<-1.611 | mid | hi>=0.989   n= 69 hrs= 8 pairs=31 mean50= -5.02 win=15.9 || n= 72 hrs=12 pairs=27 mean50= -3.24 win=20.8 || n= 71 hrs= 9 pairs=29 mean50= -4.39 win=18.3
+   pc5    lo<0.000 | mid | hi>=0.170   n= 59 hrs=13 pairs=26 mean50= -4.29 win=16.9 || n=117 hrs=14 pairs=36 mean50= -4.15 win=20.5 || n= 88 hrs=14 pairs=32 mean50= -5.61 win=11.4
+   pc1h   lo<0.579 | mid | hi>=1.640   n= 88 hrs=11 pairs=29 mean50= -4.70 win=15.9 || n= 88 hrs=13 pairs=31 mean50= -4.65 win=15.9 || n= 88 hrs=12 pairs=33 mean50= -4.65 win=18.2
+   bs     lo<0.596 | mid | hi>=0.627   n= 87 hrs=13 pairs=29 mean50= -4.55 win=17.2 || n= 89 hrs=12 pairs=33 mean50= -4.83 win=15.7 || n= 88 hrs=12 pairs=32 mean50= -4.62 win=17.0
+   v5z    lo<-0.151 | mid | hi>=0.024   n= 82 hrs=13 pairs=26 mean50= -6.00 win=13.4 || n= 83 hrs=12 pairs=32 mean50= -3.79 win=18.1 || n= 83 hrs=13 pairs=34 mean50= -4.02 win=19.3
+   sol60  lo<-0.360 | mid | hi>=0.013   n= 70 hrs=12 pairs=29 mean50= -4.69 win=14.3 || n= 69 hrs=10 pairs=28 mean50= -3.17 win=17.4 || n= 71 hrs= 6 pairs=28 mean50= -4.33 win=23.9
+   new60  lo<69.000 | mid | hi>=83.000   n= 79 hrs=10 pairs=31 mean50= -4.03 win=20.3 || n= 90 hrs=12 pairs=32 mean50= -5.22 win=11.1 || n= 97 hrs= 7 pairs=32 mean50= -4.72 win=18.6
+   tide   lo<-4.477 | mid | hi>=-1.607   n= 84 hrs= 9 pairs=25 mean50= -4.28 win=15.5 || n= 84 hrs=11 pairs=31 mean50= -5.23 win=15.5 || n= 85 hrs= 7 pairs=34 mean50= -4.12 win=20.0
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (8, -5.8), 9: (15, -4.1), 10: (9, -5.7), 11: (8, -5.3), 12: (9, -3.8), 13: (10, -3.1), 14: (23, -6.3), 15: (28, -3.0), 16: (21, -4.5), 17: (35, -5.9), 18: (28, -3.4), 19: (26, -2.0), 21: (38, -7.1), 22: (9, -2.3)}
+-- ('RANDOM', 'E2') n=186 hrs=14 pairs=43 mean50= -5.02 win=24.7
+   n      lo<35.000 | mid | hi>=60.000   n= 55 hrs=10 pairs=24 mean50= -5.83 win=21.8 || n= 63 hrs= 6 pairs=25 mean50= -3.36 win=27.0 || n= 67 hrs= 5 pairs=30 mean50= -6.29 win=23.9
+   br15   lo<0.475 | mid | hi>=0.569   n= 54 hrs=11 pairs=29 mean50= -2.38 win=27.8 || n= 57 hrs=11 pairs=28 mean50= -9.32 win=19.3 || n= 56 hrs=10 pairs=28 mean50= -2.96 win=26.8
+   br60   lo<0.400 | mid | hi>=0.558   n= 46 hrs= 8 pairs=26 mean50= -6.57 win=17.4 || n= 50 hrs=10 pairs=28 mean50= -3.59 win=26.0 || n= 48 hrs= 6 pairs=27 mean50= -2.40 win=37.5
+   med15  lo<0.000 | mid | hi>=0.311   n= 54 hrs=11 pairs=27 mean50= -2.39 win=25.9 || n= 56 hrs=12 pairs=28 mean50= -9.20 win=23.2 || n= 57 hrs=12 pairs=29 mean50= -3.19 win=24.6
+   med60  lo<-1.862 | mid | hi>=0.862   n= 48 hrs= 7 pairs=29 mean50= -5.00 win=22.9 || n= 48 hrs=10 pairs=25 mean50= -6.66 win=16.7 || n= 48 hrs= 7 pairs=26 mean50= -0.76 win=41.7
+   pc5    lo<0.013 | mid | hi>=0.180   n= 61 hrs=12 pairs=30 mean50= -5.47 win=24.6 || n= 61 hrs=11 pairs=28 mean50= -4.62 win=26.2 || n= 61 hrs=14 pairs=29 mean50= -4.88 win=23.0
+   pc1h   lo<0.660 | mid | hi>=1.650   n= 61 hrs=11 pairs=27 mean50= -6.67 win=19.7 || n= 60 hrs=13 pairs=31 mean50= -5.87 win=23.3 || n= 62 hrs=12 pairs=32 mean50= -2.49 win=30.6
+   bs     lo<0.594 | mid | hi>=0.622   n= 61 hrs=10 pairs=29 mean50= -6.25 win=18.0 || n= 61 hrs=11 pairs=30 mean50= -2.38 win=29.5 || n= 61 hrs=12 pairs=28 mean50= -6.34 win=26.2
+   v5z    lo<-0.133 | mid | hi>=0.037   n= 57 hrs=12 pairs=25 mean50= -6.18 win=24.6 || n= 56 hrs= 8 pairs=27 mean50= -1.40 win=30.4 || n= 59 hrs=11 pairs=33 mean50= -7.04 win=18.6
+   sol60  lo<-0.320 | mid | hi>=0.017   n= 47 hrs=10 pairs=29 mean50= -4.66 win=25.5 || n= 47 hrs= 8 pairs=26 mean50= -2.55 win=27.7 || n= 48 hrs= 5 pairs=27 mean50= -4.73 win=27.1
+   new60  lo<70.000 | mid | hi>=83.000   n= 55 hrs=10 pairs=27 mean50= -4.00 win=27.3 || n= 65 hrs=10 pairs=32 mean50= -6.90 win=18.5 || n= 65 hrs= 7 pairs=31 mean50= -4.39 win=27.7
+   tide   lo<-4.293 | mid | hi>=-1.500   n= 58 hrs= 9 pairs=27 mean50= -4.09 win=24.1 || n= 58 hrs=11 pairs=29 mean50= -6.98 win=22.4 || n= 59 hrs= 6 pairs=30 mean50= -3.73 win=27.1
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (7, -2.0), 9: (8, -7.5), 10: (6, -10.0), 11: (6, -4.3), 12: (7, -1.6), 13: (8, -1.6), 14: (17, -10.5), 15: (19, -0.7), 16: (14, -10.1), 17: (26, -6.9), 18: (17, 2.0), 19: (19, -0.1), 21: (31, -9.1), 22: (1, 12.2)}
+-- ('RANDOM', 'E3') n=232 hrs=14 pairs=43 mean50= -5.89 win=19.4
+   n      lo<35.000 | mid | hi>=59.000   n= 67 hrs=10 pairs=24 mean50= -7.68 win=14.9 || n= 78 hrs= 6 pairs=28 mean50= -5.97 win=16.7 || n= 86 hrs= 5 pairs=30 mean50= -4.46 win=25.6
+   br15   lo<0.471 | mid | hi>=0.561   n= 71 hrs=11 pairs=27 mean50= -3.10 win=22.5 || n= 71 hrs=12 pairs=31 mean50= -8.70 win=11.3 || n= 71 hrs=11 pairs=30 mean50= -4.32 win=23.9
+   br60   lo<0.414 | mid | hi>=0.583   n= 59 hrs= 7 pairs=28 mean50= -3.43 win=18.6 || n= 64 hrs=12 pairs=30 mean50= -7.73 win=18.8 || n= 62 hrs= 7 pairs=29 mean50= -2.98 win=25.8
+   med15  lo<-0.026 | mid | hi>=0.306   n= 71 hrs=13 pairs=29 mean50= -2.65 win=21.1 || n= 69 hrs=13 pairs=31 mean50= -8.83 win=15.9 || n= 73 hrs=13 pairs=29 mean50= -4.74 win=20.5
+   med60  lo<-1.374 | mid | hi>=1.087   n= 61 hrs= 9 pairs=30 mean50= -3.62 win=21.3 || n= 62 hrs=11 pairs=25 mean50= -6.82 win=19.4 || n= 62 hrs= 8 pairs=29 mean50= -3.84 win=22.6
+   pc5    lo<0.000 | mid | hi>=0.160   n= 50 hrs=11 pairs=26 mean50= -3.95 win=18.0 || n=100 hrs=14 pairs=37 mean50= -6.85 win=21.0 || n= 79 hrs=14 pairs=32 mean50= -4.74 win=19.0
+   pc1h   lo<0.610 | mid | hi>=1.640   n= 75 hrs=11 pairs=29 mean50= -6.41 win=17.3 || n= 77 hrs=13 pairs=33 mean50= -5.73 win=23.4 || n= 77 hrs=11 pairs=33 mean50= -4.36 win=18.2
+   bs     lo<0.595 | mid | hi>=0.623   n= 76 hrs=11 pairs=30 mean50= -5.46 win=19.7 || n= 76 hrs=10 pairs=31 mean50= -4.66 win=17.1 || n= 77 hrs=12 pairs=31 mean50= -6.35 win=22.1
+   v5z    lo<-0.125 | mid | hi>=0.017   n= 71 hrs=12 pairs=29 mean50= -6.93 win=18.3 || n= 72 hrs=11 pairs=31 mean50= -5.41 win=23.6 || n= 72 hrs=12 pairs=35 mean50= -3.50 win=19.4
+   sol60  lo<-0.343 | mid | hi>=0.003   n= 61 hrs=10 pairs=33 mean50= -4.68 win=18.0 || n= 60 hrs= 9 pairs=26 mean50= -4.26 win=21.7 || n= 62 hrs= 6 pairs=29 mean50= -4.78 win=22.6
+   new60  lo<70.000 | mid | hi>=84.000   n= 76 hrs=10 pairs=33 mean50= -7.46 win=19.7 || n= 78 hrs=12 pairs=33 mean50= -6.13 win=19.2 || n= 77 hrs= 7 pairs=30 mean50= -4.14 win=19.5
+   tide   lo<-4.477 | mid | hi>=-1.652   n= 73 hrs= 9 pairs=30 mean50= -4.19 win=21.9 || n= 75 hrs=11 pairs=31 mean50= -6.16 win=16.0 || n= 74 hrs= 7 pairs=32 mean50= -5.97 win=21.6
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (7, -7.1), 9: (11, -10.9), 10: (8, -7.5), 11: (9, -1.1), 12: (8, -5.2), 13: (10, -9.4), 14: (22, -8.1), 15: (18, -2.8), 16: (19, -6.5), 17: (32, -3.5), 18: (23, -6.5), 19: (27, -1.5), 21: (30, -11.0), 22: (8, -0.8)}
+-- ('MOMO', 'E1') n=295 hrs=14 pairs=33 mean50= -5.06 win=15.6
+   n      lo<33.000 | mid | hi>=57.000   n= 94 hrs= 8 pairs=10 mean50= -5.72 win=12.8 || n= 90 hrs= 5 pairs=22 mean50= -4.16 win=15.6 || n=111 hrs= 5 pairs=26 mean50= -5.24 win=18.0
+   br15   lo<0.452 | mid | hi>=0.562   n= 93 hrs=11 pairs=19 mean50= -4.98 win=15.1 || n= 92 hrs=13 pairs=25 mean50= -3.91 win=18.5 || n= 96 hrs=11 pairs=26 mean50= -5.68 win=13.5
+   br60   lo<0.419 | mid | hi>=0.562   n= 82 hrs= 9 pairs=21 mean50= -3.39 win=20.7 || n= 81 hrs= 9 pairs=20 mean50= -5.25 win=12.3 || n= 83 hrs= 8 pairs=24 mean50= -4.72 win=18.1
+   med15  lo<-0.113 | mid | hi>=0.337   n= 93 hrs=12 pairs=20 mean50= -4.93 win=15.1 || n= 94 hrs=12 pairs=20 mean50= -3.86 win=19.1 || n= 94 hrs=13 pairs=25 mean50= -5.81 win=12.8
+   med60  lo<-1.543 | mid | hi>=0.933   n= 82 hrs= 9 pairs=21 mean50= -4.47 win=15.9 || n= 82 hrs=11 pairs=20 mean50= -4.37 win=15.9 || n= 82 hrs= 9 pairs=25 mean50= -4.51 win=19.5
+   pc5    lo<0.010 | mid | hi>=0.180   n= 98 hrs=14 pairs=23 mean50= -5.50 win=14.3 || n= 94 hrs=12 pairs=28 mean50= -5.50 win=16.0 || n=102 hrs=14 pairs=26 mean50= -4.08 win=16.7
+   pc1h   lo<0.435 | mid | hi>=1.560   n= 98 hrs=10 pairs=23 mean50= -4.22 win=17.3 || n= 98 hrs=14 pairs=24 mean50= -6.09 win=14.3 || n= 98 hrs=13 pairs=27 mean50= -4.71 win=15.3
+   bs     lo<0.595 | mid | hi>=0.630   n= 98 hrs=11 pairs=25 mean50= -4.54 win=14.3 || n= 97 hrs=13 pairs=25 mean50= -5.38 win=17.5 || n= 99 hrs=12 pairs=21 mean50= -5.10 win=15.2
+   v5z    lo<-0.140 | mid | hi>=0.055   n= 90 hrs=13 pairs=21 mean50= -5.27 win=15.6 || n= 90 hrs= 9 pairs=25 mean50= -4.47 win=17.8 || n= 90 hrs=12 pairs=22 mean50= -4.98 win=14.4
+   sol60  lo<-0.371 | mid | hi>=-0.003   n= 80 hrs=11 pairs=23 mean50= -5.82 win=12.5 || n= 81 hrs= 9 pairs=19 mean50= -4.68 win=17.3 || n= 81 hrs= 6 pairs=21 mean50= -3.14 win=19.8
+   new60  lo<69.000 | mid | hi>=82.000   n= 98 hrs= 9 pairs=17 mean50= -3.45 win=21.4 || n= 95 hrs=12 pairs=22 mean50= -5.84 win=12.6 || n=102 hrs= 8 pairs=26 mean50= -5.88 win=12.7
+   tide   lo<-4.504 | mid | hi>=-2.307   n= 94 hrs=10 pairs=21 mean50= -3.84 win=13.8 || n= 93 hrs=11 pairs=23 mean50= -5.02 win=20.4 || n= 96 hrs= 8 pairs=27 mean50= -6.25 win=13.5
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (7, -6.7), 9: (21, -5.4), 10: (14, -7.2), 11: (11, -6.8), 12: (15, -4.1), 13: (19, -5.4), 14: (24, -5.6), 15: (31, -1.6), 16: (26, -5.4), 17: (33, -5.2), 18: (32, -2.2), 19: (30, -6.2), 21: (24, -9.2), 22: (8, -2.3)}
+-- ('MOMO', 'E2') n=169 hrs=14 pairs=33 mean50= -5.42 win=32.0
+   n      lo<34.000 | mid | hi>=58.000   n= 52 hrs= 8 pairs=14 mean50= -5.96 win=34.6 || n= 56 hrs= 6 pairs=20 mean50= -4.45 win=28.6 || n= 61 hrs= 5 pairs=24 mean50= -5.85 win=32.8
+   br15   lo<0.455 | mid | hi>=0.554   n= 53 hrs=10 pairs=17 mean50= -1.52 win=41.5 || n= 52 hrs=13 pairs=23 mean50= -7.59 win=28.8 || n= 54 hrs=11 pairs=24 mean50= -6.54 win=24.1
+   br60   lo<0.417 | mid | hi>=0.583   n= 45 hrs= 9 pairs=16 mean50= -0.84 win=40.0 || n= 48 hrs=12 pairs=24 mean50= -8.48 win=27.1 || n= 47 hrs= 7 pairs=20 mean50= -7.18 win=25.5
+   med15  lo<-0.130 | mid | hi>=0.311   n= 53 hrs=11 pairs=18 mean50= -0.59 win=43.4 || n= 53 hrs=13 pairs=20 mean50= -8.82 win=26.4 || n= 53 hrs=13 pairs=26 mean50= -6.22 win=24.5
+   med60  lo<-1.057 | mid | hi>=1.085   n= 46 hrs= 8 pairs=18 mean50= -2.44 win=34.8 || n= 47 hrs= 9 pairs=19 mean50= -7.74 win=31.9 || n= 47 hrs= 9 pairs=23 mean50= -6.52 win=25.5
+   pc5    lo<0.020 | mid | hi>=0.160   n= 55 hrs=11 pairs=21 mean50= -4.23 win=34.5 || n= 57 hrs=10 pairs=26 mean50= -5.79 win=31.6 || n= 57 hrs=13 pairs=25 mean50= -6.19 win=29.8
+   pc1h   lo<0.391 | mid | hi>=1.560   n= 56 hrs= 9 pairs=20 mean50= -0.99 win=37.5 || n= 56 hrs=12 pairs=23 mean50= -7.00 win=30.4 || n= 57 hrs=12 pairs=26 mean50= -8.22 win=28.1
+   bs     lo<0.593 | mid | hi>=0.627   n= 56 hrs=11 pairs=24 mean50= -6.10 win=30.4 || n= 56 hrs=12 pairs=23 mean50= -3.31 win=33.9 || n= 57 hrs=12 pairs=18 mean50= -6.82 win=31.6
+   v5z    lo<-0.131 | mid | hi>=0.054   n= 52 hrs=12 pairs=21 mean50= -8.43 win=23.1 || n= 52 hrs= 9 pairs=23 mean50= -5.39 win=30.8 || n= 53 hrs=10 pairs=22 mean50= -3.62 win=39.6
+   sol60  lo<-0.375 | mid | hi>=-0.000   n= 45 hrs=11 pairs=24 mean50= -8.17 win=26.7 || n= 45 hrs= 9 pairs=17 mean50= -6.42 win=31.1 || n= 46 hrs= 4 pairs=19 mean50= -1.88 win=34.8
+   new60  lo<70.000 | mid | hi>=83.000   n= 56 hrs= 9 pairs=19 mean50= -2.95 win=33.9 || n= 55 hrs=10 pairs=23 mean50= -5.29 win=32.7 || n= 58 hrs= 7 pairs=23 mean50= -7.93 win=29.3
+   tide   lo<-4.350 | mid | hi>=-1.715   n= 53 hrs=10 pairs=22 mean50= -3.23 win=32.1 || n= 54 hrs=11 pairs=21 mean50= -3.90 win=38.9 || n= 54 hrs= 7 pairs=25 mean50= -9.61 win=24.1
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (5, -6.5), 9: (10, -1.3), 10: (7, -7.7), 11: (5, 1.4), 12: (9, -3.4), 13: (9, -18.9), 14: (12, -9.7), 15: (19, -1.7), 16: (16, -6.2), 17: (17, 3.4), 18: (18, -4.6), 19: (21, -9.1), 21: (19, -7.4), 22: (2, -8.5)}
+-- ('MOMO', 'E3') n=161 hrs=14 pairs=33 mean50= -8.39 win=26.1
+   n      lo<34.000 | mid | hi>=58.000   n= 52 hrs= 9 pairs=14 mean50= -9.13 win=26.9 || n= 53 hrs= 6 pairs=22 mean50= -6.84 win=26.4 || n= 56 hrs= 5 pairs=24 mean50= -9.18 win=25.0
+   br15   lo<0.455 | mid | hi>=0.561   n= 50 hrs=10 pairs=18 mean50= -1.90 win=36.0 || n= 50 hrs=12 pairs=24 mean50=-12.40 win=20.0 || n= 51 hrs=10 pairs=24 mean50=-10.21 win=27.5
+   br60   lo<0.419 | mid | hi>=0.588   n= 41 hrs= 8 pairs=18 mean50= -1.74 win=34.1 || n= 46 hrs= 9 pairs=23 mean50=-13.76 win=23.9 || n= 44 hrs= 7 pairs=22 mean50= -8.16 win=27.3
+   med15  lo<-0.127 | mid | hi>=0.334   n= 49 hrs=11 pairs=19 mean50= -1.58 win=34.7 || n= 51 hrs=11 pairs=22 mean50=-11.25 win=23.5 || n= 51 hrs=13 pairs=24 mean50=-11.46 win=25.5
+   med60  lo<-1.374 | mid | hi>=1.016   n= 43 hrs= 9 pairs=20 mean50= -5.12 win=27.9 || n= 44 hrs= 9 pairs=19 mean50=-10.00 win=34.1 || n= 44 hrs= 7 pairs=23 mean50= -9.16 win=22.7
+   pc5    lo<0.013 | mid | hi>=0.165   n= 53 hrs=11 pairs=21 mean50= -9.60 win=22.6 || n= 53 hrs=11 pairs=26 mean50=-10.19 win=24.5 || n= 54 hrs=14 pairs=24 mean50= -5.55 win=31.5
+   pc1h   lo<0.423 | mid | hi>=1.650   n= 53 hrs= 9 pairs=21 mean50= -6.58 win=30.2 || n= 53 hrs=12 pairs=23 mean50= -7.22 win=26.4 || n= 54 hrs=10 pairs=26 mean50=-11.43 win=22.2
+   bs     lo<0.591 | mid | hi>=0.625   n= 53 hrs= 9 pairs=25 mean50= -9.50 win=18.9 || n= 52 hrs=13 pairs=21 mean50= -7.32 win=32.7 || n= 55 hrs=12 pairs=21 mean50= -8.44 win=27.3
+   v5z    lo<-0.202 | mid | hi>=0.054   n= 49 hrs= 9 pairs=21 mean50= -8.08 win=28.6 || n= 49 hrs= 8 pairs=23 mean50=-11.85 win=24.5 || n= 49 hrs=11 pairs=20 mean50= -7.09 win=26.5
+   sol60  lo<-0.375 | mid | hi>=-0.002   n= 43 hrs=11 pairs=22 mean50= -4.06 win=30.2 || n= 43 hrs= 9 pairs=19 mean50=-12.83 win=20.9 || n= 43 hrs= 5 pairs=21 mean50= -7.22 win=37.2
+   new60  lo<69.000 | mid | hi>=83.000   n= 51 hrs=10 pairs=17 mean50= -5.23 win=29.4 || n= 54 hrs=11 pairs=23 mean50= -8.56 win=29.6 || n= 56 hrs= 8 pairs=24 mean50=-11.12 win=19.6
+   tide   lo<-4.496 | mid | hi>=-1.753   n= 51 hrs=10 pairs=21 mean50=  0.18 win=33.3 || n= 51 hrs=10 pairs=23 mean50=-12.99 win=27.5 || n= 51 hrs= 7 pairs=24 mean50=-14.24 win=19.6
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (5, -12.1), 9: (9, -0.3), 10: (7, -18.1), 11: (9, -2.3), 12: (5, -2.5), 13: (8, -26.6), 14: (12, -9.6), 15: (18, -0.5), 16: (14, -18.5), 17: (15, 4.3), 18: (18, -10.6), 19: (20, -7.7), 21: (18, -14.7), 22: (3, 4.6)}
+-- ('DIP', 'E1') n=167 hrs=14 pairs=24 mean50= -5.00 win=16.2
+   n      lo<35.000 | mid | hi>=58.000   n= 55 hrs=10 pairs=15 mean50= -4.53 win=16.4 || n= 45 hrs= 6 pairs=12 mean50= -4.51 win=15.6 || n= 67 hrs= 5 pairs=17 mean50= -5.72 win=16.4
+   br15   lo<0.438 | mid | hi>=0.562   n= 50 hrs=10 pairs=19 mean50= -3.88 win=14.0 || n= 55 hrs=12 pairs=17 mean50= -5.54 win=20.0 || n= 53 hrs=10 pairs=15 mean50= -4.73 win=17.0
+   br60   lo<0.417 | mid | hi>=0.596   n= 45 hrs= 9 pairs=13 mean50= -1.40 win=28.9 || n= 44 hrs=12 pairs=14 mean50= -5.77 win=11.4 || n= 46 hrs= 6 pairs=14 mean50= -5.40 win=13.0
+   med15  lo<-0.192 | mid | hi>=0.281   n= 52 hrs=10 pairs=18 mean50= -3.26 win=19.2 || n= 53 hrs=12 pairs=16 mean50= -6.25 win=15.1 || n= 53 hrs=12 pairs=14 mean50= -4.69 win=17.0
+   med60  lo<-0.922 | mid | hi>=0.971   n= 45 hrs= 9 pairs=14 mean50= -1.36 win=28.9 || n= 45 hrs=11 pairs=15 mean50= -6.01 win=11.1 || n= 45 hrs= 9 pairs=15 mean50= -5.19 win=13.3
+   pc5    lo<0.000 | mid | hi>=0.150   n= 47 hrs=10 pairs=20 mean50= -2.24 win=23.4 || n= 60 hrs=11 pairs=17 mean50= -6.22 win=16.7 || n= 57 hrs=14 pairs=16 mean50= -5.92 win=10.5
+   pc1h   lo<0.429 | mid | hi>=1.450   n= 54 hrs=11 pairs=14 mean50= -3.28 win=16.7 || n= 55 hrs=12 pairs=17 mean50= -6.70 win=14.5 || n= 55 hrs=12 pairs=18 mean50= -4.91 win=18.2
+   bs     lo<0.600 | mid | hi>=0.633   n= 54 hrs= 9 pairs=17 mean50= -3.24 win=24.1 || n= 55 hrs=13 pairs=17 mean50= -5.57 win=18.2 || n= 55 hrs=12 pairs=17 mean50= -6.09 win= 7.3
+   v5z    lo<-0.221 | mid | hi>=0.013   n= 50 hrs=12 pairs=16 mean50= -5.42 win=16.0 || n= 51 hrs=11 pairs=16 mean50= -5.22 win=11.8 || n= 51 hrs=11 pairs=17 mean50= -3.30 win=25.5
+   sol60  lo<-0.385 | mid | hi>=-0.049   n= 44 hrs=11 pairs=16 mean50= -3.79 win=20.5 || n= 45 hrs= 9 pairs=13 mean50= -4.76 win= 8.9 || n= 45 hrs= 6 pairs=12 mean50= -4.47 win=22.2
+   new60  lo<69.000 | mid | hi>=83.000   n= 53 hrs=10 pairs=17 mean50= -6.08 win= 9.4 || n= 56 hrs=12 pairs=16 mean50= -3.90 win=21.4 || n= 58 hrs= 7 pairs=15 mean50= -5.08 win=17.2
+   tide   lo<-4.384 | mid | hi>=-1.508   n= 52 hrs=10 pairs=16 mean50= -3.33 win=19.2 || n= 53 hrs=12 pairs=17 mean50= -4.37 win=18.9 || n= 53 hrs= 7 pairs=14 mean50= -6.77 win=13.2
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (2, -11.0), 9: (15, -8.2), 10: (5, -6.7), 11: (4, -8.8), 12: (6, -3.4), 13: (7, 0.4), 14: (12, -2.4), 15: (15, -0.1), 16: (19, -4.7), 17: (20, -3.7), 18: (16, -5.7), 19: (20, -6.9), 21: (19, -8.0), 22: (7, -4.0)}
+-- ('DIP', 'E2') n=102 hrs=14 pairs=24 mean50= -3.00 win=33.3
+   n      lo<35.000 | mid | hi>=59.000   n= 33 hrs=10 pairs=13 mean50= -0.79 win=39.4 || n= 35 hrs= 6 pairs=14 mean50= -3.51 win=28.6 || n= 34 hrs= 5 pairs=12 mean50= -4.61 win=32.4
+   br15   lo<0.429 | mid | hi>=0.552   n= 27 hrs=10 pairs=16 mean50=  2.89 win=44.4 || n= 35 hrs=11 pairs=14 mean50= -7.55 win=25.7 || n= 32 hrs=10 pairs=14 mean50= -3.31 win=34.4
+   br60   lo<0.400 | mid | hi>=0.596   n= 26 hrs= 7 pairs=12 mean50=  1.55 win=46.2 || n= 27 hrs=10 pairs=12 mean50= -3.63 win=33.3 || n= 28 hrs= 7 pairs=12 mean50= -4.20 win=28.6
+   med15  lo<-0.192 | mid | hi>=0.232   n= 31 hrs=10 pairs=16 mean50=  2.18 win=45.2 || n= 31 hrs=10 pairs=14 mean50= -9.59 win=22.6 || n= 32 hrs=12 pairs=15 mean50= -1.95 win=34.4
+   med60  lo<-0.985 | mid | hi>=0.827   n= 27 hrs= 8 pairs=13 mean50= -1.82 win=40.7 || n= 27 hrs= 9 pairs=14 mean50= -1.00 win=37.0 || n= 27 hrs= 7 pairs=13 mean50= -3.67 win=29.6
+   pc5    lo<0.000 | mid | hi>=0.130   n= 31 hrs=10 pairs=15 mean50=  1.05 win=41.9 || n= 33 hrs=10 pairs=15 mean50= -5.33 win=27.3 || n= 36 hrs=13 pairs=15 mean50= -4.23 win=33.3
+   pc1h   lo<0.423 | mid | hi>=1.275   n= 33 hrs= 9 pairs=12 mean50=  1.65 win=42.4 || n= 33 hrs=12 pairs=14 mean50= -5.06 win=33.3 || n= 34 hrs=10 pairs=16 mean50= -5.37 win=26.5
+   bs     lo<0.600 | mid | hi>=0.636   n= 31 hrs= 7 pairs=14 mean50= -6.56 win=22.6 || n= 35 hrs=12 pairs=17 mean50= -1.00 win=40.0 || n= 34 hrs=11 pairs=14 mean50= -1.67 win=38.2
+   v5z    lo<-0.202 | mid | hi>=0.024   n= 30 hrs=10 pairs=13 mean50= -6.64 win=23.3 || n= 30 hrs=10 pairs=13 mean50= -5.30 win=30.0 || n= 31 hrs=11 pairs=15 mean50=  1.24 win=45.2
+   sol60  lo<-0.390 | mid | hi>=-0.103   n= 26 hrs= 9 pairs=15 mean50=  0.22 win=42.3 || n= 26 hrs= 8 pairs=13 mean50= -2.05 win=34.6 || n= 27 hrs= 7 pairs=13 mean50= -4.97 win=29.6
+   new60  lo<68.000 | mid | hi>=84.000   n= 30 hrs=10 pairs=16 mean50=  0.32 win=43.3 || n= 38 hrs=12 pairs=16 mean50= -3.89 win=28.9 || n= 34 hrs= 7 pairs=14 mean50= -4.93 win=29.4
+   tide   lo<-4.327 | mid | hi>=-1.448   n= 31 hrs= 9 pairs=15 mean50=  0.43 win=38.7 || n= 32 hrs=11 pairs=16 mean50= -0.42 win=40.6 || n= 32 hrs= 7 pairs=12 mean50=-10.20 win=18.8
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (2, 9.0), 9: (10, -5.4), 10: (1, 5.1), 11: (3, -1.1), 12: (4, -5.6), 13: (4, 2.5), 14: (8, -1.6), 15: (10, -3.5), 16: (10, -3.8), 17: (13, 1.3), 18: (10, -1.1), 19: (11, -4.0), 21: (13, -13.2), 22: (3, 11.9)}
+-- ('DIP', 'E3') n= 88 hrs=14 pairs=24 mean50= -2.48 win=36.4
+   n      lo<34.000 | mid | hi>=58.000   n= 27 hrs= 9 pairs=11 mean50= -3.84 win=37.0 || n= 25 hrs= 5 pairs=12 mean50=  3.90 win=32.0 || n= 36 hrs= 5 pairs=14 mean50= -5.90 win=38.9
+   br15   lo<0.419 | mid | hi>=0.561   n= 26 hrs=10 pairs=17 mean50= -8.30 win=19.2 || n= 27 hrs= 9 pairs=15 mean50=  7.30 win=51.9 || n= 27 hrs= 8 pairs=12 mean50= -4.50 win=37.0
+   br60   lo<0.400 | mid | hi>=0.600   n= 24 hrs= 8 pairs=13 mean50= -8.53 win=37.5 || n= 24 hrs=10 pairs=14 mean50=  6.97 win=41.7 || n= 24 hrs= 7 pairs=12 mean50= -5.42 win=33.3
+   med15  lo<-0.262 | mid | hi>=0.293   n= 26 hrs=10 pairs=15 mean50=  2.56 win=34.6 || n= 27 hrs=10 pairs=15 mean50= -4.76 win=33.3 || n= 27 hrs=11 pairs=13 mean50= -2.89 win=40.7
+   med60  lo<-1.455 | mid | hi>=0.827   n= 24 hrs= 8 pairs=14 mean50=-10.21 win=33.3 || n= 24 hrs=10 pairs=14 mean50=  8.20 win=45.8 || n= 24 hrs= 7 pairs=12 mean50= -4.96 win=33.3
+   pc5    lo<0.000 | mid | hi>=0.153   n= 28 hrs=10 pairs=15 mean50=  2.37 win=32.1 || n= 29 hrs= 9 pairs=14 mean50= -7.71 win=34.5 || n= 29 hrs=13 pairs=13 mean50= -1.59 win=44.8
+   pc1h   lo<0.480 | mid | hi>=1.300   n= 28 hrs=10 pairs=14 mean50=  0.28 win=35.7 || n= 29 hrs=11 pairs=14 mean50=  2.85 win=48.3 || n= 29 hrs= 9 pairs=14 mean50=-10.14 win=27.6
+   bs     lo<0.600 | mid | hi>=0.634   n= 28 hrs= 8 pairs=14 mean50=  0.48 win=39.3 || n= 29 hrs=13 pairs=15 mean50= -6.30 win=37.9 || n= 29 hrs=11 pairs=14 mean50= -1.18 win=34.5
+   v5z    lo<-0.247 | mid | hi>=0.024   n= 26 hrs=10 pairs=14 mean50=  6.29 win=30.8 || n= 26 hrs=10 pairs=12 mean50=-12.29 win=23.1 || n= 27 hrs=11 pairs=13 mean50= -1.66 win=55.6
+   sol60  lo<-0.393 | mid | hi>=-0.096   n= 23 hrs= 9 pairs=15 mean50= -7.48 win=21.7 || n= 24 hrs= 8 pairs=12 mean50=  1.20 win=45.8 || n= 24 hrs= 6 pairs=13 mean50=  2.82 win=45.8
+   new60  lo<68.000 | mid | hi>=82.000   n= 26 hrs=10 pairs=16 mean50= -1.93 win=42.3 || n= 32 hrs=13 pairs=14 mean50= -1.38 win=40.6 || n= 30 hrs= 7 pairs=15 mean50= -4.14 win=26.7
+   tide   lo<-4.423 | mid | hi>=-1.656   n= 27 hrs=10 pairs=14 mean50=  0.19 win=37.0 || n= 27 hrs=10 pairs=14 mean50=-10.03 win=37.0 || n= 27 hrs= 7 pairs=12 mean50=  1.24 win=33.3
+   by UTC hour (descriptive; holdout hours are disjoint): {8: (2, 11.3), 9: (6, -10.5), 10: (3, 3.0), 11: (3, 1.0), 12: (3, -2.8), 13: (5, -23.9), 14: (6, -4.2), 15: (9, 3.0), 16: (9, 21.6), 17: (11, -8.4), 18: (8, -10.3), 19: (9, 3.3), 21: (9, -13.9), 22: (5, 2.1)}
+== top 15 train tercile cells (mean net50)
+   [8.2, ('DIP', 'E3'), 'med60', 1, -1.455, 0.827, 24, 10]
+   [7.3, ('DIP', 'E3'), 'br15', 1, 0.419, 0.561, 27, 9]
+   [6.97, ('DIP', 'E3'), 'br60', 1, 0.4, 0.6, 24, 10]
+   [6.29, ('DIP', 'E3'), 'v5z', 0, -0.247, 0.024, 26, 10]
+   [3.9, ('DIP', 'E3'), 'n', 1, 34, 58, 25, 5]
+   [2.89, ('DIP', 'E2'), 'br15', 0, 0.429, 0.552, 27, 10]
+   [2.85, ('DIP', 'E3'), 'pc1h', 1, 0.48, 1.3, 29, 11]
+   [2.82, ('DIP', 'E3'), 'sol60', 2, -0.393, -0.096, 24, 6]
+   [2.56, ('DIP', 'E3'), 'med15', 0, -0.262, 0.293, 26, 10]
+   [2.37, ('DIP', 'E3'), 'pc5', 0, 0.0, 0.153, 28, 10]
+   [2.18, ('DIP', 'E2'), 'med15', 0, -0.192, 0.232, 31, 10]
+   [1.65, ('DIP', 'E2'), 'pc1h', 0, 0.423, 1.275, 33, 9]
+   [1.55, ('DIP', 'E2'), 'br60', 0, 0.4, 0.596, 26, 7]
+   [1.24, ('DIP', 'E3'), 'tide', 2, -4.423, -1.656, 27, 7]
+   [1.24, ('DIP', 'E2'), 'v5z', 2, -0.202, 0.024, 31, 11]
+== (b) panel: forward net50 of 1/min random samples, TRAIN entries only
+-- U_liquid samples 11055 pairs 44 mean f30 -4.02
+   n      lo<36.000 hi>=59.000  n=3511 hrs=10 f30= -4.55 f60= -5.44 || n=3567 hrs= 8 f30= -3.86 f60= -4.16 || n=3970 hrs= 6 f30= -3.70 f60= -2.21
+   br15   lo<0.467 hi>=0.581  n=3472 hrs=13 f30= -3.06 f60= -3.13 || n=3514 hrs=15 f30= -4.73 f60= -4.23 || n=3549 hrs=12 f30= -3.83 f60= -4.02
+   br60   lo<0.433 hi>=0.600  n=3057 hrs= 9 f30= -3.56 f60= -3.88 || n=3075 hrs=13 f30= -4.30 f60= -4.52 || n=3094 hrs=11 f30= -3.64 f60= -3.39
+   med15  lo<-0.030 hi>=0.365  n=3494 hrs=13 f30= -3.20 f60= -3.16 || n=3525 hrs=14 f30= -4.10 f60= -3.41 || n=3516 hrs=14 f30= -4.32 f60= -4.83
+   med60  lo<-0.769 hi>=1.125  n=3070 hrs=10 f30= -3.63 f60= -4.05 || n=3070 hrs=12 f30= -3.83 f60= -4.04 || n=3086 hrs=13 f30= -4.03 f60= -3.70
+   pc5    lo<0.000 hi>=0.170  n=2785 hrs=13 f30= -3.72 f60= -3.79 || n=4561 hrs=15 f30= -3.68 f60= -3.53 || n=3684 hrs=14 f30= -4.69 f60= -4.37
+   pc1h   lo<0.578 hi>=1.605  n=3670 hrs=13 f30= -2.78 f60= -3.67 || n=3674 hrs=15 f30= -4.26 f60= -3.23 || n=3686 hrs=14 f30= -5.03 f60= -4.73
+   bs     lo<0.598 hi>=0.625  n=3675 hrs=14 f30= -4.41 f60= -4.63 || n=3618 hrs=14 f30= -4.08 f60= -3.52 || n=3737 hrs=14 f30= -3.60 f60= -3.49
+   v5z    lo<-0.175 hi>=0.014  n=3503 hrs=14 f30= -4.19 f60= -3.86 || n=3512 hrs=13 f30= -4.00 f60= -3.49 || n=3522 hrs=13 f30= -3.81 f60= -3.78
+   sol60  lo<-0.375 hi>=-0.016  n=3023 hrs=13 f30= -3.14 f60= -3.64 || n=3026 hrs=11 f30= -3.79 f60= -3.86 || n=3029 hrs= 8 f30= -4.50 f60= -4.19
+   new60  lo<70.000 hi>=84.000  n=3494 hrs=10 f30= -3.36 f60= -3.71 || n=3576 hrs=12 f30= -4.33 f60= -4.37 || n=3978 hrs= 8 f30= -4.32 f60= -3.57
+   tide   lo<-4.410 hi>=-1.624  n=3578 hrs=10 f30= -2.55 f60= -3.11 || n=3610 hrs=12 f30= -5.61 f60= -4.43 || n=3598 hrs= 8 f30= -4.02 f60= -3.86
+-- U_lowcost samples 1440 pairs 5 mean f30 -1.11
+   n      lo<57.000 hi>=60.000  n= 381 hrs= 6 f30= -2.57 f60= -2.68 || n= 442 hrs= 5 f30=  0.12 f60=  1.39 || n= 617 hrs= 6 f30= -1.10 f60=  0.46
+   br15   lo<0.508 hi>=0.600  n= 446 hrs= 8 f30= -0.84 f60= -0.41 || n= 436 hrs= 9 f30= -1.63 f60= -0.50 || n= 484 hrs= 7 f30= -0.59 f60=  1.27
+   br60   lo<0.500 hi>=0.623  n= 388 hrs= 5 f30= -1.36 f60= -1.16 || n= 389 hrs= 8 f30= -0.71 f60=  0.82 || n= 405 hrs= 7 f30= -0.07 f60=  1.77
+   med15  lo<0.041 hi>=0.384  n= 454 hrs= 8 f30= -0.81 f60= -0.43 || n= 454 hrs= 9 f30= -1.54 f60= -0.02 || n= 458 hrs= 8 f30= -0.66 f60=  0.93
+   med60  lo<0.000 hi>=1.340  n= 392 hrs= 5 f30= -1.34 f60= -1.23 || n= 395 hrs= 8 f30= -0.69 f60=  1.01 || n= 395 hrs= 7 f30= -0.08 f60=  1.71
+   pc5    lo<0.035 hi>=0.160  n= 478 hrs= 7 f30= -1.29 f60= -0.51 || n= 455 hrs= 9 f30= -1.09 f60= -0.10 || n= 503 hrs= 8 f30= -0.96 f60=  0.38
+   pc1h   lo<0.930 hi>=1.685  n= 461 hrs= 8 f30= -1.15 f60= -1.53 || n= 495 hrs= 9 f30= -1.57 f60= -0.43 || n= 480 hrs= 8 f30= -0.60 f60=  1.70
+   bs     lo<0.600 hi>=0.625  n= 425 hrs= 8 f30= -2.20 f60= -1.84 || n= 528 hrs= 8 f30= -0.94 f60= -0.09 || n= 483 hrs= 8 f30= -0.34 f60=  1.50
+   v5z    lo<-0.130 hi>=0.001  n= 476 hrs= 9 f30= -1.64 f60=  0.41 || n= 478 hrs= 7 f30= -1.02 f60= -0.12 || n= 482 hrs= 8 f30= -0.68 f60= -0.50
+   sol60  lo<-0.381 hi>=-0.038  n= 386 hrs= 8 f30=  0.92 f60=  2.25 || n= 387 hrs= 6 f30= -0.82 f60=  1.68 || n= 389 hrs= 6 f30= -2.18 f60= -2.12
+   new60  lo<73.000 hi>=88.000  n= 468 hrs= 5 f30= -1.58 f60= -1.82 || n= 482 hrs= 8 f30= -2.08 f60= -1.32 || n= 490 hrs= 6 f30=  0.29 f60=  2.79
+   tide   lo<-4.372 hi>=-1.508  n= 476 hrs= 7 f30= -0.92 f60= -1.42 || n= 481 hrs= 7 f30= -2.43 f60= -1.26 || n= 479 hrs= 5 f30=  0.02 f60=  2.46
+configs_tried (step2 train evaluations of base x exit x regime cell): 333

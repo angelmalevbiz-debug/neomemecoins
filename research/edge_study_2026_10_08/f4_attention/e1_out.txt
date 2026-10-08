@@ -1,0 +1,110 @@
+events 1953 base samples 66770 secs 3.9
+
+######## TRAIN events (t < split) - counts by type and dex
+   ('FIRST_gecko-new-pools', 'pumpswap') 679
+   ('FIRST_latest', 'pumpfun') 204
+   ('FIRST_pumpswap-address-catalog', 'pumpswap') 66
+   ('FIRST_latest', 'pumpswap') 51
+   ('FIRSTPAIR_latest', 'pumpswap') 41
+   ('BOOST_ON', 'pumpswap') 26
+   ('ONSETRE_boosted-latest', 'pumpswap') 18
+   ('ONSET1_latest', 'pumpswap') 17
+   ('ONSET1_boosted-latest', 'pumpswap') 16
+   ('ONSETRE_boosted', 'pumpswap') 12
+   ('FIRST_latest', 'meteoradbc') 11
+   ('ONSET1_boosted-latest', 'pumpfun') 9
+   ('BOOST_ON', 'pumpfun') 9
+   ('ONSET1_boosted', 'pumpswap') 8
+   ('FIRST_boost', 'pumpswap') 7
+   ('FIRSTPAIR_gecko-new-pools', 'pumpswap') 6
+   ('BOOST_UP', 'pumpswap') 5
+   ('ONSET1_boosted', 'pumpfun') 5
+   ('FIRST_boosted-latest', 'pumpswap') 4
+   ('FIRST_latest', 'meteora') 4
+   ('FIRST_boost', 'pumpfun') 3
+   ('FIRST_boosted', 'pumpswap') 3
+   ('FIRST_boosted-latest', 'pumpfun') 2
+   ('FIRST_latest', 'raydium') 2
+   ('ONSETRE_boosted-latest', 'raydium') 2
+   ('ONSETRE_boosted', 'pumpfun') 2
+   ('FIRST_boosted', 'pumpfun') 1
+   ('FIRSTPAIR_latest', 'meteora') 1
+   ('ONSETRE_boosted-latest', 'pumpfun') 1
+   ('FIRST_boosted', 'raydium') 1
+   ('FIRST_boosted-latest', 'raydium') 1
+   ('FIRST_boost', 'raydium') 1
+   ('ONSET1_boosted-latest', 'meteoradbc') 1
+   ('BOOST_ON', 'meteoradbc') 1
+   ('FIRSTPAIR_boosted', 'pumpswap') 1
+   ('FIRSTPAIR_boosted-latest', 'pumpswap') 1
+   ('FIRSTPAIR_boost', 'pumpswap') 1
+   ('FIRST_boosted-latest', 'meteoradbc') 1
+   ('FIRST_boost', 'meteoradbc') 1
+   ('ONSET1_boosted', 'meteoradbc') 1
+   ('ONSETRE_boosted', 'meteoradbc') 1
+   ('ONSETRE_latest', 'pumpfun') 1
+
+######## TRAIN PumpSwap events: forward NET50 % (stress), by type (all buckets), rug-screened
+   BOOST_ON                     n=17 | pairs 14 | 60s:n17 m-6.97 med-5.06 w0% v0 180s:n17 m-7.91 med-6.47 w0% v0 300s:n17 m-6.31 med-4.59 w6% v0 600s:n17 m-4.56 med-5.42 w12% v0 900s:n17 m-11.39 med-10.09 w12% v0 1800s:n17 m-10.61 med-4.68 w29% v0 3600s:n17 m-14.02 med-5.71 w24% v0
+   BOOST_UP                     n=5 | pairs 3 | 60s:n5 m-4.36 med-4.07 w0% v0 180s:n5 m-4.71 med-3.70 w0% v0 300s:n5 m-5.40 med-3.43 w20% v0 600s:n5 m-7.17 med-3.29 w20% v0 900s:n5 m-10.18 med-10.54 w0% v0 1800s:n5 m+1.98 med-2.96 w40% v0 3600s:n5 m-7.85 med-3.12 w40% v0
+   FIRST_boost                  n=7 | pairs 7 | 60s:n7 m-2.87 med-3.62 w29% v0 180s:n7 m-1.88 med-3.66 w29% v0 300s:n7 m-3.74 med-2.12 w29% v0 600s:n7 m+2.18 med-2.01 w43% v0 900s:n7 m+10.77 med+1.85 w57% v0 1800s:n7 m+27.34 med-0.73 w43% v0 3600s:n7 m+8.71 med-4.36 w29% v0
+   FIRST_gecko-new-pools        n=320 | pairs 320 | 60s:n317 m-14.90 med-14.26 w8% v149 180s:n317 m+7.83 med-16.58 w6% v302 300s:n317 m+4.84 med-16.58 w6% v303 600s:n317 m+3.40 med-16.59 w5% v303 900s:n317 m+3.09 med-16.60 w5% v303 1800s:n317 m+2.60 med-16.60 w5% v304 3600s:n317 m+2.82 med-16.60 w5% v314
+   FIRST_latest                 n=39 | pairs 39 | 60s:n39 m-9.94 med-9.67 w21% v0 180s:n39 m-16.65 med-10.90 w33% v0 300s:n39 m-23.10 med-24.76 w21% v0 600s:n39 m-31.86 med-28.11 w21% v0 900s:n39 m-31.18 med-18.47 w18% v0 1800s:n39 m-47.27 med-42.40 w8% v6 3600s:n39 m-51.00 med-61.08 w5% v32
+   FIRST_pumpswap-address-catalog n=25 | pairs 25 | 60s:n25 m-2.96 med-2.66 w8% v0 180s:n25 m-3.20 med-2.54 w8% v0 300s:n25 m-3.64 med-2.89 w8% v0 600s:n25 m-4.61 med-2.80 w12% v0 900s:n25 m-4.10 med-2.58 w16% v0 1800s:n25 m-1.52 med-2.70 w28% v1 3600s:n25 m-6.70 med-4.85 w8% v1
+   ONSET1_boosted               n=5 | pairs 5 | 60s:n5 m-4.74 med-4.59 w0% v0 180s:n5 m-3.89 med-3.48 w0% v0 300s:n5 m-2.07 med-3.12 w20% v0 600s:n5 m-4.33 med-3.29 w0% v0 900s:n5 m-8.58 med-10.09 w20% v0 1800s:n5 m-6.68 med-3.47 w0% v0 3600s:n5 m+0.62 med-3.12 w40% v0
+   ONSET1_boosted-latest        n=12 | pairs 12 | 60s:n12 m-6.91 med-5.33 w8% v0 180s:n12 m-7.61 med-6.47 w0% v0 300s:n12 m-5.64 med-2.54 w8% v0 600s:n12 m-3.97 med-5.88 w25% v0 900s:n12 m-12.27 med-10.14 w17% v0 1800s:n12 m-1.70 med-2.53 w33% v0 3600s:n12 m-7.51 med-8.38 w17% v0
+   ONSET1_latest                n=10 | pairs 10 | 60s:n10 m-5.41 med-7.75 w30% v0 180s:n10 m-12.73 med-21.98 w20% v0 300s:n10 m-9.11 med-19.96 w20% v0 600s:n10 m-42.33 med-29.02 w20% v1 900s:n10 m-38.91 med-56.30 w20% v1 1800s:n10 m-38.47 med-64.19 w20% v3 3600s:n10 m-30.61 med-74.44 w20% v8
+   ONSETRE_boosted              n=8 | pairs 8 | 60s:n8 m-7.74 med-4.14 w0% v0 180s:n8 m-7.24 med-4.18 w0% v0 300s:n8 m-7.19 med-3.61 w0% v0 600s:n8 m-7.73 med-4.27 w0% v0 900s:n8 m-11.91 med-7.56 w0% v0 1800s:n8 m-22.63 med-7.57 w12% v0 3600s:n8 m-24.05 med-5.71 w12% v1
+   ONSETRE_boosted-latest       n=14 | pairs 7 | 60s:n14 m-4.21 med-3.71 w0% v0 180s:n14 m-6.39 med-4.22 w7% v0 300s:n14 m-5.54 med-2.74 w21% v0 600s:n14 m-3.49 med-3.70 w21% v0 900s:n14 m-4.24 med-4.06 w36% v0 1800s:n14 m-3.47 med-2.26 w43% v0 3600s:n14 m-4.74 med-4.27 w29% v0
+
+  (same, rug-flagged only)
+   BOOST_ON                     n=9 | pairs 6 | 60s:n9 m-9.30 med-5.98 w11% v0 180s:n9 m+2.55 med-5.82 w22% v0 300s:n9 m+13.49 med-5.86 w33% v0 600s:n9 m+25.74 med-3.39 w33% v0 900s:n9 m+12.18 med-5.08 w22% v0 1800s:n9 m+36.30 med-2.47 w44% v0 3600s:n9 m+55.08 med+4.66 w56% v0
+   FIRSTPAIR_gecko-new-pools    n=6 | pairs 6 | 60s:n6 m-4.10 med-1.70 w33% v3 180s:n6 m+1.87 med+2.45 w50% v3 300s:n6 m+2.76 med+2.61 w50% v3 600s:n6 m-18.85 med-1.70 w33% v3 900s:n6 m-19.61 med-1.70 w33% v3 1800s:n6 m-29.34 med-1.70 w33% v3 3600s:n6 m-26.69 med-1.70 w33% v5
+   FIRSTPAIR_latest             n=41 | pairs 41 | 60s:n41 m-8.56 med-7.59 w24% v1 180s:n41 m-8.67 med-12.01 w34% v1 300s:n41 m-18.05 med-18.01 w37% v2 600s:n41 m-35.56 med-49.36 w20% v3 900s:n41 m-30.97 med-57.79 w24% v5 1800s:n41 m-43.31 med-76.54 w20% v15 3600s:n41 m-33.85 med-75.85 w17% v34
+   FIRST_gecko-new-pools        n=359 | pairs 359 | 60s:n355 m-11.62 med-12.08 w6% v191 180s:n355 m-9.51 med-16.36 w5% v344 300s:n355 m-9.49 med-16.39 w5% v347 600s:n355 m-9.89 med-16.40 w4% v348 900s:n355 m-9.98 med-16.40 w4% v348 1800s:n355 m-9.96 med-16.40 w4% v348 3600s:n355 m-10.25 med-16.40 w4% v350
+   FIRST_latest                 n=12 | pairs 12 | 60s:n12 m-20.82 med-16.85 w8% v0 180s:n12 m-26.42 med-25.01 w8% v0 300s:n12 m-29.54 med-25.75 w8% v0 600s:n12 m-40.35 med-35.37 w8% v0 900s:n12 m-42.90 med-35.26 w0% v1 1800s:n12 m-58.51 med-54.36 w0% v3 3600s:n12 m-62.21 med-62.83 w8% v11
+   FIRST_pumpswap-address-catalog n=41 | pairs 41 | 60s:n41 m-4.18 med-2.04 w5% v4 180s:n41 m-3.87 med-1.98 w10% v4 300s:n41 m-4.22 med-1.77 w10% v5 600s:n41 m-4.14 med-1.60 w12% v5 900s:n41 m-7.98 med-1.52 w17% v6 1800s:n41 m-6.69 med-1.21 w22% v6 3600s:n41 m-9.19 med-0.81 w29% v8
+   ONSET1_latest                n=7 | pairs 7 | 60s:n7 m-14.74 med-15.45 w14% v0 180s:n7 m-29.06 med-23.72 w14% v0 300s:n7 m-18.73 med-17.87 w14% v0 600s:n7 m-43.28 med-35.46 w14% v0 900s:n7 m-46.53 med-40.18 w14% v1 1800s:n7 m-52.30 med-40.18 w0% v1 3600s:n7 m-63.31 med-76.44 w14% v5
+
+######## TRAIN PumpSwap events by type x fee x liq (rug-screened), NET50
+   BOOST_ON                   fee100-125 liq50-250k | pairs 6 | 60s:n7 m-5.53 med-4.64 w0% v0 180s:n7 m-6.86 med-6.47 w0% v0 300s:n7 m-4.92 med-3.61 w0% v0 600s:n7 m-5.97 med-5.42 w0% v0 900s:n7 m-9.16 med-7.56 w14% v0 1800s:n7 m-18.85 med-3.10 w43% v0 3600s:n7 m-20.30 med+0.27 w57% v0
+   BOOST_ON                   fee100-125 liq<50k    | pairs 5 | 60s:n6 m-11.36 med-6.55 w0% v0 180s:n6 m-10.90 med-6.91 w0% v0 300s:n6 m-8.45 med-6.15 w17% v0 600s:n6 m-3.01 med-5.88 w17% v0 900s:n6 m-17.99 med-19.15 w0% v0 1800s:n6 m-3.46 med-1.63 w33% v0 3600s:n6 m-11.56 med-9.33 w0% v0
+   BOOST_UP                   fee100-125 liq50-250k | pairs 3 | 60s:n5 m-4.36 med-4.07 w0% v0 180s:n5 m-4.71 med-3.70 w0% v0 300s:n5 m-5.40 med-3.43 w20% v0 600s:n5 m-7.17 med-3.29 w20% v0 900s:n5 m-10.18 med-10.54 w0% v0 1800s:n5 m+1.98 med-2.96 w40% v0 3600s:n5 m-7.85 med-3.12 w40% v0
+   FIRST_gecko-new-pools      fee100-125 liq50-250k | pairs 57 | 60s:n57 m-7.88 med-4.94 w14% v29 180s:n57 m-12.26 med-13.77 w5% v57 300s:n57 m-12.26 med-13.77 w5% v57 600s:n57 m-12.26 med-13.77 w5% v57 900s:n57 m-12.26 med-13.77 w5% v57 1800s:n57 m-12.26 med-13.77 w5% v57 3600s:n57 m-12.26 med-13.77 w5% v57
+   FIRST_gecko-new-pools      fee100-125 liq<50k    | pairs 257 | 60s:n254 m-16.65 med-15.41 w6% v120 180s:n254 m+12.92 med-16.64 w6% v239 300s:n254 m+9.18 med-16.64 w6% v240 600s:n254 m+7.38 med-16.64 w6% v240 900s:n254 m+7.00 med-16.65 w5% v240 1800s:n254 m+6.39 med-16.65 w5% v241 3600s:n254 m+6.66 med-16.65 w5% v251
+   FIRST_latest               fee100-125 liq50-250k | pairs 7 | 60s:n7 m-6.76 med-4.34 w14% v0 180s:n7 m-11.04 med-7.86 w14% v0 300s:n7 m-3.91 med-2.67 w29% v0 600s:n7 m-1.05 med-0.54 w43% v0 900s:n7 m-13.02 med-11.99 w29% v0 1800s:n7 m-27.55 med-24.24 w14% v2 3600s:n7 m-2.17 med-28.25 w29% v2
+   FIRST_latest               fee100-125 liq<50k    | pairs 31 | 60s:n31 m-10.79 med-10.69 w23% v0 180s:n31 m-17.56 med-17.56 w39% v0 300s:n31 m-27.08 med-27.59 w19% v0 600s:n31 m-38.86 med-37.47 w16% v0 900s:n31 m-36.22 med-37.07 w16% v0 1800s:n31 m-52.84 med-56.74 w6% v3 3600s:n31 m-63.27 med-70.41 w0% v29
+   FIRST_pumpswap-address-catalog fee<=50    liq>=250k  | pairs 9 | 60s:n9 m-1.21 med-1.97 w22% v0 180s:n9 m-1.18 med-2.00 w22% v0 300s:n9 m-1.70 med-1.95 w22% v0 600s:n9 m-2.27 med-1.67 w22% v0 900s:n9 m-1.73 med-1.42 w22% v0 1800s:n9 m-2.72 med-2.00 w33% v1 3600s:n9 m-3.41 med-2.46 w22% v1
+   FIRST_pumpswap-address-catalog fee55-95   liq>=250k  | pairs 5 | 60s:n5 m-2.81 med-2.78 w0% v0 180s:n5 m-2.86 med-2.76 w0% v0 300s:n5 m-3.09 med-3.33 w0% v0 600s:n5 m-3.12 med-2.97 w0% v0 900s:n5 m-3.68 med-3.25 w0% v0 1800s:n5 m-4.20 med-3.22 w0% v0 3600s:n5 m-4.82 med-4.38 w0% v0
+   FIRST_pumpswap-address-catalog fee55-95   liq50-250k | pairs 6 | 60s:n6 m-3.78 med-3.57 w0% v0 180s:n6 m-3.62 med-3.43 w0% v0 300s:n6 m-3.72 med-2.89 w0% v0 600s:n6 m-3.35 med-2.80 w17% v0 900s:n6 m-2.51 med-2.49 w17% v0 1800s:n6 m-1.71 med-1.49 w33% v0 3600s:n6 m-7.96 med-2.73 w0% v0
+   ONSET1_boosted-latest      fee100-125 liq<50k    | pairs 5 | 60s:n5 m-9.73 med-5.83 w20% v0 180s:n5 m-10.82 med-12.35 w0% v0 300s:n5 m-7.78 med-6.24 w20% v0 600s:n5 m+0.06 med-5.88 w40% v0 900s:n5 m-13.94 med-20.59 w20% v0 1800s:n5 m+5.53 med+4.15 w60% v0 3600s:n5 m-3.61 med-9.33 w20% v0
+   ONSET1_latest              fee100-125 liq<50k    | pairs 10 | 60s:n10 m-5.41 med-7.75 w30% v0 180s:n10 m-12.73 med-21.98 w20% v0 300s:n10 m-9.11 med-19.96 w20% v0 600s:n10 m-42.33 med-29.02 w20% v1 900s:n10 m-38.91 med-56.30 w20% v1 1800s:n10 m-38.47 med-64.19 w20% v3 3600s:n10 m-30.61 med-74.44 w20% v8
+   ONSETRE_boosted-latest     fee100-125 liq50-250k | pairs 2 | 60s:n5 m-5.03 med-4.90 w0% v0 180s:n5 m-6.57 med-4.22 w0% v0 300s:n5 m-4.95 med-2.39 w20% v0 600s:n5 m-4.07 med-3.70 w0% v0 900s:n5 m-5.72 med-6.98 w20% v0 1800s:n5 m-2.46 med+1.64 w60% v0 3600s:n5 m-2.01 med+0.33 w60% v0
+
+######## TRAIN gross price change % (no costs) by type, rug-screened
+   BOOST_ON                     60s:m-2.07 med-0.36 180s:m-3.00 med-1.12 300s:m-1.27 med-0.12 600s:m+0.65 med-0.47 900s:m-6.76 med-3.95 1800s:m-5.65 med-1.10 3600s:m-9.38 med-1.86
+   BOOST_UP                     60s:m+0.14 med+0.10 180s:m-0.23 med+0.48 300s:m-0.97 med+0.77 600s:m-2.82 med+0.95 900s:m-5.98 med-5.97 1800s:m+6.83 med+1.26 3600s:m-3.51 med+1.12
+   FIRST_boost                  60s:m+3.54 med+0.00 180s:m+4.59 med+0.71 300s:m+2.58 med+2.26 600s:m+9.04 med+5.43 900s:m+18.36 med+10.86 1800s:m+36.43 med+10.30 3600s:m+16.36 med+0.00
+   FIRST_gecko-new-pools        60s:m+1.13 med+0.00 180s:m+758.10 med+5.40 300s:m+6.53 med-2.09 600s:m-29.18 med-33.43 900s:m-37.00 med-57.19 1800s:m-45.31 med-62.97 3600s:m-37.62 med-30.82
+   FIRST_latest                 60s:m-2.78 med-1.42 180s:m-9.93 med-3.74 300s:m-16.98 med-14.33 600s:m-26.74 med-23.04 900s:m-26.01 med-12.88 1800s:m-43.94 med-39.29 3600s:m+14.97 med-10.83
+   FIRST_pumpswap-address-catalog 60s:m+0.11 med+0.04 180s:m-0.15 med-0.05 300s:m-0.61 med-0.05 600s:m-1.63 med-0.32 900s:m-1.09 med-0.14 1800s:m+2.10 med+0.07 3600s:m-3.53 med-1.71
+   ONSET1_boosted               60s:m+0.83 med+0.55 180s:m+1.75 med+0.74 300s:m+3.62 med+1.12 600s:m+1.27 med+0.95 900s:m-3.18 med-3.95 1800s:m-1.21 med+1.40 3600s:m+6.82 med+1.12
+   ONSET1_boosted-latest        60s:m-1.66 med-0.36 180s:m-2.36 med-1.86 300s:m-0.23 med+0.91 600s:m+1.70 med-0.47 900s:m-7.31 med-6.36 1800s:m+4.21 med+1.68 3600s:m-2.10 med-1.86
+   ONSET1_latest                60s:m+4.58 med+0.08 180s:m-3.01 med-6.32 300s:m+1.07 med-12.88 600s:m-38.97 med-69.00 900s:m-34.20 med-58.62 1800s:m-15.22 med-62.24 3600s:m-20.34 med+57.58
+   ONSETRE_boosted              60s:m-0.28 med+0.00 180s:m+0.24 med+0.54 300s:m+0.30 med+0.00 600s:m-0.27 med+0.07 900s:m-4.70 med-2.57 1800s:m-15.89 med-1.10 3600s:m-18.91 med-2.34
+   ONSETRE_boosted-latest       60s:m+0.28 med+0.04 180s:m-2.00 med+0.58 300s:m-1.12 med+0.88 600s:m+1.05 med+0.31 900s:m+0.25 med-0.66 1800s:m+1.05 med+2.58 3600s:m-0.23 med+0.54
+
+######## TRAIN base rate (1/min samples, PumpSwap, rug-screened) NET50, by attention state
+   on_boost_list      fee55-95   liq>=250k  pairs 3 300s:n277 m-3.46 med-3.47 w5% 900s:n277 m-4.10 med-3.96 w10% 3600s:n277 m-5.83 med-5.74 w17%
+   on_boost_list      fee55-95   liq50-250k pairs 6 300s:n1265 m-3.41 med-3.20 w17% 900s:n1265 m-3.47 med-3.19 w27% 3600s:n1265 m-3.82 med-1.14 w44%
+   on_boost_list      fee100-125 liq50-250k pairs 9 300s:n2480 m-4.92 med-4.36 w11% 900s:n2480 m-5.55 med-4.36 w15% 3600s:n2480 m-7.59 med-4.36 w26%
+   on_boost_list      fee100-125 liq<50k    pairs 33 300s:n9036 m-17.20 med-18.06 w4% 900s:n9036 m-17.85 med-19.88 w7% 3600s:n9036 m-20.56 med-23.94 w9%
+   on_latest_list     fee55-95   liq50-250k pairs 2 300s:n61 m-3.59 med-2.45 w15% 900s:n61 m-2.85 med-2.83 w20% 3600s:n61 m-5.97 med-6.64 w2%
+   on_latest_list     fee100-125 liq50-250k pairs 11 300s:n142 m-13.42 med-9.61 w30% 900s:n142 m-35.62 med-26.51 w22% 3600s:n142 m-23.64 med-51.28 w30%
+   on_latest_list     fee100-125 liq<50k    pairs 49 300s:n1296 m-19.47 med-24.00 w17% 900s:n1296 m-23.17 med-29.79 w15% 3600s:n1296 m-28.73 med-35.29 w10%
+   no_attention_flag  fee<=50    liq>=250k  pairs 12 300s:n1724 m-1.87 med-2.12 w6% 900s:n1724 m-1.69 med-2.21 w11% 3600s:n1724 m-0.57 med-2.21 w16%
+   no_attention_flag  fee55-95   liq>=250k  pairs 9 300s:n1740 m-2.98 med-2.94 w3% 900s:n1740 m-3.25 med-3.21 w8% 3600s:n1740 m-4.00 med-3.50 w16%
+   no_attention_flag  fee55-95   liq50-250k pairs 11 300s:n2012 m-3.57 med-3.36 w8% 900s:n2012 m-3.89 med-3.42 w16% 3600s:n2012 m-4.81 med-4.59 w24%
+   no_attention_flag  fee100-125 liq50-250k pairs 68 300s:n1476 m-4.78 med-5.42 w15% 900s:n1476 m-3.87 med-6.48 w25% 3600s:n1476 m-3.17 med-6.37 w37%
+   no_attention_flag  fee100-125 liq<50k    pairs 267 300s:n745 m+9.36 med-7.85 w8% 900s:n745 m+9.74 med-9.81 w14% 3600s:n745 m+14.00 med-12.22 w31%
+done 4.0

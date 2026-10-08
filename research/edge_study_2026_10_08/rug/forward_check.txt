@@ -1,0 +1,28 @@
+forward rows 59301 pairs 113 window 36.5 min read secs 2.9
+== forward drains (fast LIQ/PRICE <= 20% of 10-min peak) with >= 1 point before: 4
+  CODY       8LwKKb6R LIQPRICE pts_before  168 flagged_share 1.00 flagged_at_last True liq0 19996 | last reasons ['YOUNG_POOL'] | in_dataset False
+  CERT       5d2XCTMg PRICE    pts_before   32 flagged_share 1.00 flagged_at_last True liq0 17865 | last reasons ['YOUNG_POOL'] | in_dataset False
+  Wick       95erHtAR LIQPRICE pts_before   15 flagged_share 1.00 flagged_at_last True liq0 27 | last reasons ['YOUNG_POOL'] | in_dataset False
+  PLAGUE     FK8CX3pY PRICE    pts_before   25 flagged_share 1.00 flagged_at_last True liq0 12 | last reasons ['YOUNG_POOL'] | in_dataset False
+forward drains with liq0 >= $20k: 0, flagged at last pre-drain point: 0
+never-drained forward pairs (liq0 >= $50k, >= 10 min seen): 49, mean share of points flagged 0.245, flagged-ever 12
+== dataset-end survivors of the families, seen after the cutoff:
+  SARP       HiPe6mDS drained_after_cutoff False kind  minutes_seen 36 liq_first 823057 liq_last 824749 vanished False reasons_first ['FAKE_MCAP']
+  WOSE       GhBPuDpt drained_after_cutoff False kind  minutes_seen 36 liq_first 1397467 liq_last 1395645 vanished False reasons_first ['YOUNG_POOL', 'FAKE_MCAP']
+  PQC        6qUUCwD9 drained_after_cutoff False kind  minutes_seen 36 liq_first 30355 liq_last 31460 vanished False reasons_first ['YOUNG_POOL']
+  CAPYBARA   BhGDfqqK drained_after_cutoff False kind  minutes_seen 36 liq_first 209402 liq_last 214559 vanished False reasons_first ['LP_PULLABLE', 'YOUNG_POOL']
+  PQC        FNU5SNrh drained_after_cutoff False kind  minutes_seen 36 liq_first 229862 liq_last 256995 vanished False reasons_first ['LP_PULLABLE', 'YOUNG_POOL']
+  CAPYBARA   H66u4gnT drained_after_cutoff False kind  minutes_seen 36 liq_first 360664 liq_last 367072 vanished False reasons_first ['LP_PULLABLE', 'YOUNG_POOL']
+  US         A7cJ8yHX drained_after_cutoff False kind  minutes_seen 36 liq_first 220985 liq_last 220711 vanished False reasons_first []
+  IOF        7wCarEYc drained_after_cutoff False kind  minutes_seen 36 liq_first 267261 liq_last 266832 vanished False reasons_first []
+  WOSE       BAPyQHY6 drained_after_cutoff False kind  minutes_seen 36 liq_first 201205 liq_last 201463 vanished False reasons_first []
+  USDP       8RCJrW94 drained_after_cutoff False kind  minutes_seen 36 liq_first 2395725 liq_last 2410619 vanished False reasons_first ['FAKE_MCAP']
+  GOIF       D2pVedgH drained_after_cutoff False kind  minutes_seen 36 liq_first 1260346 liq_last 1261925 vanished False reasons_first ['YOUNG_POOL', 'FAKE_MCAP']
+  USDF       FL5gakwf drained_after_cutoff False kind  minutes_seen 36 liq_first 3297964 liq_last 3298901 vanished False reasons_first ['FAKE_MCAP']
+  UDR        Gs6hrh68 drained_after_cutoff False kind  minutes_seen 36 liq_first 3219749 liq_last 3222240 vanished False reasons_first ['FAKE_MCAP']
+  SARP       AdvA19rg drained_after_cutoff False kind  minutes_seen 36 liq_first 1487002 liq_last 1488295 vanished False reasons_first ['FAKE_MCAP']
+  USDF       EpugLBw1 drained_after_cutoff False kind  minutes_seen 36 liq_first 413260 liq_last 411888 vanished False reasons_first []
+  UDR        ERFmQZQU drained_after_cutoff False kind  minutes_seen 36 liq_first 466550 liq_last 463317 vanished False reasons_first []
+  GOIF       8ZMkMgWM drained_after_cutoff False kind  minutes_seen 35 liq_first 513044 liq_last 511861 vanished False reasons_first []
+  SARP       EpakUVUm drained_after_cutoff False kind  minutes_seen 36 liq_first 2989 liq_last 2965 vanished False reasons_first ['LP_PULLABLE']
+secs 3.0

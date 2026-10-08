@@ -1,0 +1,8 @@
+HARNESS_FINAL rerun: train {'n': 30, 'pairs': 14, 'mean_usd': -7.518, 'mean_pct': -3.759} holdout {'n': 21, 'pairs': 13, 'mean_usd': 7.443, 'mean_pct': 3.721, 'median_pct': 0.989, 'win_rate': 52.4, 'pf': 1.778, 'ci95_mean_usd': [-6.852, 22.755], 'ci95_mean_usd_pair': [-2.163, 19.339], 'top_pair_share': 0.19, 'trades_per_hour': 2.31}
+compare harness_final_rerun vs leaderboard: 51 vs 51 trades, 51 matched by (pair, entry_t); only-harness_final_rerun 0, only-leaderboard 0
+   max |net0| diff 0.000000  max |net50| diff 0.000000  exit mismatches 0
+
+trap run: trades 51 identical True fields read ['age', 'liq', 'mcap', 'pc1h'] static fields ['pair', 'sym']
+truncation test: 51 / 51 recorded decisions still fire with the future deleted
+truncation test on 3000 random points of eligible pairs: 0 mismatches full-vs-truncated
+secs 9.9

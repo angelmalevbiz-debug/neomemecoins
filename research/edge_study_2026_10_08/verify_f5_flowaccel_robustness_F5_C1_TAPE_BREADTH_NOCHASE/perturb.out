@@ -1,0 +1,77 @@
+==== variant guard
+BASE                               full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+liq_min 15k (-25%)                 full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+liq_min 25k (+25%)                 full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+fee_lo 40 (-24%)                   full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+fee_lo 65 (+24%)                   full n= 64 mean$  -4.635 | train n= 55 p= 9 mean$  -6.454 | holdout n=  9 p= 4 mean$   6.481 pct   3.241 top 0.444
+fee_hi 100 (-20%)                  full n= 41 mean$  -6.797 | train n= 30 p= 5 mean$ -11.528 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+live_s 450 (-25%)                  full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+live_s 750 (+25%)                  full n= 66 mean$  -4.361 | train n= 55 p= 9 mean$  -6.454 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+nochase win 225s (-25%)            full n= 67 mean$   -4.33 | train n= 55 p= 9 mean$  -5.968 | holdout n= 12 p= 5 mean$   3.176 pct   1.588 top 0.333
+nochase win 375s (+25%)            full n= 60 mean$  -1.859 | train n= 49 p= 9 mean$   -3.62 | holdout n= 11 p= 5 mean$   5.986 pct   2.993 top 0.364
+nochase lo -1.5 (-25%)             full n= 66 mean$  -4.259 | train n= 55 p= 9 mean$  -6.323 | holdout n= 11 p= 5 mean$   6.062 pct   3.031 top 0.364
+nochase lo -2.5 (+25%)             full n= 67 mean$  -4.496 | train n= 56 p= 9 mean$  -6.579 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+nochase hi 3.75 (-25%)             full n= 64 mean$  -3.429 | train n= 53 p= 9 mean$  -5.305 | holdout n= 11 p= 5 mean$   5.607 pct   2.804 top 0.364
+nochase hi 6.25 (+25%)             full n= 66 mean$  -4.441 | train n= 55 p= 9 mean$  -6.575 | holdout n= 11 p= 5 mean$   6.229 pct   3.115 top 0.364
+flow win 225s (-25%)               full n= 62 mean$  -6.185 | train n= 52 p= 9 mean$  -8.113 | holdout n= 10 p= 5 mean$   3.842 pct   1.921 top 0.3
+flow win 375s (+25%)               full n= 69 mean$  -6.609 | train n= 56 p= 9 mean$   -8.95 | holdout n= 13 p= 6 mean$   3.472 pct   1.736 top 0.385
+ub >= 8 (-20%)                     full n= 66 mean$  -4.372 | train n= 55 p= 9 mean$  -6.411 | holdout n= 11 p= 5 mean$   5.824 pct   2.912 top 0.364
+ub >= 12 (+20%)                    full n= 66 mean$  -4.356 | train n= 55 p= 9 mean$   -6.54 | holdout n= 11 p= 5 mean$   6.563 pct   3.281 top 0.364
+newb >= 4 (-20%)                   full n= 67 mean$  -5.215 | train n= 56 p= 9 mean$  -7.439 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+newb >= 6 (+20%)                   full n= 65 mean$  -4.788 | train n= 54 p= 9 mean$  -7.007 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+top < 0.225 (-25%)                 full n= 59 mean$  -5.386 | train n= 51 p= 9 mean$  -7.061 | holdout n=  8 p= 3 mean$   5.291 pct   2.646 top 0.375
+top < 0.375 (+25%)                 full n= 78 mean$  -6.296 | train n= 64 p=10 mean$  -8.191 | holdout n= 14 p= 7 mean$   2.362 pct   1.181 top 0.357
+stop -7.5 (-25%)                   full n= 74 mean$  -5.842 | train n= 63 p= 9 mean$  -7.836 | holdout n= 11 p= 5 mean$   5.575 pct   2.788 top 0.364
+stop -12.5 (+25%)                  full n= 63 mean$  -5.675 | train n= 52 p= 9 mean$  -8.167 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+tp 4.5 (-25%)                      full n= 71 mean$  -6.353 | train n= 59 p= 9 mean$  -7.977 | holdout n= 12 p= 5 mean$   1.628 pct   0.814 top 0.333
+tp 7.5 (+25%)                      full n= 66 mean$  -5.663 | train n= 55 p= 9 mean$  -8.048 | holdout n= 11 p= 5 mean$   6.267 pct   3.133 top 0.364
+hold 22.5 min (-25%)               full n= 68 mean$   -4.94 | train n= 57 p= 9 mean$  -7.162 | holdout n= 11 p= 5 mean$   6.576 pct   3.288 top 0.364
+hold 37.5 min (+25%)               full n= 66 mean$  -4.974 | train n= 55 p= 9 mean$  -7.148 | holdout n= 11 p= 5 mean$   5.897 pct   2.949 top 0.364
+size 0.15% liq (-25%)              full n= 66 mean$  -3.551 | train n= 55 p= 9 mean$  -5.482 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+size 0.25% liq (+25%)              full n= 66 mean$  -4.911 | train n= 55 p= 9 mean$  -7.114 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+cooldown 225s (-25%)               full n= 69 mean$  -4.587 | train n= 58 p= 9 mean$  -6.615 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+cooldown 375s (+25%)               full n= 65 mean$  -4.673 | train n= 54 p= 9 mean$  -6.869 | holdout n= 11 p= 5 mean$   6.106 pct   3.053 top 0.364
+ablate: no newb                    full n= 75 mean$  -7.805 | train n= 58 p=10 mean$  -7.314 | holdout n= 17 p= 6 mean$  -9.477 pct  -4.738 top 0.353
+ablate: no top_share               full n= 91 mean$  -8.011 | train n= 74 p=10 mean$  -9.497 | holdout n= 17 p= 7 mean$  -1.541 pct   -0.77 top 0.412
+ablate: no net_sol                 full n= 80 mean$  -6.416 | train n= 67 p=11 mean$  -7.951 | holdout n= 13 p= 5 mean$   1.496 pct   0.748 top 0.385
+ablate: no flow at all (ub>=0)     full n=275 mean$   -8.58 | train n=186 p=27 mean$  -8.676 | holdout n= 89 p=18 mean$  -8.379 pct  -4.252 top 0.146
+==== variant orig
+BASE                               full n= 91 mean$  -5.313 | train n= 69 p=14 mean$  -7.308 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+liq_min 15k (-25%)                 full n= 94 mean$  -5.315 | train n= 70 p=15 mean$  -7.156 | holdout n= 24 p= 9 mean$   0.053 pct  -1.228 top 0.375
+liq_min 25k (+25%)                 full n= 91 mean$  -5.446 | train n= 69 p=14 mean$  -7.308 | holdout n= 22 p= 8 mean$   0.392 pct  -0.094 top 0.409
+fee_lo 40 (-24%)                   full n= 91 mean$  -5.313 | train n= 69 p=14 mean$  -7.308 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+fee_lo 65 (+24%)                   full n= 88 mean$  -5.671 | train n= 68 p=13 mean$  -7.514 | holdout n= 20 p= 7 mean$   0.595 pct   0.962 top 0.45
+fee_hi 100 (-20%)                  full n= 48 mean$  -7.172 | train n= 32 p= 6 mean$ -11.384 | holdout n= 16 p= 6 mean$   1.251 pct    0.23 top 0.312
+live_s 450 (-25%)                  full n= 91 mean$  -5.313 | train n= 69 p=14 mean$  -7.308 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+live_s 750 (+25%)                  full n= 91 mean$  -5.313 | train n= 69 p=14 mean$  -7.308 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+nochase win 225s (-25%)            full n= 98 mean$  -5.451 | train n= 73 p=16 mean$  -7.198 | holdout n= 25 p= 9 mean$  -0.351 pct  -0.191 top 0.4
+nochase win 375s (+25%)            full n= 82 mean$  -4.595 | train n= 61 p=14 mean$  -5.877 | holdout n= 21 p=10 mean$   -0.87 pct  -2.463 top 0.286
+nochase lo -1.5 (-25%)             full n= 91 mean$  -5.239 | train n= 69 p=14 mean$  -7.203 | holdout n= 22 p= 8 mean$   0.921 pct   1.065 top 0.409
+nochase lo -2.5 (+25%)             full n= 93 mean$  -5.405 | train n= 71 p=15 mean$  -7.373 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+nochase hi 3.75 (-25%)             full n= 87 mean$  -4.653 | train n= 65 p=14 mean$  -6.458 | holdout n= 22 p= 8 mean$   0.681 pct   0.928 top 0.409
+nochase hi 6.25 (+25%)             full n= 91 mean$  -5.307 | train n= 69 p=14 mean$  -7.405 | holdout n= 22 p= 8 mean$   1.272 pct   1.401 top 0.409
+flow win 225s (-25%)               full n= 83 mean$  -6.762 | train n= 64 p=14 mean$  -9.227 | holdout n= 19 p= 8 mean$   1.542 pct   1.856 top 0.368
+flow win 375s (+25%)               full n= 96 mean$  -7.007 | train n= 71 p=16 mean$  -9.591 | holdout n= 25 p= 9 mean$   0.331 pct   0.601 top 0.36
+ub >= 8 (-20%)                     full n= 92 mean$  -5.339 | train n= 69 p=14 mean$  -7.265 | holdout n= 23 p= 8 mean$   0.441 pct   0.366 top 0.391
+ub >= 12 (+20%)                    full n= 91 mean$   -5.26 | train n= 69 p=14 mean$  -7.311 | holdout n= 22 p= 8 mean$   1.171 pct    1.19 top 0.409
+newb >= 4 (-20%)                   full n= 92 mean$  -5.925 | train n= 70 p=14 mean$  -8.084 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+newb >= 6 (+20%)                   full n= 89 mean$  -5.633 | train n= 67 p=14 mean$  -7.792 | holdout n= 22 p= 8 mean$   0.943 pct   1.076 top 0.409
+top < 0.225 (-25%)                 full n= 81 mean$  -6.207 | train n= 64 p=13 mean$   -7.99 | holdout n= 17 p= 5 mean$   0.507 pct  -0.325 top 0.471
+top < 0.375 (+25%)                 full n=104 mean$   -6.61 | train n= 80 p=17 mean$  -8.667 | holdout n= 24 p=10 mean$   0.245 pct   0.998 top 0.333
+stop -7.5 (-25%)                   full n=101 mean$   -6.34 | train n= 78 p=14 mean$  -8.296 | holdout n= 23 p= 8 mean$   0.293 pct   0.654 top 0.435
+stop -12.5 (+25%)                  full n= 87 mean$  -6.079 | train n= 65 p=14 mean$  -9.011 | holdout n= 22 p= 8 mean$   2.583 pct   2.506 top 0.409
+tp 4.5 (-25%)                      full n= 96 mean$   -6.57 | train n= 73 p=14 mean$  -8.573 | holdout n= 23 p= 8 mean$   -0.21 pct   0.492 top 0.391
+tp 7.5 (+25%)                      full n= 89 mean$  -6.533 | train n= 69 p=14 mean$  -8.934 | holdout n= 20 p= 8 mean$   1.748 pct   1.886 top 0.35
+hold 22.5 min (-25%)               full n= 93 mean$  -5.807 | train n= 71 p=14 mean$  -7.971 | holdout n= 22 p= 8 mean$   1.178 pct   1.193 top 0.409
+hold 37.5 min (+25%)               full n= 91 mean$  -5.786 | train n= 69 p=14 mean$  -7.898 | holdout n= 22 p= 8 mean$   0.839 pct   1.024 top 0.409
+size 0.15% liq (-25%)              full n= 91 mean$   -4.18 | train n= 69 p=14 mean$  -6.028 | holdout n= 22 p= 8 mean$   1.617 pct   1.202 top 0.409
+size 0.25% liq (+25%)              full n= 91 mean$  -6.203 | train n= 69 p=14 mean$  -8.333 | holdout n= 22 p= 8 mean$   0.477 pct   1.011 top 0.409
+cooldown 225s (-25%)               full n= 94 mean$  -5.624 | train n= 72 p=14 mean$  -7.616 | holdout n= 22 p= 8 mean$   0.893 pct   1.044 top 0.409
+cooldown 375s (+25%)               full n= 87 mean$   -4.62 | train n= 66 p=14 mean$  -6.178 | holdout n= 21 p= 8 mean$   0.276 pct   0.732 top 0.381
+ablate: no newb                    full n=102 mean$  -7.646 | train n= 74 p=15 mean$  -7.734 | holdout n= 28 p= 9 mean$  -7.412 pct  -3.231 top 0.321
+ablate: no top_share               full n=125 mean$  -8.199 | train n= 95 p=22 mean$  -9.902 | holdout n= 30 p=10 mean$  -2.807 pct  -1.504 top 0.333
+ablate: no net_sol                 full n=107 mean$  -5.714 | train n= 83 p=17 mean$   -7.26 | holdout n= 24 p= 8 mean$  -0.364 pct   0.699 top 0.375
+ablate: no flow at all (ub>=0)     full n=333 mean$  -7.743 | train n=225 p=42 mean$  -7.492 | holdout n=108 p=22 mean$  -8.267 pct  -4.557 top 0.12
+guard {'perturbations': 31, 'holdout_mean_pos': 31, 'train_mean_pos': 0, 'both_pos': 0, 'full_mean_pos': 0, 'gate_like_pass': 0, 'holdout_mean_usd_min': 1.628, 'holdout_mean_usd_median': 6.106, 'holdout_mean_usd_max': 6.576}
+orig {'perturbations': 31, 'holdout_mean_pos': 28, 'train_mean_pos': 0, 'both_pos': 0, 'full_mean_pos': 0, 'gate_like_pass': 0, 'holdout_mean_usd_min': -0.87, 'holdout_mean_usd_median': 0.893, 'holdout_mean_usd_max': 2.583}
+done 217.4s

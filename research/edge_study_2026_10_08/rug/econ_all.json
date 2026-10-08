@@ -1,0 +1,946 @@
+{
+ "CF|none": {
+  "train": {
+   "n": 101,
+   "pairs": 25,
+   "clusters": 91,
+   "win_rate": 40.6,
+   "mean_pct": -4.046,
+   "median_pct": -0.365,
+   "pf": 0.233,
+   "sum_usd": -817.27,
+   "ci95_mean_usd": [
+    -15.486,
+    -1.511
+   ],
+   "top_pair_share": 0.119,
+   "trades_per_hour": 7.94,
+   "exits": {
+    "OPEN_AT_END/VANISHED": 3,
+    "HOLD": 78,
+    "STOP": 17,
+    "TP": 3
+   },
+   "mean_net0": -3.082,
+   "mean_net50_realistic": -4.046,
+   "trades_le_-50pct_realistic": 3,
+   "trades_le_-50pct_harness": 3,
+   "portfolio3": {
+    "taken": 25,
+    "final_balance": 722.46,
+    "max_drawdown_pct": 28.14
+   }
+  },
+  "holdout": {
+   "n": 131,
+   "pairs": 27,
+   "clusters": 124,
+   "win_rate": 22.9,
+   "mean_pct": -5.005,
+   "median_pct": -1.171,
+   "pf": 0.091,
+   "sum_usd": -1311.22,
+   "ci95_mean_usd": [
+    -16.709,
+    -4.548
+   ],
+   "top_pair_share": 0.107,
+   "trades_per_hour": 14.55,
+   "exits": {
+    "STOP": 17,
+    "HOLD": 96,
+    "OPEN_AT_END/VANISHED": 1,
+    "TP": 4,
+    "OPEN_AT_END/END": 13
+   },
+   "mean_net0": -4.05,
+   "mean_net50_realistic": -5.005,
+   "trades_le_-50pct_realistic": 5,
+   "trades_le_-50pct_harness": 5,
+   "portfolio3": {
+    "taken": 24,
+    "final_balance": 734.92,
+    "max_drawdown_pct": 28.2
+   }
+  }
+ },
+ "CF|G1": {
+  "train": {
+   "n": 43,
+   "pairs": 8,
+   "clusters": 33,
+   "win_rate": 14.0,
+   "mean_pct": -5.356,
+   "median_pct": -2.604,
+   "pf": 0.198,
+   "sum_usd": -460.64,
+   "ci95_mean_usd": [
+    -21.733,
+    -0.738
+   ],
+   "top_pair_share": 0.279,
+   "trades_per_hour": 5.27,
+   "exits": {
+    "HOLD": 26,
+    "STOP": 15,
+    "TP": 2
+   },
+   "mean_net0": -4.405,
+   "mean_net50_realistic": -5.356,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 24,
+    "final_balance": 729.92,
+    "max_drawdown_pct": 27.01
+   }
+  },
+  "holdout": {
+   "n": 78,
+   "pairs": 13,
+   "clusters": 71,
+   "win_rate": 12.8,
+   "mean_pct": -4.95,
+   "median_pct": -2.055,
+   "pf": 0.087,
+   "sum_usd": -772.17,
+   "ci95_mean_usd": [
+    -17.556,
+    -4.257
+   ],
+   "top_pair_share": 0.179,
+   "trades_per_hour": 8.7,
+   "exits": {
+    "HOLD": 55,
+    "STOP": 14,
+    "TP": 3,
+    "OPEN_AT_END/END": 6
+   },
+   "mean_net0": -3.995,
+   "mean_net50_realistic": -4.95,
+   "trades_le_-50pct_realistic": 2,
+   "trades_le_-50pct_harness": 2,
+   "portfolio3": {
+    "taken": 29,
+    "final_balance": 673.97,
+    "max_drawdown_pct": 32.63
+   }
+  }
+ },
+ "CF|G2": {
+  "train": {
+   "n": 44,
+   "pairs": 9,
+   "clusters": 34,
+   "win_rate": 13.6,
+   "mean_pct": -5.505,
+   "median_pct": -2.604,
+   "pf": 0.19,
+   "sum_usd": -484.42,
+   "ci95_mean_usd": [
+    -21.901,
+    -1.313
+   ],
+   "top_pair_share": 0.273,
+   "trades_per_hour": 4.14,
+   "exits": {
+    "OPEN_AT_END/VANISHED": 1,
+    "HOLD": 26,
+    "STOP": 15,
+    "TP": 2
+   },
+   "mean_net0": -4.555,
+   "mean_net50_realistic": -5.505,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 25,
+    "final_balance": 706.14,
+    "max_drawdown_pct": 29.39
+   }
+  },
+  "holdout": {
+   "n": 80,
+   "pairs": 14,
+   "clusters": 73,
+   "win_rate": 15.0,
+   "mean_pct": -4.813,
+   "median_pct": -1.994,
+   "pf": 0.089,
+   "sum_usd": -770.11,
+   "ci95_mean_usd": [
+    -17.245,
+    -4.031
+   ],
+   "top_pair_share": 0.175,
+   "trades_per_hour": 8.92,
+   "exits": {
+    "HOLD": 57,
+    "STOP": 14,
+    "TP": 3,
+    "OPEN_AT_END/END": 6
+   },
+   "mean_net0": -3.857,
+   "mean_net50_realistic": -4.813,
+   "trades_le_-50pct_realistic": 2,
+   "trades_le_-50pct_harness": 2,
+   "portfolio3": {
+    "taken": 29,
+    "final_balance": 673.97,
+    "max_drawdown_pct": 32.63
+   }
+  }
+ },
+ "CF|INTERIM": {
+  "train": {
+   "n": 36,
+   "pairs": 5,
+   "clusters": 26,
+   "win_rate": 13.9,
+   "mean_pct": -6.176,
+   "median_pct": -2.974,
+   "pf": 0.2,
+   "sum_usd": -444.68,
+   "ci95_mean_usd": [
+    -24.604,
+    -0.51
+   ],
+   "top_pair_share": 0.333,
+   "trades_per_hour": 4.41,
+   "exits": {
+    "HOLD": 19,
+    "STOP": 15,
+    "TP": 2
+   },
+   "mean_net0": -5.233,
+   "mean_net50_realistic": -6.176,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 26,
+    "final_balance": 779.94,
+    "max_drawdown_pct": 26.31
+   }
+  },
+  "holdout": {
+   "n": 44,
+   "pairs": 5,
+   "clusters": 37,
+   "win_rate": 11.4,
+   "mean_pct": -3.475,
+   "median_pct": -2.799,
+   "pf": 0.172,
+   "sum_usd": -305.77,
+   "ci95_mean_usd": [
+    -10.771,
+    -3.744
+   ],
+   "top_pair_share": 0.318,
+   "trades_per_hour": 5.38,
+   "exits": {
+    "HOLD": 26,
+    "STOP": 12,
+    "TP": 3,
+    "OPEN_AT_END/END": 3
+   },
+   "mean_net0": -2.505,
+   "mean_net50_realistic": -3.475,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 30,
+    "final_balance": 776.74,
+    "max_drawdown_pct": 22.33
+   }
+  }
+ },
+ "LIQ20|none": {
+  "train": {
+   "n": 712,
+   "pairs": 120,
+   "clusters": 446,
+   "win_rate": 15.9,
+   "mean_pct": -4.305,
+   "median_pct": -6.358,
+   "pf": 0.323,
+   "sum_usd": -6129.66,
+   "ci95_mean_usd": [
+    -10.966,
+    -5.396
+   ],
+   "top_pair_share": 0.042,
+   "trades_per_hour": 52.25,
+   "exits": {
+    "HOLD": 133,
+    "STOP": 492,
+    "TP": 68,
+    "OPEN_AT_END/VANISHED": 19
+   },
+   "mean_net0": -3.345,
+   "mean_net50_realistic": -4.63,
+   "trades_le_-50pct_realistic": 5,
+   "trades_le_-50pct_harness": 2,
+   "portfolio3": {
+    "taken": 130,
+    "final_balance": -426.8,
+    "max_drawdown_pct": 142.68
+   }
+  },
+  "holdout": {
+   "n": 688,
+   "pairs": 121,
+   "clusters": 486,
+   "win_rate": 14.5,
+   "mean_pct": -4.544,
+   "median_pct": -6.132,
+   "pf": 0.21,
+   "sum_usd": -6253.19,
+   "ci95_mean_usd": [
+    -10.612,
+    -7.578
+   ],
+   "top_pair_share": 0.039,
+   "trades_per_hour": 75.63,
+   "exits": {
+    "STOP": 389,
+    "HOLD": 190,
+    "STOP/VANISHED": 1,
+    "TP": 57,
+    "OPEN_AT_END/VANISHED": 21,
+    "OPEN_AT_END/END": 30
+   },
+   "mean_net0": -3.587,
+   "mean_net50_realistic": -4.667,
+   "trades_le_-50pct_realistic": 5,
+   "trades_le_-50pct_harness": 4,
+   "portfolio3": {
+    "taken": 65,
+    "final_balance": 397.02,
+    "max_drawdown_pct": 60.3
+   }
+  }
+ },
+ "LIQ20|G1": {
+  "train": {
+   "n": 511,
+   "pairs": 52,
+   "clusters": 303,
+   "win_rate": 12.9,
+   "mean_pct": -3.928,
+   "median_pct": -6.327,
+   "pf": 0.362,
+   "sum_usd": -4014.25,
+   "ci95_mean_usd": [
+    -10.6,
+    -3.655
+   ],
+   "top_pair_share": 0.055,
+   "trades_per_hour": 37.5,
+   "exits": {
+    "HOLD": 88,
+    "STOP": 373,
+    "TP": 48,
+    "OPEN_AT_END/VANISHED": 2
+   },
+   "mean_net0": -2.965,
+   "mean_net50_realistic": -3.928,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 109,
+    "final_balance": -128.01,
+    "max_drawdown_pct": 114.61
+   }
+  },
+  "holdout": {
+   "n": 515,
+   "pairs": 58,
+   "clusters": 355,
+   "win_rate": 12.8,
+   "mean_pct": -4.178,
+   "median_pct": -6.098,
+   "pf": 0.208,
+   "sum_usd": -4303.48,
+   "ci95_mean_usd": [
+    -9.708,
+    -7.019
+   ],
+   "top_pair_share": 0.041,
+   "trades_per_hour": 56.61,
+   "exits": {
+    "STOP": 299,
+    "HOLD": 152,
+    "TP": 39,
+    "OPEN_AT_END/VANISHED": 6,
+    "OPEN_AT_END/END": 19
+   },
+   "mean_net0": -3.217,
+   "mean_net50_realistic": -4.178,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 66,
+    "final_balance": 184.54,
+    "max_drawdown_pct": 81.55
+   }
+  }
+ },
+ "LIQ20|G2": {
+  "train": {
+   "n": 655,
+   "pairs": 97,
+   "clusters": 390,
+   "win_rate": 13.0,
+   "mean_pct": -4.397,
+   "median_pct": -6.447,
+   "pf": 0.326,
+   "sum_usd": -5759.52,
+   "ci95_mean_usd": [
+    -10.982,
+    -5.278
+   ],
+   "top_pair_share": 0.046,
+   "trades_per_hour": 48.06,
+   "exits": {
+    "HOLD": 92,
+    "STOP": 483,
+    "TP": 65,
+    "OPEN_AT_END/VANISHED": 15
+   },
+   "mean_net0": -3.439,
+   "mean_net50_realistic": -4.397,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 137,
+    "final_balance": -511.33,
+    "max_drawdown_pct": 152.52
+   }
+  },
+  "holdout": {
+   "n": 609,
+   "pairs": 96,
+   "clusters": 415,
+   "win_rate": 12.5,
+   "mean_pct": -4.589,
+   "median_pct": -6.238,
+   "pf": 0.195,
+   "sum_usd": -5589.28,
+   "ci95_mean_usd": [
+    -10.532,
+    -7.9
+   ],
+   "top_pair_share": 0.044,
+   "trades_per_hour": 66.95,
+   "exits": {
+    "STOP": 370,
+    "HOLD": 155,
+    "STOP/VANISHED": 1,
+    "TP": 47,
+    "OPEN_AT_END/VANISHED": 16,
+    "OPEN_AT_END/END": 20
+   },
+   "mean_net0": -3.632,
+   "mean_net50_realistic": -4.589,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 70,
+    "final_balance": 171.52,
+    "max_drawdown_pct": 82.85
+   }
+  }
+ },
+ "LIQ20|INTERIM": {
+  "train": {
+   "n": 438,
+   "pairs": 64,
+   "clusters": 271,
+   "win_rate": 12.1,
+   "mean_pct": -4.928,
+   "median_pct": -6.43,
+   "pf": 0.231,
+   "sum_usd": -4316.6,
+   "ci95_mean_usd": [
+    -11.372,
+    -8.268
+   ],
+   "top_pair_share": 0.068,
+   "trades_per_hour": 32.14,
+   "exits": {
+    "HOLD": 64,
+    "STOP": 325,
+    "TP": 42,
+    "OPEN_AT_END/VANISHED": 7
+   },
+   "mean_net0": -3.975,
+   "mean_net50_realistic": -4.928,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 128,
+    "final_balance": -361.77,
+    "max_drawdown_pct": 139.39
+   }
+  },
+  "holdout": {
+   "n": 310,
+   "pairs": 45,
+   "clusters": 224,
+   "win_rate": 14.8,
+   "mean_pct": -4.25,
+   "median_pct": -6.124,
+   "pf": 0.221,
+   "sum_usd": -2635.21,
+   "ci95_mean_usd": [
+    -10.271,
+    -6.853
+   ],
+   "top_pair_share": 0.065,
+   "trades_per_hour": 34.15,
+   "exits": {
+    "STOP": 182,
+    "HOLD": 83,
+    "TP": 29,
+    "OPEN_AT_END/VANISHED": 5,
+    "OPEN_AT_END/END": 11
+   },
+   "mean_net0": -3.29,
+   "mean_net50_realistic": -4.25,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 57,
+    "final_balance": 343.84,
+    "max_drawdown_pct": 65.62
+   }
+  }
+ },
+ "HF50|none": {
+  "train": {
+   "n": 316,
+   "pairs": 45,
+   "clusters": 158,
+   "win_rate": 15.5,
+   "mean_pct": -4.091,
+   "median_pct": -6.561,
+   "pf": 0.44,
+   "sum_usd": -2585.58,
+   "ci95_mean_usd": [
+    -12.653,
+    -1.496
+   ],
+   "top_pair_share": 0.104,
+   "trades_per_hour": 23.17,
+   "exits": {
+    "HOLD": 26,
+    "STOP": 240,
+    "TP": 39,
+    "OPEN_AT_END/VANISHED": 11
+   },
+   "mean_net0": -3.129,
+   "mean_net50_realistic": -4.837,
+   "trades_le_-50pct_realistic": 5,
+   "trades_le_-50pct_harness": 2,
+   "portfolio3": {
+    "taken": 161,
+    "final_balance": -774.68,
+    "max_drawdown_pct": 177.6
+   }
+  },
+  "holdout": {
+   "n": 272,
+   "pairs": 45,
+   "clusters": 136,
+   "win_rate": 19.9,
+   "mean_pct": -3.732,
+   "median_pct": -6.417,
+   "pf": 0.406,
+   "sum_usd": -2029.98,
+   "ci95_mean_usd": [
+    -9.929,
+    -4.796
+   ],
+   "top_pair_share": 0.103,
+   "trades_per_hour": 30.1,
+   "exits": {
+    "STOP": 194,
+    "TP": 41,
+    "OPEN_AT_END/VANISHED": 12,
+    "HOLD": 18,
+    "OPEN_AT_END/END": 7
+   },
+   "mean_net0": -2.765,
+   "mean_net50_realistic": -4.62,
+   "trades_le_-50pct_realistic": 3,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 125,
+    "final_balance": 142.67,
+    "max_drawdown_pct": 85.73
+   }
+  }
+ },
+ "HF50|G1": {
+  "train": {
+   "n": 273,
+   "pairs": 19,
+   "clusters": 123,
+   "win_rate": 14.7,
+   "mean_pct": -3.263,
+   "median_pct": -6.471,
+   "pf": 0.498,
+   "sum_usd": -1781.77,
+   "ci95_mean_usd": [
+    -11.271,
+    1.223
+   ],
+   "top_pair_share": 0.121,
+   "trades_per_hour": 20.02,
+   "exits": {
+    "HOLD": 23,
+    "STOP": 218,
+    "TP": 31,
+    "OPEN_AT_END/VANISHED": 1
+   },
+   "mean_net0": -2.294,
+   "mean_net50_realistic": -3.263,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 148,
+    "final_balance": -210.73,
+    "max_drawdown_pct": 121.2
+   }
+  },
+  "holdout": {
+   "n": 184,
+   "pairs": 15,
+   "clusters": 83,
+   "win_rate": 16.8,
+   "mean_pct": -3.756,
+   "median_pct": -6.367,
+   "pf": 0.371,
+   "sum_usd": -1382.28,
+   "ci95_mean_usd": [
+    -10.289,
+    -4.51
+   ],
+   "top_pair_share": 0.152,
+   "trades_per_hour": 20.36,
+   "exits": {
+    "STOP": 144,
+    "TP": 23,
+    "HOLD": 14,
+    "OPEN_AT_END/END": 3
+   },
+   "mean_net0": -2.791,
+   "mean_net50_realistic": -3.756,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 105,
+    "final_balance": 62.63,
+    "max_drawdown_pct": 93.84
+   }
+  }
+ },
+ "HF50|G2": {
+  "train": {
+   "n": 300,
+   "pairs": 36,
+   "clusters": 145,
+   "win_rate": 14.7,
+   "mean_pct": -4.08,
+   "median_pct": -6.566,
+   "pf": 0.439,
+   "sum_usd": -2447.73,
+   "ci95_mean_usd": [
+    -12.929,
+    -1.254
+   ],
+   "top_pair_share": 0.11,
+   "trades_per_hour": 22.0,
+   "exits": {
+    "HOLD": 23,
+    "STOP": 234,
+    "TP": 35,
+    "OPEN_AT_END/VANISHED": 8
+   },
+   "mean_net0": -3.118,
+   "mean_net50_realistic": -4.08,
+   "trades_le_-50pct_realistic": 2,
+   "trades_le_-50pct_harness": 2,
+   "portfolio3": {
+    "taken": 170,
+    "final_balance": -810.49,
+    "max_drawdown_pct": 181.18
+   }
+  },
+  "holdout": {
+   "n": 237,
+   "pairs": 30,
+   "clusters": 109,
+   "win_rate": 16.0,
+   "mean_pct": -4.336,
+   "median_pct": -6.503,
+   "pf": 0.33,
+   "sum_usd": -2055.18,
+   "ci95_mean_usd": [
+    -11.161,
+    -5.961
+   ],
+   "top_pair_share": 0.118,
+   "trades_per_hour": 26.23,
+   "exits": {
+    "STOP": 180,
+    "TP": 28,
+    "OPEN_AT_END/VANISHED": 9,
+    "HOLD": 16,
+    "OPEN_AT_END/END": 4
+   },
+   "mean_net0": -3.377,
+   "mean_net50_realistic": -4.336,
+   "trades_le_-50pct_realistic": 0,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 120,
+    "final_balance": 152.25,
+    "max_drawdown_pct": 84.91
+   }
+  }
+ },
+ "HF50|INTERIM": {
+  "train": {
+   "n": 211,
+   "pairs": 25,
+   "clusters": 102,
+   "win_rate": 13.7,
+   "mean_pct": -5.355,
+   "median_pct": -6.593,
+   "pf": 0.254,
+   "sum_usd": -2259.92,
+   "ci95_mean_usd": [
+    -13.84,
+    -7.728
+   ],
+   "top_pair_share": 0.156,
+   "trades_per_hour": 15.54,
+   "exits": {
+    "HOLD": 15,
+    "STOP": 165,
+    "TP": 24,
+    "OPEN_AT_END/VANISHED": 7
+   },
+   "mean_net0": -4.407,
+   "mean_net50_realistic": -5.355,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 1,
+   "portfolio3": {
+    "taken": 162,
+    "final_balance": -664.32,
+    "max_drawdown_pct": 166.43
+   }
+  },
+  "holdout": {
+   "n": 99,
+   "pairs": 17,
+   "clusters": 53,
+   "win_rate": 20.2,
+   "mean_pct": -3.659,
+   "median_pct": -6.383,
+   "pf": 0.397,
+   "sum_usd": -724.51,
+   "ci95_mean_usd": [
+    -10.904,
+    -3.319
+   ],
+   "top_pair_share": 0.283,
+   "trades_per_hour": 11.03,
+   "exits": {
+    "STOP": 70,
+    "TP": 15,
+    "HOLD": 8,
+    "OPEN_AT_END/VANISHED": 5,
+    "OPEN_AT_END/END": 1
+   },
+   "mean_net0": -2.692,
+   "mean_net50_realistic": -4.463,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 69,
+    "final_balance": 537.79,
+    "max_drawdown_pct": 46.7
+   }
+  }
+ },
+ "HF250|none": {
+  "train": {
+   "n": 14,
+   "pairs": 5,
+   "clusters": 9,
+   "win_rate": 21.4,
+   "mean_pct": -6.651,
+   "median_pct": -6.25,
+   "pf": 0.212,
+   "sum_usd": -186.22,
+   "ci95_mean_usd": [
+    -25.051,
+    -3.1
+   ],
+   "top_pair_share": 0.5,
+   "trades_per_hour": 2.66,
+   "exits": {
+    "STOP": 10,
+    "HOLD": 2,
+    "TP": 2
+   },
+   "mean_net0": -5.692,
+   "mean_net50_realistic": -23.328,
+   "trades_le_-50pct_realistic": 3,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 14,
+    "final_balance": 813.78,
+    "max_drawdown_pct": 18.62
+   }
+  },
+  "holdout": {
+   "n": 23,
+   "pairs": 8,
+   "clusters": 15,
+   "win_rate": 30.4,
+   "mean_pct": -3.637,
+   "median_pct": -6.536,
+   "pf": 0.451,
+   "sum_usd": -167.31,
+   "ci95_mean_usd": [
+    -17.017,
+    1.254
+   ],
+   "top_pair_share": 0.261,
+   "trades_per_hour": 2.73,
+   "exits": {
+    "OPEN_AT_END/VANISHED": 2,
+    "TP": 7,
+    "STOP": 13,
+    "OPEN_AT_END/END": 1
+   },
+   "mean_net0": -2.651,
+   "mean_net50_realistic": -17.786,
+   "trades_le_-50pct_realistic": 4,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 23,
+    "final_balance": 832.69,
+    "max_drawdown_pct": 20.84
+   }
+  }
+ },
+ "HF250|G1": {
+  "train": {
+   "n": 0,
+   "pairs": null,
+   "clusters": null,
+   "win_rate": null,
+   "mean_pct": null,
+   "median_pct": null,
+   "pf": null,
+   "sum_usd": null,
+   "ci95_mean_usd": null,
+   "top_pair_share": null,
+   "trades_per_hour": null,
+   "exits": null
+  },
+  "holdout": {
+   "n": 0,
+   "pairs": null,
+   "clusters": null,
+   "win_rate": null,
+   "mean_pct": null,
+   "median_pct": null,
+   "pf": null,
+   "sum_usd": null,
+   "ci95_mean_usd": null,
+   "top_pair_share": null,
+   "trades_per_hour": null,
+   "exits": null
+  }
+ },
+ "HF250|G2": {
+  "train": {
+   "n": 0,
+   "pairs": null,
+   "clusters": null,
+   "win_rate": null,
+   "mean_pct": null,
+   "median_pct": null,
+   "pf": null,
+   "sum_usd": null,
+   "ci95_mean_usd": null,
+   "top_pair_share": null,
+   "trades_per_hour": null,
+   "exits": null
+  },
+  "holdout": {
+   "n": 0,
+   "pairs": null,
+   "clusters": null,
+   "win_rate": null,
+   "mean_pct": null,
+   "median_pct": null,
+   "pf": null,
+   "sum_usd": null,
+   "ci95_mean_usd": null,
+   "top_pair_share": null,
+   "trades_per_hour": null,
+   "exits": null
+  }
+ },
+ "HF250|INTERIM": {
+  "train": {
+   "n": 0,
+   "pairs": null,
+   "clusters": null,
+   "win_rate": null,
+   "mean_pct": null,
+   "median_pct": null,
+   "pf": null,
+   "sum_usd": null,
+   "ci95_mean_usd": null,
+   "top_pair_share": null,
+   "trades_per_hour": null,
+   "exits": null
+  },
+  "holdout": {
+   "n": 3,
+   "pairs": 1,
+   "clusters": 3,
+   "win_rate": 33.3,
+   "mean_pct": -6.007,
+   "median_pct": -7.141,
+   "pf": 0.341,
+   "sum_usd": -36.04,
+   "ci95_mean_usd": [
+    -40.404,
+    18.645
+   ],
+   "top_pair_share": 1.0,
+   "trades_per_hour": 1.68,
+   "exits": {
+    "STOP": 2,
+    "TP": 1
+   },
+   "mean_net0": -5.029,
+   "mean_net50_realistic": -32.608,
+   "trades_le_-50pct_realistic": 1,
+   "trades_le_-50pct_harness": 0,
+   "portfolio3": {
+    "taken": 3,
+    "final_balance": 963.96,
+    "max_drawdown_pct": 4.02
+   }
+  }
+ }
+}

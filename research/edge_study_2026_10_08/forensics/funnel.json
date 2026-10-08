@@ -1,0 +1,1215 @@
+{
+ "rows": 3116792,
+ "minutes": 1297,
+ "units": 100534,
+ "we_funnel": [
+  {
+   "stage": 0,
+   "mean_pairs_per_minute": 77.513,
+   "median": 88,
+   "p90": 93,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 1,
+   "mean_pairs_per_minute": 54.986,
+   "median": 65,
+   "p90": 71,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 2,
+   "mean_pairs_per_minute": 6.491,
+   "median": 6,
+   "p90": 11,
+   "pct_minutes_with_any": 96.5
+  },
+  {
+   "stage": 3,
+   "mean_pairs_per_minute": 0.144,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 14.1
+  },
+  {
+   "stage": 4,
+   "mean_pairs_per_minute": 0.115,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 11.5
+  },
+  {
+   "stage": 5,
+   "mean_pairs_per_minute": 0.113,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 11.3
+  },
+  {
+   "stage": 6,
+   "mean_pairs_per_minute": 0.078,
+   "median": 0,
+   "p90": 0,
+   "pct_minutes_with_any": 7.8
+  },
+  {
+   "stage": 7,
+   "mean_pairs_per_minute": 0.078,
+   "median": 0,
+   "p90": 0,
+   "pct_minutes_with_any": 7.8
+  }
+ ],
+ "ofa_funnel": [
+  {
+   "stage": 0,
+   "mean_pairs_per_minute": 77.513,
+   "median": 88,
+   "p90": 93,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 1,
+   "mean_pairs_per_minute": 54.986,
+   "median": 65,
+   "p90": 71,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 2,
+   "mean_pairs_per_minute": 6.02,
+   "median": 6,
+   "p90": 9,
+   "pct_minutes_with_any": 95.7
+  },
+  {
+   "stage": 3,
+   "mean_pairs_per_minute": 0.8,
+   "median": 1,
+   "p90": 2,
+   "pct_minutes_with_any": 57.0
+  },
+  {
+   "stage": 4,
+   "mean_pairs_per_minute": 0.218,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 21.0
+  },
+  {
+   "stage": 5,
+   "mean_pairs_per_minute": 0.198,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 19.1
+  },
+  {
+   "stage": 6,
+   "mean_pairs_per_minute": 0.156,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 15.3
+  },
+  {
+   "stage": 7,
+   "mean_pairs_per_minute": 0.141,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 13.8
+  },
+  {
+   "stage": 8,
+   "mean_pairs_per_minute": 0.135,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 13.3
+  }
+ ],
+ "cf_funnel": [
+  {
+   "stage": 0,
+   "mean_pairs_per_minute": 77.513,
+   "median": 88,
+   "p90": 93,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 1,
+   "mean_pairs_per_minute": 54.986,
+   "median": 65,
+   "p90": 71,
+   "pct_minutes_with_any": 100.0
+  },
+  {
+   "stage": 2,
+   "mean_pairs_per_minute": 12.268,
+   "median": 19,
+   "p90": 22,
+   "pct_minutes_with_any": 72.2
+  },
+  {
+   "stage": 3,
+   "mean_pairs_per_minute": 0.389,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 32.0
+  },
+  {
+   "stage": 4,
+   "mean_pairs_per_minute": 0.376,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 31.3
+  },
+  {
+   "stage": 5,
+   "mean_pairs_per_minute": 0.291,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 24.6
+  }
+ ],
+ "cf_funnel_rug_screened": [
+  {
+   "stage": 0,
+   "mean_pairs_per_minute": 48.103,
+   "median": 48,
+   "p90": 63,
+   "pct_minutes_with_any": 98.7
+  },
+  {
+   "stage": 1,
+   "mean_pairs_per_minute": 30.096,
+   "median": 31,
+   "p90": 38,
+   "pct_minutes_with_any": 98.7
+  },
+  {
+   "stage": 2,
+   "mean_pairs_per_minute": 3.797,
+   "median": 5,
+   "p90": 7,
+   "pct_minutes_with_any": 71.5
+  },
+  {
+   "stage": 3,
+   "mean_pairs_per_minute": 0.298,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 27.5
+  },
+  {
+   "stage": 4,
+   "mean_pairs_per_minute": 0.288,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 27.0
+  },
+  {
+   "stage": 5,
+   "mean_pairs_per_minute": 0.212,
+   "median": 0,
+   "p90": 1,
+   "pct_minutes_with_any": 20.9
+  }
+ ],
+ "we_blocked": {
+  "units_passing_all_nonflow_rules": 187,
+  "stop_stage_share_pct": {
+   "PASSED_to_safety_and_quote": 54.0,
+   "BLOCKED_buy_pressure": 24.1,
+   "BLOCKED_no_verified_flow": 20.3,
+   "BLOCKED_flow_stale": 1.6
+  },
+  "distinct_pairs": 5,
+  "top_pairs_by_units": [
+   [
+    "swordinu|69fyvgoT",
+    155
+   ],
+   [
+    "Agency|CyJwKnLi",
+    18
+   ],
+   [
+    "neet|5wNu5Qhd",
+    9
+   ],
+   [
+    "CATE|HMzvsEEm",
+    3
+   ],
+   [
+    "IOF|7wCarEYc",
+    2
+   ]
+  ],
+  "distinct_pairs_with_verified_flow": 3,
+  "top_pairs_with_verified_flow": [
+   [
+    "swordinu|69fyvgoT",
+    145
+   ],
+   [
+    "neet|5wNu5Qhd",
+    2
+   ],
+   [
+    "IOF|7wCarEYc",
+    2
+   ]
+  ]
+ },
+ "ofa_blocked": {
+  "units_passing_all_nonflow_rules": 1038,
+  "stop_stage_share_pct": {
+   "BLOCKED_no_verified_flow": 72.7,
+   "PASSED_to_safety_and_quote": 16.9,
+   "BLOCKED_buy_pressure": 5.3,
+   "BLOCKED_flow_stale": 2.5,
+   "BLOCKED_oct4_flow_thresholds": 1.8,
+   "BLOCKED_conviction": 0.8
+  },
+  "distinct_pairs": 15,
+  "top_pairs_by_units": [
+   [
+    "RARINU|A2ASUorC",
+    285
+   ],
+   [
+    "EVERYTHING|FcfEJ9uJ",
+    142
+   ],
+   [
+    "swordcat|8ewuF2o8",
+    130
+   ],
+   [
+    "CATCRAFT|7mQDGtei",
+    125
+   ],
+   [
+    "CRAWL|2B8tftZ5",
+    77
+   ],
+   [
+    "MISTAKE|867dKvaC",
+    76
+   ],
+   [
+    "LMAO!|AFaYrFH7",
+    39
+   ],
+   [
+    "e/acc|4JAnKFdd",
+    37
+   ],
+   [
+    "TWEETCRAFT|3NBq9zyn",
+    33
+   ],
+   [
+    "SI|Gnpvosia",
+    33
+   ],
+   [
+    "A1|F2P22Sfc",
+    19
+   ],
+   [
+    "HOTBOT|GLL3Czyb",
+    17
+   ],
+   [
+    "Agency|CyJwKnLi",
+    17
+   ],
+   [
+    "neet|5wNu5Qhd",
+    5
+   ],
+   [
+    "CATE|HMzvsEEm",
+    3
+   ]
+  ],
+  "distinct_pairs_with_verified_flow": 10,
+  "top_pairs_with_verified_flow": [
+   [
+    "RARINU|A2ASUorC",
+    95
+   ],
+   [
+    "CATCRAFT|7mQDGtei",
+    75
+   ],
+   [
+    "MISTAKE|867dKvaC",
+    43
+   ],
+   [
+    "CRAWL|2B8tftZ5",
+    27
+   ],
+   [
+    "LMAO!|AFaYrFH7",
+    17
+   ],
+   [
+    "swordcat|8ewuF2o8",
+    7
+   ],
+   [
+    "e/acc|4JAnKFdd",
+    7
+   ],
+   [
+    "SI|Gnpvosia",
+    6
+   ],
+   [
+    "EVERYTHING|FcfEJ9uJ",
+    5
+   ],
+   [
+    "Agency|CyJwKnLi",
+    1
+   ]
+  ]
+ },
+ "cf_blocked": {
+  "units_passing_all_nonflow_rules": 15911,
+  "stop_stage_share_pct": {
+   "BLOCKED_no_verified_flow": 96.8,
+   "PASSED_to_safety_and_quote": 2.4,
+   "BLOCKED_buy_pressure": 0.7,
+   "BLOCKED_flow_stale": 0.1
+  },
+  "distinct_pairs": 61,
+  "top_pairs_by_units": [
+   [
+    "ANSEM|FnzKY6x7",
+    923
+   ],
+   [
+    "CATE|HMzvsEEm",
+    894
+   ],
+   [
+    "USDP|8RCJrW94",
+    751
+   ],
+   [
+    "D O T F|C9bagG6C",
+    751
+   ],
+   [
+    "USDF|FL5gakwf",
+    751
+   ],
+   [
+    "UDR|Gs6hrh68",
+    751
+   ],
+   [
+    "UDR|ERFmQZQU",
+    751
+   ],
+   [
+    "TROLL|4w2cysot",
+    751
+   ],
+   [
+    "USDF|EpugLBw1",
+    722
+   ],
+   [
+    "swordinu|69fyvgoT",
+    697
+   ],
+   [
+    "neet|5wNu5Qhd",
+    675
+   ],
+   [
+    "DOTF|5GaCcKLd",
+    674
+   ],
+   [
+    "GOIF|8ZMkMgWM",
+    558
+   ],
+   [
+    "DOTF|7iXmtUXq",
+    505
+   ],
+   [
+    "D O T F|Bmc7xtro",
+    503
+   ]
+  ],
+  "distinct_pairs_with_verified_flow": 25,
+  "top_pairs_with_verified_flow": [
+   [
+    "swordinu|69fyvgoT",
+    262
+   ],
+   [
+    "IOF|7wCarEYc",
+    105
+   ],
+   [
+    "USDF|EpugLBw1",
+    39
+   ],
+   [
+    "SARP|HiPe6mDS",
+    18
+   ],
+   [
+    "WOSE|GhBPuDpt",
+    17
+   ],
+   [
+    "GOIF|D2pVedgH",
+    14
+   ],
+   [
+    "neet|5wNu5Qhd",
+    11
+   ],
+   [
+    "USDP|8RCJrW94",
+    7
+   ],
+   [
+    "MANIFEST|2DVbU5h8",
+    6
+   ],
+   [
+    "UDR|Gs6hrh68",
+    3
+   ],
+   [
+    "Agency|CyJwKnLi",
+    2
+   ],
+   [
+    "D O T F|Bmc7xtro",
+    2
+   ],
+   [
+    "UDR|8TSAcyiP",
+    2
+   ],
+   [
+    "GOIF|AzfHgMbz",
+    2
+   ],
+   [
+    "D O T F|C9bagG6C",
+    2
+   ]
+  ]
+ },
+ "cf_blocked_rug_screened": {
+  "units": 4925,
+  "stop_stage_share_pct": {
+   "BLOCKED_no_verified_flow": 92.1,
+   "PASSED_to_safety_and_quote": 5.6,
+   "BLOCKED_buy_pressure": 2.0,
+   "BLOCKED_flow_stale": 0.3
+  },
+  "distinct_pairs": 11,
+  "top_pairs": [
+   [
+    "ANSEM|FnzKY6x7",
+    923
+   ],
+   [
+    "CATE|HMzvsEEm",
+    894
+   ],
+   [
+    "TROLL|4w2cysot",
+    751
+   ],
+   [
+    "swordinu|69fyvgoT",
+    697
+   ],
+   [
+    "neet|5wNu5Qhd",
+    675
+   ],
+   [
+    "IOF|7wCarEYc",
+    478
+   ],
+   [
+    "MANIFEST|2DVbU5h8",
+    419
+   ],
+   [
+    "VWA|ELUGVyux",
+    66
+   ],
+   [
+    "NTDA|EfV2XaBq",
+    18
+   ],
+   [
+    "USDP|2vZhCuCR",
+    2
+   ],
+   [
+    "DOTF|CZ67xbpv",
+    2
+   ]
+  ]
+ },
+ "cf_universe_units_flagged_rug_family": {
+  "units": 10986,
+  "pairs": 50,
+  "top": [
+   [
+    "USDP|8RCJrW94",
+    751
+   ],
+   [
+    "D O T F|C9bagG6C",
+    751
+   ],
+   [
+    "USDF|FL5gakwf",
+    751
+   ],
+   [
+    "UDR|Gs6hrh68",
+    751
+   ],
+   [
+    "UDR|ERFmQZQU",
+    751
+   ],
+   [
+    "USDF|EpugLBw1",
+    722
+   ],
+   [
+    "DOTF|5GaCcKLd",
+    674
+   ],
+   [
+    "GOIF|8ZMkMgWM",
+    558
+   ],
+   [
+    "DOTF|7iXmtUXq",
+    505
+   ],
+   [
+    "D O T F|Bmc7xtro",
+    503
+   ],
+   [
+    "SARP|AdvA19rg",
+    453
+   ],
+   [
+    "VSOF|VFy2QcKA",
+    399
+   ],
+   [
+    "WAIF|77MP7fTT",
+    352
+   ],
+   [
+    "UDR|8TSAcyiP",
+    325
+   ],
+   [
+    "WOTF|HJ72PgqL",
+    295
+   ],
+   [
+    "DOTF|HYZCigd7",
+    282
+   ],
+   [
+    "ATFS|FGdoJboJ",
+    281
+   ],
+   [
+    "XRPN|GdVeeP6j",
+    281
+   ],
+   [
+    "GOIF|AzfHgMbz",
+    272
+   ],
+   [
+    "AROS|CFtnpWZ2",
+    215
+   ]
+  ]
+ },
+ "we_rules_among_cost_ok_units": [
+  [
+   "COST_EFFICIENT_FLOW",
+   187
+  ]
+ ],
+ "vf_units": 4777,
+ "vf_units_share_pct": 4.75,
+ "vf_minutes_by_pair_top": [
+  [
+   "ECSTASY|UCWmMumV",
+   515
+  ],
+  [
+   "VSOF|AGZjpu5v",
+   359
+  ],
+  [
+   "RARINU|A2ASUorC",
+   298
+  ],
+  [
+   "swordinu|69fyvgoT",
+   262
+  ],
+  [
+   "OURA|Fm6tVXcH",
+   244
+  ],
+  [
+   "CATCRAFT|7mQDGtei",
+   223
+  ],
+  [
+   "SI276|12jc1DzJ",
+   176
+  ],
+  [
+   "SNDWITCH|HU22UBaT",
+   172
+  ],
+  [
+   "A1|F2P22Sfc",
+   169
+  ],
+  [
+   "MINER|8J42or3k",
+   145
+  ],
+  [
+   "MISTAKE|867dKvaC",
+   138
+  ],
+  [
+   "CLAUDIA|Fe7bpDYC",
+   111
+  ],
+  [
+   "HASHERS|28CJf2tS",
+   110
+  ],
+  [
+   "IOF|7wCarEYc",
+   105
+  ],
+  [
+   "CRAWL|2B8tftZ5",
+   101
+  ],
+  [
+   "ZKDARK|CR5dTgvT",
+   93
+  ],
+  [
+   "LOOT|XDTrVqPD",
+   86
+  ],
+  [
+   "SEC|3ETStQ3N",
+   83
+  ],
+  [
+   "e/acc|4JAnKFdd",
+   82
+  ],
+  [
+   "WOSE|4H4ZXivP",
+   79
+  ]
+ ],
+ "vf_distinct_pairs": 220,
+ "vf_pairs_per_minute": {
+  "mean": 3.68,
+  "median": 4,
+  "max": 8
+ },
+ "hourly_distinct_pairs": {
+  "10-07 11": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 1
+  },
+  "10-07 12": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 2
+  },
+  "10-07 14": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 1
+  },
+  "10-07 15": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 1
+  },
+  "10-07 16": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 2
+  },
+  "10-07 17": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 3
+  },
+  "10-07 18": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 3
+  },
+  "10-07 19": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 4
+  },
+  "10-07 20": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 23
+  },
+  "10-07 21": {
+   "we_nonflow_ok": 3,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 22
+  },
+  "10-07 22": {
+   "we_nonflow_ok": 2,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 34
+  },
+  "10-07 23": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 21
+  },
+  "10-08 00": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 24
+  },
+  "10-08 01": {
+   "we_nonflow_ok": 2,
+   "we_with_vf": 2,
+   "we_full_pass": 1,
+   "cf_universe": 29
+  },
+  "10-08 02": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 0,
+   "cf_universe": 24
+  },
+  "10-08 03": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 27
+  },
+  "10-08 04": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 26
+  },
+  "10-08 05": {
+   "we_nonflow_ok": 2,
+   "we_with_vf": 2,
+   "we_full_pass": 2,
+   "cf_universe": 23
+  },
+  "10-08 06": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 21
+  },
+  "10-08 07": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 21
+  },
+  "10-08 08": {
+   "we_nonflow_ok": 1,
+   "we_with_vf": 1,
+   "we_full_pass": 1,
+   "cf_universe": 21
+  },
+  "10-08 09": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 22
+  },
+  "10-08 10": {
+   "we_nonflow_ok": 0,
+   "we_with_vf": 0,
+   "we_full_pass": 0,
+   "cf_universe": 19
+  }
+ },
+ "crosscheck_first_rej_vs_reconstruction": [
+  [
+   [
+    "winner_signal",
+    "we_no_market",
+    "novf"
+   ],
+   1782324
+  ],
+  [
+   [
+    "promoted_verified_flow_unavailable",
+    "we_market",
+    "novf"
+   ],
+   95104
+  ],
+  [
+   [
+    "winner_signal",
+    "we_no_market",
+    "vf"
+   ],
+   27198
+  ],
+  [
+   [
+    "promoted_buy_pressure_unconfirmed",
+    "we_market",
+    "vf"
+   ],
+   12425
+  ],
+  [
+   [
+    "promoted_verified_flow_unavailable",
+    "we_no_market",
+    "novf"
+   ],
+   12189
+  ],
+  [
+   [
+    "winner_signal",
+    "we_market",
+    "novf"
+   ],
+   10619
+  ],
+  [
+   [
+    "promoted_verified_flow_stale",
+    "we_market",
+    "vf"
+   ],
+   6761
+  ],
+  [
+   [
+    "reported_linked_insiders",
+    "we_market",
+    "vf"
+   ],
+   6277
+  ],
+  [
+   [
+    "quote_inconsistent",
+    "we_market",
+    "vf"
+   ],
+   3751
+  ],
+  [
+   [
+    "quote_retry_cooldown",
+    "we_market",
+    "vf"
+   ],
+   3724
+  ],
+  [
+   [
+    "cooldown",
+    "we_no_market",
+    "novf"
+   ],
+   3492
+  ],
+  [
+   [
+    "cooldown",
+    "we_no_market",
+    "vf"
+   ],
+   2366
+  ],
+  [
+   [
+    "cooldown",
+    "we_market",
+    "vf"
+   ],
+   2228
+  ],
+  [
+   [
+    "cooldown",
+    "we_market",
+    "novf"
+   ],
+   1268
+  ],
+  [
+   [
+    "quote_retry_cooldown",
+    "we_market",
+    "novf"
+   ],
+   1226
+  ],
+  [
+   [
+    "roundtrip_cost",
+    "we_market",
+    "vf"
+   ],
+   559
+  ],
+  [
+   [
+    "risk_check_pending",
+    "we_market",
+    "vf"
+   ],
+   558
+  ],
+  [
+   [
+    "winner_signal",
+    "we_market",
+    "vf"
+   ],
+   534
+  ],
+  [
+   [
+    "stale_feed",
+    "we_no_market",
+    "novf"
+   ],
+   526
+  ],
+  [
+   [
+    "holder_concentration",
+    "we_market",
+    "vf"
+   ],
+   397
+  ],
+  [
+   [
+    "promoted_verified_flow_stale",
+    "we_no_market",
+    "vf"
+   ],
+   170
+  ],
+  [
+   [
+    "impact",
+    "we_market",
+    "vf"
+   ],
+   156
+  ],
+  [
+   [
+    "quote_inconsistent",
+    "we_market",
+    "novf"
+   ],
+   107
+  ],
+  [
+   [
+    "roundtrip_cost",
+    "we_market",
+    "novf"
+   ],
+   94
+  ],
+  [
+   [
+    "exact_pool_buy_unavailable",
+    "we_market",
+    "vf"
+   ],
+   66
+  ],
+  [
+   [
+    "price_source_disagreement",
+    "we_market",
+    "vf"
+   ],
+   63
+  ],
+  [
+   [
+    "risk_data_unavailable",
+    "we_market",
+    "vf"
+   ],
+   58
+  ],
+  [
+   [
+    "impact",
+    "we_market",
+    "novf"
+   ],
+   36
+  ],
+  [
+   [
+    "stale_feed",
+    "we_market",
+    "novf"
+   ],
+   25
+  ],
+  [
+   [
+    "stale_feed",
+    "we_market",
+    "vf"
+   ],
+   18
+  ],
+  [
+   [
+    "promoted_verified_flow_unavailable",
+    "we_market",
+    "vf"
+   ],
+   17
+  ],
+  [
+   [
+    "exact_pool_sell_unavailable",
+    "we_market",
+    "vf"
+   ],
+   15
+  ],
+  [
+   [
+    "reported_linked_insiders",
+    "we_market",
+    "novf"
+   ],
+   7
+  ],
+  [
+   [
+    "promoted_buy_pressure_unconfirmed",
+    "we_market",
+    "novf"
+   ],
+   7
+  ],
+  [
+   [
+    "exact_pool_sell_unavailable",
+    "we_no_market",
+    "vf"
+   ],
+   7
+  ],
+  [
+   [
+    "promoted_verified_flow_stale",
+    "we_market",
+    "novf"
+   ],
+   6
+  ],
+  [
+   [
+    "exact_pool_buy_unavailable",
+    "we_no_market",
+    "vf"
+   ],
+   4
+  ],
+  [
+   [
+    "sell_impact_limit",
+    "we_market",
+    "vf"
+   ],
+   2
+  ],
+  [
+   [
+    "stale_feed",
+    "we_no_market",
+    "vf"
+   ],
+   2
+  ],
+  [
+   [
+    "buy_impact_limit",
+    "we_market",
+    "vf"
+   ],
+   2
+  ]
+ ]
+}

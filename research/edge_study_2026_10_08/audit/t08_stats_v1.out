@@ -1,0 +1,24 @@
+summarize n=1: {'n': 1, 'pairs': 1, 'clusters': 1, 'win_rate': 100.0, 'mean_usd': 5.0, 'mean_pct': 2.5, 'median_pct': 2.5, 'sum_usd': 5.0, 'pf': inf, 'ci95_mean_usd': [None, None], 'trades_per_hour': 1.0, 'avg_hold_min': 0.2, 'top_pair_share': 1.0, 'exits': {'TP': 1}}
+summarize n=2 median_pct (true median 1.0): 2.5
+portfolio slots=1 (expect taken 1, final 1005): {'taken': 1, 'final_balance': 1005.0, 'max_drawdown_pct': 0.0}
+portfolio mdd (expect 1.98): {'taken': 3, 'final_balance': 995.0, 'max_drawdown_pct': 1.98}
+random_all_ps train n 589 mean $-19.88 sd $43.83 | iid CI [-23.41, -16.34] | (pair,hour) CI [-23.036, -15.594] clusters 460 | pair CI [-24.706, -14.739] pairs 165
+    design effect (pair) 1.98 -> effective n 297; MDE80 ~ $7.12 per $200 trade (3.56%)
+random_all_ps holdout n 468 mean $-15.37 sd $26.32 | iid CI [-17.75, -12.98] | (pair,hour) CI [-17.84, -12.976] clusters 394 | pair CI [-19.165, -11.825] pairs 132
+    design effect (pair) 2.37 -> effective n 198; MDE80 ~ $5.24 per $200 trade (2.62%)
+random_mid_fee train n 240 mean $-8.96 sd $17.31 | iid CI [-11.15, -6.77] | (pair,hour) CI [-11.181, -6.949] clusters 163 | pair CI [-10.915, -7.317] pairs 36
+    design effect (pair) 0.68 -> effective n 356; MDE80 ~ $2.57 per $200 trade (1.28%)
+random_mid_fee holdout n 170 mean $-8.63 sd $18.27 | iid CI [-11.38, -5.89] | (pair,hour) CI [-11.619, -6.013] clusters 134 | pair CI [-11.681, -6.017] pairs 26
+    design effect (pair) 1.06 -> effective n 160; MDE80 ~ $4.05 per $200 trade (2.02%)
+random all-PumpSwap mean net50 by hour since start: {0: (31, -15.6), 1: (34, -13.6), 2: (27, -13.7), 3: (30, -14.8), 4: (34, -14.1), 5: (46, -9.6), 6: (64, -2.9), 7: (41, -11.8), 8: (75, -10.2), 9: (57, -5.1), 10: (52, -9.0), 11: (29, -7.7), 12: (39, -12.3), 13: (54, -7.6), 14: (10, -15.0), 15: (80, -8.8), 16: (52, -12.3), 17: (56, -6.7), 18: (56, -7.1), 19: (50, -7.3), 20: (47, -4.9), 21: (44, -5.9), 22: (49, -7.0)}
+  rug ('UDR', '8TSAcyiP', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 223.5, 'liq/mcap%', 0.61)
+  rug ('GOIF', 'AzfHgMbz', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 343.5, 'liq/mcap%', 0.49)
+  rug ('DAWS', 'BTSpnpim', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 22.9, 'liq/mcap%', 1.89)
+  rug ('D\u200aO\u200aT\u200aF', 'Bmc7xtro', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 94.9, 'liq/mcap%', 0.93)
+  rug ('WSOS', 'DpenfQSG', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 234.8, 'liq/mcap%', 0.59)
+  rug ('DOTF', 'HYZCigd7', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 369.6, 'liq/mcap%', 0.47)
+  rug ('VSOF', 'VFy2QcKA', 'drain', 'holdout', 'flag_at_first_cf', True, 'mcap_m', 298.5, 'liq/mcap%', 0.52)
+  rug ('IOF', '3oKvxwy5', 'drain', 'train', 'flag_at_first_cf', True, 'mcap_m', 242.3, 'liq/mcap%', 0.58)
+  rug ('SARP', 'EpakUVUm', 'drain', 'train', 'flag_at_first_cf', True, 'mcap_m', 852.8, 'liq/mcap%', 0.31)
+  rug ('IOF', 'FeCGDeqW', 'drain', 'train', 'flag_at_first_cf', True, 'mcap_m', 253.7, 'liq/mcap%', 0.57)
+rugs drained in train 3 holdout 7

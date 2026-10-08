@@ -1,0 +1,36 @@
+== A1_latest_first_default | Enter at the first point a pair carries the paid-profile latest flag; -5/+10/60 | secs 0.8
+   TRAIN net50 {"n": 49, "pairs": 49, "clusters": 49, "win_rate": 12.2, "mean_pct": -5.856, "median_pct": -7.773, "sum_usd": -573.86, "pf": 0.293, "ci95_mean_usd": [-17.49, -5.297], "trades_per_hour": 3.87, "avg_hold_min": 0.5, "top_pair_share": 0.02, "exits": {"STOP": 44, "TP": 5}}
+   TRAIN net0  {"n": 49, "win_rate": 12.2, "mean_pct": -4.918, "median_pct": -6.848, "sum_usd": -482.01, "pf": 0.343}
+   TRAIN portfolio(3) {'taken': 45, 'final_balance': 554.21, 'max_drawdown_pct': 45.53}
+== A2_latest_first_quick | Same event, quick scalp -5/+5/5min | secs 0.8
+   TRAIN net50 {"n": 49, "pairs": 49, "clusters": 49, "win_rate": 14.3, "mean_pct": -6.296, "median_pct": -7.505, "sum_usd": -617.05, "pf": 0.224, "ci95_mean_usd": [-17.775, -6.865], "trades_per_hour": 3.87, "avg_hold_min": 0.4, "top_pair_share": 0.02, "exits": {"STOP": 43, "TP": 6}}
+   TRAIN net0  {"n": 49, "win_rate": 14.3, "mean_pct": -5.364, "median_pct": -6.584, "sum_usd": -525.62, "pf": 0.27}
+   TRAIN portfolio(3) {'taken': 45, 'final_balance': 485.69, 'max_drawdown_pct': 52.27}
+== A3_latest_first_trail | Same event, stop -8, no TP, trail arm 5 / give-back 4, hold 30 | secs 0.8
+   TRAIN net50 {"n": 49, "pairs": 49, "clusters": 49, "win_rate": 20.4, "mean_pct": -14.478, "median_pct": -12.862, "sum_usd": -1418.84, "pf": 0.17, "ci95_mean_usd": [-43.892, -14.992], "trades_per_hour": 3.87, "avg_hold_min": 1.7, "top_pair_share": 0.02, "exits": {"STOP": 37, "TRAIL": 12}}
+   TRAIN net0  {"n": 49, "win_rate": 20.4, "mean_pct": -13.627, "median_pct": -11.996, "sum_usd": -1335.4, "pf": 0.19}
+   TRAIN portfolio(3) {'taken': 45, 'final_balance': -311.67, 'max_drawdown_pct': 131.17}
+== B1_boost_first_default | Enter at the first point a pair ever shows a boost amount; -5/+10/60 | secs 0.7
+   TRAIN net50 {"n": 14, "pairs": 14, "clusters": 14, "win_rate": 0.0, "mean_pct": -7.787, "median_pct": -7.543, "sum_usd": -218.04, "pf": 0.0, "ci95_mean_usd": [-18.463, -12.655], "trades_per_hour": 1.27, "avg_hold_min": 13.2, "top_pair_share": 0.071, "exits": {"HOLD": 1, "STOP": 12, "TP": 1}}
+   TRAIN net0  {"n": 14, "win_rate": 0.0, "mean_pct": -6.866, "median_pct": -6.623, "sum_usd": -192.26, "pf": 0.0}
+   TRAIN portfolio(3) {'taken': 14, 'final_balance': 781.96, 'max_drawdown_pct': 21.8}
+== B2_boost_first_long | Same event, -10/+20/120 | secs 0.7
+   TRAIN net50 {"n": 14, "pairs": 14, "clusters": 14, "win_rate": 14.3, "mean_pct": -8.38, "median_pct": -11.053, "sum_usd": -234.65, "pf": 0.262, "ci95_mean_usd": [-30.735, -0.688], "trades_per_hour": 1.27, "avg_hold_min": 45.3, "top_pair_share": 0.071, "exits": {"HOLD": 3, "STOP": 8, "TP": 2, "OPEN_AT_END/VANISHED": 1}}
+   TRAIN net0  {"n": 14, "win_rate": 21.4, "mean_pct": -7.465, "median_pct": -10.163, "sum_usd": -209.03, "pf": 0.297}
+   TRAIN portfolio(3) {'taken': 14, 'final_balance': 765.35, 'max_drawdown_pct': 23.5}
+== B3_boost_list_member | On a boosted list, fee<=95, liq>=50k, pc5>0; -5/+10/60, cooldown 30 min | secs 0.6
+   TRAIN net50 {"n": 38, "pairs": 7, "clusters": 30, "win_rate": 21.1, "mean_pct": -4.943, "median_pct": -6.573, "sum_usd": -375.67, "pf": 0.304, "ci95_mean_usd": [-17.145, -2.772], "trades_per_hour": 2.95, "avg_hold_min": 20.8, "top_pair_share": 0.421, "exits": {"STOP": 26, "TP": 7, "HOLD": 5}}
+   TRAIN net0  {"n": 38, "win_rate": 21.1, "mean_pct": -3.989, "median_pct": -5.635, "sum_usd": -303.15, "pf": 0.374}
+   TRAIN portfolio(3) {'taken': 38, 'final_balance': 624.33, 'max_drawdown_pct': 37.57}
+== D1_post_latest_bounce | 10-45 min after the first latest flag, price <= 50% of event price and +5% in 60 s; -10/+15/20 | secs 0.8
+   TRAIN net50 {"n": 34, "pairs": 14, "clusters": 17, "win_rate": 2.9, "mean_pct": -17.57, "median_pct": -15.832, "sum_usd": -1194.77, "pf": 0.041, "ci95_mean_usd": [-43.599, -26.298], "trades_per_hour": 4.45, "avg_hold_min": 0.3, "top_pair_share": 0.147, "exits": {"STOP": 33, "TP": 1}}
+   TRAIN net0  {"n": 34, "win_rate": 2.9, "mean_pct": -16.764, "median_pct": -15.012, "sum_usd": -1139.92, "pf": 0.045}
+   TRAIN portfolio(3) {'taken': 34, 'final_balance': -194.77, 'max_drawdown_pct': 119.48}
+== E1_surge_mid_dip | Buy-count surge (3x 1h pace) in fee55-95 / liq 50-250k with pc5<0; -5/+10/60 | secs 0.9
+   TRAIN net50 {"n": 15, "pairs": 7, "clusters": 14, "win_rate": 40.0, "mean_pct": -2.746, "median_pct": -6.37, "sum_usd": -82.39, "pf": 0.515, "ci95_mean_usd": [-14.664, 3.43], "trades_per_hour": 1.6, "avg_hold_min": 34.9, "top_pair_share": 0.267, "exits": {"TP": 4, "STOP": 9, "HOLD": 2}}
+   TRAIN net0  {"n": 15, "win_rate": 40.0, "mean_pct": -1.77, "median_pct": -5.43, "sum_usd": -53.1, "pf": 0.654}
+   TRAIN portfolio(3) {'taken': 15, 'final_balance': 917.61, 'max_drawdown_pct': 11.46}
+== E2_surge_nontoxic | Buy-count surge (3x 1h pace), fee<=95, liq>=50k, any direction; -5/+10/60 | secs 0.9
+   TRAIN net50 {"n": 39, "pairs": 17, "clusters": 38, "win_rate": 30.8, "mean_pct": -2.556, "median_pct": -5.213, "sum_usd": -199.37, "pf": 0.487, "ci95_mean_usd": [-10.849, 1.407], "trades_per_hour": 3.14, "avg_hold_min": 44.8, "top_pair_share": 0.128, "exits": {"STOP": 19, "TP": 5, "HOLD": 15}}
+   TRAIN net0  {"n": 39, "win_rate": 33.3, "mean_pct": -1.577, "median_pct": -4.26, "sum_usd": -123.03, "pf": 0.637}
+   TRAIN portfolio(3) {'taken': 30, 'final_balance': 840.22, 'max_drawdown_pct': 15.98}

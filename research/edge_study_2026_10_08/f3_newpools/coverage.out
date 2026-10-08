@@ -1,0 +1,24 @@
+split at hour 13.66
+hour  0 new_young= 65 (gecko  61, latest   3) stayed>=10m= 5 | F3-24h universe: pairs= 5 points= 1480
+hour  1 new_young= 57 (gecko  53, latest   4) stayed>=10m= 5 | F3-24h universe: pairs= 4 points= 1876
+hour  2 new_young= 45 (gecko  44, latest   1) stayed>=10m= 1 | F3-24h universe: pairs= 3 points= 1261
+hour  3 new_young= 47 (gecko  45, latest   2) stayed>=10m= 4 | F3-24h universe: pairs= 2 points=  594
+hour  4 new_young= 69 (gecko  60, latest  11) stayed>=10m=11 | F3-24h universe: pairs= 2 points=  730
+hour  5 new_young= 58 (gecko  45, latest  13) stayed>=10m=14 | F3-24h universe: pairs= 9 points= 2588
+hour  6 new_young= 54 (gecko  50, latest   4) stayed>=10m= 6 | F3-24h universe: pairs= 6 points= 3034
+hour  7 new_young= 54 (gecko  48, latest   6) stayed>=10m= 8 | F3-24h universe: pairs= 9 points= 2903
+hour  8 new_young= 48 (gecko  38, latest   8) stayed>=10m=10 | F3-24h universe: pairs= 8 points= 2726
+hour  9 new_young= 45 (gecko  38, latest   7) stayed>=10m= 7 | F3-24h universe: pairs= 6 points= 2845
+hour 10 new_young= 58 (gecko  52, latest   6) stayed>=10m=11 | F3-24h universe: pairs= 9 points= 3368
+hour 11 new_young= 62 (gecko  61, latest   2) stayed>=10m= 2 | F3-24h universe: pairs= 4 points=  767
+hour 12 new_young= 71 (gecko  60, latest  12) stayed>=10m=15 | F3-24h universe: pairs= 4 points=  720
+hour 13 new_young= 75 (gecko  68, latest   5) stayed>=10m= 8 | F3-24h universe: pairs= 1 points=  713
+hour 14 new_young= 20 (gecko  12, latest   7) stayed>=10m= 5 | F3-24h universe: pairs= 1 points=  100
+hour 15 new_young= 89 (gecko  84, latest   5) stayed>=10m=10 | F3-24h universe: pairs= 4 points= 1441
+hour 16 new_young= 73 (gecko  67, latest   6) stayed>=10m= 6 | F3-24h universe: pairs= 1 points=  169
+hour 17 new_young= 83 (gecko  79, latest   3) stayed>=10m= 5 | F3-24h universe: pairs= 1 points=    7
+hour 18 new_young= 82 (gecko  79, latest   3) stayed>=10m= 4 | F3-24h universe: pairs= 1 points=   96
+hour 19 new_young= 79 (gecko  75, latest   3) stayed>=10m= 3 | F3-24h universe: pairs= 0 points=    0
+hour 20 new_young= 73 (gecko  71, latest   2) stayed>=10m= 3 | F3-24h universe: pairs= 0 points=    0
+hour 21 new_young= 69 (gecko  67, latest   3) stayed>=10m= 5 | F3-24h universe: pairs= 1 points=   82
+hour 22 new_young= 47 (gecko  47, latest   1) stayed>=10m= 2 | F3-24h universe: pairs= 1 points=   29

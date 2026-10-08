@@ -1,0 +1,28 @@
+== F6_STABLE_SIZE_U50_E5_K3 secs 3.7
+   train {"n": 28, "pairs": 14, "clusters": 28, "win_rate": 28.6, "mean_pct": 1.575, "median_pct": -1.784, "pf": 1.471, "sum_usd": 88.19, "ci95_mean_usd": [-7.381, 16.081], "trades_per_hour": 2.06, "avg_hold_min": 129.4, "top_pair_share": 0.179, "exits": {"ROTATE": 26, "OPEN_AT_END/END": 2}}
+   holdout {"n": 4, "pairs": 3, "clusters": 4, "win_rate": 0.0, "mean_pct": -10.153, "median_pct": -2.026, "pf": 0.0, "sum_usd": -81.22, "ci95_mean_usd": [-48.273, -3.925], "trades_per_hour": 0.73, "avg_hold_min": 116.2, "top_pair_share": 0.5, "exits": {"ROTATE": 3, "OPEN_AT_END/END": 1}}
+   holdout_model {"n": 4, "pairs": 3, "clusters": 4, "win_rate": 0.0, "mean_pct": -9.25, "median_pct": -1.042, "pf": 0.0, "sum_usd": -74.0, "ci95_mean_usd": [-46.748, -1.954], "trades_per_hour": 0.73, "avg_hold_min": 116.2, "top_pair_share": 0.5, "exits": {"ROTATE": 3, "OPEN_AT_END/END": 1}}
+   portfolio_holdout {'taken': 4, 'final_balance': 918.78, 'max_drawdown_pct': 8.12} portfolio_train {'taken': 24, 'final_balance': 1078.82, 'max_drawdown_pct': 6.61}
+   matched_random holdout mean_pct [-0.944, -6.416, -8.033, -4.824, -0.366] n [4, 4, 4, 4, 4]
+   random_k holdout mean_pct [-2.777, -3.134, -3.095, -3.254, -2.827] n [211, 218, 232, 217, 226]
+   largest_k holdout {"n": 0, "pairs": null, "mean_pct": null, "median_pct": null, "sum_usd": null}
+   holdout by pair [['CATE HMzvsEEm', 2, -66.81], ['neet 5wNu5Qhd', 1, -10.36], ['OTC DA4pM4xS', 1, -4.05]]
+== F6_LARGEST3_U50_E15_MH120 secs 6.1
+   train {"n": 22, "pairs": 9, "clusters": 22, "win_rate": 22.7, "mean_pct": 1.219, "median_pct": -1.747, "pf": 1.271, "sum_usd": 53.62, "ci95_mean_usd": [-10.851, 19.891], "trades_per_hour": 1.73, "avg_hold_min": 115.2, "top_pair_share": 0.182, "exits": {"MAXHOLD": 17, "ROTATE": 4, "OPEN_AT_END/VANISHED": 1}}
+   holdout {"n": 12, "pairs": 3, "clusters": 12, "win_rate": 0.0, "mean_pct": -4.586, "median_pct": -2.139, "pf": 0.0, "sum_usd": -110.07, "ci95_mean_usd": [-19.921, -3.012], "trades_per_hour": 1.78, "avg_hold_min": 101.2, "top_pair_share": 0.333, "exits": {"MAXHOLD": 9, "OPEN_AT_END/END": 3}}
+   holdout_model {"n": 12, "pairs": 3, "clusters": 12, "win_rate": 25.0, "mean_pct": -3.627, "median_pct": -1.155, "pf": 0.035, "sum_usd": -87.05, "ci95_mean_usd": [-18.111, -1.033], "trades_per_hour": 1.78, "avg_hold_min": 101.2, "top_pair_share": 0.333, "exits": {"MAXHOLD": 9, "OPEN_AT_END/END": 3}}
+   portfolio_holdout {'taken': 12, 'final_balance': 889.93, 'max_drawdown_pct': 11.01} portfolio_train {'taken': 20, 'final_balance': 925.94, 'max_drawdown_pct': 14.97}
+   matched_random holdout mean_pct [-5.202, -4.113, -4.307, -9.273, -8.975] n [12, 12, 12, 12, 12]
+   random_k holdout mean_pct [-2.744, -3.066, -4.339, -3.492, -2.987] n [73, 78, 81, 63, 81]
+   largest_k holdout {"n": 12, "pairs": 3, "mean_pct": -4.586, "median_pct": -2.139, "sum_usd": -110.07}
+   holdout by pair [['CATE HMzvsEEm', 4, -80.76], ['ANSEM FnzKY6x7', 4, -15.6], ['TROLL 4w2cysot', 4, -13.71]]
+== F6_REVERSAL6H_U50_E5_MH120 secs 9.3
+   train {"n": 32, "pairs": 14, "clusters": 31, "win_rate": 46.9, "mean_pct": 0.799, "median_pct": -1.793, "pf": 1.103, "sum_usd": 51.13, "ci95_mean_usd": [-15.486, 16.0], "trades_per_hour": 2.38, "avg_hold_min": 83.6, "top_pair_share": 0.156, "exits": {"ROTATE": 20, "MAXHOLD": 12}}
+   holdout {"n": 21, "pairs": 10, "clusters": 20, "win_rate": 33.3, "mean_pct": -3.745, "median_pct": -3.352, "pf": 0.505, "sum_usd": -157.29, "ci95_mean_usd": [-20.283, 6.766], "trades_per_hour": 2.83, "avg_hold_min": 64.9, "top_pair_share": 0.238, "exits": {"MAXHOLD": 6, "ROTATE": 12, "OPEN_AT_END/END": 3}}
+   holdout_model {"n": 21, "pairs": 10, "clusters": 20, "win_rate": 42.9, "mean_pct": -2.778, "median_pct": -2.38, "pf": 0.604, "sum_usd": -116.7, "ci95_mean_usd": [-18.478, 8.842], "trades_per_hour": 2.83, "avg_hold_min": 64.9, "top_pair_share": 0.238, "exits": {"MAXHOLD": 6, "ROTATE": 12, "OPEN_AT_END/END": 3}}
+   portfolio_holdout {'taken': 17, 'final_balance': 876.52, 'max_drawdown_pct': 12.35} portfolio_train {'taken': 26, 'final_balance': 1151.28, 'max_drawdown_pct': 14.26}
+   matched_random holdout mean_pct [-4.886, -1.086, -4.496, -9.307, -5.936] n [21, 21, 21, 21, 21]
+   random_k holdout mean_pct [-2.777, -3.134, -3.095, -3.254, -2.827] n [211, 218, 232, 217, 226]
+   largest_k holdout {"n": 12, "pairs": 3, "mean_pct": -4.683, "median_pct": -1.896, "sum_usd": -112.4}
+   holdout by pair [['e/acc 4JAnKFdd', 4, -91.07], ['swordinu 69fyvgoT', 5, -78.01], ['TON618 34w9ReB7', 1, -37.18], ['darwin 53W7r4XU', 1, -25.24], ['HIGGS BFrSZake', 1, -17.13], ['phubber BaiHzFqn', 2, -9.97], ['PAID 6e3jZLtf', 2, -8.12], ['CATE HMzvsEEm', 2, -7.21], ['swordcat 8ewuF2o8', 2, 33.31], ['Frank 745ATaSS', 1, 83.32]]
+done secs 9.3

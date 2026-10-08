@@ -1,0 +1,24 @@
+[   0.4s] loaded series 2042 pairs; cut 1791411625348.0
+[   2.4s] tape built 349 pools {'rows': 185465, 'confirmed': 185465, 'buy_sell': 185465, 'non_wsol_quote': 53, 'bad_q': 0, 'et_gt_av': 0, 'payload_av_mismatch': 0}
+[   2.5s] stored guard holdout 11 6.106
+[   5.6s] family rerun guard n 66 identical to stored: True
+[   9.0s] reimpl guard n 66 holdout 11 6.106
+[  12.5s] reimpl orig n 91 holdout 22 0.943
+[  12.5s] overlap guard {'a': 66, 'b': 66, 'both': 64, 'only_a': 2, 'only_b': 2} holdout {'a': 11, 'b': 11, 'both': 11, 'only_a': 0, 'only_b': 0}
+[  16.0s] lag 30000 holdout 12 1.798
+[  19.5s] lag 120000 holdout 13 -0.676
+[  26.2s] random vA holdout n 54 -5.584
+[  29.7s] random vB holdout n 61 -11.472
+[  33.3s] random vC holdout n 53 -5.901
+[  37.5s] random vD holdout n 57 -9.231
+[  41.9s] random vE holdout n 57 -5.578
+[  46.1s] random vF holdout n 58 -7.678
+[  46.4s] pair-matched random pA n 29 -6.009
+[  46.7s] pair-matched random pB n 32 -4.122
+[  46.9s] pair-matched random pC n 28 -5.386
+[  47.1s] pair-matched random pD n 29 -3.476
+[  47.4s] pair-matched random pE n 29 -7.162
+[  47.6s] pair-matched random pF n 28 -3.972
+[  47.8s] pair-matched random pG n 29 -5.096
+[  48.1s] pair-matched random pH n 25 -4.857
+[  48.1s] done

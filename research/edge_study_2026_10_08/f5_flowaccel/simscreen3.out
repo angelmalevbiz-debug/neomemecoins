@@ -1,0 +1,14 @@
+tb base (ref, already counted)       {"n": 108, "pairs": 33, "mean": 1.63, "median": -3.72, "trim5": -2.67, "mean_wo_top3": -3.19, "pairavg": 8.53, "win": 49.1, "top_share": 0.241} 1s
+DS analog (ref, already counted)     {"n": 258, "pairs": 58, "mean": -3.04, "median": -8.01, "trim5": -5.0, "mean_wo_top3": -5.13, "pairavg": -4.88, "win": 37.2, "top_share": 0.132} 1s
+tb age>=360                          {"n": 74, "pairs": 10, "mean": -2.08, "median": 1.8, "trim5": -2.22, "mean_wo_top3": -3.0, "pairavg": -1.22, "win": 51.4, "top_share": 0.351} 2s
+tb age>=1440                         {"n": 1} 1s
+tb nochase r300 in [-2,5]            {"n": 70, "pairs": 14, "mean": 5.21, "median": 5.16, "trim5": -0.22, "mean_wo_top3": -0.95, "pairavg": 29.4, "win": 58.6, "top_share": 0.329} 2s
+tb sustained (prev 5m ub>=10)        {"n": 75, "pairs": 16, "mean": -3.06, "median": -0.63, "trim5": -3.05, "mean_wo_top3": -4.02, "pairavg": -6.63, "win": 49.3, "top_share": 0.32} 1s
+DS analog age>=360                   {"n": 190, "pairs": 27, "mean": -4.64, "median": -5.39, "trim5": -4.63, "mean_wo_top3": -5.19, "pairavg": -5.43, "win": 36.8, "top_share": 0.179} 1s
+RANDOM tape-live                     salt a {"n": 166, "pairs": 41, "mean": -3.66, "median": -8.03, "trim5": -4.24, "mean_wo_top3": -4.54, "pairavg": -1.86, "win": 36.7, "top_share": 0.12}
+RANDOM tape-live                     salt b {"n": 163, "pairs": 37, "mean": -5.61, "median": -10.92, "trim5": -6.04, "mean_wo_top3": -6.66, "pairavg": -4.75, "win": 31.3, "top_share": 0.141}
+RANDOM tape-live                     salt c {"n": 166, "pairs": 41, "mean": -2.84, "median": -10.94, "trim5": -5.92, "mean_wo_top3": -5.88, "pairavg": -1.65, "win": 28.9, "top_share": 0.114}
+RANDOM tape-live age>=360            salt a {"n": 139, "pairs": 27, "mean": -4.39, "median": -8.06, "trim5": -4.96, "mean_wo_top3": -5.21, "pairavg": -3.79, "win": 33.1, "top_share": 0.144}
+RANDOM tape-live age>=360            salt b {"n": 137, "pairs": 23, "mean": -5.95, "median": -9.84, "trim5": -6.04, "mean_wo_top3": -6.78, "pairavg": -4.51, "win": 29.9, "top_share": 0.168}
+RANDOM tape-live age>=360            salt c {"n": 135, "pairs": 26, "mean": -5.29, "median": -8.94, "trim5": -5.58, "mean_wo_top3": -5.8, "pairavg": -6.79, "win": 28.9, "top_share": 0.141}
+new configs counted: 5

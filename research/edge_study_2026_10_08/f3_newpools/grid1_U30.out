@@ -1,0 +1,28 @@
+#1 U30_any|rnd2pct|E1_s15_trail20/15_h60 secs=0
+   net50 {"n": 48, "pairs": 43, "clusters": 44, "win_rate": 8.3, "mean_pct": -19.264, "median_pct": -15.085, "mean_usd": -24.658, "sum_usd": -1183.56, "pf": 0.08, "ci95_mean_usd": [-34.014, -16.521], "trades_per_hour": 3.55, "avg_hold_min": 1.6, "top_pair_share": 0.062, "exits": {"OPEN_AT_END/VANISHED": 23, "TRAIL": 4, "STOP": 21}}
+   net0 mean_pct -18.457 median -14.235 | robust {"cp_mean_pct": -19.253, "cp_median_pct": -15.073, "gap_trades": 0, "nogap_mean_pct": -19.264, "vanished": 23}
+#2 U30_any|rnd2pct|E2_s25_trail40/25_h120 secs=0
+   net50 {"n": 45, "pairs": 43, "clusters": 43, "win_rate": 4.4, "mean_pct": -20.872, "median_pct": -15.085, "mean_usd": -28.783, "sum_usd": -1295.25, "pf": 0.111, "ci95_mean_usd": [-40.897, -18.007], "trades_per_hour": 3.33, "avg_hold_min": 2.5, "top_pair_share": 0.044, "exits": {"OPEN_AT_END/VANISHED": 23, "TRAIL": 2, "STOP": 19, "STOP/VANISHED": 1}}
+   net0 mean_pct -20.08 median -14.235 | robust {"cp_mean_pct": -20.86, "cp_median_pct": -15.073, "gap_trades": 0, "nogap_mean_pct": -20.872, "vanished": 24}
+#3 U30_any|rnd2pct|E3_s10_tp25_h30 secs=0
+   net50 {"n": 48, "pairs": 43, "clusters": 44, "win_rate": 6.2, "mean_pct": -17.663, "median_pct": -15.085, "mean_usd": -22.779, "sum_usd": -1093.39, "pf": 0.125, "ci95_mean_usd": [-32.457, -14.423], "trades_per_hour": 3.55, "avg_hold_min": 1.2, "top_pair_share": 0.062, "exits": {"OPEN_AT_END/VANISHED": 23, "TP": 3, "STOP": 22}}
+   net0 mean_pct -16.84 median -14.235 | robust {"cp_mean_pct": -17.651, "cp_median_pct": -15.073, "gap_trades": 0, "nogap_mean_pct": -17.663, "vanished": 23}
+#4 U30_any|organic|E1_s15_trail20/15_h60 secs=0
+   net50 {"n": 3, "pairs": 2, "clusters": 2, "win_rate": 33.3, "mean_pct": 3.469, "median_pct": -17.839, "mean_usd": 6.006, "sum_usd": 18.02, "pf": 1.439, "ci95_mean_usd": [null, null], "trades_per_hour": 3.0, "avg_hold_min": 6.8, "top_pair_share": 0.667, "exits": {"STOP": 2, "TRAIL": 1}}
+   net0 mean_pct 4.504 median -17.017 | robust {"cp_mean_pct": 3.488, "cp_median_pct": -17.826, "gap_trades": 0, "nogap_mean_pct": 3.469, "vanished": 0}
+#5 U30_any|organic|E2_s25_trail40/25_h120 secs=0
+   net50 {"n": 2, "pairs": 2, "clusters": 2, "win_rate": 50.0, "mean_pct": 33.04, "median_pct": 95.804, "mean_usd": 33.086, "sum_usd": 66.17, "pf": 3.326, "ci95_mean_usd": [null, null], "trades_per_hour": 2.0, "avg_hold_min": 16.3, "top_pair_share": 0.5, "exits": {"TRAIL": 1, "STOP": 1}}
+   net0 mean_pct 34.371 median 97.762 | robust {"cp_mean_pct": 33.072, "cp_median_pct": 95.859, "gap_trades": 0, "nogap_mean_pct": 33.04, "vanished": 0}
+#6 U30_any|organic|E3_s10_tp25_h30 secs=0
+   net50 {"n": 3, "pairs": 2, "clusters": 2, "win_rate": 33.3, "mean_pct": 0.24, "median_pct": -13.13, "mean_usd": 1.771, "sum_usd": 5.31, "pf": 1.176, "ci95_mean_usd": [null, null], "trades_per_hour": 3.0, "avg_hold_min": 5.6, "top_pair_share": 0.667, "exits": {"STOP": 2, "TP": 1}}
+   net0 mean_pct 1.243 median -12.261 | robust {"cp_mean_pct": 0.258, "cp_median_pct": -13.116, "gap_trades": 0, "nogap_mean_pct": 0.24, "vanished": 0}
+#7 U30_any|breakout|E1_s15_trail20/15_h60 secs=0
+   net50 {"n": 51, "pairs": 43, "clusters": 44, "win_rate": 25.5, "mean_pct": -9.177, "median_pct": -15.944, "mean_usd": -12.498, "sum_usd": -637.42, "pf": 0.5, "ci95_mean_usd": [-25.668, 2.04], "trades_per_hour": 3.86, "avg_hold_min": 2.8, "top_pair_share": 0.059, "exits": {"OPEN_AT_END/VANISHED": 16, "TRAIL": 12, "STOP": 23}}
+   net0 mean_pct -8.269 median -15.103 | robust {"cp_mean_pct": -9.162, "cp_median_pct": -15.93, "gap_trades": 0, "nogap_mean_pct": -9.177, "vanished": 16}
+#8 U30_any|breakout|E2_s25_trail40/25_h120 secs=0
+   net50 {"n": 50, "pairs": 43, "clusters": 44, "win_rate": 18.0, "mean_pct": -13.366, "median_pct": -23.003, "mean_usd": -20.485, "sum_usd": -1024.26, "pf": 0.416, "ci95_mean_usd": [-37.361, -2.049], "trades_per_hour": 3.79, "avg_hold_min": 5.5, "top_pair_share": 0.06, "exits": {"OPEN_AT_END/VANISHED": 18, "TRAIL": 8, "STOP": 24}}
+   net0 mean_pct -12.499 median -22.232 | robust {"cp_mean_pct": -13.351, "cp_median_pct": -22.993, "gap_trades": 0, "nogap_mean_pct": -13.366, "vanished": 18}
+#9 U30_any|breakout|E3_s10_tp25_h30 secs=0
+   net50 {"n": 54, "pairs": 43, "clusters": 45, "win_rate": 16.7, "mean_pct": -9.632, "median_pct": -14.81, "mean_usd": -12.827, "sum_usd": -692.65, "pf": 0.412, "ci95_mean_usd": [-20.313, -5.23], "trades_per_hour": 4.09, "avg_hold_min": 1.9, "top_pair_share": 0.056, "exits": {"OPEN_AT_END/VANISHED": 13, "STOP": 32, "TP": 9}}
+   net0 mean_pct -8.728 median -13.958 | robust {"cp_mean_pct": -9.618, "cp_median_pct": -14.798, "gap_trades": 0, "nogap_mean_pct": -9.632, "vanished": 13}
+configs 9

@@ -1,0 +1,13 @@
+module C:\Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep\harness.py
+ago/window brute-force mismatches: 0
+P.static("price") returns array len 14181 at i=10 -> LEAK
+P.s accessible directly: True
+ticker-index brute-force mismatches: 0
+eligible pairs 277
+poisoned-future: decision calls before T*: 149462 vs 149462, identical=True
+poisoned-future: exit_fn calls before T*: 54602 vs 54602, identical=True
+poisoned-future: trades closed before T*: 1294 vs 1294, identical=True
+signal call order: time inversions between consecutive calls = 139 of 361831 (per-pair iteration => global state inside a signal can see other pairs' future)
+random trades 2959 overlaps 0 cooldown violations (entry within 300 s of previous exit) 0
+forward_net(3600) samples: ok 53168, None because pair vanished before horizon (dataset continued) 8307, None near dataset end/lag 3725
+secs 21.1

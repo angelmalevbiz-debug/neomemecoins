@@ -1,0 +1,33 @@
+tape pairs used 113 events 167006 secs 2.6
+same-second buy/sell log ratio bps: n 21020 median 105.9 p25 56.8 p75 201.4 ; median modeled fee bps 100.0
+fresh DexScreener points on tape pairs 46232
+lag L s | n | median |err| bps fee-adjusted mid | p75 | median |err| raw last trade
+    0 |   5007 |    76.8 |   164.6 |    93.9
+    5 |   5148 |    70.7 |   150.3 |    88.0
+   10 |   5118 |    62.8 |   123.0 |    81.4
+   15 |   5217 |    60.1 |   110.0 |    61.5
+   20 |   5182 |    65.8 |   116.6 |    37.6
+   25 |   5173 |    71.8 |   122.7 |    51.5
+   30 |   4996 |    79.6 |   139.7 |    71.1
+   40 |   5159 |    86.3 |   176.5 |    85.3
+   50 |   5100 |    99.4 |   206.8 |    96.4
+   60 |   4965 |   108.9 |   238.5 |   108.7
+   90 |   4947 |   143.8 |   326.7 |   139.5
+  120 |   5006 |   171.7 |   386.9 |   166.4
+fill bias bps = log(tape mid at t_i+2s / DexScreener fill price at j); context = last DexScreener move at i
+  all decision points
+    dn>2%     n    2935 mean    21.9 median    19.5 p10  -474.5 p90   485.1
+    dn0.5-2%  n    6137 mean    14.6 median    26.3 p10  -198.4 p90   205.7
+    flat      n    9574 mean    -9.8 median   -16.4 p10  -152.5 p90   138.5
+    up0.5-2%  n    7869 mean   -26.5 median   -18.7 p10  -212.5 p90   167.5
+    up>2%     n    4017 mean   -82.4 median   -22.8 p10  -546.1 p90   421.2
+    ALL       n   30532 mean   -15.7 median   -14.8 p10  -237.4 p90   213.9
+  decision at a FRESH point (price just changed)
+    dn>2%     n     566 mean    10.1 median    22.9 p10  -484.3 p90   439.9
+    dn0.5-2%  n    1035 mean     8.5 median    26.9 p10  -188.4 p90   190.9
+    flat      n    1436 mean   -19.6 median   -17.9 p10  -153.9 p90   122.0
+    up0.5-2%  n    1263 mean   -35.9 median   -20.7 p10  -219.2 p90   145.6
+    up>2%     n     689 mean   -45.5 median   -33.4 p10  -492.7 p90   368.6
+    ALL       n    4989 mean   -18.1 median   -16.0 p10  -234.8 p90   199.4
+tape pairs: next point same DexScreener price share 0.864; when unchanged, |true tape move| over the gap bps: median 35.9 p90 168.2
+secs 5.4

@@ -1,0 +1,3766 @@
+{
+ "meta": {
+  "cut_t": 1791444401772.0,
+  "t1": 1791451301436.0,
+  "forward_hours": 1.9165733333333332,
+  "fwd_build": {
+   "start_byte": 13206393390,
+   "end_byte": 14325257983,
+   "file_size_at_start": 14325257983,
+   "rows": 278812,
+   "points": 92654,
+   "bad": 0,
+   "pairs": 290,
+   "t_min": 1791444404605.0,
+   "t_max": 1791451301436.0
+  },
+  "new_pairs": 192,
+  "ext_pairs": 98,
+  "forward_points": 92654
+ },
+ "sample_tests": {
+  "G_RUG_cat60": {
+   "diff": 0.091,
+   "ci95": [
+    -0.018,
+    0.224
+   ],
+   "n_flag": 1129,
+   "n_keep": 2289,
+   "mean_flag": 0.108,
+   "mean_keep": 0.017,
+   "pairs_flag": 92,
+   "pairs_all": 135,
+   "predicted_sign": 1,
+   "decision": "consistent"
+  },
+  "G_RUG_f30": {
+   "diff": -5.063,
+   "ci95": [
+    -12.654,
+    0.706
+   ],
+   "n_flag": 1648,
+   "n_keep": 3501,
+   "mean_flag": -9.251,
+   "mean_keep": -4.188,
+   "pairs_flag": 95,
+   "pairs_all": 139,
+   "predicted_sign": -1,
+   "decision": "consistent"
+  },
+  "V_MOM_S1_f30": {
+   "diff": -5.727,
+   "ci95": [
+    -12.144,
+    -1.367
+   ],
+   "n_flag": 1706,
+   "n_keep": 1285,
+   "mean_flag": -9.198,
+   "mean_keep": -3.471,
+   "pairs_flag": 84,
+   "pairs_all": 85,
+   "predicted_sign": -1,
+   "decision": "confirmed"
+  },
+  "V_ATT_S1fee100_f30": {
+   "diff": -4.819,
+   "ci95": [
+    -30.749,
+    7.626
+   ],
+   "n_flag": 409,
+   "n_keep": 1321,
+   "mean_flag": -13.447,
+   "mean_keep": -8.627,
+   "pairs_flag": 9,
+   "pairs_all": 66,
+   "predicted_sign": -1,
+   "decision": "consistent"
+  },
+  "V_CRASH_S1_f30": {
+   "diff": -3.755,
+   "ci95": [
+    -28.902,
+    11.78
+   ],
+   "n_flag": 108,
+   "n_keep": 2883,
+   "mean_flag": -10.357,
+   "mean_keep": -6.602,
+   "pairs_flag": 9,
+   "pairs_all": 85,
+   "predicted_sign": -1,
+   "decision": "consistent"
+  },
+  "V_HOT_S1_f30": {
+   "diff": -6.076,
+   "ci95": [
+    -21.951,
+    3.947
+   ],
+   "n_flag": 493,
+   "n_keep": 2498,
+   "mean_flag": -11.812,
+   "mean_keep": -5.736,
+   "pairs_flag": 32,
+   "pairs_all": 85,
+   "predicted_sign": -1,
+   "decision": "consistent"
+  },
+  "V_STACK_S1_f30": {
+   "diff": -5.073,
+   "ci95": [
+    -11.02,
+    -0.95
+   ],
+   "n_flag": 1815,
+   "n_keep": 1176,
+   "mean_flag": -8.732,
+   "mean_keep": -3.659,
+   "pairs_flag": 84,
+   "pairs_all": 85,
+   "predicted_sign": -1,
+   "decision": "confirmed"
+  },
+  "V_STACK_S2_f30": {
+   "diff": -2.727,
+   "ci95": [
+    -8.494,
+    1.258
+   ],
+   "n_flag": 1460,
+   "n_keep": 2041,
+   "mean_flag": -5.778,
+   "mean_keep": -3.051,
+   "pairs_flag": 37,
+   "pairs_all": 44,
+   "predicted_sign": -1,
+   "decision": "consistent"
+  }
+ },
+ "sample_secondary": {
+  "V_STACK_S1_f15": {
+   "diff": -3.079,
+   "ci95": [
+    -6.229,
+    -0.803
+   ],
+   "n_flag": 2077,
+   "n_keep": 1382,
+   "mean_flag": -6.831,
+   "mean_keep": -3.752,
+   "pairs_flag": 84,
+   "pairs_all": 85
+  },
+  "V_STACK_S1_f60": {
+   "diff": -5.427,
+   "ci95": [
+    -13.698,
+    1.052
+   ],
+   "n_flag": 1215,
+   "n_keep": 758,
+   "mean_flag": -8.638,
+   "mean_keep": -3.212,
+   "pairs_flag": 81,
+   "pairs_all": 82
+  },
+  "V_ATT_S1fee100_f15": {
+   "diff": -2.634,
+   "ci95": [
+    -17.451,
+    3.837
+   ],
+   "n_flag": 469,
+   "n_keep": 1531,
+   "mean_flag": -9.651,
+   "mean_keep": -7.017,
+   "pairs_flag": 9,
+   "pairs_all": 66
+  },
+  "V_ATT_S1fee100_f60": {
+   "diff": -2.612,
+   "ci95": [
+    -21.61,
+    17.33
+   ],
+   "n_flag": 260,
+   "n_keep": 896,
+   "mean_flag": -11.657,
+   "mean_keep": -9.045,
+   "pairs_flag": 7,
+   "pairs_all": 63
+  },
+  "G_RUG_f60": {
+   "diff": -10.467,
+   "ci95": [
+    -24.221,
+    1.111
+   ],
+   "n_flag": 1129,
+   "n_keep": 2289,
+   "mean_flag": -14.304,
+   "mean_keep": -3.837,
+   "pairs_flag": 92,
+   "pairs_all": 135
+  }
+ },
+ "base_rates": {
+  "S0 all liq>=20k": {
+   "f30": {
+    "n": 5149,
+    "pairs": 139,
+    "mean": -5.809,
+    "median": -2.407,
+    "p10": -15.045,
+    "p90": 3.526
+   },
+   "f60": {
+    "n": 3418,
+    "pairs": 135,
+    "mean": -7.294,
+    "median": -2.411,
+    "p10": -17.635,
+    "p90": 5.81
+   },
+   "cat60_rate": 0.0474
+  },
+  "S0 guard-flagged": {
+   "f30": {
+    "n": 1648,
+    "pairs": 95,
+    "mean": -9.251,
+    "median": -1.303,
+    "p10": -33.704,
+    "p90": 6.986
+   },
+   "f60": {
+    "n": 1129,
+    "pairs": 92,
+    "mean": -14.304,
+    "median": -0.911,
+    "p10": -61.101,
+    "p90": 6.397
+   },
+   "cat60_rate": 0.1081
+  },
+  "S2 guard-pass": {
+   "f30": {
+    "n": 3501,
+    "pairs": 44,
+    "mean": -4.188,
+    "median": -2.681,
+    "p10": -9.977,
+    "p90": 2.323
+   },
+   "f60": {
+    "n": 2289,
+    "pairs": 43,
+    "mean": -3.837,
+    "median": -2.525,
+    "p10": -11.539,
+    "p90": 5.509
+   },
+   "cat60_rate": 0.0175
+  },
+  "S2 guard-pass, no veto": {
+   "f30": {
+    "n": 2041,
+    "pairs": 39,
+    "mean": -3.051,
+    "median": -2.489,
+    "p10": -9.03,
+    "p90": 0.681
+   },
+   "f60": {
+    "n": 1315,
+    "pairs": 39,
+    "mean": -2.761,
+    "median": -2.363,
+    "p10": -9.271,
+    "p90": 1.123
+   },
+   "cat60_rate": 0.0
+  },
+  "S2 fee<=50 liq>=250k": {
+   "f30": {
+    "n": 1003,
+    "pairs": 14,
+    "mean": -2.293,
+    "median": -2.155,
+    "p10": -3.06,
+    "p90": -1.211
+   },
+   "f60": {
+    "n": 646,
+    "pairs": 14,
+    "mean": -2.132,
+    "median": -2.13,
+    "p10": -3.183,
+    "p90": -0.516
+   },
+   "cat60_rate": 0.0
+  },
+  "S2 fee55-95": {
+   "f30": {
+    "n": 1255,
+    "pairs": 17,
+    "mean": -2.531,
+    "median": -3.321,
+    "p10": -9.026,
+    "p90": 3.638
+   },
+   "f60": {
+    "n": 811,
+    "pairs": 16,
+    "mean": -2.117,
+    "median": -3.464,
+    "p10": -10.129,
+    "p90": 6.672
+   },
+   "cat60_rate": 0.0
+  },
+  "S2 fee>=100": {
+   "f30": {
+    "n": 1077,
+    "pairs": 14,
+    "mean": -8.291,
+    "median": -5.489,
+    "p10": -15.658,
+    "p90": 7.776
+   },
+   "f60": {
+    "n": 712,
+    "pairs": 13,
+    "mean": -7.986,
+    "median": -4.723,
+    "p10": -17.346,
+    "p90": 9.793
+   },
+   "cat60_rate": 0.0562
+  },
+  "S1 young (<12h) structural-pass": {
+   "f30": {
+    "n": 659,
+    "pairs": 55,
+    "mean": -12.209,
+    "median": -14.296,
+    "p10": -46.852,
+    "p90": 26.219
+   },
+   "f60": {
+    "n": 450,
+    "pairs": 53,
+    "mean": -12.283,
+    "median": -15.024,
+    "p10": -40.617,
+    "p90": 16.721
+   },
+   "cat60_rate": 0.0422
+  }
+ },
+ "guard_reason_rates": {
+  "PASS": {
+   "cat60": {
+    "n": 2289,
+    "pairs": 43,
+    "mean": 0.017,
+    "median": 0.0,
+    "p10": 0.0,
+    "p90": 0.0
+   },
+   "f30": {
+    "n": 3501,
+    "pairs": 44,
+    "mean": -4.188,
+    "median": -2.681,
+    "p10": -9.977,
+    "p90": 2.323
+   }
+  },
+  "YOUNG_POOL": {
+   "cat60": {
+    "n": 793,
+    "pairs": 86,
+    "mean": 0.154,
+    "median": 0.0,
+    "p10": 0.0,
+    "p90": 1.0
+   },
+   "f30": {
+    "n": 1132,
+    "pairs": 89,
+    "mean": -12.944,
+    "median": -4.193,
+    "p10": -52.705,
+    "p90": 13.469
+   }
+  },
+  "FAKE_MCAP": {
+   "cat60": {
+    "n": 464,
+    "pairs": 10,
+    "mean": 0.0,
+    "median": 0.0,
+    "p10": 0.0,
+    "p90": 0.0
+   },
+   "f30": {
+    "n": 734,
+    "pairs": 10,
+    "mean": -1.133,
+    "median": -1.224,
+    "p10": -1.619,
+    "p90": -0.539
+   }
+  },
+  "LP_PULLABLE": {
+   "cat60": {
+    "n": 210,
+    "pairs": 27,
+    "mean": 0.49,
+    "median": 0.0,
+    "p10": 0.0,
+    "p90": 1.0
+   },
+   "f30": {
+    "n": 250,
+    "pairs": 28,
+    "mean": -25.23,
+    "median": -3.496,
+    "p10": -100.006,
+    "p90": 6.799
+   }
+  }
+ },
+ "trade_tests": {
+  "R1_LIVE_COST_FIRST_RULE": {
+   "net50": {
+    "n": 36,
+    "pairs": 18,
+    "clusters": 36,
+    "win_rate": 5.6,
+    "mean_usd": -3.835,
+    "mean_pct": -1.918,
+    "median_pct": -1.793,
+    "sum_usd": -138.07,
+    "pf": 0.032,
+    "ci95_mean_usd": [
+     -4.701,
+     -2.969
+    ],
+    "ci95_mean_usd_pair": [
+     -4.857,
+     -2.837
+    ],
+    "trades_per_hour": 18.78,
+    "avg_hold_min": 53.5,
+    "top_pair_share": 0.056,
+    "censored_end": 18,
+    "vanished": 0,
+    "gap_closed": 1,
+    "exits": {
+     "HOLD": 17,
+     "FEED_GAP/GAP": 1,
+     "OPEN_AT_END/END": 18
+    }
+   },
+   "net0_mean_pct": -0.385,
+   "netcal_mean_pct": -0.932,
+   "portfolio": {
+    "taken": 6,
+    "final_balance": 980.77,
+    "max_drawdown_pct": 1.92,
+    "skipped_no_cash": 0
+   },
+   "decision": "confirmed",
+   "trades": [
+    {
+     "pair": "GhBPuDpt",
+     "sym": "WOSE",
+     "entry_utc": "07:26:46",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.86,
+     "net0": -0.32,
+     "fee": 30.0,
+     "liq": 1397467
+    },
+    {
+     "pair": "8RCJrW94",
+     "sym": "USDP",
+     "entry_utc": "07:26:55",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -0.12,
+     "net0": 1.44,
+     "fee": 30.0,
+     "liq": 2395945
+    },
+    {
+     "pair": "C9bagG6C",
+     "sym": "D\u200aO\u200aT\u200aF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.45,
+     "net0": 0.09,
+     "fee": 30.0,
+     "liq": 1805110
+    },
+    {
+     "pair": "FL5gakwf",
+     "sym": "USDF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.08,
+     "net0": 0.47,
+     "fee": 30.0,
+     "liq": 3297729
+    },
+    {
+     "pair": "Gs6hrh68",
+     "sym": "UDR",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.79,
+     "net0": -0.25,
+     "fee": 30.0,
+     "liq": 3220156
+    },
+    {
+     "pair": "HiPe6mDS",
+     "sym": "SARP",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -0.72,
+     "net0": 0.83,
+     "fee": 30.0,
+     "liq": 823098
+    },
+    {
+     "pair": "AdvA19rg",
+     "sym": "SARP",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.11,
+     "net0": 0.43,
+     "fee": 30.0,
+     "liq": 1487221
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -5.42,
+     "net0": -3.94,
+     "fee": 30.0,
+     "liq": 1962861
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.21,
+     "net0": -2.71,
+     "fee": 30.0,
+     "liq": 3114421
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.73,
+     "net0": -2.22,
+     "fee": 30.0,
+     "liq": 2418692
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.76,
+     "net0": -1.25,
+     "fee": 30.0,
+     "liq": 413264
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.9,
+     "net0": -1.38,
+     "fee": 30.0,
+     "liq": 416358
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.84,
+     "net0": -1.33,
+     "fee": 30.0,
+     "liq": 465327
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "07:26:56",
+     "reason": "FEED_GAP",
+     "flag": "GAP",
+     "net50": -2.62,
+     "net0": -1.1,
+     "fee": 30.0,
+     "liq": 513093
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.73,
+     "net0": -2.23,
+     "fee": 30.0,
+     "liq": 2819967
+    },
+    {
+     "pair": "D2pVedgH",
+     "sym": "GOIF",
+     "entry_utc": "07:27:30",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.0,
+     "net0": 0.55,
+     "fee": 30.0,
+     "liq": 1260705
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "07:27:30",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.08,
+     "net0": -1.57,
+     "fee": 30.0,
+     "liq": 414698
+    },
+    {
+     "pair": "BcStCqTJ",
+     "sym": "USDP",
+     "entry_utc": "08:09:29",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 2.12,
+     "net0": 3.71,
+     "fee": 30.0,
+     "liq": 1355935
+    },
+    {
+     "pair": "FL5gakwf",
+     "sym": "USDF",
+     "entry_utc": "08:32:13",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.83,
+     "net0": -0.3,
+     "fee": 30.0,
+     "liq": 3316314
+    },
+    {
+     "pair": "Gs6hrh68",
+     "sym": "UDR",
+     "entry_utc": "08:32:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.8,
+     "net0": -0.26,
+     "fee": 30.0,
+     "liq": 3237087
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "08:32:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.56,
+     "net0": -1.03,
+     "fee": 30.0,
+     "liq": 3088116
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "08:32:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.03,
+     "net0": -1.51,
+     "fee": 30.0,
+     "liq": 2793801
+    },
+    {
+     "pair": "HiPe6mDS",
+     "sym": "SARP",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -0.81,
+     "net0": 0.74,
+     "fee": 30.0,
+     "liq": 830100
+    },
+    {
+     "pair": "AdvA19rg",
+     "sym": "SARP",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.0,
+     "net0": 0.55,
+     "fee": 30.0,
+     "liq": 1496486
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -0.67,
+     "net0": 0.89,
+     "fee": 30.0,
+     "liq": 463917
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": 0.18,
+     "net0": 1.74,
+     "fee": 30.0,
+     "liq": 411244
+    },
+    {
+     "pair": "GhBPuDpt",
+     "sym": "WOSE",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.5,
+     "net0": 0.04,
+     "fee": 30.0,
+     "liq": 1400326
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.72,
+     "net0": -1.2,
+     "fee": 30.0,
+     "liq": 1933406
+    },
+    {
+     "pair": "8RCJrW94",
+     "sym": "USDP",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.27,
+     "net0": 0.28,
+     "fee": 30.0,
+     "liq": 2422405
+    },
+    {
+     "pair": "C9bagG6C",
+     "sym": "D\u200aO\u200aT\u200aF",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.37,
+     "net0": 0.17,
+     "fee": 30.0,
+     "liq": 1812620
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.47,
+     "net0": 0.07,
+     "fee": 30.0,
+     "liq": 414080
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.7,
+     "net0": -1.18,
+     "fee": 30.0,
+     "liq": 2398553
+    },
+    {
+     "pair": "D2pVedgH",
+     "sym": "GOIF",
+     "entry_utc": "08:33:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.12,
+     "net0": 0.42,
+     "fee": 30.0,
+     "liq": 1269067
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "08:33:55",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.71,
+     "net0": -0.17,
+     "fee": 30.0,
+     "liq": 413132
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:34:23",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.05,
+     "net0": -1.53,
+     "fee": 30.0,
+     "liq": 512588
+    },
+    {
+     "pair": "BcStCqTJ",
+     "sym": "USDP",
+     "entry_utc": "09:15:06",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.3,
+     "net0": -0.78,
+     "fee": 30.0,
+     "liq": 1393611
+    }
+   ]
+  },
+  "R2_LIVE_COST_FIRST_RULE+RUG_GUARD_V1": {
+   "net50": {
+    "n": 18,
+    "pairs": 9,
+    "clusters": 18,
+    "win_rate": 5.6,
+    "mean_usd": -5.447,
+    "mean_pct": -2.723,
+    "median_pct": -2.805,
+    "sum_usd": -98.04,
+    "pf": 0.004,
+    "ci95_mean_usd": [
+     -6.541,
+     -4.221
+    ],
+    "ci95_mean_usd_pair": [
+     -6.459,
+     -4.334
+    ],
+    "trades_per_hour": 9.39,
+    "avg_hold_min": 54.6,
+    "top_pair_share": 0.111,
+    "censored_end": 9,
+    "vanished": 0,
+    "gap_closed": 1,
+    "exits": {
+     "HOLD": 8,
+     "FEED_GAP/GAP": 1,
+     "OPEN_AT_END/END": 9
+    }
+   },
+   "net0_mean_pct": -1.203,
+   "netcal_mean_pct": -1.746,
+   "portfolio": {
+    "taken": 6,
+    "final_balance": 960.79,
+    "max_drawdown_pct": 3.92,
+    "skipped_no_cash": 0
+   },
+   "decision": "confirmed",
+   "trades": [
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -5.42,
+     "net0": -3.94,
+     "fee": 30.0,
+     "liq": 1962861
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.21,
+     "net0": -2.71,
+     "fee": 30.0,
+     "liq": 3114421
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.73,
+     "net0": -2.22,
+     "fee": 30.0,
+     "liq": 2418692
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.76,
+     "net0": -1.25,
+     "fee": 30.0,
+     "liq": 413264
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.9,
+     "net0": -1.38,
+     "fee": 30.0,
+     "liq": 416358
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.84,
+     "net0": -1.33,
+     "fee": 30.0,
+     "liq": 465327
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "07:26:56",
+     "reason": "FEED_GAP",
+     "flag": "GAP",
+     "net50": -2.62,
+     "net0": -1.1,
+     "fee": 30.0,
+     "liq": 513093
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "07:26:56",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.73,
+     "net0": -2.23,
+     "fee": 30.0,
+     "liq": 2819967
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "07:27:30",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.08,
+     "net0": -1.57,
+     "fee": 30.0,
+     "liq": 414698
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "08:32:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.56,
+     "net0": -1.03,
+     "fee": 30.0,
+     "liq": 3088116
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "08:32:14",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.03,
+     "net0": -1.51,
+     "fee": 30.0,
+     "liq": 2793801
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -0.67,
+     "net0": 0.89,
+     "fee": 30.0,
+     "liq": 463917
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "08:32:26",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": 0.18,
+     "net0": 1.74,
+     "fee": 30.0,
+     "liq": 411244
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.72,
+     "net0": -1.2,
+     "fee": 30.0,
+     "liq": 1933406
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.47,
+     "net0": 0.07,
+     "fee": 30.0,
+     "liq": 414080
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "08:32:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.7,
+     "net0": -1.18,
+     "fee": 30.0,
+     "liq": 2398553
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "08:33:55",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.71,
+     "net0": -0.17,
+     "fee": 30.0,
+     "liq": 413132
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:34:23",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.05,
+     "net0": -1.53,
+     "fee": 30.0,
+     "liq": 512588
+    }
+   ]
+  },
+  "R3_RANDOM_ALL_PUMPSWAP": {
+   "net50": {
+    "n": 101,
+    "pairs": 66,
+    "clusters": 93,
+    "win_rate": 7.9,
+    "mean_usd": -16.047,
+    "mean_pct": -8.023,
+    "median_pct": -7.303,
+    "sum_usd": -1620.71,
+    "pf": 0.086,
+    "ci95_mean_usd": [
+     -21.515,
+     -11.656
+    ],
+    "ci95_mean_usd_pair": [
+     -22.11,
+     -11.406
+    ],
+    "trades_per_hour": 52.7,
+    "avg_hold_min": 18.7,
+    "top_pair_share": 0.03,
+    "censored_end": 24,
+    "vanished": 3,
+    "gap_closed": 1,
+    "exits": {
+     "STOP": 56,
+     "OPEN_AT_END/VANISHED": 2,
+     "HOLD": 15,
+     "TP": 2,
+     "FEED_GAP/GAP": 1,
+     "STOP/VANISHED": 1,
+     "OPEN_AT_END/END": 24
+    }
+   },
+   "net0_mean_pct": -5.52,
+   "netcal_mean_pct": -7.099,
+   "portfolio": {
+    "taken": 14,
+    "final_balance": 695.97,
+    "max_drawdown_pct": 30.62,
+    "skipped_no_cash": 0
+   },
+   "decision": "confirmed",
+   "trades": [
+    {
+     "pair": "BhGDfqqK",
+     "sym": "CAPYBARA",
+     "entry_utc": "07:27:58",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.79,
+     "net0": -4.65,
+     "fee": 120.0,
+     "liq": 208743
+    },
+    {
+     "pair": "3hiAQbF2",
+     "sym": "BARRON",
+     "entry_utc": "07:28:18",
+     "reason": "OPEN_AT_END",
+     "flag": "VANISHED",
+     "net50": -15.08,
+     "net0": -13.54,
+     "fee": 110.0,
+     "liq": 54296
+    },
+    {
+     "pair": "GhBPuDpt",
+     "sym": "WOSE",
+     "entry_utc": "07:28:19",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.86,
+     "net0": -0.32,
+     "fee": 30.0,
+     "liq": 1397783
+    },
+    {
+     "pair": "BERQeJZD",
+     "sym": "BATONPASS",
+     "entry_utc": "07:28:39",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -32.0,
+     "net0": -29.15,
+     "fee": 125.0,
+     "liq": 2323
+    },
+    {
+     "pair": "7ZZCee7s",
+     "sym": "butter",
+     "entry_utc": "07:29:43",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -31.91,
+     "net0": -29.07,
+     "fee": 125.0,
+     "liq": 2333
+    },
+    {
+     "pair": "6e3jZLtf",
+     "sym": "PAID",
+     "entry_utc": "07:30:41",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.94,
+     "net0": -3.69,
+     "fee": 70.0,
+     "liq": 485638
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "07:31:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.1,
+     "net0": -3.93,
+     "fee": 105.0,
+     "liq": 78193
+    },
+    {
+     "pair": "2WFm4D9u",
+     "sym": "MOGCAT",
+     "entry_utc": "07:33:03",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -22.69,
+     "net0": -19.54,
+     "fee": 125.0,
+     "liq": 4024
+    },
+    {
+     "pair": "6qUUCwD9",
+     "sym": "PQC",
+     "entry_utc": "07:35:13",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.97,
+     "net0": -6.42,
+     "fee": 120.0,
+     "liq": 32966
+    },
+    {
+     "pair": "FL5gakwf",
+     "sym": "USDF",
+     "entry_utc": "07:36:09",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.09,
+     "net0": 0.46,
+     "fee": 30.0,
+     "liq": 3301323
+    },
+    {
+     "pair": "Fe7bpDYC",
+     "sym": "CLAUDIA",
+     "entry_utc": "07:36:46",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.74,
+     "net0": -5.62,
+     "fee": 100.0,
+     "liq": 83072
+    },
+    {
+     "pair": "72tZoSAH",
+     "sym": "GIGACAT",
+     "entry_utc": "07:37:36",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.57,
+     "net0": -6.0,
+     "fee": 120.0,
+     "liq": 23455
+    },
+    {
+     "pair": "ABUAVQYJ",
+     "sym": "URI-M",
+     "entry_utc": "07:37:59",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -31.24,
+     "net0": -28.51,
+     "fee": 125.0,
+     "liq": 11023
+    },
+    {
+     "pair": "12jc1DzJ",
+     "sym": "SI276",
+     "entry_utc": "07:38:18",
+     "reason": "TP",
+     "flag": "",
+     "net50": 15.03,
+     "net0": 17.13,
+     "fee": 105.0,
+     "liq": 62059
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "07:38:50",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.75,
+     "net0": -1.23,
+     "fee": 30.0,
+     "liq": 1943033
+    },
+    {
+     "pair": "GV5G2ZGz",
+     "sym": "AnyPS5",
+     "entry_utc": "07:39:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -10.03,
+     "net0": -6.48,
+     "fee": 115.0,
+     "liq": 47842
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "07:40:24",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.4,
+     "net0": -5.27,
+     "fee": 105.0,
+     "liq": 77874
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "07:40:24",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.63,
+     "net0": -1.11,
+     "fee": 30.0,
+     "liq": 415023
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "07:41:35",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.49,
+     "net0": -0.96,
+     "fee": 30.0,
+     "liq": 415608
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "07:43:17",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.41,
+     "net0": -3.76,
+     "fee": 120.0,
+     "liq": 24544
+    },
+    {
+     "pair": "745ATaSS",
+     "sym": "Frank",
+     "entry_utc": "07:44:40",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.07,
+     "net0": -4.93,
+     "fee": 100.0,
+     "liq": 80373
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "07:48:39",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.05,
+     "net0": -1.53,
+     "fee": 30.0,
+     "liq": 2403704
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "07:48:59",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -11.26,
+     "net0": -8.24,
+     "fee": 52.5,
+     "liq": 241426
+    },
+    {
+     "pair": "GLL3Czyb",
+     "sym": "HOTBOT",
+     "entry_utc": "07:49:00",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.35,
+     "net0": -5.22,
+     "fee": 95.0,
+     "liq": 150843
+    },
+    {
+     "pair": "AFaYrFH7",
+     "sym": "LMAO!",
+     "entry_utc": "07:50:32",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.15,
+     "net0": -2.89,
+     "fee": 85.0,
+     "liq": 302892
+    },
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "07:52:38",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.87,
+     "net0": -5.76,
+     "fee": 100.0,
+     "liq": 96115
+    },
+    {
+     "pair": "867dKvaC",
+     "sym": "MISTAKE",
+     "entry_utc": "07:53:06",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.88,
+     "net0": -5.77,
+     "fee": 60.0,
+     "liq": 258736
+    },
+    {
+     "pair": "C9bagG6C",
+     "sym": "D\u200aO\u200aT\u200aF",
+     "entry_utc": "07:54:16",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.09,
+     "net0": 0.45,
+     "fee": 30.0,
+     "liq": 1806319
+    },
+    {
+     "pair": "7oHDsL98",
+     "sym": "iCoin",
+     "entry_utc": "07:56:59",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -10.45,
+     "net0": -6.91,
+     "fee": 120.0,
+     "liq": 21632
+    },
+    {
+     "pair": "8RCJrW94",
+     "sym": "USDP",
+     "entry_utc": "07:57:55",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -0.94,
+     "net0": 0.61,
+     "fee": 30.0,
+     "liq": 2409595
+    },
+    {
+     "pair": "3dcwhqJp",
+     "sym": "fone",
+     "entry_utc": "07:57:55",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 1.57,
+     "net0": 2.91,
+     "fee": 70.0,
+     "liq": 500312
+    },
+    {
+     "pair": "Gnpvosia",
+     "sym": "SI",
+     "entry_utc": "07:58:05",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.47,
+     "net0": -5.35,
+     "fee": 85.0,
+     "liq": 178817
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:03:19",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.34,
+     "net0": -4.18,
+     "fee": 80.0,
+     "liq": 238246
+    },
+    {
+     "pair": "34w9ReB7",
+     "sym": "TON618",
+     "entry_utc": "08:03:44",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -14.83,
+     "net0": -11.47,
+     "fee": 120.0,
+     "liq": 34597
+    },
+    {
+     "pair": "A7cJ8yHX",
+     "sym": "US",
+     "entry_utc": "08:03:51",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -100.01,
+     "net0": -100.01,
+     "fee": 100.0,
+     "liq": 220777
+    },
+    {
+     "pair": "DA4pM4xS",
+     "sym": "OTC",
+     "entry_utc": "08:07:33",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.36,
+     "net0": -1.07,
+     "fee": 65.0,
+     "liq": 524719
+    },
+    {
+     "pair": "7wCarEYc",
+     "sym": "IOF",
+     "entry_utc": "08:08:35",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.95,
+     "net0": -0.42,
+     "fee": 42.5,
+     "liq": 264671
+    },
+    {
+     "pair": "H66u4gnT",
+     "sym": "CAPYBARA",
+     "entry_utc": "08:10:01",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.53,
+     "net0": -4.38,
+     "fee": 115.0,
+     "liq": 370537
+    },
+    {
+     "pair": "HiPe6mDS",
+     "sym": "SARP",
+     "entry_utc": "08:10:02",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 0.17,
+     "net0": 1.73,
+     "fee": 30.0,
+     "liq": 824790
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "08:11:05",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.3,
+     "net0": -4.14,
+     "fee": 105.0,
+     "liq": 76050
+    },
+    {
+     "pair": "EKejCoLC",
+     "sym": "Bilbo",
+     "entry_utc": "08:11:23",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -13.61,
+     "net0": -10.19,
+     "fee": 125.0,
+     "liq": 15819
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:13:08",
+     "reason": "FEED_GAP",
+     "flag": "GAP",
+     "net50": -2.74,
+     "net0": -1.22,
+     "fee": 30.0,
+     "liq": 511784
+    },
+    {
+     "pair": "BdqHdZm2",
+     "sym": "wrld",
+     "entry_utc": "08:15:05",
+     "reason": "STOP",
+     "flag": "VANISHED",
+     "net50": -19.07,
+     "net0": -15.87,
+     "fee": 125.0,
+     "liq": 19563
+    },
+    {
+     "pair": "Gs6hrh68",
+     "sym": "UDR",
+     "entry_utc": "08:18:54",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -0.27,
+     "net0": 1.29,
+     "fee": 30.0,
+     "liq": 3224159
+    },
+    {
+     "pair": "5HHKjbh7",
+     "sym": "Miso",
+     "entry_utc": "08:19:13",
+     "reason": "OPEN_AT_END",
+     "flag": "VANISHED",
+     "net50": -17.36,
+     "net0": -15.86,
+     "fee": 125.0,
+     "liq": 19627
+    },
+    {
+     "pair": "H4Jn1yGe",
+     "sym": "Penguin",
+     "entry_utc": "08:19:40",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -19.29,
+     "net0": -16.04,
+     "fee": 125.0,
+     "liq": 5373
+    },
+    {
+     "pair": "4R8CiMnJ",
+     "sym": "JEANPHIL",
+     "entry_utc": "08:20:38",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.44,
+     "net0": -6.35,
+     "fee": 65.0,
+     "liq": 333850
+    },
+    {
+     "pair": "7Nj7mBE7",
+     "sym": "SI",
+     "entry_utc": "08:21:10",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.48,
+     "net0": -5.36,
+     "fee": 100.0,
+     "liq": 145740
+    },
+    {
+     "pair": "DXodBovS",
+     "sym": "wrld",
+     "entry_utc": "08:21:14",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -1.56,
+     "net0": 2.33,
+     "fee": 120.0,
+     "liq": 21243
+    },
+    {
+     "pair": "34w9ReB7",
+     "sym": "TON618",
+     "entry_utc": "08:25:34",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.66,
+     "net0": -5.06,
+     "fee": 120.0,
+     "liq": 33371
+    },
+    {
+     "pair": "6qUUCwD9",
+     "sym": "PQC",
+     "entry_utc": "08:27:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -0.61,
+     "net0": 3.31,
+     "fee": 120.0,
+     "liq": 31818
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "08:27:40",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.35,
+     "net0": -5.77,
+     "fee": 120.0,
+     "liq": 26269
+    },
+    {
+     "pair": "EpakUVUm",
+     "sym": "SARP",
+     "entry_utc": "08:28:20",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -27.76,
+     "net0": -24.78,
+     "fee": 125.0,
+     "liq": 2913
+    },
+    {
+     "pair": "BFrSZake",
+     "sym": "HIGGS",
+     "entry_utc": "08:29:14",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.53,
+     "net0": -4.38,
+     "fee": 95.0,
+     "liq": 140926
+    },
+    {
+     "pair": "2xMj4Nhu",
+     "sym": "GDEX",
+     "entry_utc": "08:31:22",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.95,
+     "net0": -9.49,
+     "fee": 125.0,
+     "liq": 11083
+    },
+    {
+     "pair": "BcStCqTJ",
+     "sym": "USDP",
+     "entry_utc": "08:31:51",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": 1.07,
+     "net0": 2.65,
+     "fee": 30.0,
+     "liq": 1369336
+    },
+    {
+     "pair": "745ATaSS",
+     "sym": "Frank",
+     "entry_utc": "08:33:24",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.28,
+     "net0": -4.11,
+     "fee": 100.0,
+     "liq": 80503
+    },
+    {
+     "pair": "ABUAVQYJ",
+     "sym": "URI-M",
+     "entry_utc": "08:33:29",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -6.77,
+     "net0": -3.09,
+     "fee": 120.0,
+     "liq": 26625
+    },
+    {
+     "pair": "EKejCoLC",
+     "sym": "Bilbo",
+     "entry_utc": "08:34:03",
+     "reason": "STOP",
+     "flag": "",
+     "net50": 22.73,
+     "net0": 27.62,
+     "fee": 125.0,
+     "liq": 11711
+    },
+    {
+     "pair": "3NBq9zyn",
+     "sym": "TWEETCRAFT",
+     "entry_utc": "08:35:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.51,
+     "net0": -6.43,
+     "fee": 85.0,
+     "liq": 198208
+    },
+    {
+     "pair": "12jc1DzJ",
+     "sym": "SI276",
+     "entry_utc": "08:36:07",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.17,
+     "net0": -4.55,
+     "fee": 105.0,
+     "liq": 62165
+    },
+    {
+     "pair": "8NVFB1un",
+     "sym": "Pumpoween",
+     "entry_utc": "08:36:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.3,
+     "net0": -5.17,
+     "fee": 100.0,
+     "liq": 98756
+    },
+    {
+     "pair": "FGdGihHZ",
+     "sym": "USWR",
+     "entry_utc": "08:36:38",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.96,
+     "net0": -1.44,
+     "fee": 37.5,
+     "liq": 282869
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:37:37",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -0.73,
+     "net0": 0.58,
+     "fee": 80.0,
+     "liq": 229169
+    },
+    {
+     "pair": "EGHZxFBb",
+     "sym": "BULLCRAFT",
+     "entry_utc": "08:40:45",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -24.29,
+     "net0": -21.2,
+     "fee": 125.0,
+     "liq": 3604
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "08:40:53",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.26,
+     "net0": -4.64,
+     "fee": 120.0,
+     "liq": 28539
+    },
+    {
+     "pair": "GV5G2ZGz",
+     "sym": "AnyPS5",
+     "entry_utc": "08:40:53",
+     "reason": "TP",
+     "flag": "",
+     "net50": 10.64,
+     "net0": 12.65,
+     "fee": 115.0,
+     "liq": 51885
+    },
+    {
+     "pair": "GhBPuDpt",
+     "sym": "WOSE",
+     "entry_utc": "08:41:07",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.54,
+     "net0": -0.0,
+     "fee": 30.0,
+     "liq": 1399599
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:42:03",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.47,
+     "net0": -0.95,
+     "fee": 30.0,
+     "liq": 510648
+    },
+    {
+     "pair": "DXodBovS",
+     "sym": "wrld",
+     "entry_utc": "08:42:07",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.17,
+     "net0": -5.59,
+     "fee": 120.0,
+     "liq": 31911
+    },
+    {
+     "pair": "3PbPuNJK",
+     "sym": "RetardPad",
+     "entry_utc": "08:42:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": 20.86,
+     "net0": 25.66,
+     "fee": 125.0,
+     "liq": 13609
+    },
+    {
+     "pair": "8ewuF2o8",
+     "sym": "swordcat",
+     "entry_utc": "08:48:23",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.37,
+     "net0": -4.21,
+     "fee": 85.0,
+     "liq": 203514
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "08:48:30",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.03,
+     "net0": -0.5,
+     "fee": 30.0,
+     "liq": 3078070
+    },
+    {
+     "pair": "D2pVedgH",
+     "sym": "GOIF",
+     "entry_utc": "08:49:52",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.62,
+     "net0": -0.08,
+     "fee": 30.0,
+     "liq": 1271495
+    },
+    {
+     "pair": "KoQr2pvC",
+     "sym": "$BITFOOTS",
+     "entry_utc": "08:50:55",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -4.23,
+     "net0": -0.46,
+     "fee": 115.0,
+     "liq": 42306
+    },
+    {
+     "pair": "Fe7bpDYC",
+     "sym": "CLAUDIA",
+     "entry_utc": "08:50:55",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -5.45,
+     "net0": -4.2,
+     "fee": 105.0,
+     "liq": 79020
+    },
+    {
+     "pair": "EKejCoLC",
+     "sym": "Bilbo",
+     "entry_utc": "08:51:25",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -10.52,
+     "net0": -6.99,
+     "fee": 120.0,
+     "liq": 23290
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "08:52:36",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.65,
+     "net0": -1.12,
+     "fee": 30.0,
+     "liq": 2788491
+    },
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "08:53:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -14.42,
+     "net0": -11.5,
+     "fee": 100.0,
+     "liq": 103447
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "08:56:39",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.94,
+     "net0": -0.41,
+     "fee": 30.0,
+     "liq": 413386
+    },
+    {
+     "pair": "DJJxfrvC",
+     "sym": "baton",
+     "entry_utc": "09:00:51",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": 3.9,
+     "net0": 5.27,
+     "fee": 120.0,
+     "liq": 220240
+    },
+    {
+     "pair": "KoQr2pvC",
+     "sym": "$BITFOOTS",
+     "entry_utc": "09:04:39",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.1,
+     "net0": -5.51,
+     "fee": 115.0,
+     "liq": 37246
+    },
+    {
+     "pair": "6qUUCwD9",
+     "sym": "PQC",
+     "entry_utc": "09:05:39",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.31,
+     "net0": -8.85,
+     "fee": 120.0,
+     "liq": 31651
+    },
+    {
+     "pair": "5PB8aHdY",
+     "sym": "HUGHOG",
+     "entry_utc": "09:06:49",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -30.31,
+     "net0": -27.42,
+     "fee": 125.0,
+     "liq": 2582
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "09:07:27",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.81,
+     "net0": -1.29,
+     "fee": 30.0,
+     "liq": 417754
+    },
+    {
+     "pair": "8RCJrW94",
+     "sym": "USDP",
+     "entry_utc": "09:07:27",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.39,
+     "net0": -0.86,
+     "fee": 30.0,
+     "liq": 2437416
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "09:10:29",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.08,
+     "net0": -1.57,
+     "fee": 30.0,
+     "liq": 1938008
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "09:13:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.84,
+     "net0": -1.32,
+     "fee": 30.0,
+     "liq": 2401045
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "09:14:01",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.41,
+     "net0": -2.13,
+     "fee": 52.5,
+     "liq": 240684
+    },
+    {
+     "pair": "2xMj4Nhu",
+     "sym": "GDEX",
+     "entry_utc": "09:14:36",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.97,
+     "net0": -9.51,
+     "fee": 125.0,
+     "liq": 11035
+    },
+    {
+     "pair": "8ewuF2o8",
+     "sym": "swordcat",
+     "entry_utc": "09:15:37",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.51,
+     "net0": -2.24,
+     "fee": 85.0,
+     "liq": 201578
+    },
+    {
+     "pair": "3dcwhqJp",
+     "sym": "fone",
+     "entry_utc": "09:16:34",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.1,
+     "net0": -2.83,
+     "fee": 70.0,
+     "liq": 513539
+    },
+    {
+     "pair": "72tZoSAH",
+     "sym": "GIGACAT",
+     "entry_utc": "09:17:00",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.57,
+     "net0": -5.99,
+     "fee": 120.0,
+     "liq": 23484
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "09:17:11",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.88,
+     "net0": -1.36,
+     "fee": 30.0,
+     "liq": 469368
+    },
+    {
+     "pair": "AFaYrFH7",
+     "sym": "LMAO!",
+     "entry_utc": "09:17:41",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.82,
+     "net0": -3.57,
+     "fee": 85.0,
+     "liq": 304212
+    },
+    {
+     "pair": "BAPyQHY6",
+     "sym": "WOSE",
+     "entry_utc": "09:18:15",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.41,
+     "net0": -2.14,
+     "fee": 60.0,
+     "liq": 203162
+    },
+    {
+     "pair": "Gnpvosia",
+     "sym": "SI",
+     "entry_utc": "09:18:16",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.33,
+     "net0": -3.07,
+     "fee": 85.0,
+     "liq": 176798
+    },
+    {
+     "pair": "DXodBovS",
+     "sym": "wrld",
+     "entry_utc": "09:19:22",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.71,
+     "net0": -6.13,
+     "fee": 125.0,
+     "liq": 13995
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "09:19:44",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.4,
+     "net0": -1.89,
+     "fee": 30.0,
+     "liq": 418331
+    },
+    {
+     "pair": "EpakUVUm",
+     "sym": "SARP",
+     "entry_utc": "09:19:57",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -27.88,
+     "net0": -24.9,
+     "fee": 125.0,
+     "liq": 2893
+    },
+    {
+     "pair": "C9bagG6C",
+     "sym": "D\u200aO\u200aT\u200aF",
+     "entry_utc": "09:20:53",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.57,
+     "net0": -1.05,
+     "fee": 30.0,
+     "liq": 1822135
+    }
+   ]
+  },
+  "R4_RANDOM_ALL_PUMPSWAP+RUG_GUARD_V1": {
+   "net50": {
+    "n": 61,
+    "pairs": 38,
+    "clusters": 56,
+    "win_rate": 4.9,
+    "mean_usd": -14.213,
+    "mean_pct": -7.106,
+    "median_pct": -7.104,
+    "sum_usd": -866.98,
+    "pf": 0.059,
+    "ci95_mean_usd": [
+     -21.841,
+     -9.346
+    ],
+    "ci95_mean_usd_pair": [
+     -22.15,
+     -9.289
+    ],
+    "trades_per_hour": 31.83,
+    "avg_hold_min": 22.0,
+    "top_pair_share": 0.049,
+    "censored_end": 18,
+    "vanished": 0,
+    "gap_closed": 1,
+    "exits": {
+     "HOLD": 9,
+     "STOP": 31,
+     "TP": 2,
+     "FEED_GAP/GAP": 1,
+     "OPEN_AT_END/END": 18
+    }
+   },
+   "net0_mean_pct": -4.78,
+   "netcal_mean_pct": -6.17,
+   "portfolio": {
+    "taken": 15,
+    "final_balance": 839.76,
+    "max_drawdown_pct": 16.02,
+    "skipped_no_cash": 0
+   },
+   "decision": "confirmed",
+   "trades": [
+    {
+     "pair": "6e3jZLtf",
+     "sym": "PAID",
+     "entry_utc": "07:30:41",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.94,
+     "net0": -3.69,
+     "fee": 70.0,
+     "liq": 485638
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "07:31:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.1,
+     "net0": -3.93,
+     "fee": 105.0,
+     "liq": 78193
+    },
+    {
+     "pair": "Fe7bpDYC",
+     "sym": "CLAUDIA",
+     "entry_utc": "07:36:46",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.74,
+     "net0": -5.62,
+     "fee": 100.0,
+     "liq": 83072
+    },
+    {
+     "pair": "72tZoSAH",
+     "sym": "GIGACAT",
+     "entry_utc": "07:37:36",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.57,
+     "net0": -6.0,
+     "fee": 120.0,
+     "liq": 23455
+    },
+    {
+     "pair": "12jc1DzJ",
+     "sym": "SI276",
+     "entry_utc": "07:38:18",
+     "reason": "TP",
+     "flag": "",
+     "net50": 15.03,
+     "net0": 17.13,
+     "fee": 105.0,
+     "liq": 62059
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "07:38:50",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.75,
+     "net0": -1.23,
+     "fee": 30.0,
+     "liq": 1943033
+    },
+    {
+     "pair": "GV5G2ZGz",
+     "sym": "AnyPS5",
+     "entry_utc": "07:39:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -10.03,
+     "net0": -6.48,
+     "fee": 115.0,
+     "liq": 47842
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "07:40:24",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.4,
+     "net0": -5.27,
+     "fee": 105.0,
+     "liq": 77874
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "07:40:24",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.63,
+     "net0": -1.11,
+     "fee": 30.0,
+     "liq": 415023
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "07:41:35",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.49,
+     "net0": -0.96,
+     "fee": 30.0,
+     "liq": 415608
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "07:43:17",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.41,
+     "net0": -3.76,
+     "fee": 120.0,
+     "liq": 24544
+    },
+    {
+     "pair": "745ATaSS",
+     "sym": "Frank",
+     "entry_utc": "07:44:40",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.07,
+     "net0": -4.93,
+     "fee": 100.0,
+     "liq": 80373
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "07:48:39",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.05,
+     "net0": -1.53,
+     "fee": 30.0,
+     "liq": 2403704
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "07:48:59",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -11.26,
+     "net0": -8.24,
+     "fee": 52.5,
+     "liq": 241426
+    },
+    {
+     "pair": "GLL3Czyb",
+     "sym": "HOTBOT",
+     "entry_utc": "07:49:00",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.35,
+     "net0": -5.22,
+     "fee": 95.0,
+     "liq": 150843
+    },
+    {
+     "pair": "AFaYrFH7",
+     "sym": "LMAO!",
+     "entry_utc": "07:50:32",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.15,
+     "net0": -2.89,
+     "fee": 85.0,
+     "liq": 302892
+    },
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "07:52:38",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.87,
+     "net0": -5.76,
+     "fee": 100.0,
+     "liq": 96115
+    },
+    {
+     "pair": "867dKvaC",
+     "sym": "MISTAKE",
+     "entry_utc": "07:53:06",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.88,
+     "net0": -5.77,
+     "fee": 60.0,
+     "liq": 258736
+    },
+    {
+     "pair": "3dcwhqJp",
+     "sym": "fone",
+     "entry_utc": "07:57:55",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 1.57,
+     "net0": 2.91,
+     "fee": 70.0,
+     "liq": 500312
+    },
+    {
+     "pair": "Gnpvosia",
+     "sym": "SI",
+     "entry_utc": "07:58:05",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.47,
+     "net0": -5.35,
+     "fee": 85.0,
+     "liq": 178817
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:03:19",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.34,
+     "net0": -4.18,
+     "fee": 80.0,
+     "liq": 238246
+    },
+    {
+     "pair": "34w9ReB7",
+     "sym": "TON618",
+     "entry_utc": "08:03:44",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -14.83,
+     "net0": -11.47,
+     "fee": 120.0,
+     "liq": 34597
+    },
+    {
+     "pair": "A7cJ8yHX",
+     "sym": "US",
+     "entry_utc": "08:03:51",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -100.01,
+     "net0": -100.01,
+     "fee": 100.0,
+     "liq": 220777
+    },
+    {
+     "pair": "DA4pM4xS",
+     "sym": "OTC",
+     "entry_utc": "08:07:33",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.36,
+     "net0": -1.07,
+     "fee": 65.0,
+     "liq": 524719
+    },
+    {
+     "pair": "7wCarEYc",
+     "sym": "IOF",
+     "entry_utc": "08:08:35",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.95,
+     "net0": -0.42,
+     "fee": 42.5,
+     "liq": 264671
+    },
+    {
+     "pair": "9GBXHym9",
+     "sym": "PLAGUE",
+     "entry_utc": "08:11:05",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.3,
+     "net0": -4.14,
+     "fee": 105.0,
+     "liq": 76050
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:13:08",
+     "reason": "FEED_GAP",
+     "flag": "GAP",
+     "net50": -2.74,
+     "net0": -1.22,
+     "fee": 30.0,
+     "liq": 511784
+    },
+    {
+     "pair": "4R8CiMnJ",
+     "sym": "JEANPHIL",
+     "entry_utc": "08:20:38",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.44,
+     "net0": -6.35,
+     "fee": 65.0,
+     "liq": 333850
+    },
+    {
+     "pair": "7Nj7mBE7",
+     "sym": "SI",
+     "entry_utc": "08:21:10",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.48,
+     "net0": -5.36,
+     "fee": 100.0,
+     "liq": 145740
+    },
+    {
+     "pair": "34w9ReB7",
+     "sym": "TON618",
+     "entry_utc": "08:25:34",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.66,
+     "net0": -5.06,
+     "fee": 120.0,
+     "liq": 33371
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "08:27:40",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.35,
+     "net0": -5.77,
+     "fee": 120.0,
+     "liq": 26269
+    },
+    {
+     "pair": "BFrSZake",
+     "sym": "HIGGS",
+     "entry_utc": "08:29:14",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.53,
+     "net0": -4.38,
+     "fee": 95.0,
+     "liq": 140926
+    },
+    {
+     "pair": "2xMj4Nhu",
+     "sym": "GDEX",
+     "entry_utc": "08:31:22",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.95,
+     "net0": -9.49,
+     "fee": 125.0,
+     "liq": 11083
+    },
+    {
+     "pair": "745ATaSS",
+     "sym": "Frank",
+     "entry_utc": "08:33:24",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.28,
+     "net0": -4.11,
+     "fee": 100.0,
+     "liq": 80503
+    },
+    {
+     "pair": "3NBq9zyn",
+     "sym": "TWEETCRAFT",
+     "entry_utc": "08:35:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.51,
+     "net0": -6.43,
+     "fee": 85.0,
+     "liq": 198208
+    },
+    {
+     "pair": "12jc1DzJ",
+     "sym": "SI276",
+     "entry_utc": "08:36:07",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.17,
+     "net0": -4.55,
+     "fee": 105.0,
+     "liq": 62165
+    },
+    {
+     "pair": "8NVFB1un",
+     "sym": "Pumpoween",
+     "entry_utc": "08:36:08",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.3,
+     "net0": -5.17,
+     "fee": 100.0,
+     "liq": 98756
+    },
+    {
+     "pair": "FGdGihHZ",
+     "sym": "USWR",
+     "entry_utc": "08:36:38",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.96,
+     "net0": -1.44,
+     "fee": 37.5,
+     "liq": 282869
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:37:37",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -0.73,
+     "net0": 0.58,
+     "fee": 80.0,
+     "liq": 229169
+    },
+    {
+     "pair": "UCWmMumV",
+     "sym": "ECSTASY",
+     "entry_utc": "08:40:53",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.26,
+     "net0": -4.64,
+     "fee": 120.0,
+     "liq": 28539
+    },
+    {
+     "pair": "GV5G2ZGz",
+     "sym": "AnyPS5",
+     "entry_utc": "08:40:53",
+     "reason": "TP",
+     "flag": "",
+     "net50": 10.64,
+     "net0": 12.65,
+     "fee": 115.0,
+     "liq": 51885
+    },
+    {
+     "pair": "8ZMkMgWM",
+     "sym": "GOIF",
+     "entry_utc": "08:42:03",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.47,
+     "net0": -0.95,
+     "fee": 30.0,
+     "liq": 510648
+    },
+    {
+     "pair": "8ewuF2o8",
+     "sym": "swordcat",
+     "entry_utc": "08:48:23",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.37,
+     "net0": -4.21,
+     "fee": 85.0,
+     "liq": 203514
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "08:48:30",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.03,
+     "net0": -0.5,
+     "fee": 30.0,
+     "liq": 3078070
+    },
+    {
+     "pair": "Fe7bpDYC",
+     "sym": "CLAUDIA",
+     "entry_utc": "08:50:55",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -5.45,
+     "net0": -4.2,
+     "fee": 105.0,
+     "liq": 79020
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "08:52:36",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.65,
+     "net0": -1.12,
+     "fee": 30.0,
+     "liq": 2788491
+    },
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "08:53:35",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -14.42,
+     "net0": -11.5,
+     "fee": 100.0,
+     "liq": 103447
+    },
+    {
+     "pair": "HJ72PgqL",
+     "sym": "WOTF",
+     "entry_utc": "08:56:39",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.94,
+     "net0": -0.41,
+     "fee": 30.0,
+     "liq": 413386
+    },
+    {
+     "pair": "EpugLBw1",
+     "sym": "USDF",
+     "entry_utc": "09:07:27",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.81,
+     "net0": -1.29,
+     "fee": 30.0,
+     "liq": 417754
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "09:10:29",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.08,
+     "net0": -1.57,
+     "fee": 30.0,
+     "liq": 1938008
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "09:13:54",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.84,
+     "net0": -1.32,
+     "fee": 30.0,
+     "liq": 2401045
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "09:14:01",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.41,
+     "net0": -2.13,
+     "fee": 52.5,
+     "liq": 240684
+    },
+    {
+     "pair": "2xMj4Nhu",
+     "sym": "GDEX",
+     "entry_utc": "09:14:36",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.97,
+     "net0": -9.51,
+     "fee": 125.0,
+     "liq": 11035
+    },
+    {
+     "pair": "8ewuF2o8",
+     "sym": "swordcat",
+     "entry_utc": "09:15:37",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.51,
+     "net0": -2.24,
+     "fee": 85.0,
+     "liq": 201578
+    },
+    {
+     "pair": "3dcwhqJp",
+     "sym": "fone",
+     "entry_utc": "09:16:34",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.1,
+     "net0": -2.83,
+     "fee": 70.0,
+     "liq": 513539
+    },
+    {
+     "pair": "72tZoSAH",
+     "sym": "GIGACAT",
+     "entry_utc": "09:17:00",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -9.57,
+     "net0": -5.99,
+     "fee": 120.0,
+     "liq": 23484
+    },
+    {
+     "pair": "ERFmQZQU",
+     "sym": "UDR",
+     "entry_utc": "09:17:11",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.88,
+     "net0": -1.36,
+     "fee": 30.0,
+     "liq": 469368
+    },
+    {
+     "pair": "AFaYrFH7",
+     "sym": "LMAO!",
+     "entry_utc": "09:17:41",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.82,
+     "net0": -3.57,
+     "fee": 85.0,
+     "liq": 304212
+    },
+    {
+     "pair": "BAPyQHY6",
+     "sym": "WOSE",
+     "entry_utc": "09:18:15",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.41,
+     "net0": -2.14,
+     "fee": 60.0,
+     "liq": 203162
+    },
+    {
+     "pair": "Gnpvosia",
+     "sym": "SI",
+     "entry_utc": "09:18:16",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.33,
+     "net0": -3.07,
+     "fee": 85.0,
+     "liq": 176798
+    },
+    {
+     "pair": "5GaCcKLd",
+     "sym": "DOTF",
+     "entry_utc": "09:19:44",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.4,
+     "net0": -1.89,
+     "fee": 30.0,
+     "liq": 418331
+    }
+   ]
+  },
+  "LAB_A_SURGE_EST_GUARD": {
+   "net50": {
+    "n": 8,
+    "pairs": 8,
+    "clusters": 8,
+    "win_rate": 12.5,
+    "mean_usd": -7.405,
+    "mean_pct": -3.703,
+    "median_pct": -3.367,
+    "sum_usd": -59.24,
+    "pf": 0.056,
+    "ci95_mean_usd": [
+     -11.607,
+     -3.113
+    ],
+    "ci95_mean_usd_pair": [
+     -11.607,
+     -3.113
+    ],
+    "trades_per_hour": 4.17,
+    "avg_hold_min": 30.1,
+    "top_pair_share": 0.125,
+    "censored_end": 5,
+    "vanished": 0,
+    "gap_closed": 0,
+    "exits": {
+     "STOP": 2,
+     "HOLD": 1,
+     "OPEN_AT_END/END": 5
+    }
+   },
+   "net0_mean_pct": -1.891,
+   "netcal_mean_pct": -2.733,
+   "portfolio": {
+    "taken": 5,
+    "final_balance": 970.36,
+    "max_drawdown_pct": 2.96,
+    "skipped_no_cash": 0
+   },
+   "decision": "inconclusive (n<20)",
+   "trades": [
+    {
+     "pair": "4JAnKFdd",
+     "sym": "e/acc",
+     "entry_utc": "07:40:56",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.18,
+     "net0": -5.05,
+     "fee": 80.0,
+     "liq": 335945
+    },
+    {
+     "pair": "HMzvsEEm",
+     "sym": "CATE",
+     "entry_utc": "07:42:38",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.71,
+     "net0": -2.21,
+     "fee": 30.0,
+     "liq": 2821295
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "08:31:51",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": 1.77,
+     "net0": 3.11,
+     "fee": 55.0,
+     "liq": 234245
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "08:39:21",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -3.02,
+     "net0": -1.51,
+     "fee": 30.0,
+     "liq": 1935438
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:40:20",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.86,
+     "net0": -0.56,
+     "fee": 80.0,
+     "liq": 230470
+    },
+    {
+     "pair": "6e3jZLtf",
+     "sym": "PAID",
+     "entry_utc": "08:49:52",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.67,
+     "net0": -0.37,
+     "fee": 70.0,
+     "liq": 470030
+    },
+    {
+     "pair": "4R8CiMnJ",
+     "sym": "JEANPHIL",
+     "entry_utc": "08:58:50",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -6.8,
+     "net0": -3.62,
+     "fee": 70.0,
+     "liq": 325993
+    },
+    {
+     "pair": "AFaYrFH7",
+     "sym": "LMAO!",
+     "entry_utc": "09:20:19",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -6.15,
+     "net0": -4.91,
+     "fee": 85.0,
+     "liq": 306044
+    }
+   ]
+  },
+  "LAB_B_DIP_MKTDIP_GUARD": {
+   "net50": {
+    "n": 1,
+    "pairs": 1,
+    "clusters": 1,
+    "win_rate": 100.0,
+    "mean_usd": 16.261,
+    "mean_pct": 8.131,
+    "median_pct": 8.131,
+    "sum_usd": 16.26,
+    "pf": Infinity,
+    "ci95_mean_usd": [
+     null,
+     null
+    ],
+    "ci95_mean_usd_pair": [
+     null,
+     null
+    ],
+    "trades_per_hour": 0.52,
+    "avg_hold_min": 60.2,
+    "top_pair_share": 1.0,
+    "censored_end": 0,
+    "vanished": 0,
+    "gap_closed": 0,
+    "exits": {
+     "HOLD": 1
+    }
+   },
+   "net0_mean_pct": 9.554,
+   "netcal_mean_pct": 9.215,
+   "portfolio": {
+    "taken": 1,
+    "final_balance": 1016.26,
+    "max_drawdown_pct": 0.0,
+    "skipped_no_cash": 0
+   },
+   "decision": "inconclusive (n<20)",
+   "trades": [
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "07:47:47",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 8.13,
+     "net0": 9.55,
+     "fee": 100.0,
+     "liq": 96761
+    }
+   ]
+  },
+  "RND_LAB_A": {
+   "net50": {
+    "n": 7,
+    "pairs": 7,
+    "clusters": 7,
+    "win_rate": 0.0,
+    "mean_usd": -13.939,
+    "mean_pct": -6.97,
+    "median_pct": -7.532,
+    "sum_usd": -97.58,
+    "pf": 0.0,
+    "ci95_mean_usd": [
+     -18.36,
+     -9.897
+    ],
+    "ci95_mean_usd_pair": [
+     -18.36,
+     -9.897
+    ],
+    "trades_per_hour": 3.65,
+    "avg_hold_min": 26.8,
+    "top_pair_share": 0.143,
+    "censored_end": 1,
+    "vanished": 0,
+    "gap_closed": 0,
+    "exits": {
+     "HOLD": 2,
+     "STOP": 4,
+     "OPEN_AT_END/END": 1
+    }
+   },
+   "net0_mean_pct": -4.591,
+   "netcal_mean_pct": -6.03,
+   "portfolio": {
+    "taken": 7,
+    "final_balance": 902.42,
+    "max_drawdown_pct": 9.76,
+    "skipped_no_cash": 0
+   },
+   "decision": "inconclusive (n<20)",
+   "trades": [
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "07:30:40",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -4.53,
+     "net0": -3.04,
+     "fee": 30.0,
+     "liq": 1950922
+    },
+    {
+     "pair": "FnzKY6x7",
+     "sym": "ANSEM",
+     "entry_utc": "07:33:09",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.32,
+     "net0": -1.81,
+     "fee": 30.0,
+     "liq": 2412923
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "08:18:03",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -8.85,
+     "net0": -5.74,
+     "fee": 80.0,
+     "liq": 238488
+    },
+    {
+     "pair": "BFrSZake",
+     "sym": "HIGGS",
+     "entry_utc": "08:32:54",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.53,
+     "net0": -4.38,
+     "fee": 95.0,
+     "liq": 140995
+    },
+    {
+     "pair": "4R8CiMnJ",
+     "sym": "JEANPHIL",
+     "entry_utc": "08:40:20",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -12.34,
+     "net0": -9.36,
+     "fee": 65.0,
+     "liq": 339015
+    },
+    {
+     "pair": "4JAnKFdd",
+     "sym": "e/acc",
+     "entry_utc": "08:42:32",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -7.72,
+     "net0": -4.58,
+     "fee": 80.0,
+     "liq": 333492
+    },
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "08:58:55",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -4.49,
+     "net0": -3.24,
+     "fee": 52.5,
+     "liq": 241795
+    }
+   ]
+  },
+  "RND_LAB_B": {
+   "net50": {
+    "n": 15,
+    "pairs": 14,
+    "clusters": 15,
+    "win_rate": 6.7,
+    "mean_usd": -9.306,
+    "mean_pct": -4.653,
+    "median_pct": -2.941,
+    "sum_usd": -139.59,
+    "pf": 0.07,
+    "ci95_mean_usd": [
+     -14.656,
+     -4.322
+    ],
+    "ci95_mean_usd_pair": [
+     -14.761,
+     -4.533
+    ],
+    "trades_per_hour": 7.83,
+    "avg_hold_min": 43.0,
+    "top_pair_share": 0.133,
+    "censored_end": 8,
+    "vanished": 0,
+    "gap_closed": 0,
+    "exits": {
+     "HOLD": 6,
+     "OPEN_AT_END/END": 8,
+     "STOP": 1
+    }
+   },
+   "net0_mean_pct": -3.218,
+   "netcal_mean_pct": -3.695,
+   "portfolio": {
+    "taken": 6,
+    "final_balance": 915.4,
+    "max_drawdown_pct": 8.46,
+    "skipped_no_cash": 0
+   },
+   "decision": "inconclusive (n<20)",
+   "trades": [
+    {
+     "pair": "FcfEJ9uJ",
+     "sym": "EVERYTHING",
+     "entry_utc": "07:33:15",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -9.55,
+     "net0": -8.36,
+     "fee": 52.5,
+     "liq": 242891
+    },
+    {
+     "pair": "867dKvaC",
+     "sym": "MISTAKE",
+     "entry_utc": "07:42:03",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": 5.25,
+     "net0": 6.64,
+     "fee": 60.0,
+     "liq": 258098
+    },
+    {
+     "pair": "BFrSZake",
+     "sym": "HIGGS",
+     "entry_utc": "07:44:42",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -2.94,
+     "net0": -1.66,
+     "fee": 100.0,
+     "liq": 138451
+    },
+    {
+     "pair": "DA4pM4xS",
+     "sym": "OTC",
+     "entry_utc": "07:50:20",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -5.35,
+     "net0": -4.1,
+     "fee": 65.0,
+     "liq": 532945
+    },
+    {
+     "pair": "7wCarEYc",
+     "sym": "IOF",
+     "entry_utc": "08:03:52",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -3.55,
+     "net0": -2.04,
+     "fee": 42.5,
+     "liq": 266267
+    },
+    {
+     "pair": "5wNu5Qhd",
+     "sym": "neet",
+     "entry_utc": "08:18:55",
+     "reason": "HOLD",
+     "flag": "",
+     "net50": -1.99,
+     "net0": -0.46,
+     "fee": 30.0,
+     "liq": 1924423
+    },
+    {
+     "pair": "FGdGihHZ",
+     "sym": "USWR",
+     "entry_utc": "08:26:31",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.8,
+     "net0": -1.29,
+     "fee": 37.5,
+     "liq": 282676
+    },
+    {
+     "pair": "4w2cysot",
+     "sym": "TROLL",
+     "entry_utc": "08:27:48",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.0,
+     "net0": -0.47,
+     "fee": 30.0,
+     "liq": 3078350
+    },
+    {
+     "pair": "8NVFB1un",
+     "sym": "Pumpoween",
+     "entry_utc": "08:35:11",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -7.28,
+     "net0": -6.05,
+     "fee": 100.0,
+     "liq": 98525
+    },
+    {
+     "pair": "4R8CiMnJ",
+     "sym": "JEANPHIL",
+     "entry_utc": "08:46:51",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -9.84,
+     "net0": -8.65,
+     "fee": 65.0,
+     "liq": 337391
+    },
+    {
+     "pair": "53W7r4XU",
+     "sym": "darwin",
+     "entry_utc": "08:47:57",
+     "reason": "STOP",
+     "flag": "",
+     "net50": -17.94,
+     "net0": -15.14,
+     "fee": 100.0,
+     "liq": 102991
+    },
+    {
+     "pair": "4JAnKFdd",
+     "sym": "e/acc",
+     "entry_utc": "08:50:23",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -5.12,
+     "net0": -3.87,
+     "fee": 80.0,
+     "liq": 335484
+    },
+    {
+     "pair": "6e3jZLtf",
+     "sym": "PAID",
+     "entry_utc": "09:07:53",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.21,
+     "net0": -0.92,
+     "fee": 70.0,
+     "liq": 471801
+    },
+    {
+     "pair": "DA4pM4xS",
+     "sym": "OTC",
+     "entry_utc": "09:09:49",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -2.54,
+     "net0": -1.26,
+     "fee": 65.0,
+     "liq": 527928
+    },
+    {
+     "pair": "2B8tftZ5",
+     "sym": "CRAWL",
+     "entry_utc": "09:18:37",
+     "reason": "OPEN_AT_END",
+     "flag": "END",
+     "net50": -1.92,
+     "net0": -0.63,
+     "fee": 80.0,
+     "liq": 230803
+    }
+   ]
+  },
+  "LAB_C_TAPE_BREADTH_EST": {
+   "decision": "not_testable: no tape events after the cutoff in the research snapshot"
+  }
+ },
+ "live_positions": {
+  "swordinu": {
+   "sym": "swordinu",
+   "pair": "69fyvgoT",
+   "price_at_cut": 0.005448,
+   "price_last": 0.006962,
+   "chg_since_cut_pct": 27.79,
+   "chg_since_entry_pct": null,
+   "fwd_min_vs_cut_pct": 0.0,
+   "fwd_max_vs_cut_pct": 43.85,
+   "liq_at_cut": 232958,
+   "liq_last": 263991,
+   "minutes_since_last_point": 0.0,
+   "rug_reasons_last": [],
+   "fwd_points": 1043
+  },
+  "VSOF": {
+   "sym": "VSOF",
+   "pair": "AGZjpu5v",
+   "price_at_cut": 0.007947,
+   "price_last": 0.008024,
+   "chg_since_cut_pct": 0.97,
+   "chg_since_entry_pct": 2.63,
+   "fwd_min_vs_cut_pct": -1.11,
+   "fwd_max_vs_cut_pct": 1.25,
+   "liq_at_cut": 255427,
+   "liq_last": 255760,
+   "minutes_since_last_point": 0.0,
+   "rug_reasons_last": [],
+   "fwd_points": 1032
+  },
+  "GOIF": {
+   "sym": "GOIF",
+   "pair": "D2pVedgH",
+   "price_at_cut": 0.1954,
+   "price_last": 0.2022,
+   "chg_since_cut_pct": 3.48,
+   "chg_since_entry_pct": 4.44,
+   "fwd_min_vs_cut_pct": -0.36,
+   "fwd_max_vs_cut_pct": 3.68,
+   "liq_at_cut": 1260346,
+   "liq_last": 1277570,
+   "minutes_since_last_point": 0.0,
+   "rug_reasons_last": [
+    "YOUNG_POOL",
+    "FAKE_MCAP"
+   ],
+   "fwd_points": 1033
+  },
+  "WOSE": {
+   "sym": "WOSE",
+   "pair": "GhBPuDpt",
+   "price_at_cut": 0.2402,
+   "price_last": 0.2452,
+   "chg_since_cut_pct": 2.08,
+   "chg_since_entry_pct": 3.37,
+   "fwd_min_vs_cut_pct": 0.0,
+   "fwd_max_vs_cut_pct": 2.29,
+   "liq_at_cut": 1397467,
+   "liq_last": 1406902,
+   "minutes_since_last_point": 0.0,
+   "rug_reasons_last": [
+    "YOUNG_POOL",
+    "FAKE_MCAP"
+   ],
+   "fwd_points": 1033
+  },
+  "SARP": {
+   "sym": "SARP",
+   "pair": "HiPe6mDS",
+   "price_at_cut": 0.08343,
+   "price_last": 0.08691,
+   "chg_since_cut_pct": 4.17,
+   "chg_since_entry_pct": 5.22,
+   "fwd_min_vs_cut_pct": -0.34,
+   "fwd_max_vs_cut_pct": 4.36,
+   "liq_at_cut": 823057,
+   "liq_last": 837032,
+   "minutes_since_last_point": 0.0,
+   "rug_reasons_last": [
+    "FAKE_MCAP"
+   ],
+   "fwd_points": 1034
+  }
+ },
+ "cost_first_universe_forward": {
+  "units": 2028,
+  "pools": 18,
+  "guard_share": 0.4940828402366864,
+  "interim_share": 0.7712031558185405,
+  "pools_detail": [
+   {
+    "pair": "4w2cysot",
+    "sym": "TROLL",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 0.0,
+    "why": []
+   },
+   {
+    "pair": "5GaCcKLd",
+    "sym": "DOTF",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 1.0,
+    "why": []
+   },
+   {
+    "pair": "5wNu5Qhd",
+    "sym": "neet",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 0.0,
+    "why": []
+   },
+   {
+    "pair": "8RCJrW94",
+    "sym": "USDP",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "AdvA19rg",
+    "sym": "SARP",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "C9bagG6C",
+    "sym": "D\u200aO\u200aT\u200aF",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "D2pVedgH",
+    "sym": "GOIF",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP",
+     "YOUNG_POOL"
+    ]
+   },
+   {
+    "pair": "ERFmQZQU",
+    "sym": "UDR",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 1.0,
+    "why": []
+   },
+   {
+    "pair": "EpugLBw1",
+    "sym": "USDF",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 1.0,
+    "why": []
+   },
+   {
+    "pair": "FL5gakwf",
+    "sym": "USDF",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "FnzKY6x7",
+    "sym": "ANSEM",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 0.0,
+    "why": []
+   },
+   {
+    "pair": "GhBPuDpt",
+    "sym": "WOSE",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP",
+     "YOUNG_POOL"
+    ]
+   },
+   {
+    "pair": "Gs6hrh68",
+    "sym": "UDR",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "HJ72PgqL",
+    "sym": "WOTF",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 1.0,
+    "why": []
+   },
+   {
+    "pair": "HMzvsEEm",
+    "sym": "CATE",
+    "units": 116,
+    "guard_share": 0.0,
+    "interim_share": 0.0,
+    "why": []
+   },
+   {
+    "pair": "HiPe6mDS",
+    "sym": "SARP",
+    "units": 116,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP"
+    ]
+   },
+   {
+    "pair": "8ZMkMgWM",
+    "sym": "GOIF",
+    "units": 98,
+    "guard_share": 0.0,
+    "interim_share": 1.0,
+    "why": []
+   },
+   {
+    "pair": "BcStCqTJ",
+    "sym": "USDP",
+    "units": 74,
+    "guard_share": 1.0,
+    "interim_share": 1.0,
+    "why": [
+     "FAKE_MCAP",
+     "YOUNG_POOL"
+    ]
+   }
+  ]
+ }
+}

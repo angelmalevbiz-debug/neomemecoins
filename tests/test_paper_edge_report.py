@@ -410,6 +410,44 @@ class AccountLabelTests(unittest.TestCase):
             self.assertIn('user_42d3192d', err)
 
 
+class MainPoolingTests(unittest.TestCase):
+    def write(self, root, rel, data):
+        path = Path(root) / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data), encoding='utf-8')
+        return path
+
+    def test_explicit_main_and_unlabelled_other_session_are_not_pooled(self):
+        with tempfile.TemporaryDirectory() as root:
+            main = self.write(root, 'a/state.json', engine_state('PAPER-RESET-1-aaaa', [engine_trade('PAPER-RESET-1-aaaa', 1, -1.0)]))
+            other = self.write(root, 'b/state.json', engine_state('PAPER-RESET-2-bbbb', [engine_trade('PAPER-RESET-2-bbbb', 1, -2.0)]))
+            collector = edge.LedgerCollector()
+            collector.add_engine_ledger(main, 'main')
+            with self.assertRaisesRegex(ValueError, 'pooled as account'):
+                collector.add_engine_ledger(other)
+            reverse = edge.LedgerCollector()
+            reverse.add_engine_ledger(other)
+            with self.assertRaisesRegex(ValueError, 'pooled as account'):
+                reverse.add_engine_ledger(main, 'main')
+
+    def test_explicit_main_labels_may_span_sessions(self):
+        with tempfile.TemporaryDirectory() as root:
+            first = self.write(root, 'a/state.json', engine_state('PAPER-RESET-1-aaaa', [engine_trade('PAPER-RESET-1-aaaa', 1, -1.0)]))
+            second = self.write(root, 'b/state.json', engine_state('PAPER-RESET-2-bbbb', [engine_trade('PAPER-RESET-2-bbbb', 1, -2.0)]))
+            collector = edge.LedgerCollector()
+            collector.add_engine_ledger(first, 'main')
+            collector.add_engine_ledger(second, 'main')
+            self.assertEqual(len(collector.unique_trades()), 2)
+
+    def test_unlabelled_ledger_without_session_is_refused(self):
+        with tempfile.TemporaryDirectory() as root:
+            data = engine_state('X', [engine_trade('X', 1, -1.0)])
+            data.pop('demo_session_id')
+            path = self.write(root, 'a/state.json', data)
+            with self.assertRaisesRegex(ValueError, 'no demo_session_id'):
+                edge.LedgerCollector().add_engine_ledger(path)
+
+
 class SegmentedDrawdownTests(unittest.TestCase):
     def test_engine_sessions_are_separate_equity_paths(self):
         with tempfile.TemporaryDirectory() as tmp:

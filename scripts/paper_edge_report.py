@@ -339,6 +339,8 @@ class LedgerCollector:
         # Path-derived 'main' is a fallback, not proof of ownership: remember which
         # session each unlabelled fallback ledger carried so pooling can be refused.
         self._fallback_sessions: dict[str, dict[str, str]] = defaultdict(dict)
+        # Every session attributed to 'main', with where the attribution came from.
+        self._main_sessions: dict[str, tuple[str, str]] = {}
 
     def _admit(self, trade: dict[str, Any]) -> None:
         if (self.since is not None and trade['closed_at'] < self.since) or \
@@ -360,6 +362,8 @@ class LedgerCollector:
             raise ValueError(f'{display_path(path)}: not an engine ledger (expected object with history array)')
         session_id = str(data.get('demo_session_id') or 'UNKNOWN')
         account = label or self._derive_label(path, session_id)
+        if account == 'main':
+            self._check_main_session(path, session_id, 'explicit' if label else 'path')
         start = finite(data.get('demo_starting_balance_usd'))
         if start and start > 0:
             self.starting_balances.setdefault(account, start)
@@ -381,6 +385,25 @@ class LedgerCollector:
         self.sources.append({'kind': 'engine', 'account': account, 'file': scrub(path.name), 'sha256': digest,
                              'bytes': size, 'closed_rows': admitted, 'session': scrub(session_id),
                              'label_source': 'explicit' if label else 'path'})
+
+    def _check_main_session(self, path: Path, session_id: str, source: str) -> None:
+        """Refuse to pool a path-derived 'main' ledger with a 'main' ledger from another session.
+
+        Explicit main= labels may span sessions (the operator asserts they are one account
+        across resets); a ledger that is 'main' only because of its path may not join them.
+        """
+        hint = 'pass an explicit label, e.g. --state main=PATH or --state user_3aa07b45=PATH'
+        if source == 'path' and session_id == 'UNKNOWN':
+            raise ValueError(f'{display_path(path)}: unlabelled ledger has no demo_session_id, so its account '
+                             f'cannot be checked; {hint}')
+        for other_session, (other_path, other_source) in self._main_sessions.items():
+            if other_session == session_id or (source == 'explicit' and other_source == 'explicit'):
+                continue
+            raise ValueError(
+                f'{display_path(path)} (session {scrub(session_id)}, {source} label) and {other_path} '
+                f'(session {scrub(other_session)}, {other_source} label) would both be pooled as account "main"; '
+                f'label every main ledger explicitly or give the other file its own label. {hint}')
+        self._main_sessions.setdefault(session_id, (display_path(path), source))
 
     def _derive_label(self, path: Path, session_id: str) -> str:
         """Path-derived label for an unlabelled ledger, refusing anything ambiguous."""
@@ -541,8 +564,10 @@ def assign_segments(trades: list[dict[str, Any]], collector: 'LedgerCollector') 
             implied_before = (trade['balance_after'] - trade['pnl_usd']) if trade.get('balance_after') is not None else None
             restart = previous is None
             if previous is not None:
+                # Books that hold several positions close out of trade_no order, so only a
+                # restart back to the first trade number marks a reset.
                 if trade.get('trade_no') is not None and previous.get('trade_no') is not None \
-                        and trade['trade_no'] <= previous['trade_no']:
+                        and int(trade['trade_no']) <= 1 < int(previous['trade_no']):
                     restart = True
                 elif (implied_before is not None and previous.get('balance_after') is not None and book_start
                       and abs(implied_before - previous['balance_after']) > LAB_BALANCE_TOLERANCE_USD

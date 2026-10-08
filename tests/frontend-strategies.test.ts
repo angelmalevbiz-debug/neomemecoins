@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabEntryStatus from '../src/components/LabEntryStatus';
-import { forwardCapitalNote, forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, isForwardZeroCapital, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { costCapRule, forwardCapitalNote, forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, isForwardZeroCapital, labEntryStatus, labEntryView, labForwardGateStatus, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -320,4 +320,53 @@ test('LAB_FORWARD_CONTROL_CONTINUITY_V1 and SIGNAL_CARRY_V1: a control keeps mea
   const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(source, /isForwardZeroCapital\(book\)/);
   assert.match(source, /forwardCapitalNote\(trade\.capital_mode\)/);
+});
+
+test('LAB_FORWARD review: a gate is met only when every criterion was evaluated; research fills are shown', () => {
+  const gate = { all_evaluable_pass: true, gate_met: false, gate_status: 'evaluable_criteria_pass_replay_pending',
+    not_evaluated: ['max_drawdown_pct_3slot_1000'], automatic_promotion: false };
+  const pending = { ...book('LAB_A_SURGE_EST_GUARD', 520, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', evidence: { closed_trades: 160, min_closes: 50,
+      research_fill: { closed_trades: 158, pending: 2, mean_net50_usd: 1.25, ci95_mean_net50_usd: [0.3, 2.2] } },
+    promotion_gate: gate } };
+  const summary = labForwardSummary(pending) ?? '';
+  assert.doesNotMatch(summary, /гейтът за промоция е изпълнен/);
+  assert.match(summary, /чака офлайн проверка на спада при 3 слота и \$1000 \(≤ 20%\), затова гейтът още не е изпълнен/);
+  assert.match(summary, /research\): 158 сделки, средно net50 \$1\.25\/сделка, CI95 \[\$0\.30, \$2\.20\]/);
+  assert.match(labForwardGateStatus({ ...gate, gate_met: true, not_evaluated: [] }), /гейтът за промоция е изпълнен/);
+  // A backend without gate_met never shows a met gate.
+  assert.doesNotMatch(labForwardGateStatus({ all_evaluable_pass: true }), /гейтът за промоция е изпълнен/);
+  assert.match(labForwardGateStatus({ all_evaluable_pass: false }), /не е изпълнен/);
+  const retired = { ...pending, strategy_lifecycle: { ...pending.strategy_lifecycle, status: 'retired',
+    evidence: { ...pending.strategy_lifecycle.evidence, kill_rule_met_bases: ['research_fill'] } } };
+  assert.match(labForwardSummary(retired) ?? '', /спряна: средно net50 < 0 и горна граница на CI95 < 0 \(при research изпълнение\)/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /trade\.net50_research_fill_usd != null/);
+});
+
+test('LAB_FORWARD review: the cost cap names its ceiling for a 15% stop and a fixed $200 entry', () => {
+  const diagnostics = { signal_candidates: 1, cost_rejected: 1, cost_infeasible_candidates: 1, affordable_candidates: 0,
+    max_entry_roundtrip_cost_pct: 2.75, max_entry_roundtrip_cost_ceiling_pct: 2.75, stop_loss_net_pct: 15,
+    entry_size_rule: 'FIXED_NOTIONAL_NO_BACKOFF', fixed_notional_usd: 200, blocked_reason: 'modeled_roundtrip_cost_limit' };
+  const view = labEntryView({ ...book('LAB_B_DIP_MKTDIP_GUARD', 500, 500), entry_diagnostics: diagnostics });
+  assert.equal(view.costLimited, true);
+  assert.match(view.detail!, /лимита 2\.75% = min\(0\.5 × нетен стоп 15\.00%, таван 2\.75%\)/);
+  assert.doesNotMatch(view.detail!, /= 0\.5 × нетен стоп 15/, 'never the false 2.75% = 0.5 × 15%');
+  assert.match(view.detail!, /при фиксирания вход \$200 \(размерът не се намалява\)/);
+  assert.doesNotMatch(view.detail!, /при всеки проверен размер/);
+  assert.equal(costCapRule(1.5, 3), '0.5 × нетен стоп 3.00%');
+  assert.equal(costCapRule(2.5, 5, 2.75), '0.5 × нетен стоп 5.00%');
+  assert.equal(costCapRule(2.75, 15), 'min(0.5 × нетен стоп 15.00%, таван 2.75%)', 'the cap itself is the ceiling');
+  assert.equal(costCapRule(2.0, 3), null, 'no equation the numbers do not satisfy');
+  assert.equal(costCapRule(1.5, undefined), null);
+  // The fee-and-buffer floor uses the book's own stop for the headroom, not 2 × the cap.
+  const floor = labEntryView({ ...book('LAB_B_DIP_MKTDIP_GUARD', 500, 500), entry_diagnostics: {
+    signal_candidates: 2, affordable_candidates: 0, stop_loss_net_pct: 15, max_entry_roundtrip_cost_pct: 2.75,
+    cost_feasibility: { checked_market_candidates: 2, fixed_cost_infeasible_candidates: 2,
+      minimum_model_roundtrip_cost_pct: 3.18, maximum_roundtrip_cost_pct: 2.75,
+      best_candidates: [{ model_cost_feasible: false }] } } });
+  assert.match(floor.detail!, /При нетен стоп 15\.00% този минимум оставя 11\.82 п\.п\. запас/);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /\(0\.5 × стоп \$\{/);
+  assert.match(source, /costCapRule\(diagnostics\.max_entry_roundtrip_cost_pct, diagnostics\.stop_loss_net_pct, diagnostics\.max_entry_roundtrip_cost_ceiling_pct\)/);
 });

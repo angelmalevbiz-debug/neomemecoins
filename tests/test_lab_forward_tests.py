@@ -63,10 +63,10 @@ DAY = 24 * HOUR
 # Frozen config hashes (sha256 of each book's canonical parameter JSON). A parameter
 # change must change these pins, strategy-lock.json and docs/STRATEGY_VALIDATION.md together.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': '883e08b8379fe319e7c5d783eb821d35938911f2c29c500665f5dd499bc6cc34',
-    'RND_LAB_A': '8be0ce70a1bc1247b326063f912f7ec917da70258e34ad63b686846b7614d5c1',
-    'LAB_B_DIP_MKTDIP_GUARD': '08e20572c482bd44e2d2092e600e81579a6bbcac3890906deba99752ed85cfd8',
-    'RND_LAB_B': '76ef3c3083bede7b02ce301d010f17179e12c51e10fce9059bc94eb5030872c9',
+    'LAB_A_SURGE_EST_GUARD': 'c6ccc2db34023c31671d8c001b9f755691260ebaf3953523a6062ebeb9a3447b',
+    'RND_LAB_A': '3ee45c0f1133604234470e9a98028587b1e639ed461091be266bf511f538c4bb',
+    'LAB_B_DIP_MKTDIP_GUARD': '9861b19f342fb44a08ec51fd40e2c5b94c8451e680294ceeb438ff7afd80c383',
+    'RND_LAB_B': '82bd8fba714b935724c8dfe9034f13f14bfd4e1813859ae60ec87ce92308164b',
 }
 
 
@@ -130,6 +130,21 @@ def closes(book_id, values, *, pairs=6, start=1_800_000_000_000, config_hash=Non
                      'lab_forward_version': version,
                      'lab_config_hash': config_hash or lf.CONFIG_HASHES[book_id]})
     return list(reversed(rows))
+
+
+def with_research_fill(rows, delta=0.0, *, entry=lf.FILL_NEXT_REFRESH, exit=lf.FILL_QUIET, pending=False):
+    """Give closes a completed LAB_FORWARD_FILL_BASIS_V1 shadow: research net50 = booked net50 + ``delta``."""
+    for row in rows:
+        shadow = {'version': lf.FILL_BASIS_VERSION, 'entry': {'status': entry}, 'exit': {'status': exit},
+                  'result': None}
+        row['research_fill'] = shadow
+        if pending:
+            row['net50_research_fill_usd'] = None
+            continue
+        shadow['result'] = {'net50_usd': row['net50_usd'] + delta}
+        row['net50_research_fill_usd'] = row['net50_usd'] + delta
+        row['net50_research_fill_pct'] = row['net50_pct'] + delta / 2
+    return rows
 
 
 # ------------------------------------------------------------------ definitions
@@ -251,6 +266,13 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual(section['known_versions'], list(lf.KNOWN_VERSIONS))
         self.assertFalse(section['tape_pin_required'])
         self.assertEqual(section['promotion_gate']['min_control_coverage'], 0.9)
+        # LAB_FORWARD_FILL_BASIS_V1 and the review-cost rule are part of the locked definition.
+        self.assertEqual(section['fill_basis'], dataclasses.asdict(lf.FILL_BASIS))
+        self.assertEqual((section['kill_rule']['bases'], section['kill_rule']['bootstrap_min_closes']),
+                         (lf.KILL_RULE.bases, lf.KILL_RULE.bootstrap_min_closes))
+        self.assertEqual(section['promotion_gate']['max_research_fill_unobserved_leg_share'],
+                         lf.GATE.max_research_fill_unobserved_leg_share)
+        self.assertFalse(section['promotion_gate']['gate_met_in_lab_possible'])
         seats = lock['tape_seat_policy']
         self.assertEqual((seats['version'], seats['previous_version']),
                          (tape_pool_scheduler.POLICY_VERSION, tape_pool_scheduler.PREVIOUS_POLICY_VERSION))
@@ -696,7 +718,7 @@ class KillRuleTests(unittest.TestCase):
         self.assertEqual(fallback['method'], 'normal_per_trade')
         self.assertAlmostEqual((fallback['low'] + fallback['high']) / 2, -1.0, places=9)
 
-    def test_promotion_gate_is_reported_never_applied(self):
+    def gate_books(self, delta=0.0, **fill):
         values = [6.0, 4.0, 5.0, -2.0] * 45
         rows = closes(lf.LAB_A_ID, values, pairs=30)
         for index, row in enumerate(rows):
@@ -706,18 +728,29 @@ class KillRuleTests(unittest.TestCase):
         for index, row in enumerate(control):
             row['opened_at'] = 1_800_000_000_000 + index * 29 * MINUTE
             row['closed_at'] = row['opened_at'] + 10 * MINUTE
+        return with_research_fill(rows, delta, **fill), with_research_fill(control, -1.0)
+
+    def test_promotion_gate_is_reported_never_applied(self):
+        rows, control = self.gate_books()
         books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
         report = self.review(books)
         gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
         criteria = gate['criteria']
         for name in ('closed_trades', 'pairs', 'days', 'utc_hours_covered', 'mean_net50_usd', 'ci95_low_net50_usd',
-                     'control_coverage', 'beats_same_period_control_usd', 'top_pair_share',
+                     'mean_net50_research_fill_usd', 'ci95_low_net50_research_fill_usd',
+                     'control_coverage', 'beats_same_period_control_usd',
+                     'beats_same_period_control_research_fill_usd', 'top_pair_share',
                      'mean_without_best_pair_usd', 'best_day_share_of_pnl', 'entries_on_rug_flagged_pools',
-                     'vanished_or_unpriced_share'):
+                     'vanished_or_unpriced_share', 'research_fill_unobserved_leg_share'):
             with self.subTest(criterion=name):
                 self.assertTrue(criteria[name]['pass'], criteria[name])
         self.assertTrue(gate['all_evaluable_pass'])
         self.assertEqual(gate['not_evaluated'], ['max_drawdown_pct_3slot_1000'])
+        # Review finding: every evaluable criterion passing is not a met gate while the
+        # 3-slot $1000 drawdown replay has not been evaluated.
+        self.assertFalse(gate['gate_met'])
+        self.assertEqual(gate['gate_status'], 'evaluable_criteria_pass_replay_pending')
+        self.assertEqual(gate['same_period']['research_fill']['control_closed_trades'], 180)
         self.assertFalse(gate['automatic_promotion'])
         book = books[lf.LAB_A_ID]
         self.assertEqual(book['portfolio_group'], 'TEST')
@@ -959,6 +992,190 @@ class KillRuleTests(unittest.TestCase):
         self.assertTrue(marker['evidence']['open_unpriced_past_max_hold'])
         self.assertAlmostEqual(marker['promotion_gate']['criteria']['vanished_or_unpriced_share']['value'], 0.1)
 
+    # ---------------------------------------------- LAB_FORWARD_FILL_BASIS_V1 and review cost
+
+    def test_the_kill_rule_is_met_on_either_fill_basis(self):
+        """Booked fills look fine but the research fills (next refresh) lose: the book retires."""
+        values = [2.0, 4.0, 0.5, 3.0, 1.0] * 10
+        books = self.books(LAB_A_SURGE_EST_GUARD=with_research_fill(closes(lf.LAB_A_ID, values), -6.0))
+        report = self.review(books)
+        marker = books[lf.LAB_A_ID]['strategy_lifecycle']
+        evidence = marker['evidence']
+        self.assertEqual((marker['status'], marker['reason']), ('retired', 'pre_registered_kill_rule'))
+        self.assertGreater(evidence['mean_net50_usd'], 0)
+        self.assertEqual((evidence['kill_rule_met_booked'], evidence['kill_rule_met_research_fill']), (False, True))
+        self.assertEqual(evidence['kill_rule_met_bases'], ['research_fill'])
+        research = evidence['research_fill']
+        self.assertEqual((research['closed_trades'], research['pending'], research['missing']), (50, 0, 0))
+        self.assertAlmostEqual(research['mean_net50_usd'], 2.1 - 6.0, places=6)
+        self.assertLess(research['ci95_mean_net50_usd'][1], 0)
+        self.assertEqual(research['ci_method'], 'pair_bootstrap')
+        self.assertAlmostEqual(research['mean_minus_booked_net50_usd'], -6.0, places=6)
+        self.assertEqual(research['legs']['entry'][lf.FILL_NEXT_REFRESH], 50)
+        self.assertIn(lf.LAB_A_ID, report['retired_strategy_ids'])
+        self.assertEqual(report['lab_forward_kill_rule']['fill_basis_version'], lf.FILL_BASIS_VERSION)
+        # The other way round: booked fills lose clearly, the research fills do not.
+        books = self.books(LAB_A_SURGE_EST_GUARD=with_research_fill(closes(lf.LAB_A_ID, [-v for v in values]), 9.0))
+        self.review(books)
+        evidence = books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']
+        self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['status'], 'retired')
+        self.assertEqual(evidence['kill_rule_met_bases'], ['booked'])
+        # Shadows still pending (closed less than about 90 s ago) are not evidence yet.
+        books = self.books(LAB_A_SURGE_EST_GUARD=with_research_fill(closes(lf.LAB_A_ID, values), pending=True))
+        self.review(books)
+        evidence = books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']
+        self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['status'], 'active')
+        self.assertEqual((evidence['research_fill']['closed_trades'], evidence['research_fill']['pending']), (0, 50))
+        self.assertFalse(evidence['kill_rule_met_research_fill'])
+
+    def test_the_gate_needs_both_fill_bases_and_observed_research_fills(self):
+        rows, control = self.gate_books(-8.0)
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
+        self.review(books)
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        self.assertTrue(gate['criteria']['mean_net50_usd']['pass'])
+        self.assertFalse(gate['criteria']['mean_net50_research_fill_usd']['pass'])
+        self.assertFalse(gate['criteria']['ci95_low_net50_research_fill_usd']['pass'])
+        self.assertFalse(gate['all_evaluable_pass'])
+        self.assertEqual((gate['gate_met'], gate['gate_status']), (False, 'not_met'))
+        # Research fills valued at the decision print (no later observation in 60 s) are counted.
+        rows, control = self.gate_books(0.0, entry=lf.FILL_NO_NEXT)
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
+        self.review(books)
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        unobserved = gate['criteria']['research_fill_unobserved_leg_share']
+        self.assertEqual((unobserved['value'], unobserved['pass']), (0.5, False))
+        self.assertEqual(gate['research_fill']['legs']['entry'][lf.FILL_NO_NEXT], 180)
+        # Closes without a shadow (for example from before LAB_FORWARD_FILL_BASIS_V1) are unobserved too.
+        plain = closes(lf.LAB_A_ID, [6.0, 4.0, 5.0, -2.0] * 45, pairs=30)
+        books = self.books(LAB_A_SURGE_EST_GUARD=plain)
+        self.review(books)
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        self.assertEqual(gate['research_fill']['missing'], 180)
+        self.assertEqual(gate['criteria']['research_fill_unobserved_leg_share']['value'], 1.0)
+        self.assertIsNone(gate['criteria']['mean_net50_research_fill_usd']['value'])
+
+    def test_the_ci_is_bootstrapped_only_where_the_kill_rule_can_use_it(self):
+        values = [-6.0, -9.0, -3.0, -12.0, 1.0] * 10
+        with patch.object(lf, 'bootstrap_ci', wraps=lf.bootstrap_ci) as bootstrap, \
+                patch.dict(lf._CI_CACHE, clear=True):
+            books = self.books(LAB_A_SURGE_EST_GUARD=closes(lf.LAB_A_ID, values[:49]))
+            self.review(books)
+            evidence = books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']
+            self.assertEqual(bootstrap.call_count, 0, 'no bootstrap below the 50 closes the rule needs')
+            self.assertEqual((evidence['ci_method'], evidence['ci_method_reason']),
+                             ('normal_per_trade', 'below_bootstrap_min_closes'))
+            self.assertLess(evidence['ci95_mean_net50_usd'][0], evidence['mean_net50_usd'])
+            books = self.books(LAB_A_SURGE_EST_GUARD=closes(lf.LAB_A_ID, values))
+            self.review(books)
+            self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']['ci_method'], 'pair_bootstrap')
+            calls = bootstrap.call_count
+            self.assertGreater(calls, 0)
+            # A repeated review (the Lab reviews twice per loop) reuses the cached evidence, and
+            # an unchanged sample is never resampled again (cached by content).
+            self.review(books)
+            self.assertEqual(bootstrap.call_count, calls)
+            books = self.books(LAB_A_SURGE_EST_GUARD=closes(lf.LAB_A_ID, values))
+            self.review(books)
+            self.assertEqual(bootstrap.call_count, calls)
+            self.assertEqual(lf.decision_ci(closes(lf.LAB_A_ID, values)), lf.bootstrap_ci(closes(lf.LAB_A_ID, values)))
+
+    def test_reviews_reuse_history_digests_until_the_history_changes(self):
+        start = 1_800_000_000_000
+        books = self.books(LAB_A_SURGE_EST_GUARD=with_research_fill(closes(lf.LAB_A_ID, [-3.0, 2.0] * 40)),
+                           RND_LAB_A=with_research_fill(closes(lf.RND_A_ID, [-6.0, 1.0] * 60)))
+        with patch.object(lf, '_build_digest', wraps=lf._build_digest) as build:
+            self.review(books)
+            first = books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']
+            built = build.call_count
+            self.assertGreater(built, 0)
+            self.review(books)
+            self.assertEqual(build.call_count, built, 'an unchanged ledger is scanned once, not on every review')
+            self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['evidence'], first)
+            # A new close changes the digest of that book only.
+            history = books[lf.LAB_A_ID]['history']
+            newest = dict(history[0], trade_no=81, opened_at=start + 81 * 20 * MINUTE,
+                          closed_at=start + 81 * 20 * MINUTE + 10 * MINUTE, net50_usd=-50.0,
+                          net50_research_fill_usd=-50.0)
+            history.insert(0, newest)
+            self.review(books)
+            self.assertEqual(build.call_count - built, 1)
+            self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['evidence']['closed_trades'], 81)
+            # Completing a research-fill shadow in place invalidates every digest.
+            built = build.call_count
+            lf._SHADOW_REVISION[0] += 1
+            self.review(books)
+            self.assertGreater(build.call_count, built)
+
+
+# ------------------------------------------------------------------ fill basis
+
+class FillBasisTests(unittest.TestCase):
+    """LAB_FORWARD_FILL_BASIS_V1 legs: the research harness's next-refresh fill (harness_final F1)."""
+    MINT, PAIR = full('FillMint'), full('FillPair')
+    T0 = 1_800_000_000_000
+
+    def coin(self, price, stamp, **changes):
+        return pool(self.MINT, self.PAIR, price, 400_000.0, stamp, priceNative=price / 150,
+                    marketCap=20_000_000.0, **changes)
+
+    def leg(self, price=0.01):
+        return lf.new_fill_leg(self.coin(price, self.T0), self.T0 + 800)
+
+    def test_a_leg_fills_at_the_first_differing_price_within_60_s(self):
+        leg = self.leg()
+        self.assertEqual((leg['status'], leg['decision_at'], leg['decision_price']),
+                         (lf.FILL_PENDING, self.T0, 0.01))
+        key = (self.MINT, self.PAIR)
+        self.assertFalse(lf.advance_fill_leg(leg, self.coin(0.02, self.T0), self.T0 + 1_000, key=key),
+                         'the decision observation itself is not a later one')
+        self.assertFalse(lf.advance_fill_leg(leg, dict(self.coin(0.02, self.T0 + 3_000), pairAddress=full('Other')),
+                                             self.T0 + 3_500, key=key), 'another pool is ignored')
+        self.assertFalse(lf.advance_fill_leg(leg, self.coin(0.01, self.T0 + 3_000), self.T0 + 3_500, key=key))
+        self.assertEqual((leg['later_observations'], leg['first_later_at']), (1, self.T0 + 3_000))
+        self.assertFalse(lf.advance_fill_leg(leg, self.coin(0.01, self.T0 + 3_000), self.T0 + 5_000, key=key),
+                         'a repeated observation is counted once')
+        self.assertTrue(lf.advance_fill_leg(leg, self.coin(0.0103, self.T0 + 33_000), self.T0 + 34_000, key=key))
+        self.assertEqual((leg['status'], leg['fill_price'], leg['fill_at'], leg['fill_lag_ms']),
+                         (lf.FILL_NEXT_REFRESH, 0.0103, self.T0 + 33_000, 33_000))
+        self.assertEqual(leg['later_observations'], 2)
+        self.assertEqual(lf.fill_leg_coin({'address': self.MINT, 'pairAddress': self.PAIR}, leg)['priceUsd'], 0.0103)
+        self.assertFalse(lf.advance_fill_leg(leg, self.coin(0.02, self.T0 + 40_000), self.T0 + 40_000, key=key),
+                         'a resolved leg never changes')
+        # The 60 s window includes its end, as MAX_FILL_LAG_MS in the harness.
+        leg = self.leg()
+        self.assertTrue(lf.advance_fill_leg(leg, self.coin(0.011, self.T0 + 60_000), self.T0 + 60_100, key=key))
+        self.assertEqual(leg['status'], lf.FILL_NEXT_REFRESH)
+
+    def test_a_quiet_leg_fills_at_the_first_later_observation_and_an_unseen_one_at_the_decision(self):
+        key = (self.MINT, self.PAIR)
+        leg = self.leg()
+        lf.advance_fill_leg(leg, self.coin(0.01, self.T0 + 3_000, liquidityUsd=410_000.0), self.T0 + 3_100, key=key)
+        lf.advance_fill_leg(leg, self.coin(0.01, self.T0 + 59_000), self.T0 + 59_100, key=key)
+        self.assertEqual(leg['status'], lf.FILL_PENDING)
+        # The first observation past the window ends it: the harness fills at i + 1 (same price).
+        self.assertTrue(lf.advance_fill_leg(leg, self.coin(0.02, self.T0 + 62_000), self.T0 + 62_100, key=key))
+        self.assertEqual((leg['status'], leg['fill_price'], leg['fill_at']), (lf.FILL_QUIET, 0.01, self.T0 + 3_000))
+        self.assertEqual(lf.fill_leg_coin({'address': self.MINT, 'pairAddress': self.PAIR}, leg)['liquidityUsd'],
+                         410_000.0)
+        # No later observation at all: resolved on time 90 s after the decision, at the decision print.
+        leg = self.leg()
+        self.assertFalse(lf.advance_fill_leg(leg, None, self.T0 + 90_000, key=key))
+        self.assertTrue(lf.advance_fill_leg(leg, None, self.T0 + 90_001, key=key))
+        self.assertEqual((leg['status'], leg['fill_price'], leg['fill_lag_ms']), (lf.FILL_NO_NEXT, 0.01, 0))
+        # A vanished close has no exit fill (the harness values it at the last price minus the haircut).
+        vanished = lf.new_fill_leg(self.coin(0.009, self.T0), self.T0, vanished=True)
+        self.assertEqual((vanished['status'], vanished['fill_price']), (lf.FILL_VANISHED, 0.009))
+
+    def test_a_snapshot_values_exactly_like_its_coin(self):
+        coin = self.coin(0.01, self.T0, fdv=21_000_000.0)
+        coin['liquidity'] = {'usd': 380_000.0}          # the pair object's own value (drain-aware exit)
+        rebuilt = lf.fill_leg_coin({'address': self.MINT, 'pairAddress': self.PAIR},
+                                   lf.new_fill_leg(coin, self.T0, vanished=True))
+        for quote in (lambda c: lab.calibrated_entry_execution(c, 200.0, 27.5),
+                      lambda c: lab.calibrated_exit_execution(c, 18_000.0, 27.5, drain_aware=True)):
+            self.assertEqual(quote(rebuilt), quote(coin))
+
 
 # ------------------------------------------------------------------ signal carry
 
@@ -1069,6 +1286,7 @@ class LabIntegrationTests(unittest.TestCase):
                   patch.object(lab, 'FORWARD_MEMORY', self.memory),
                   patch.object(lab, 'FORWARD_SIGNAL_CARRY', self.carry),
                   patch.object(lab, 'FORWARD_UNPRICED_SINCE', self.unpriced),
+                  patch.object(lab, 'FORWARD_FILL_FULL_SCAN', set()),
                   patch.object(lab, 'now_ms', side_effect=lambda: self.clock[0]),
                   patch.object(lab.price_integrity, 'check', side_effect=price),
                   patch.object(lab.rug_guard, 'check', side_effect=rugcheck),
@@ -1170,6 +1388,111 @@ class LabIntegrationTests(unittest.TestCase):
         self.refresh(quiet)
         self.refresh(surge)
         self.assertIsNotNone(book['position'], book['entry_diagnostics'])
+
+    # ---------------------------------------------- research-fill shadow (LAB_FORWARD_FILL_BASIS_V1)
+
+    def poll(self, *coins):
+        """One Lab loop per observation, each 500 ms after it."""
+        for coin in coins:
+            self.clock[0] = coin['updatedAt'] + 500
+            lab.update_positions({}, [coin])
+
+    def test_research_fill_shadow_reprices_both_legs_at_the_next_refresh(self):
+        """Review finding: entry at the decision print and exit at the trigger mark are not the research fills."""
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        decision = points[1]
+        entry_price = book['position']['entry_price']
+        leg = book['position']['research_fill']['entry']
+        self.assertEqual((book['position']['research_fill']['version'], leg['status'], leg['decision_at'],
+                          leg['decision_price']), (lf.FILL_BASIS_VERSION, lf.FILL_PENDING, decision['updatedAt'],
+                                                   entry_price))
+        # The next DexScreener refresh prints 0.4% higher, 30 s after the decision (15 s: unchanged).
+        fill_in = dict(decision, priceUsd=entry_price * 1.004, updatedAt=decision['updatedAt'] + 30_000)
+        self.poll(dict(decision, updatedAt=decision['updatedAt'] + 15_000), fill_in)
+        leg = book['position']['research_fill']['entry']
+        self.assertEqual((leg['status'], leg['fill_price'], leg['fill_lag_ms'], leg['later_observations']),
+                         (lf.FILL_NEXT_REFRESH, entry_price * 1.004, 30_000, 2))
+        self.assertEqual(book['position']['entry_price'], entry_price, 'booking is unchanged')
+        # Take profit on a +12% print; the next refresh after the trigger prints +11%.
+        trigger = dict(decision, priceUsd=entry_price * 1.12, updatedAt=decision['updatedAt'] + 300_000)
+        self.poll(trigger)
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'TAKE_PROFIT_10_NET')
+        self.assertEqual((trade['research_fill']['exit']['status'], trade['net50_research_fill_usd']),
+                         (lf.FILL_PENDING, None))
+        self.assertEqual(trade['fill_basis_version'], lf.FILL_BASIS_VERSION)
+        booked = {key: trade[key] for key in ('pnl_usd', 'net50_usd', 'balance_after', 'exit_price',
+                                               'execution_exit_price', 'balance_effect_usd')}
+        balance = book['balance']
+        fill_out = dict(decision, priceUsd=entry_price * 1.11, updatedAt=trigger['updatedAt'] + 25_000)
+        self.poll(dict(trigger, updatedAt=trigger['updatedAt'] + 10_000), fill_out)
+        exit_leg = trade['research_fill']['exit']
+        self.assertEqual((exit_leg['status'], exit_leg['fill_price'], exit_leg['fill_lag_ms']),
+                         (lf.FILL_NEXT_REFRESH, entry_price * 1.11, 25_000))
+        calib = trade['calib_bps_per_leg']
+        entry = lab.calibrated_entry_execution(fill_in, 200.0, calib)
+        proceeds = lab.calibrated_exit_execution(fill_out, entry['quantity'], calib, drain_aware=True)
+        expected = proceeds['net_proceeds_usd'] - entry['capital_committed_usd']
+        self.assertAlmostEqual(trade['research_fill_pnl_usd'], expected, places=6)
+        self.assertAlmostEqual(trade['net50_research_fill_usd'],
+                               lf.net50(expected, 200.0, 'TAKE_PROFIT_10_NET')['net50_usd'], places=6)
+        self.assertLess(trade['net50_research_fill_usd'], trade['net50_usd'], 'bought higher and sold lower')
+        self.assertEqual(trade['research_fill']['result']['valuation_fallbacks'], [])
+        # Only the shadow was written: booked P&L, net50 and the balance are untouched.
+        self.assertEqual({key: trade[key] for key in booked}, booked)
+        self.assertEqual(book['balance'], balance)
+        self.assertEqual(lf.pending_fill_rows(book, self.clock[0], full_scan=True), [])
+        evidence = lf.evidence(book, lf.LAB_A_ID, self.clock[0])
+        self.assertEqual((evidence['research_fill']['closed_trades'], evidence['research_fill']['pending']), (1, 0))
+        self.assertAlmostEqual(evidence['research_fill']['mean_net50_usd'], trade['net50_research_fill_usd'], places=6)
+        projected = lab_dashboard_projection.compact_strategy_lab({'books': {lf.LAB_A_ID: book}})
+        self.assertAlmostEqual(projected['books'][lf.LAB_A_ID]['history'][0]['net50_research_fill_usd'],
+                               trade['net50_research_fill_usd'], places=9)
+
+    def test_research_fill_equals_booked_when_the_pool_does_not_reprice(self):
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        decision = points[1]
+        self.poll(*(dict(decision, updatedAt=decision['updatedAt'] + seconds * 1000) for seconds in (20, 50, 65)))
+        leg = book['position']['research_fill']['entry']
+        self.assertEqual((leg['status'], leg['fill_at']), (lf.FILL_QUIET, decision['updatedAt'] + 20_000))
+        trigger = dict(decision, updatedAt=book['position']['opened_at'] + 60 * MINUTE)
+        self.clock[0] = trigger['updatedAt'] + 100
+        lab.update_positions({}, [trigger])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'ABSOLUTE_MAX_HOLD_60')
+        self.assertEqual(lf.pending_fill_rows(book, self.clock[0]), [trade])
+        # The pool leaves the feed after the close: 90 s later the exit leg is valued at the trigger print.
+        other = pool(full('OtherMint'), full('OtherPair'), 1.0, 100_000.0, 0)
+        self.clock[0] = trigger['updatedAt'] + 90_000
+        lab.update_positions({}, [dict(other, updatedAt=self.clock[0] - 1_000)])
+        self.assertEqual(trade['research_fill']['exit']['status'], lf.FILL_PENDING)
+        self.clock[0] = trigger['updatedAt'] + 91_000
+        lab.update_positions({}, [dict(other, updatedAt=self.clock[0] - 1_000)])
+        self.assertEqual(trade['research_fill']['exit']['status'], lf.FILL_NO_NEXT)
+        self.assertAlmostEqual(trade['research_fill_pnl_usd'], trade['pnl_usd'], places=3)
+        self.assertAlmostEqual(trade['net50_research_fill_usd'], trade['net50_usd'], places=3)
+        evidence = lf.evidence(book, lf.LAB_A_ID, self.clock[0])
+        self.assertEqual(evidence['research_fill']['legs']['exit'][lf.FILL_NO_NEXT], 1)
+        self.assertEqual(evidence['research_fill']['unobserved_leg_share'], 0.5)
+
+    def test_a_restart_resolves_shadows_it_left_pending(self):
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        trigger = dict(points[1], updatedAt=book['position']['opened_at'] + 60 * MINUTE)
+        self.clock[0] = trigger['updatedAt'] + 100
+        lab.update_positions({}, [trigger])
+        trade = book['history'][0]
+        self.assertEqual(trade['research_fill']['exit']['status'], lf.FILL_PENDING)
+        # The Lab was down for two hours; the first loop of the new process scans the whole history.
+        self.clock[0] = trigger['updatedAt'] + 2 * HOUR
+        self.assertEqual(lf.pending_fill_rows(book, self.clock[0]), [], 'a later loop only scans recent closes')
+        with patch.object(lab, 'FORWARD_FILL_FULL_SCAN', set()):
+            lab.update_positions({}, [])
+        self.assertEqual(trade['research_fill']['exit']['status'], lf.FILL_NO_NEXT)
+        self.assertIsNotNone(trade['net50_research_fill_usd'])
 
     def test_take_profit_and_max_hold(self):
         points = self.open_neet()

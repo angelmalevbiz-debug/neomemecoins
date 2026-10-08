@@ -81,6 +81,30 @@ class LabMeasurementTests(unittest.TestCase):
         self.assertEqual(result['realized_net_pnl_usd'], -10)
         self.assertEqual(result['closed_ledger_drawdown_pct'], 2)
 
+    def test_zero_capital_control_closes_never_enter_realized_pnl_or_drawdown(self):
+        """LAB_FORWARD_CONTROL_CONTINUITY_V1: a control's closes past its funding never moved the balance."""
+        rows = []
+        for n in range(8):
+            row = trade(n, -45.0)
+            row.update(capital_mode='funded', balance_effect_usd=-45.0)
+            rows.append(row)
+        for n in range(8, 20):
+            row = trade(n, -12.0)
+            row.update(capital_mode='zero_capital_control', balance_effect_usd=0.0)
+            rows.append(row)
+        data = state(list(reversed(rows)), balance=140.0)
+        data['books']['RUSH']['id'] = 'RND_LAB_B'
+        result = evaluate_lab(data)['books']['RUSH']
+        # Lab stats: balance $140, realized_pnl -$360 (the review found -504.0 and 100.8%).
+        self.assertEqual(result['realized_net_pnl_usd'], -360.0)
+        self.assertEqual(result['closed_ledger_drawdown_pct'], 72.0)
+        self.assertEqual((result['zero_capital_closes'], result['zero_capital_pnl_usd']), (12, -144.0))
+        self.assertEqual((result['closed_trades'], result['funded_closed_trades']), (20, 8))
+        self.assertEqual(result['net_expectancy_usd_per_close'], round(-504.0 / 20, 6))
+        # A row without a capital mode moves the balance by its P&L, as before.
+        plain = evaluate_lab(state([trade(1, -10.0)]))['books']['RUSH']
+        self.assertEqual((plain['realized_net_pnl_usd'], plain['zero_capital_closes']), (-10.0, 0))
+
     def test_new_book_uses_own_creation_window(self):
         result = evaluate_lab(state([trade(1, -5)], created_at=START + 4 * DAY))['books']['RUSH']
         self.assertEqual(result['elapsed_hours'], 24)

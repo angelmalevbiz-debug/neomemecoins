@@ -46,15 +46,17 @@ The frozen hashes, with the Lab's default cost model:
 
 | Book | `lab_config_hash` |
 |---|---|
-| `LAB_A_SURGE_EST_GUARD` | `883e08b8379fe319e7c5d783eb821d35938911f2c29c500665f5dd499bc6cc34` |
-| `RND_LAB_A` | `8be0ce70a1bc1247b326063f912f7ec917da70258e34ad63b686846b7614d5c1` |
-| `LAB_B_DIP_MKTDIP_GUARD` | `08e20572c482bd44e2d2092e600e81579a6bbcac3890906deba99752ed85cfd8` |
-| `RND_LAB_B` | `76ef3c3083bede7b02ce301d010f17179e12c51e10fce9059bc94eb5030872c9` |
+| `LAB_A_SURGE_EST_GUARD` | `c6ccc2db34023c31671d8c001b9f755691260ebaf3953523a6062ebeb9a3447b` |
+| `RND_LAB_A` | `3ee45c0f1133604234470e9a98028587b1e639ed461091be266bf511f538c4bb` |
+| `LAB_B_DIP_MKTDIP_GUARD` | `9861b19f342fb44a08ec51fd40e2c5b94c8451e680294ceeb438ff7afd80c383` |
+| `RND_LAB_B` | `82bd8fba714b935724c8dfe9034f13f14bfd4e1813859ae60ec87ce92308164b` |
 
 The canonical parameters of every book include the signal carry
-(`LAB_FORWARD_SIGNAL_CARRY_V1`) and the hypothesis-control protocol
-(`LAB_FORWARD_CONTROL_CONTINUITY_V1`), described below. No close exists under the
-earlier hashes: the PR had not run when they changed.
+(`LAB_FORWARD_SIGNAL_CARRY_V1`), the hypothesis-control protocol
+(`LAB_FORWARD_CONTROL_CONTINUITY_V1`) and the research-fill basis
+(`LAB_FORWARD_FILL_BASIS_V1`, with the kill rule's two bases and its bootstrap minimum),
+described below. No close exists under the earlier hashes: the PR had not run when they
+changed.
 
 The canonical parameters include the resolved Lab cost-model knobs
 (`NEO_LAB_GENERIC_DEX_FEE_BPS`, `NEO_LAB_BASE_SLIPPAGE_BPS`, `NEO_LAB_LATENCY_BUFFER_BPS`,
@@ -229,7 +231,11 @@ applies it to its own pre-registered stop:
 
 The modeled round trip at $200 must fit the cap, or the signal is counted under
 `cost_rejected` with `modeled_roundtrip_cost_limit`. The size is never reduced to
-make it fit.
+make it fit. The entry diagnostics publish `max_entry_roundtrip_cost_pct`, the model
+ceiling (`max_entry_roundtrip_cost_ceiling_pct`, 2.75), `entry_size_rule`
+(`FIXED_NOTIONAL_NO_BACKOFF`) and `fixed_notional_usd`. The dashboard therefore shows
+the LAB_B cap as `min(0.5 × нетен стоп 15.00%, таван 2.75%)`, not as 0.5 × the stop, and
+says the fixed $200 was checked, not "every checked size".
 
 **The cap filters the research populations.** At $200, about 72% of the
 research's LAB_A trades and 23% of its LAB_B trades fit (in-sample, 22.8 h).
@@ -313,6 +319,80 @@ The research's feed-gap rule (a pool absent for more than 10 min that returns is
 at the lower of the pre-gap and return prices) is not replicated. Here a returning pool
 resumes, and its exits are decided on the returning mark.
 
+### Fill basis (LAB_FORWARD_FILL_BASIS_V1)
+
+**Booked fills are not the research's fills.** A forward entry is booked at the decision
+observation's DexScreener print (the price the signal saw), and a close at the mark that
+triggered it. The research judged every book on net50 with the audited fills of
+`harness_final` F1: an order decided at one point fills at the **next DexScreener
+refresh**, the first later point within 60 s whose price differs from the decision
+print (else the next point). The engine restamps every pool on each scan while
+DexScreener refreshes a pair about every 30 s, so most later observations repeat the
+decision print. The research audit found that filling at the decision print gives zero
+effective latency and monetizes single-print spikes, and that F1 removed most of the
+context-dependent bias.
+
+The bias is not neutral between a hypothesis and its control. The code review that raised
+this measured it read-only on the research data (series.pkl, the frozen strategies under
+`harness_final`; approximate): the next refresh sat on average +0.335% above the decision
+print at LAB_B signals (median +0.158%) and −0.171% at RND_LAB_B draws, and re-pricing the
+research trades the Lab's way moved LAB_B by about +0.9 to +1.7 pp per trade (trimmed and
+plain mean) against about 0 to +0.3 pp for its control. That is a large share of the
+roughly 3.2 pp relative edge under test, and it would favour LAB_B on every gate criterion
+that compares it with its control. LAB_A and RND_LAB_A moved by smaller amounts that were
+not significant.
+
+The booking is kept (positions, exits, balances and `net50_usd` are unchanged). Every
+forward position and close also carries a research-fill **shadow**, `research_fill`, with
+one leg per side:
+
+- **Entry leg.** Decided at the entry observation (`decision_at`, `decision_price`, and a
+  snapshot of the model inputs: price, native price, liquidity, market cap, quote).
+- **Exit leg.** Decided at the mark that triggered the close.
+- **Fill.** The first later observation of the exact pool, within 60 s
+  (`max_fill_lag_ms`, the harness's `MAX_FILL_LAG_MS`), whose `priceUsd` differs from the
+  decision print: status `next_refresh`. With later observations in the window but no
+  different price, the first of them (the harness's i + 1 in a quiet market): `quiet`.
+  With no later observation in the window at all: `no_next_observation`, valued at the
+  decision print. The harness would have skipped such an entry and taken a later point for
+  such an exit, so these legs are counted, not hidden. A `VANISHED_NO_FRESH_MARK` close
+  has no exit fill (`not_applicable_vanished`): the harness values a vanished pool at its
+  last price minus the haircut, as booked.
+- **Observations.** The shared feed's observations of the exact pool and the exact-pair
+  refresh (`updatedAt`, as `PairHistory` counts them), each used once, oldest first. After
+  a close, a pool that left the feed is refreshed through the exact-pair path for the
+  window. A leg with no observation past its window resolves on time, 30 s after the
+  window (`resolve_grace_ms`).
+- **Valuation.** Once both legs are known, the booked model (the Lab spot model plus the
+  position's CALIB_V1 bps per leg, drain-aware exit) is re-run at the two fill
+  observations, and net50 is applied with the same stress and exit-reason extra. A fill
+  observation without a network price falls back to its decision observation and the
+  result says so (`valuation_fallbacks`).
+
+The close then gets `net50_research_fill_usd`, `net50_research_fill_pct`,
+`research_fill_pnl_usd` and `research_fill.result` (fill prices and times, and the
+difference to the booked P&L). These are the only fields written after a close, at most
+about 90 s after it; the booked P&L, `net50_usd` and the balance never change (the
+retrospective-evidence pattern of `paper_training`). Shadows left pending by a restart are
+resolved on time by the first loop of the next process, from what they recorded.
+
+What uses it:
+
+- **Kill rule:** evaluated on both bases, each on its own closes; met on either retires
+  (`kill_rule_met_bases`).
+- **Gate:** mean net50 > 0, CI95 lower bound > 0 and "beats the same-period control" must
+  pass on **both** bases, and fewer than 10% of the research-fill legs may be valued at the
+  decision print (`research_fill_unobserved_leg_share`; a close without a valued shadow
+  counts as two such legs).
+- **Evidence and dashboard:** `evidence.research_fill` (closes, pending, mean, CI, legs by
+  status, mean difference to the booked net50), net50 at the research fills on each close.
+
+Neither basis is an executable quote. The specification says PAPER fills must come from
+executable quotes, never from DexScreener prints; these books are DexScreener-only
+hypotheses, so both bases are DexScreener prints with modeled costs. The research-fill
+basis only removes the zero-latency print that the research audit identified, and is the
+basis the research results (−3.21% LAB_A, −1.27% LAB_B) were measured on.
+
 ## Kill rule (LAB_FORWARD_KILL_RULE_V1)
 
 The kill rule applies to each of the four books. It counts only closes stamped with
@@ -323,9 +403,29 @@ After at least 50 such closes, the book is retired when both of these hold:
 - mean net50 $/trade < 0;
 - the upper bound of the 95% CI of mean net50 $/trade < 0.
 
+It is evaluated on the booked net50 and on the research-fill net50
+(`LAB_FORWARD_FILL_BASIS_V1`), each on the closes that have it; met on either basis
+retires the book. A close whose research-fill shadow is still pending is not evidence on
+that basis yet.
+
 The CI is a pair (mint, pool) bootstrap with 2,000 resamples and a fixed seed of
 20261008. With fewer than 3 distinct pools, a per-trade normal approximation is
-used instead.
+used instead. Below the 50 closes the rule needs (`bootstrap_min_closes`), the
+published CI is the per-trade normal approximation too (`ci_method_reason:
+below_bootstrap_min_closes`): no decision depends on it there.
+
+**Review cost.** The Lab reviews every book twice per loop (before entries and when it
+persists). The forward review reads each ledger once per change: a history digest
+(cash aggregates and the frozen-config closes) is reused while the same history has the
+same length and newest and oldest rows, and is rebuilt when a close is added or a
+research-fill shadow is completed. A bootstrap is cached by the content of its sample, so
+an unchanged sample is never resampled. The gate's control CI is bootstrapped only once
+the hypothesis has the gate's 150 closes (below, the normal approximation,
+`below_gate_min_closes`). Measured on 4 books with 400 pools, both bases filled: a
+repeated review takes under 10 ms at 5,000 closes per book (it took 176 ms on the booked
+basis alone), a review after a new close 0.08–0.18 s at 500–5,000 closes per book (it
+took 0.12–0.46 s, and every close re-ran the bootstraps from the first closes on), and the
+review after a research-fill shadow completes, which rebuilds the digests once, 0.01–0.12 s.
 
 Retirement:
 
@@ -380,11 +480,29 @@ So while its hypothesis can still enter (not retired and not `cash_exhausted`):
 - The kill-rule evidence and the gate count funded and zero-capital closes alike
   (`zero_capital_closes`). `stats` adds `zero_capital_trades` and `zero_capital_pnl_usd`;
   `realized_pnl` stays balance minus start.
+- **Ledger tools never sum them into the balance.** `backend/paper_lab_metrics.py`
+  (`scripts/evaluate_paper_lab.py`) and `scripts/paper_edge_report.py` move the equity
+  path, the drawdown and the realized or net P&L only by what each close did to the
+  balance (`balance_effect_usd`; 0 for `capital_mode: zero_capital_control`). They report
+  the zero-capital closes separately (`zero_capital_closes`, `zero_capital_pnl_usd`) and
+  keep them in the per-trade statistics (trades, wins, expectancy). Example: 8 funded
+  closes of −$45 and 12 zero-capital closes of −$12 are a realized −$360 and a 72%
+  drawdown from $500 (balance $140), not −$504 and 100.8%.
 
 The hypotheses are unchanged: a hypothesis is retired by its kill rule and stops when it
 runs out of cash. When it stops, its control's continuity ends at the same review. The
 review reports `lab_forward_kill_rule_deferred_ids` and
 `lab_forward_zero_capital_control_ids`. No balance or history is ever rewritten.
+
+**Owner sign-off required.** This protocol departs from the task's literal "kill rule per
+book" in two ways: a control's met kill rule does not retire it while its hypothesis can
+enter, and a control past its funding keeps entering at zero capital. It is versioned
+(`LAB_FORWARD_CONTROL_CONTINUITY_V1`, part of every book's config hash) and listed as a
+decision for the owner in the pull request. If the owner declines it, the alternative is
+to retire each control on its own kill rule and cash as specified. Then expect
+`control_coverage` near 0.2–0.3 and a gate that cannot pass while the control behaves as
+the research expects. That is a new test with new, versioned book ids (see
+[Changing the test](#changing-the-test-new-book-ids-not-a-new-hash-in-the-old-ledger)).
 
 ## Cash state (LAB_FORWARD_CASH_STATE_V1)
 
@@ -430,13 +548,21 @@ whatever it says.
 | Criterion | Threshold |
 |---|---|
 | Sample | ≥ 150 closed trades over ≥ 25 pairs and ≥ 3 days, covering every UTC hour |
-| Expectancy | mean net50 > 0, and the pair-bootstrap CI95 lower bound of mean $/trade > 0 |
+| Expectancy | mean net50 > 0, and the pair-bootstrap CI95 lower bound of mean $/trade > 0, on the booked **and** the research-fill basis |
 | Control coverage | the control could still enter (not retired, not out of cash; zero-capital continuity counts as able to enter) for ≥ 90% of the hypothesis's evaluated trades and of its time window (`control_coverage`) |
-| Control | inside that same period, the hypothesis beats the random control by more than the control's CI half-width |
+| Control | inside that same period, the hypothesis beats the random control by more than the control's CI half-width, on both bases |
 | Concentration | top pair share ≤ 0.20, still positive with the best pair removed, no single day > 50% of the P&L |
 | Drawdown | a 3-slot $1000 book's max drawdown ≤ 20% (not evaluated in the Lab: it needs an offline replay; the 1-slot book's own drawdown is published) |
 | Rug guard | zero entries on pools the structural guard flagged |
 | Pricing | vanished, drained or unpriced closes, plus an open position past max hold without a mark, < 10% of trades |
+| Fill basis | research-fill legs valued at the decision print (no later observation in 60 s), or closes without a valued shadow, < 10% of the legs (`research_fill_unobserved_leg_share`) |
+
+**Met only when everything was evaluated.** The gate publishes `all_evaluable_pass`,
+`not_evaluated` and `gate_met = all_evaluable_pass and not not_evaluated`, with
+`gate_status` `met`, `evaluable_criteria_pass_replay_pending` or `not_met`. The Lab cannot
+evaluate the 3-slot $1000 drawdown, so its best status is
+`evaluable_criteria_pass_replay_pending`. The dashboard then says that the evaluable
+criteria pass and the offline 3-slot drawdown check is pending, never that the gate is met.
 
 **Same period.** The comparison window runs from the hypothesis's first evaluated entry
 to the earlier of two times: its last evaluated close, and the moment the control could
@@ -453,6 +579,12 @@ check (a large difference between them would bias the comparison).
 Passing every evaluable criterion only makes a book eligible for the owner's review
 and an offline 3-slot replay. Promotion to an engine account would be a separate,
 versioned change.
+
+**Caveat for any reading of the gate.** Both bases are DexScreener prints with modeled
+costs, not executable quotes: the booked basis fills at the decision print and the
+triggering mark, the research-fill basis at the next refresh
+([Fill basis](#fill-basis-lab_forward_fill_basis_v1)). A hypothesis that passes only on
+the booked basis has not passed.
 
 ## Restarts
 
@@ -471,6 +603,11 @@ mark is looked for for 60 s before it can close as vanished. Its persisted
 
 Pending signal-carry episodes are in memory only; a restart drops them uncounted. The
 episode counters are persisted in the ledger.
+
+Research-fill legs are persisted on the position and the close. A leg still pending at a
+restart keeps what it recorded (its first later observation); the new process scans the
+whole history once and resolves such legs on time (`quiet` with that observation, else
+`no_next_observation`), then completes the shadow.
 
 ## Positions keep their recorded exits
 

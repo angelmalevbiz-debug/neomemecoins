@@ -1,5 +1,9 @@
 export type LabForwardGate = {
   all_evaluable_pass?: boolean;
+  // Met only when every criterion was evaluated and passes; the Lab cannot evaluate the
+  // 3-slot $1000 drawdown replay, so its best status is 'evaluable_criteria_pass_replay_pending'.
+  gate_met?: boolean;
+  gate_status?: string;
   automatic_promotion?: boolean;
   not_evaluated?: string[];
   criteria?: Record<string, { value?: number | null; threshold?: string; pass?: boolean | null }>;
@@ -19,6 +23,10 @@ export type StrategyLifecycle = {
     min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
     ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
     vanished_closes?: number; drained_closes?: number; zero_capital_closes?: number;
+    // LAB_FORWARD_FILL_BASIS_V1: net50 re-priced at the research fills (next DexScreener refresh).
+    kill_rule_met_bases?: string[];
+    research_fill?: { closed_trades?: number; pending?: number; mean_net50_usd?: number | null;
+      ci95_mean_net50_usd?: (number | null)[]; unobserved_leg_share?: number | null };
   };
   // LAB_FORWARD_CASH_STATE_V1: status 'cash_exhausted' when the fixed $200 entry cannot be funded.
   cash?: { exhausted?: boolean; balance_usd?: number | null; min_entry_balance_usd?: number; zero_capital_closes?: number };
@@ -82,7 +90,23 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   const parts = [`Затворени ${closed}/${minimum} до правилото за спиране`];
   if (typeof mean === 'number' && Number.isFinite(mean)) parts.push(`средно net50 ${usd(mean)}/сделка`);
   if (typeof low === 'number' && typeof high === 'number') parts.push(`CI95 [${usd(low)}, ${usd(high)}]`);
-  if (lifecycle?.status === 'retired') parts.push('спряна: средно net50 < 0 и горна граница на CI95 < 0');
+  // LAB_FORWARD_FILL_BASIS_V1: the same closes re-priced at the research fills (next DexScreener refresh).
+  const research = evidence?.research_fill;
+  if (research && (research.closed_trades ?? 0) > 0) {
+    const [researchLow, researchHigh] = research.ci95_mean_net50_usd ?? [];
+    let text = `при изпълнение на следващото опресняване (research): ${research.closed_trades} сделки`;
+    if (typeof research.mean_net50_usd === 'number' && Number.isFinite(research.mean_net50_usd)) {
+      text += `, средно net50 ${usd(research.mean_net50_usd)}/сделка`;
+    }
+    if (typeof researchLow === 'number' && typeof researchHigh === 'number') {
+      text += `, CI95 [${usd(researchLow)}, ${usd(researchHigh)}]`;
+    }
+    parts.push(text);
+  }
+  if (lifecycle?.status === 'retired') {
+    const bases = evidence?.kill_rule_met_bases ?? [];
+    parts.push(`спряна: средно net50 < 0 и горна граница на CI95 < 0${bases.length === 1 && bases[0] === 'research_fill' ? ' (при research изпълнение)' : ''}`);
+  }
   if (lifecycle?.status === 'cash_exhausted') {
     const balance = lifecycle.cash?.balance_usd;
     parts.push(`без капитал${typeof balance === 'number' ? ` (${usd(balance)})` : ''}: фиксираният вход $200 не може да се финансира${lifecycle.kill_rule_evaluable ? '' : ', правилото за спиране не може да се оцени'}`);
@@ -106,10 +130,20 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   if (gate && coverage?.pass === false && typeof coverage.value === 'number') {
     parts.push(`контролата е можела да влиза само в ${(coverage.value * 100).toFixed(0)}% от периода (${gate.control_window?.control_entry_end_reason ?? 'няма контрола'})`);
   }
-  if (gate) parts.push(gate.all_evaluable_pass
-    ? 'гейтът за промоция е изпълнен: само за преглед от собственика, без автоматична промоция'
-    : 'гейтът за промоция не е изпълнен (≥ 150 сделки, ≥ 25 pool-а, ≥ 3 дни, CI95 > 0, по-добра от контролата в същия период)');
+  // A gate is met only when every criterion was evaluated; the 3-slot $1000 drawdown needs an
+  // offline replay, so passing the evaluable criteria is not a met gate.
+  if (gate) parts.push(labForwardGateStatus(gate));
   return parts.join(' · ');
+}
+
+export function labForwardGateStatus(gate: LabForwardGate) {
+  if (gate.gate_met === true) {
+    return 'гейтът за промоция е изпълнен: само за преглед от собственика, без автоматична промоция';
+  }
+  if (gate.all_evaluable_pass) {
+    return 'оценимите критерии на гейта са изпълнени; чака офлайн проверка на спада при 3 слота и $1000 (≤ 20%), затова гейтът още не е изпълнен; без автоматична промоция';
+  }
+  return 'гейтът за промоция не е изпълнен (≥ 150 сделки, ≥ 25 pool-а, ≥ 3 дни, CI95 > 0 и по-добра от контролата в същия период, при записаните и при research изпълненията)';
 }
 
 type ViewBook = {
@@ -221,7 +255,12 @@ export type LabEntryViewDiagnostics = {
   cost_infeasible_candidates?: number;
   affordable_candidates?: number;
   max_entry_roundtrip_cost_pct?: number;
+  // The cap is min(0.5 × net stop, this model ceiling).
+  max_entry_roundtrip_cost_ceiling_pct?: number;
   stop_loss_net_pct?: number;
+  // LAB_FORWARD_TESTS_V1 books check one fixed size and never reduce it.
+  entry_size_rule?: string;
+  fixed_notional_usd?: number;
   // LAB_ACTIVE_V6: fee-and-buffer planning floor published for every book.
   cost_feasibility?: CostFeasibility;
   promoted_cost_feasibility?: CostFeasibility;
@@ -232,6 +271,18 @@ type EntryView = { status: string; detail: string | null; costLimited: boolean }
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
+// LAB_ACTIVE_V6: the admission cap is min(0.5 × net stop, the model ceiling). Name the
+// ceiling when it binds (a 15% stop gives 2.75%, not 7.5%); state no equation that the
+// published numbers do not satisfy.
+export function costCapRule(cap?: number, stop?: number, ceiling?: number) {
+  if (!finite(cap) || !finite(stop)) return null;
+  const half = 0.5 * stop;
+  if (Math.abs(cap - half) <= 0.005) return `0.5 × нетен стоп ${stop.toFixed(2)}%`;
+  const roof = finite(ceiling) ? ceiling : cap;
+  if (half > cap && Math.abs(cap - roof) <= 0.005) return `min(0.5 × нетен стоп ${stop.toFixed(2)}%, таван ${roof.toFixed(2)}%)`;
+  return null;
+}
+
 function costCapView(diagnostics: LabEntryViewDiagnostics): EntryView | null {
   // LAB_ACTIVE_V6: every checked candidate of this book exceeded the admission
   // cap under the full modeled round trip (fees, impact, buffers, network).
@@ -239,11 +290,15 @@ function costCapView(diagnostics: LabEntryViewDiagnostics): EntryView | null {
   const rejected = diagnostics.cost_infeasible_candidates ?? diagnostics.cost_rejected;
   const cap = diagnostics.max_entry_roundtrip_cost_pct;
   if (!finite(rejected) || rejected <= 0 || !finite(cap) || cap < 0) return null;
-  const stop = finite(diagnostics.stop_loss_net_pct) ? diagnostics.stop_loss_net_pct : cap * 2;
+  const rule = costCapRule(cap, diagnostics.stop_loss_net_pct, diagnostics.max_entry_roundtrip_cost_ceiling_pct);
   const signals = finite(diagnostics.signal_candidates) ? diagnostics.signal_candidates : rejected;
+  // A forward-test book checks one fixed size and never reduces it to fit.
+  const size = finite(diagnostics.fixed_notional_usd)
+    ? `при фиксирания вход $${diagnostics.fixed_notional_usd.toFixed(0)} (размерът не се намалява)`
+    : 'при всеки проверен размер';
   return {
     status: `Няма вход: ${rejected} от ${signals} кандидата над лимита на разходите ${cap.toFixed(2)}%`,
-    detail: `Моделираният round-trip (DEX такса вход и изход, impact, slippage/забавяне, мрежа) при всеки проверен размер надхвърля лимита ${cap.toFixed(2)}% = 0.5 × нетен стоп ${stop.toFixed(2)}%. Кандидатите са отчетени като неизпълними по разходи, не са скрити; лимитът не се сваля, за да се отворят сделки. Не е изпълнима котировка.`,
+    detail: `Моделираният round-trip (DEX такса вход и изход, impact, slippage/забавяне, мрежа) ${size} надхвърля лимита ${cap.toFixed(2)}%${rule ? ` = ${rule}` : ''}. Кандидатите са отчетени като неизпълними по разходи, не са скрити; лимитът не се сваля, за да се отворят сделки. Не е изпълнима котировка.`,
     costLimited: true,
   };
 }
@@ -284,7 +339,9 @@ export function labEntryView(book: EntryViewBook, backendAvailable = true): Entr
     ?? (isFundedStrategy(book) ? diagnostics.promoted_cost_feasibility : undefined);
   if (genericWait && allMatchedCostsExceedLimit(diagnostics, feasibility)) {
     const cost = feasibility!;
-    const stopBudget = cost.maximum_roundtrip_cost_pct! * 2;
+    // The book's own net stop when published (the cap may be the model ceiling, not stop / 2).
+    const stopBudget = finite(diagnostics.stop_loss_net_pct) ? diagnostics.stop_loss_net_pct
+      : cost.maximum_roundtrip_cost_pct! * 2;
     const stopHeadroom = stopBudget - cost.minimum_model_roundtrip_cost_pct!;
     return {
       status: `Няма вход в модела: разходи поне ${cost.minimum_model_roundtrip_cost_pct!.toFixed(2)}% > лимит ${cost.maximum_roundtrip_cost_pct!.toFixed(2)}%`,

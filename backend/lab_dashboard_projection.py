@@ -75,7 +75,9 @@ def compact_strategy_lab(data):
                               'close_policy_version', 'close_kind', 'drain_valuation_cost_usd',
                               'exit_liquidity_usd',
                               # LAB_FORWARD_CONTROL_CONTINUITY_V1: a zero-capital close moves no balance.
-                              'capital_mode', 'balance_effect_usd')
+                              'capital_mode', 'balance_effect_usd',
+                              # LAB_FORWARD_FILL_BASIS_V1: net50 re-priced at the research fills.
+                              'fill_basis_version', 'net50_research_fill_usd', 'net50_research_fill_pct')
             })
         books[key] = {
             'id': raw.get('id', key),
@@ -107,6 +109,8 @@ def compact_strategy_lab(data):
                     # LAB_ACTIVE_V6: every book publishes its cap and cost-infeasible count.
                     'entry_policy_version', 'max_entry_roundtrip_cost_pct', 'stop_loss_net_pct',
                     'cost_infeasible_candidates', 'cost_feasibility', 'cost_first', 'evidence_guard_version',
+                    # The cap's model ceiling, and a fixed entry size (LAB_FORWARD_TESTS_V1 books).
+                    'max_entry_roundtrip_cost_ceiling_pct', 'entry_size_rule', 'fixed_notional_usd',
                     # DEFENSIVE_ENTRY_LAYER_V1: counts only (examples stay in the full ledger).
                     'defensive_rejected', 'defensive_entry',
                     # LAB_FORWARD_TESTS_V1: universe/signal counts and the LAB_B regime.

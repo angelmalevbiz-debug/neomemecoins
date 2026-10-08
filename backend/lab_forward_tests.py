@@ -55,8 +55,11 @@ Kill rule (LAB_FORWARD_KILL_RULE_V1), per book: after >= 50 closes of the
 book's frozen config, retire it (new entries only; balance, history and open
 exits are never touched) when mean net50 < 0 and the upper bound of the
 pair-bootstrap 95% CI of mean net50 $/trade (2,000 resamples, fixed seed;
-per-trade normal approximation under 3 pairs) is < 0. Promotion is never
-automatic; the promotion gate is computed for the owner's review only.
+per-trade normal approximation under 3 pairs, and below the 50 closes the
+rule needs) is < 0, on the booked or on the research-fill basis. Promotion is
+never automatic; the promotion gate is computed for the owner's review only and
+is 'met' only when every criterion, including the offline 3-slot drawdown
+replay, has been evaluated and passes.
 
 Close policy (LAB_FORWARD_CLOSE_POLICY_V1), forward books only: the booked
 exit leg values a drained pool as the research does (constant-product impact
@@ -89,6 +92,19 @@ lost whenever the price reference was cold, while LAB_B's persistent dip was
 not. Episodes are counted per book and config hash: entered, lost to a still
 pending price check, dropped by another gate, superseded.
 
+Fill basis (LAB_FORWARD_FILL_BASIS_V1): the books book their entry at the
+decision observation's DexScreener print and their exit at the triggering mark.
+The research judged every book on fills at the next DexScreener refresh
+(harness_final F1: the first later exact-pool observation within 60 s whose
+price differs from the decision print, else the next observation). Each forward
+position and close therefore carries a research-fill shadow ('research_fill',
+one leg per side) that is completed once both legs are known, at most about
+90 s after the close; booked fields never change. The close gets
+net50_research_fill_usd / _pct: the same booked model re-run at the research
+fill observations, minus the same net50 stress. The kill rule is evaluated on
+both bases (met on either retires) and the gate's expectancy, CI and control
+criteria must pass on both.
+
 Positions keep the exits they were opened with: exit triggers, the vanish clock
 and the unpriced-past-max-hold count read the position's own exit_parameters,
 and any released LAB_FORWARD_TESTS version (KNOWN_VERSIONS) is still booked as
@@ -100,6 +116,7 @@ the old ones. It does not start a new ledger: the same book keeps its balance,
 its cash state and a kill-rule retirement. A new test with fresh funding needs
 new, versioned book ids.
 """
+import bisect
 from collections import OrderedDict, deque
 from dataclasses import asdict, dataclass
 import copy
@@ -126,6 +143,7 @@ CLOSE_POLICY_VERSION = 'LAB_FORWARD_CLOSE_POLICY_V1'
 CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
 CONTROL_CONTINUITY_VERSION = 'LAB_FORWARD_CONTROL_CONTINUITY_V1'
 SIGNAL_CARRY_VERSION = 'LAB_FORWARD_SIGNAL_CARRY_V1'
+FILL_BASIS_VERSION = 'LAB_FORWARD_FILL_BASIS_V1'
 # Every released LAB_FORWARD_TESTS version whose open positions this module still
 # books and exits (with their own stored exit parameters). Add, never remove.
 KNOWN_VERSIONS = (VERSION,)
@@ -283,7 +301,13 @@ class KillRuleParameters:
     bootstrap_seed: int = 20261008
     fallback_under_pairs: int = 3
     fallback_method: str = 'normal_per_trade'
+    # Below the closes the rule needs, the published CI is the per-trade normal
+    # approximation (the bootstrap only runs where a decision can depend on it).
+    bootstrap_min_closes: int = 50
     action: str = 'retire_new_entries_only'
+    # LAB_FORWARD_FILL_BASIS_V1: the rule is evaluated on the booked net50 and on the
+    # research-fill net50 (each on its own closes); met on either basis retires.
+    bases: str = 'booked and research_fill (LAB_FORWARD_FILL_BASIS_V1); met on either retires'
 
 
 @dataclass(frozen=True)
@@ -299,6 +323,13 @@ class GateParameters:
     # The control must have been able to enter (not retired, not out of cash) for at
     # least this share of the hypothesis's evaluated trades and of its time window.
     min_control_coverage: float = 0.90
+    max_drawdown_pct_3slot_1000: float = 20.0
+    # LAB_FORWARD_FILL_BASIS_V1: expectancy, CI and control criteria pass on both bases,
+    # and fewer than this share of the research-fill legs fell back to the decision print.
+    max_research_fill_unobserved_leg_share: float = 0.10
+    met_rule: str = ('gate_met only when every criterion was evaluated and passes; the 3-slot $1000 '
+                     'drawdown needs an offline replay, so the Lab reports at most '
+                     'evaluable_criteria_pass_replay_pending')
 
 
 @dataclass(frozen=True)
@@ -391,6 +422,37 @@ class SignalCarryParameters:
     applies_to: str = 'all four books (each hypothesis and its control see the same latency)'
 
 
+@dataclass(frozen=True)
+class FillBasisParameters:
+    """LAB_FORWARD_FILL_BASIS_V1: a research-fill shadow next to the booked fills (research harness_final F1).
+
+    The books keep booking at the decision print (entry) and at the triggering
+    mark (exit). Each side also records where the research harness would have
+    filled: the first later observation of the exact pool, within 60 s of the
+    decision observation, whose priceUsd differs from the decision print (the
+    next DexScreener refresh); with no differing price in the window, the first
+    later observation in it (a quiet market, the harness's i + 1). With no later
+    observation in the window at all the leg is 'no_next_observation' and is
+    valued at the decision print (the harness would have skipped such an entry
+    and taken a later point for such an exit); those legs are counted, not hidden.
+    A VANISHED close has no exit fill (the harness values it at the last price
+    minus the haircut, as booked).
+    """
+    version: str = FILL_BASIS_VERSION
+    source: str = 'research harness_final F1 (fill_index, FILL_RULE next_refresh, MAX_FILL_LAG_MS)'
+    max_fill_lag_ms: int = 60_000
+    # A leg with no observation beyond the window resolves on time this long after it.
+    resolve_grace_ms: int = 30_000
+    observations: str = ("the shared feed's exact-pool observations and the exact-pair refresh "
+                         '(updatedAt, as PairHistory), each counted once, in stamp order')
+    valuation: str = ('the booked model (Lab spot model + the position CALIB_V1 bps per leg, drain-aware exit) '
+                      're-run at the entry and exit fill observations; net50 with the booked stress and '
+                      'exit-reason extra')
+    applies_to: str = 'every forward position and close (shadow only: booked P&L, balance and exits unchanged)'
+    kill_rule: str = 'evaluated on both bases; met on either retires'
+    gate: str = 'expectancy, CI and same-period control criteria must pass on both bases'
+
+
 def _whole(value) -> str:
     return str(int(value)) if float(value).is_integer() else str(value)
 
@@ -417,6 +479,7 @@ CLOSE_POLICY = ClosePolicyParameters()
 CASH = CashParameters()
 CONTROL_CONTINUITY = ControlContinuityParameters()
 SIGNAL_CARRY = SignalCarryParameters()
+FILL_BASIS = FillBasisParameters()
 
 UNIVERSES = {LAB_A_ID: UNIVERSE_A, RND_A_ID: UNIVERSE_A, LAB_B_ID: UNIVERSE_B, RND_B_ID: UNIVERSE_B}
 EXITS = {LAB_A_ID: EXITS_A, RND_A_ID: EXITS_A, LAB_B_ID: EXITS_B, RND_B_ID: EXITS_B}
@@ -481,6 +544,7 @@ def book_parameters(book_id) -> dict:
         'costs': {'execution_model': EXECUTION_MODEL, 'model': _hashable(asdict(COST_MODEL)),
                   'calibration': asdict(CALIB)},
         'net50': asdict(NET50),
+        'fill_basis': asdict(FILL_BASIS),
         'heat_veto': {'version': heat_veto.VERSION, 'mode': HEAT_MODE},
         'structural_rug_guard': structural_rug_guard.VERSION,
         'pool_loss_memory': pool_loss_memory.VERSION,
@@ -1129,6 +1193,217 @@ def unpriced_past_max_hold(position, now) -> bool:
             and current - opened >= position_exits(position).max_hold_minutes * 60_000)
 
 
+# ------------------------------------------------------------------ research-fill shadow (LAB_FORWARD_FILL_BASIS_V1)
+
+FILL_PENDING = 'pending'
+FILL_NEXT_REFRESH = 'next_refresh'
+FILL_QUIET = 'quiet'
+FILL_NO_NEXT = 'no_next_observation'
+FILL_VANISHED = 'not_applicable_vanished'
+FILL_LEG_STATUSES = (FILL_PENDING, FILL_NEXT_REFRESH, FILL_QUIET, FILL_NO_NEXT, FILL_VANISHED)
+# Bumped whenever a close's research-fill shadow is completed in place, so cached
+# history digests (statistics, kill rule, gate) are rebuilt.
+_SHADOW_REVISION = [0]
+
+
+def fill_snapshot(coin, observed_at) -> dict:
+    """What a research-fill valuation needs from one exact-pool observation (the booked model's inputs).
+
+    ``liquidityUsd`` follows the Lab's pair_liquidity_usd (the feed's liquidityUsd,
+    else the pair object's liquidity.usd) and ``liquidity.usd`` keeps the reported
+    value the drain-aware exit reads, so a snapshot values exactly like its coin.
+    """
+    coin = coin if isinstance(coin, dict) else {}
+    raw = coin.get('liquidity') if isinstance(coin.get('liquidity'), dict) else {}
+    snapshot = {'priceUsd': _finite(coin.get('priceUsd')), 'priceNative': _finite(coin.get('priceNative')),
+                'marketCap': _finite(coin.get('marketCap')), 'fdv': _finite(coin.get('fdv')),
+                'dexId': coin.get('dexId'), 'quoteTokenAddress': feasibility.quote_token_address(coin),
+                'liquidityUsd': _finite(coin.get('liquidityUsd') or raw.get('usd')),
+                'observed_at': None if _finite(observed_at) is None else int(_finite(observed_at))}
+    reported = reported_liquidity_usd(coin)
+    if reported is not None:
+        snapshot['liquidity'] = {'usd': reported}
+    return snapshot
+
+
+def new_fill_leg(coin, observed_at, *, vanished=False) -> dict:
+    """A research-fill leg decided at one observation: pending until the next refresh (or 60 s) is known."""
+    stamp = observation_ms(coin, observed_at) if isinstance(coin, dict) else None
+    price = _finite(coin.get('priceUsd')) if isinstance(coin, dict) else None
+    leg = {'status': FILL_PENDING, 'decision_at': None if stamp is None else int(stamp), 'decision_price': price,
+           'decision': fill_snapshot(coin, stamp), 'first_later_at': None, 'first_later': None,
+           'fill': None, 'fill_at': None, 'fill_price': None, 'fill_lag_ms': None, 'later_observations': 0,
+           'last_observed_at': None, 'resolved_at': None}
+    if vanished:
+        # The harness values a vanished pool at its last price minus the haircut: no fill.
+        _resolve_leg(leg, FILL_VANISHED, None, stamp)
+    elif stamp is None or price is None or price <= 0:
+        _resolve_leg(leg, FILL_NO_NEXT, None, stamp)
+    return leg
+
+
+def _resolve_leg(leg, status, snapshot, now):
+    """Close a leg; ``snapshot`` None means it is valued at its decision observation."""
+    leg['status'] = status
+    leg['resolved_at'] = None if _finite(now) is None else int(_finite(now))
+    leg['fill'] = snapshot
+    source = snapshot if isinstance(snapshot, dict) else (leg.get('decision') or {})
+    leg['fill_at'], leg['fill_price'] = source.get('observed_at'), source.get('priceUsd')
+    start, end = _finite(leg.get('decision_at')), _finite(leg.get('fill_at'))
+    leg['fill_lag_ms'] = None if start is None or end is None else int(end - start)
+    return True
+
+
+def _resolve_at_window_end(leg, now):
+    first = leg.get('first_later')
+    if isinstance(first, dict):
+        return _resolve_leg(leg, FILL_QUIET, first, now)
+    return _resolve_leg(leg, FILL_NO_NEXT, None, now)
+
+
+def advance_fill_leg(leg, coin, now, *, key=None, params: FillBasisParameters = FILL_BASIS) -> bool:
+    """Advance one pending leg with an observation of its exact pool (``coin`` None: time only).
+
+    Observations at or before the decision, of another pool, or not newer than
+    the last one used are ignored. Returns True when the leg resolved now.
+    """
+    if not isinstance(leg, dict) or leg.get('status') != FILL_PENDING:
+        return False
+    start, price0 = _finite(leg.get('decision_at')), _finite(leg.get('decision_price'))
+    current = _finite(now)
+    if start is None or price0 is None:
+        return _resolve_leg(leg, FILL_NO_NEXT, None, now)
+    if isinstance(coin, dict) and (key is None or _identity(coin) == key):
+        stamp, price = observation_ms(coin, now), _finite(coin.get('priceUsd'))
+        last = _finite(leg.get('last_observed_at'))
+        if (stamp is not None and price is not None and price > 0 and stamp > start
+                and (last is None or stamp > last)):
+            leg['last_observed_at'] = int(stamp)
+            if stamp - start > params.max_fill_lag_ms:
+                return _resolve_at_window_end(leg, now)
+            leg['later_observations'] = int(leg.get('later_observations') or 0) + 1
+            snapshot = fill_snapshot(coin, stamp)
+            if leg.get('first_later') is None:
+                leg['first_later_at'], leg['first_later'] = int(stamp), snapshot
+            if price != price0:
+                return _resolve_leg(leg, FILL_NEXT_REFRESH, snapshot, now)
+    if current is not None and current - start > params.max_fill_lag_ms + params.resolve_grace_ms:
+        return _resolve_at_window_end(leg, now)
+    return False
+
+
+def _snapshot_coin(row, snapshot):
+    if not isinstance(snapshot, dict):
+        return None
+    coin = {name: value for name, value in snapshot.items() if name != 'observed_at' and value is not None}
+    coin.update(address=row.get('address'), pairAddress=row.get('pairAddress'),
+                updatedAt=snapshot.get('observed_at'))
+    return coin
+
+
+def fill_leg_coin(row, leg):
+    """The exact pool as a coin at the leg's research fill (its decision observation when it has none)."""
+    if not isinstance(leg, dict) or leg.get('status') == FILL_PENDING:
+        return None
+    return _snapshot_coin(row, leg.get('fill') if isinstance(leg.get('fill'), dict) else leg.get('decision'))
+
+
+def fill_legs_resolved(row) -> bool:
+    shadow = row.get('research_fill') if isinstance(row, dict) else None
+    if not isinstance(shadow, dict):
+        return False
+    return all(isinstance(shadow.get(side), dict) and shadow[side].get('status') in FILL_LEG_STATUSES
+               and shadow[side].get('status') != FILL_PENDING for side in ('entry', 'exit'))
+
+
+def research_fill_value(row, entry_fn, exit_fn) -> dict:
+    """The booked model of one forward close re-run at its research fills.
+
+    ``entry_fn(coin, notional, calib_bps)`` and ``exit_fn(coin, quantity, calib_bps)``
+    are the Lab's calibrated entry and drain-aware exit. A leg whose fill
+    observation cannot be valued (no network price) falls back to its decision
+    observation, and the result names it in ``valuation_fallbacks``.
+    """
+    shadow = row['research_fill']
+    notional = _finite(row.get('notional_usd')) or 0.0
+    calib = position_calib_bps(row)
+    out = {'version': FILL_BASIS_VERSION, 'entry_status': shadow['entry']['status'],
+           'exit_status': shadow['exit']['status'], 'valuation_fallbacks': []}
+
+    def run(side, fn, *args):
+        leg = shadow[side]
+        for fallback, coin in ((False, fill_leg_coin(row, leg)), (True, _snapshot_coin(row, leg.get('decision')))):
+            if coin is None:
+                continue
+            try:
+                quote = fn(coin, *args)
+            except (ValueError, TypeError, ZeroDivisionError):
+                continue
+            if fallback:
+                out['valuation_fallbacks'].append(side)
+            return quote, coin
+        raise ValueError(f'research_fill_{side}_unpriced')
+
+    try:
+        entry, entry_coin = run('entry', entry_fn, notional, calib)
+        exit_quote, exit_coin = run('exit', exit_fn, _finite(entry.get('quantity')) or 0.0, calib)
+    except ValueError as error:
+        out.update({'pnl_usd': None, 'pnl_pct': None, 'net50_usd': None, 'net50_pct': None, 'error': str(error)})
+        return out
+    pnl = ((_finite(exit_quote.get('net_proceeds_usd')) or 0.0)
+           - (_finite(entry.get('capital_committed_usd')) or 0.0))
+    stressed = net50(pnl, notional, row.get('exit_reason'))
+    booked = _finite(row.get('pnl_usd'))
+    out.update({'entry_fill_price': _finite(entry_coin.get('priceUsd')),
+                'exit_fill_price': _finite(exit_coin.get('priceUsd')),
+                'entry_fill_at': entry_coin.get('updatedAt'), 'exit_fill_at': exit_coin.get('updatedAt'),
+                'quantity': _finite(entry.get('quantity')),
+                'pnl_usd': round(pnl, 6), 'pnl_pct': round(pnl / notional * 100, 6) if notional else None,
+                'net50_usd': stressed['net50_usd'], 'net50_pct': stressed['net50_pct'],
+                'minus_booked_usd': None if booked is None else round(pnl - booked, 6)})
+    return out
+
+
+def complete_research_fill(row, entry_fn, exit_fn) -> bool:
+    """Value a close's research fills once both legs are known (completed once, in place).
+
+    Only the shadow fields are written ('research_fill.result',
+    'net50_research_fill_usd', 'net50_research_fill_pct', 'research_fill_pnl_usd');
+    the booked P&L, net50 and balance of the close never change.
+    """
+    shadow = row.get('research_fill') if isinstance(row, dict) else None
+    if not isinstance(shadow, dict) or shadow.get('result') is not None or not fill_legs_resolved(row):
+        return False
+    result = research_fill_value(row, entry_fn, exit_fn)
+    shadow['result'] = result
+    row['net50_research_fill_usd'] = result.get('net50_usd')
+    row['net50_research_fill_pct'] = result.get('net50_pct')
+    row['research_fill_pnl_usd'] = result.get('pnl_usd')
+    _SHADOW_REVISION[0] += 1
+    return True
+
+
+def pending_fill_rows(book, now, *, full_scan=False, horizon_ms=30 * 60_000):
+    """Forward closes of the book whose research-fill shadow is not complete (newest first).
+
+    Closes are stored newest first and a shadow completes within about 90 s, so
+    only the recent rows are scanned unless ``full_scan`` (once per process, for
+    shadows left pending by a restart).
+    """
+    current = _finite(now)
+    out = []
+    for row in (book.get('history') or ()) if isinstance(book, dict) else ():
+        if not isinstance(row, dict):
+            continue
+        closed = _finite(row.get('closed_at'))
+        if not full_scan and current is not None and closed is not None and closed < current - horizon_ms:
+            break
+        shadow = row.get('research_fill')
+        if isinstance(shadow, dict) and shadow.get('result') is None and is_forward_position(row):
+            out.append(row)
+    return out
+
+
 # ------------------------------------------------------------------ cash state
 
 def cash_state(book, params: CashParameters = CASH) -> dict:
@@ -1137,29 +1412,27 @@ def cash_state(book, params: CashParameters = CASH) -> dict:
     balance = _finite(book.get('balance'))
     holding = isinstance(book.get('position'), dict) and bool(book.get('position'))
     exhausted = bool(not holding and balance is not None and balance < params.min_entry_balance_usd)
-    rows = [row for row in (book.get('history') or ()) if isinstance(row, dict)]
-    zero_capital = [row for row in rows if row.get('capital_mode') == ZERO_CAPITAL]
-    # Only funded closes move the balance (zero-capital control closes never do).
-    funded_closed = [value for value in (_finite(row.get('closed_at')) for row in rows
-                                         if row.get('capital_mode') != ZERO_CAPITAL) if value is not None]
-    closed = [value for value in (_finite(row.get('closed_at')) for row in rows) if value is not None]
-    opened = [value for value in (_finite(row.get('opened_at')) for row in rows) if value is not None]
-    zero_opened = [value for value in (_finite(row.get('opened_at')) for row in zero_capital) if value is not None]
+    # One cached pass over the history (LAB_FORWARD review performance).
+    ledger = _history_digest(book, book.get('id'))['cash']
+    opened = [value for value in (ledger['opened_max'],) if value is not None]
+    zero_opened = [value for value in (ledger['zero_opened_max'],) if value is not None]
     position = book.get('position') if holding else None
     if position and _finite(position.get('opened_at')) is not None:
         opened.append(_finite(position.get('opened_at')))
         if position.get('capital_mode') == ZERO_CAPITAL:
             zero_opened.append(_finite(position.get('opened_at')))
+    funded_closed = ledger['funded_closed_max']
     return {'version': params.version, 'exhausted': exhausted,
             'balance_usd': None if balance is None else round(balance, 4),
             'min_entry_balance_usd': params.min_entry_balance_usd, 'notional_usd': params.notional_usd,
-            # Balance only moves on a funded close, so the latest one is when the book ran out.
-            'exhausted_at': int(max(funded_closed)) if exhausted and funded_closed else None,
+            # Balance only moves on a funded close (zero-capital control closes never do),
+            # so the latest funded close is when the book ran out.
+            'exhausted_at': int(funded_closed) if exhausted and funded_closed is not None else None,
             'last_entry_at': int(max(opened)) if opened else None,
-            'closes_in_ledger': len(closed),
+            'closes_in_ledger': ledger['closes_in_ledger'],
             # LAB_FORWARD_CONTROL_CONTINUITY_V1 measurement beyond the funded balance.
-            'zero_capital_closes': len(zero_capital),
-            'zero_capital_pnl_usd': round(math.fsum(_finite(row.get('pnl_usd')) or 0.0 for row in zero_capital), 4),
+            'zero_capital_closes': ledger['zero_capital_closes'],
+            'zero_capital_pnl_usd': ledger['zero_capital_pnl_usd'],
             'last_zero_capital_entry_at': int(max(zero_opened)) if zero_opened else None}
 
 
@@ -1410,17 +1683,24 @@ def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defe
         'model_quantity': model_entry['quantity'],
         'model_entry_roundtrip_pnl_pct': round(model_mark, 6),
         'exit_policy_label': EXITS[book_id].label, 'exit_parameters': asdict(EXITS[book_id]),
+        # LAB_FORWARD_FILL_BASIS_V1: where the research would have filled this entry (shadow only).
+        'research_fill': {'version': FILL_BASIS_VERSION,
+                          'entry': new_fill_leg(entry_coin, entry_at) if isinstance(entry_coin, dict)
+                          else new_fill_leg(None, None),
+                          'exit': None, 'result': None},
         'promotion_eligible': False,
     }
 
 
 def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_proceeds_usd=None,
-                 booked_net_proceeds_usd=None, exit_liquidity_usd=None) -> dict:
+                 booked_net_proceeds_usd=None, exit_liquidity_usd=None, exit_coin=None, exit_at=None) -> dict:
     """Fields added to a forward-test close: model P&L, calibration and drain costs, net50 and close kind.
 
     ``capped_net_proceeds_usd`` is the booked (calibrated) exit with the shared
     capped impact; the difference to the booked exit is the drain valuation of
     LAB_FORWARD_CLOSE_POLICY_V1 (0 unless the sale exceeds 12.5% of liquidity).
+    ``exit_coin`` is the mark the close was booked at: the exit leg of the
+    research-fill shadow (LAB_FORWARD_FILL_BASIS_V1) is decided there.
     """
     notional = _finite(position.get('notional_usd'))
     # The model leg's cost basis equals the booked one: calibration changes prices, not capital.
@@ -1452,27 +1732,129 @@ def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_
         record.update({'quote_status': 'vanished', 'vanish_haircut_pct': CLOSE_POLICY.vanish_haircut_pct,
                        'last_mark_at': _finite(position.get('mark_received_at'))})
     record.update(net50(booked, notional, reason))
+    shadow = position.get('research_fill')
+    if isinstance(shadow, dict) and isinstance(shadow.get('entry'), dict):
+        # The close keeps its own copy: the entry leg may still be pending and resolves on the row.
+        shadow = copy.deepcopy(shadow)
+        shadow['exit'] = new_fill_leg(exit_coin if isinstance(exit_coin, dict) else None, exit_at,
+                                      vanished=kind == 'vanished')
+        shadow['result'] = None
+        record.update({'research_fill': shadow, 'fill_basis_version': FILL_BASIS_VERSION,
+                       'net50_research_fill_usd': None, 'net50_research_fill_pct': None,
+                       'research_fill_pnl_usd': None})
     return record
 
 
 # ------------------------------------------------------------------ statistics, kill rule, promotion gate
 
-def _evaluated_closes(book, book_id, now):
-    """Unique closes of the book's frozen config with a finite net50 (chronological)."""
-    rows = {}
-    expected = CONFIG_HASHES[book_id]
-    for row in (book.get('history') or ()):
+# The two net50 bases of every forward close: the booked fills and the research
+# fills of LAB_FORWARD_FILL_BASIS_V1 (each on the closes that have it).
+BASES = ('booked', 'research_fill')
+BASIS_FIELDS = {'booked': ('net50_usd', 'net50_pct'),
+                'research_fill': ('net50_research_fill_usd', 'net50_research_fill_pct')}
+
+# History digests: one pass over a ledger's history per change, shared by the
+# kill rule, the cash state and the gate of every review (the Lab reviews twice
+# per loop). A digest is reused while the same list object has the same length,
+# the same newest and oldest rows and no research-fill shadow was completed since
+# (rows are otherwise append-only). The cache holds the list, so its id cannot be
+# reused while cached.
+_DIGESTS = OrderedDict()
+_DIGEST_LOCK = threading.Lock()
+_DIGEST_CACHE_SIZE = 32
+
+
+def _row_key(row):
+    return (id(row), row.get('trade_no'), row.get('closed_at')) if isinstance(row, dict) else (id(row),)
+
+
+def _build_digest(history, book_id) -> dict:
+    """Cash aggregates of the ledger and the frozen-config closes of ``book_id`` (chronological)."""
+    funded_closed = opened_max = zero_opened = None
+    closes_in_ledger = 0
+    zero_pnl = []
+    by_trade = {}
+    expected = CONFIG_HASHES.get(book_id)
+    for row in history:
         if not isinstance(row, dict):
             continue
-        closed, value = _finite(row.get('closed_at')), _finite(row.get('net50_usd'))
+        closed, opened = _finite(row.get('closed_at')), _finite(row.get('opened_at'))
+        zero = row.get('capital_mode') == ZERO_CAPITAL
+        if closed is not None:
+            closes_in_ledger += 1
+            if not zero and (funded_closed is None or closed > funded_closed):
+                funded_closed = closed
+        if opened is not None:
+            opened_max = opened if opened_max is None else max(opened_max, opened)
+            if zero:
+                zero_opened = opened if zero_opened is None else max(zero_opened, opened)
+        if zero:
+            zero_pnl.append(_finite(row.get('pnl_usd')) or 0.0)
         trade_no = row.get('trade_no')
-        if (row.get('strategy_id') != book_id or row.get('lab_forward_version') != VERSION
-                or row.get('lab_config_hash') != expected or closed is None or value is None
-                or (now is not None and closed > now) or _identity(row) is None
+        if (expected is None or row.get('strategy_id') != book_id or row.get('lab_forward_version') != VERSION
+                or row.get('lab_config_hash') != expected or closed is None
+                or _finite(row.get('net50_usd')) is None or _identity(row) is None
                 or isinstance(trade_no, bool) or not isinstance(trade_no, int)):
             continue
-        rows.setdefault(trade_no, row)
-    return sorted(rows.values(), key=lambda row: (_finite(row.get('closed_at')), row.get('trade_no')))
+        by_trade.setdefault(trade_no, row)
+    evaluated = sorted(by_trade.values(), key=lambda row: (_finite(row.get('closed_at')), row.get('trade_no')))
+    return {'cash': {'funded_closed_max': funded_closed, 'opened_max': opened_max, 'zero_opened_max': zero_opened,
+                     'closes_in_ledger': closes_in_ledger, 'zero_capital_closes': len(zero_pnl),
+                     'zero_capital_pnl_usd': round(math.fsum(zero_pnl), 4)},
+            'evaluated': evaluated, 'closed_at': [_finite(row.get('closed_at')) for row in evaluated],
+            'cache': {}}
+
+
+def _history_digest(book, book_id=None) -> dict:
+    history = book.get('history') if isinstance(book, dict) else None
+    if not isinstance(history, list):
+        return _build_digest(list(history or ()), book_id)
+    signature = (book_id, len(history), _row_key(history[0]) if history else None,
+                 _row_key(history[-1]) if history else None, _SHADOW_REVISION[0])
+    token = (id(history), book_id)
+    with _DIGEST_LOCK:
+        cached = _DIGESTS.get(token)
+        if cached is not None and cached[0] is history and cached[1] == signature:
+            _DIGESTS.move_to_end(token)
+            return cached[2]
+    digest = _build_digest(history, book_id)
+    with _DIGEST_LOCK:
+        _DIGESTS[token] = (history, signature, digest)
+        _DIGESTS.move_to_end(token)
+        while len(_DIGESTS) > _DIGEST_CACHE_SIZE:
+            _DIGESTS.popitem(last=False)
+    return digest
+
+
+def _count_until(digest, now) -> int:
+    """Number of the digest's chronological closes at or before ``now`` (a later close is not evidence yet)."""
+    current = _finite(now)
+    return len(digest['evaluated']) if current is None else bisect.bisect_right(digest['closed_at'], current)
+
+
+def _memo(digest, key, build):
+    cache = digest['cache']
+    if key not in cache:
+        cache[key] = build()
+    return cache[key]
+
+
+def _evaluated_closes(book, book_id, now):
+    """Unique closes of the book's frozen config with a finite net50 (chronological)."""
+    digest = _history_digest(book, book_id)
+    return digest['evaluated'][:_count_until(digest, now)]
+
+
+def _normal_ci(values, groups, params: KillRuleParameters = KILL_RULE, reason=None) -> dict:
+    count = len(values)
+    out = {'low': None, 'high': None, 'method': params.fallback_method, 'groups': groups, 'method_reason': reason}
+    if count < 2:
+        return out
+    mean = math.fsum(values) / count
+    variance = math.fsum((value - mean) ** 2 for value in values) / (count - 1)
+    half = 1.959963984540054 * math.sqrt(variance / count)
+    out.update(low=mean - half, high=mean + half)
+    return out
 
 
 def bootstrap_ci(rows, *, key='net50_usd', params: KillRuleParameters = KILL_RULE):
@@ -1484,53 +1866,74 @@ def bootstrap_ci(rows, *, key='net50_usd', params: KillRuleParameters = KILL_RUL
     values = [_finite(row.get(key)) for row in rows]
     values = [value for value in values if value is not None]
     if not values:
-        return {'low': None, 'high': None, 'method': None, 'groups': 0}
+        return {'low': None, 'high': None, 'method': None, 'groups': 0, 'method_reason': None}
     groups = OrderedDict()
     for row in rows:
         value = _finite(row.get(key))
         if value is not None:
             groups.setdefault(_identity(row), []).append(value)
-    if len(groups) >= params.fallback_under_pairs:
-        rnd = random.Random(params.bootstrap_seed)
-        members = list(groups.values())
-        totals = [(math.fsum(group), len(group)) for group in members]
-        means = []
-        for _ in range(params.bootstrap_resamples):
-            total = count = 0
-            for _ in range(len(members)):
-                group_total, group_count = totals[rnd.randrange(len(members))]
-                total += group_total
-                count += group_count
-            means.append(total / count)
-        means.sort()
-        reps = params.bootstrap_resamples
-        return {'low': means[int(reps * .025)], 'high': means[min(reps - 1, int(reps * .975))],
-                'method': params.ci_method, 'groups': len(groups)}
-    count = len(values)
-    mean = math.fsum(values) / count
-    if count < 2:
-        return {'low': None, 'high': None, 'method': params.fallback_method, 'groups': len(groups)}
-    variance = math.fsum((value - mean) ** 2 for value in values) / (count - 1)
-    half = 1.959963984540054 * math.sqrt(variance / count)
-    return {'low': mean - half, 'high': mean + half, 'method': params.fallback_method, 'groups': len(groups)}
+    if len(groups) < params.fallback_under_pairs:
+        return _normal_ci(values, len(groups), params, reason='under_minimum_pairs')
+    rnd = random.Random(params.bootstrap_seed)
+    members = list(groups.values())
+    totals = [math.fsum(group) for group in members]
+    counts = [len(group) for group in members]
+    size = len(members)
+    draw, span = rnd.random, range(size)
+    total_of, count_of = totals.__getitem__, counts.__getitem__
+    means = []
+    for _ in range(params.bootstrap_resamples):
+        picks = [int(draw() * size) for _ in span]
+        means.append(sum(map(total_of, picks)) / sum(map(count_of, picks)))
+    means.sort()
+    reps = params.bootstrap_resamples
+    return {'low': means[int(reps * .025)], 'high': means[min(reps - 1, int(reps * .975))],
+            'method': params.ci_method, 'groups': len(groups), 'method_reason': None}
 
 
+# Bootstraps already computed, by the content of their sample (an unchanged sample is
+# never resampled again, whichever review or digest asks for it). Bounded.
 _CI_CACHE = OrderedDict()
 _CI_LOCK = threading.Lock()
+_CI_CACHE_SIZE = 64
 
 
-def _cached_ci(book_id, rows):
-    fingerprint = (book_id, len(rows), tuple((row.get('trade_no'), row.get('net50_usd')) for row in rows[-3:]),
-                   round(math.fsum(_finite(row.get('net50_usd')) for row in rows), 9))
-    with _CI_LOCK:
-        cached = _CI_CACHE.get(fingerprint)
-    if cached is None:
-        cached = bootstrap_ci(rows)
+def _ci_fingerprint(rows, key):
+    def ident(row):
+        return (row.get('trade_no'), row.get('address'), row.get('pairAddress'), row.get(key))
+    values = [_finite(row.get(key)) for row in rows]
+    return (key, len(rows), tuple(ident(row) for row in rows[:2]), tuple(ident(row) for row in rows[-3:]),
+            round(math.fsum(value for value in values if value is not None), 9),
+            round(math.fsum(index * (value or 0.0) for index, value in enumerate(values)), 6))
+
+
+def decision_ci(rows, *, key='net50_usd', bootstrap=True, params: KillRuleParameters = KILL_RULE) -> dict:
+    """The published CI of mean $/trade: the pair bootstrap where a decision can depend on it.
+
+    That is from ``bootstrap_min_closes`` closes (the kill rule's minimum) and
+    when the caller allows it; below, the per-trade normal approximation. A
+    bootstrap is cached by the content of its sample.
+    """
+    rows = list(rows)
+    if bootstrap and len(rows) >= params.bootstrap_min_closes:
+        fingerprint = (params.bootstrap_seed, params.bootstrap_resamples, _ci_fingerprint(rows, key))
         with _CI_LOCK:
-            _CI_CACHE[fingerprint] = cached
-            while len(_CI_CACHE) > 32:
+            cached = _CI_CACHE.get(fingerprint)
+            if cached is not None:
+                _CI_CACHE.move_to_end(fingerprint)
+                return dict(cached)
+        result = bootstrap_ci(rows, key=key, params=params)
+        with _CI_LOCK:
+            _CI_CACHE[fingerprint] = dict(result)
+            while len(_CI_CACHE) > _CI_CACHE_SIZE:
                 _CI_CACHE.popitem(last=False)
-    return dict(cached)
+        return result
+    values = [value for value in (_finite(row.get(key)) for row in rows) if value is not None]
+    groups = len({_identity(row) for row in rows if _finite(row.get(key)) is not None})
+    if not values:
+        return {'low': None, 'high': None, 'method': None, 'groups': 0, 'method_reason': None}
+    reason = 'below_bootstrap_min_closes' if len(rows) < params.bootstrap_min_closes else 'below_gate_min_closes'
+    return _normal_ci(values, groups, params, reason=reason)
 
 
 def _round(value, digits=6):
@@ -1538,44 +1941,159 @@ def _round(value, digits=6):
     return None if value is None else round(value, digits)
 
 
+def _basis_stats(digest, basis, count) -> dict:
+    """Per-basis statistics of the first ``count`` evaluated closes (cached in the digest)."""
+    def build():
+        usd_field, pct_field = BASIS_FIELDS[basis]
+        rows = [row for row in digest['evaluated'][:count] if _finite(row.get(usd_field)) is not None]
+        values = [_finite(row.get(usd_field)) for row in rows]
+        pct = [value for value in (_finite(row.get(pct_field)) for row in rows) if value is not None]
+        pairs = OrderedDict()
+        for row, value in zip(rows, values):
+            pairs.setdefault(_identity(row), []).append(value)
+        number = len(values)
+        mean = math.fsum(values) / number if number else None
+        ci = (decision_ci(rows, key=usd_field) if number
+              else {'low': None, 'high': None, 'method': None, 'groups': 0, 'method_reason': None})
+        retire = bool(number >= KILL_RULE.min_closes and mean is not None
+                      and mean < KILL_RULE.max_mean_net50_usd_exclusive
+                      and ci['high'] is not None and ci['high'] < KILL_RULE.max_ci95_upper_usd_exclusive)
+        return {'basis': basis, 'field': usd_field, 'rows': rows, 'values': values, 'count': number,
+                'mean': mean, 'total': math.fsum(values) if number else None,
+                'pct_mean': math.fsum(pct) / len(pct) if pct else None, 'pairs': pairs, 'ci': ci,
+                'wins': sum(value > 0 for value in values), 'kill_rule_met': retire}
+    return _memo(digest, ('stats', basis, count), build)
+
+
+def _research_coverage(digest, count) -> dict:
+    """LAB_FORWARD_FILL_BASIS_V1 coverage of the first ``count`` evaluated closes."""
+    def build():
+        legs = {'entry': {status: 0 for status in FILL_LEG_STATUSES},
+                'exit': {status: 0 for status in FILL_LEG_STATUSES}}
+        pending = missing = failed = observed = unobserved = 0
+        differences = []
+        for row in digest['evaluated'][:count]:
+            shadow = row.get('research_fill')
+            if not isinstance(shadow, dict) or not isinstance(shadow.get('entry'), dict):
+                missing += 1
+                unobserved += 2
+                continue
+            for side in ('entry', 'exit'):
+                status = (shadow.get(side) or {}).get('status')
+                if status in legs[side]:
+                    legs[side][status] += 1
+            if shadow.get('result') is None:
+                pending += 1
+                continue
+            value = _finite(row.get('net50_research_fill_usd'))
+            if value is None:
+                failed += 1
+                unobserved += 2
+                continue
+            differences.append(value - _finite(row.get('net50_usd')))
+            for side in ('entry', 'exit'):
+                status = (shadow.get(side) or {}).get('status')
+                if status in {FILL_NEXT_REFRESH, FILL_QUIET}:
+                    observed += 1
+                elif status == FILL_NO_NEXT:
+                    unobserved += 1
+        applicable = observed + unobserved
+        return {'pending': pending, 'missing': missing, 'valuation_failed': failed, 'legs': legs,
+                'unobserved_leg_share': (unobserved / applicable) if applicable else None,
+                'mean_minus_booked_net50_usd': (math.fsum(differences) / len(differences)) if differences else None}
+    return _memo(digest, ('research_coverage', count), build)
+
+
+def _shape(digest, count) -> dict:
+    """Booked-basis sample shape of the gate (pairs, days, hours, concentration, pricing, rug entries)."""
+    def build():
+        stats = _basis_stats(digest, 'booked', count)
+        rows, values, pairs = stats['rows'], stats['values'], stats['pairs']
+        opened = [value for value in (_finite(row.get('opened_at')) for row in rows) if value is not None]
+        days = (max(opened) - min(opened)) / 86_400_000 if len(opened) >= 2 else 0.0
+        hours = {int(value // 3_600_000) % 24 for value in opened}
+        top_share = (max(len(group) for group in pairs.values()) / len(values)) if values else None
+        if len(pairs) >= 2:
+            best = max(pairs, key=lambda key: math.fsum(pairs[key]))
+            rest = [value for key, group in pairs.items() if key != best for value in group]
+            without_best = math.fsum(rest) / len(rest)
+        else:
+            without_best = None
+        by_day = {}
+        for row, value in zip(rows, values):
+            day = int(_finite(row.get('closed_at')) // 86_400_000)
+            by_day[day] = by_day.get(day, 0.0) + value
+        total = math.fsum(values)
+        best_day_share = (max(by_day.values()) / total) if by_day and total > 0 else None
+        rug_entries = sum(1 for row in rows
+                          if ((row.get('defensive_entry') or {}).get('structural_rug_guard') or {}).get('blocked'))
+        kinds = [row.get('close_kind') for row in rows]
+        unpriced = sum(1 for row in rows if row.get('close_kind') in {'vanished', 'drained'}
+                       or row.get('quote_status') in {'stale', 'unavailable', 'vanished'})
+        return {'days': days, 'hours': len(hours), 'top_share': top_share, 'without_best': without_best,
+                'best_day_share': best_day_share, 'rug_entries': rug_entries, 'unpriced': unpriced,
+                'vanished': kinds.count('vanished'), 'drained': kinds.count('drained'),
+                'zero_capital': sum(row.get('capital_mode') == ZERO_CAPITAL for row in rows),
+                'booked_total': math.fsum(_finite(row.get('pnl_usd')) or 0.0 for row in rows) if rows else None,
+                'max_drawdown_pct': _max_drawdown_pct(rows, START_BALANCE_USD)}
+    return _memo(digest, ('shape', count), build)
+
+
 def evidence(book, book_id, now) -> dict:
-    """Kill-rule evidence of one book on its own frozen-config closes."""
-    rows = _evaluated_closes(book, book_id, now)
-    count = len(rows)
-    values = [_finite(row['net50_usd']) for row in rows]
-    mean = math.fsum(values) / count if count else None
-    ci = _cached_ci(book_id, rows) if count else {'low': None, 'high': None, 'method': None, 'groups': 0}
-    pairs = {_identity(row) for row in rows}
-    retire = bool(count >= KILL_RULE.min_closes and mean is not None
-                  and mean < KILL_RULE.max_mean_net50_usd_exclusive
-                  and ci['high'] is not None and ci['high'] < KILL_RULE.max_ci95_upper_usd_exclusive)
-    pct = [_finite(row.get('net50_pct')) for row in rows]
-    pct = [value for value in pct if value is not None]
-    kinds = [row.get('close_kind') for row in rows]
+    """Kill-rule evidence of one book on its own frozen-config closes, on both net50 bases."""
+    digest = _history_digest(book, book_id)
+    count = _count_until(digest, now)
+    booked = _basis_stats(digest, 'booked', count)
+    research = _basis_stats(digest, 'research_fill', count)
+    coverage = _research_coverage(digest, count)
+    shape = _shape(digest, count)
+    rows = booked['rows']
+    ci = booked['ci']
+    met_bases = [basis for basis, stats in (('booked', booked), ('research_fill', research)) if stats['kill_rule_met']]
     return {'version': KILL_RULE_VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
-            'closed_trades': count, 'pairs': len(pairs),
-            'wins': sum(value > 0 for value in values),
+            'closed_trades': booked['count'], 'pairs': len(booked['pairs']),
+            'wins': booked['wins'],
             # LAB_FORWARD_CLOSE_POLICY_V1: these closes are in the sample above, valued conservatively.
-            'vanished_closes': kinds.count('vanished'), 'drained_closes': kinds.count('drained'),
+            'vanished_closes': shape['vanished'], 'drained_closes': shape['drained'],
             # LAB_FORWARD_CONTROL_CONTINUITY_V1: closes of a control past its funded balance.
-            'zero_capital_closes': sum(row.get('capital_mode') == ZERO_CAPITAL for row in rows),
+            'zero_capital_closes': shape['zero_capital'],
             'open_unpriced_past_max_hold': unpriced_past_max_hold(book.get('position'), now),
-            'net50_total_usd': _round(math.fsum(values)) if count else None,
-            'mean_net50_usd': _round(mean), 'mean_net50_pct': _round(math.fsum(pct) / len(pct)) if pct else None,
+            'net50_total_usd': _round(booked['total']),
+            'mean_net50_usd': _round(booked['mean']), 'mean_net50_pct': _round(booked['pct_mean']),
             'ci95_mean_net50_usd': [_round(ci['low']), _round(ci['high'])], 'ci_method': ci['method'],
-            'ci_groups': ci['groups'],
-            'booked_total_usd': _round(math.fsum(_finite(row.get('pnl_usd')) or 0.0 for row in rows)) if count else None,
+            'ci_method_reason': ci.get('method_reason'), 'ci_groups': ci['groups'],
+            'booked_total_usd': _round(shape['booked_total']),
             'first_closed_at': int(_finite(rows[0]['closed_at'])) if rows else None,
             'last_closed_at': int(_finite(rows[-1]['closed_at'])) if rows else None,
-            'min_closes': KILL_RULE.min_closes, 'kill_rule_met': retire,
-            'note': 'PAPER forward test; net50 is booked net minus the research stress. Not a profit claim.'}
+            'min_closes': KILL_RULE.min_closes,
+            # LAB_FORWARD_FILL_BASIS_V1: met on either basis retires (each on its own closes).
+            'kill_rule_met': bool(met_bases), 'kill_rule_met_bases': met_bases,
+            'kill_rule_met_booked': booked['kill_rule_met'],
+            'kill_rule_met_research_fill': research['kill_rule_met'],
+            'research_fill': {
+                'version': FILL_BASIS_VERSION, 'closed_trades': research['count'],
+                'pending': coverage['pending'], 'missing': coverage['missing'],
+                'valuation_failed': coverage['valuation_failed'],
+                'mean_net50_usd': _round(research['mean']), 'mean_net50_pct': _round(research['pct_mean']),
+                'net50_total_usd': _round(research['total']),
+                'ci95_mean_net50_usd': [_round(research['ci']['low']), _round(research['ci']['high'])],
+                'ci_method': research['ci']['method'], 'ci_method_reason': research['ci'].get('method_reason'),
+                'kill_rule_met': research['kill_rule_met'], 'legs': copy.deepcopy(coverage['legs']),
+                'unobserved_leg_share': _round(coverage['unobserved_leg_share']),
+                'mean_minus_booked_net50_usd': _round(coverage['mean_minus_booked_net50_usd'])},
+            'note': ('PAPER forward test; net50 is booked net minus the research stress; net50_research_fill '
+                     're-runs the booked model at the research fills (next refresh). Not a profit claim.')}
 
 
 def _max_drawdown_pct(rows, start):
+    """Closed-ledger drawdown of the balance: a zero-capital control close never moves it."""
     balance = peak = start
     worst = 0.0
     for row in rows:
-        balance += _finite(row.get('pnl_usd')) or 0.0
+        if row.get('capital_mode') == ZERO_CAPITAL:
+            continue
+        effect = _finite(row.get('balance_effect_usd'))
+        balance += effect if effect is not None else (_finite(row.get('pnl_usd')) or 0.0)
         peak = max(peak, balance)
         if peak > 0:
             worst = max(worst, (peak - balance) / peak * 100)
@@ -1619,96 +2137,115 @@ def control_window(book_id, rows, control_book) -> dict:
     return out
 
 
+def _window_rows(digest, basis, count, start, end):
+    """The basis rows of the first ``count`` closes opened inside [start, end] and their mean (cached)."""
+    def build():
+        if start is None or end is None:
+            return {'rows': [], 'mean': None}
+        rows = [row for row in _basis_stats(digest, basis, count)['rows']
+                if _finite(row.get('opened_at')) is not None and start <= _finite(row.get('opened_at')) <= end]
+        field = BASIS_FIELDS[basis][0]
+        values = [_finite(row.get(field)) for row in rows]
+        return {'rows': rows, 'mean': math.fsum(values) / len(values) if values else None}
+    return _memo(digest, ('window', basis, count, start, end), build)
+
+
 def promotion_gate(book, book_id, control_book, now) -> dict:
-    """The research PROMOTION GATE on the hypothesis book's closes (owner review only, never automatic)."""
-    rows = _evaluated_closes(book, book_id, now)
-    values = [_finite(row['net50_usd']) for row in rows]
-    count = len(values)
+    """The research PROMOTION GATE on the hypothesis book's closes (owner review only, never automatic).
+
+    Expectancy, CI and the same-period control comparison are evaluated on both
+    net50 bases (booked fills and the research fills of LAB_FORWARD_FILL_BASIS_V1)
+    and must pass on both. ``gate_met`` needs every criterion evaluated: the
+    3-slot $1000 drawdown needs an offline replay, so the Lab reports at most
+    'evaluable_criteria_pass_replay_pending'.
+    """
+    digest = _history_digest(book, book_id)
+    count = _count_until(digest, now)
+    booked = _basis_stats(digest, 'booked', count)
+    research = _basis_stats(digest, 'research_fill', count)
+    coverage_rf = _research_coverage(digest, count)
+    shape = _shape(digest, count)
+    rows = booked['rows']
+    number = booked['count']
     criteria = {}
 
     def put(name, value, threshold, passed):
         criteria[name] = {'value': value, 'threshold': threshold, 'pass': passed}
 
-    put('closed_trades', count, f'>= {GATE.min_closes}', count >= GATE.min_closes)
-    pair_totals = OrderedDict()
-    for row, value in zip(rows, values):
-        pair_totals.setdefault(_identity(row), []).append(value)
-    put('pairs', len(pair_totals), f'>= {GATE.min_pairs}', len(pair_totals) >= GATE.min_pairs)
-    opened = [_finite(row.get('opened_at')) for row in rows]
-    opened = [value for value in opened if value is not None]
-    days = (max(opened) - min(opened)) / 86_400_000 if len(opened) >= 2 else 0.0
-    put('days', _round(days, 3), f'>= {GATE.min_days}', days >= GATE.min_days)
-    hours = {int(value // 3_600_000) % 24 for value in opened}
-    put('utc_hours_covered', len(hours), f'= {GATE.utc_hours_required}', len(hours) >= GATE.utc_hours_required)
-    mean = math.fsum(values) / count if count else None
-    put('mean_net50_usd', _round(mean), '> 0', bool(mean is not None and mean > 0))
-    ci = _cached_ci(book_id, rows) if count else {'low': None, 'high': None}
-    put('ci95_low_net50_usd', _round(ci['low']), '> 0', bool(ci['low'] is not None and ci['low'] > 0))
+    put('closed_trades', number, f'>= {GATE.min_closes}', number >= GATE.min_closes)
+    put('pairs', len(booked['pairs']), f'>= {GATE.min_pairs}', len(booked['pairs']) >= GATE.min_pairs)
+    put('days', _round(shape['days'], 3), f'>= {GATE.min_days}', shape['days'] >= GATE.min_days)
+    put('utc_hours_covered', shape['hours'], f'= {GATE.utc_hours_required}', shape['hours'] >= GATE.utc_hours_required)
+    for basis, stats, suffix in (('booked', booked, ''), ('research_fill', research, '_research_fill')):
+        mean = stats['mean']
+        put(f'mean_net50{suffix}_usd', _round(mean), '> 0', bool(mean is not None and mean > 0))
+        low = stats['ci']['low']
+        put(f'ci95_low_net50{suffix}_usd', _round(low), '> 0', bool(low is not None and low > 0))
     # Same period = from the hypothesis's first entry to the earlier of its last close and
     # the moment the control could no longer enter (retired or out of cash). Both books
-    # are compared on trades opened inside that window only.
+    # are compared on trades opened inside that window only, on each basis.
     control_id = CONTROL_OF[book_id]
     window = control_window(book_id, rows, control_book)
-    def in_window(row):
-        opened_at = _finite(row.get('opened_at'))
-        return (window['end'] is not None and opened_at is not None
-                and window['start'] <= opened_at <= window['end'])
-
-    same_rows = [row for row in rows if in_window(row)]
-    control_rows = ([row for row in _evaluated_closes(control_book, control_id, now) if in_window(row)]
-                    if isinstance(control_book, dict) else [])
     coverage = window['coverage']
     put('control_coverage', _round(coverage),
         f'>= {GATE.min_control_coverage} (control entry-enabled and funded)',
         bool(coverage is not None and coverage >= GATE.min_control_coverage))
-    same_values = [_finite(row['net50_usd']) for row in same_rows]
-    same_mean = math.fsum(same_values) / len(same_values) if same_values else None
-    control_values = [_finite(row['net50_usd']) for row in control_rows]
-    control_mean = math.fsum(control_values) / len(control_values) if control_values else None
-    control_ci = (_cached_ci(f'{control_id}@{book_id}', control_rows) if control_rows
-                  else {'low': None, 'high': None})
-    half_width = (None if control_ci['low'] is None or control_ci['high'] is None
-                  else (control_ci['high'] - control_ci['low']) / 2)
-    margin = None if same_mean is None or control_mean is None else same_mean - control_mean
-    put('beats_same_period_control_usd', _round(margin),
-        f'> control CI half-width ({_round(half_width)})',
-        bool(margin is not None and half_width is not None and margin > half_width))
-    top_share = (max(len(group) for group in pair_totals.values()) / count) if count else None
-    put('top_pair_share', _round(top_share), f'<= {GATE.max_top_pair_share}',
-        bool(top_share is not None and top_share <= GATE.max_top_pair_share))
-    if len(pair_totals) >= 2:
-        best = max(pair_totals, key=lambda key: math.fsum(pair_totals[key]))
-        rest = [value for key, group in pair_totals.items() if key != best for value in group]
-        without_best = math.fsum(rest) / len(rest)
-    else:
-        without_best = None
-    put('mean_without_best_pair_usd', _round(without_best), '> 0',
-        bool(without_best is not None and without_best > 0))
-    by_day = {}
-    for row, value in zip(rows, values):
-        day = int(_finite(row.get('closed_at')) // 86_400_000)
-        by_day[day] = by_day.get(day, 0.0) + value
-    total = math.fsum(values)
-    best_day_share = (max(by_day.values()) / total) if by_day and total > 0 else None
-    put('best_day_share_of_pnl', _round(best_day_share), f'<= {GATE.max_best_day_share}',
-        bool(best_day_share is not None and best_day_share <= GATE.max_best_day_share))
-    put('max_drawdown_pct_3slot_1000', None, '<= 20 (research: 3-slot $1000 replay)', None)
-    rug_entries = sum(1 for row in rows
-                      if ((row.get('defensive_entry') or {}).get('structural_rug_guard') or {}).get('blocked'))
-    put('entries_on_rug_flagged_pools', rug_entries, '= 0', rug_entries == 0)
+    control_digest = _history_digest(control_book, control_id) if isinstance(control_book, dict) else None
+    control_count = _count_until(control_digest, now) if control_digest is not None else 0
+    same = {}
+    for basis, suffix in (('booked', ''), ('research_fill', '_research_fill')):
+        mine = _window_rows(digest, basis, count, window['start'], window['end'])
+        theirs = (_window_rows(control_digest, basis, control_count, window['start'], window['end'])
+                  if control_digest is not None else {'rows': [], 'mean': None})
+        # The control's CI decides this criterion only once the sample criterion can pass:
+        # below the gate's minimum closes it is the cheap normal approximation.
+        control_ci = (decision_ci(theirs['rows'], key=BASIS_FIELDS[basis][0],
+                                  bootstrap=number >= GATE.min_closes)
+                      if theirs['rows'] else {'low': None, 'high': None, 'method': None})
+        half_width = (None if control_ci['low'] is None or control_ci['high'] is None
+                      else (control_ci['high'] - control_ci['low']) / 2)
+        margin = None if mine['mean'] is None or theirs['mean'] is None else mine['mean'] - theirs['mean']
+        put(f'beats_same_period_control{suffix}_usd', _round(margin),
+            f'> control CI half-width ({_round(half_width)})',
+            bool(margin is not None and half_width is not None and margin > half_width))
+        same[basis] = {'book_closed_trades': len(mine['rows']), 'book_mean_net50_usd': _round(mine['mean']),
+                       'control_closed_trades': len(theirs['rows']), 'control_mean_net50_usd': _round(theirs['mean']),
+                       'control_ci_half_width_usd': _round(half_width), 'control_ci_method': control_ci.get('method'),
+                       'control_ci_method_reason': control_ci.get('method_reason')}
+    put('top_pair_share', _round(shape['top_share']), f'<= {GATE.max_top_pair_share}',
+        bool(shape['top_share'] is not None and shape['top_share'] <= GATE.max_top_pair_share))
+    put('mean_without_best_pair_usd', _round(shape['without_best']), '> 0',
+        bool(shape['without_best'] is not None and shape['without_best'] > 0))
+    put('best_day_share_of_pnl', _round(shape['best_day_share']), f'<= {GATE.max_best_day_share}',
+        bool(shape['best_day_share'] is not None and shape['best_day_share'] <= GATE.max_best_day_share))
+    put('max_drawdown_pct_3slot_1000', None,
+        f'<= {_whole(GATE.max_drawdown_pct_3slot_1000)} (research: 3-slot $1000 replay; not evaluated in the Lab)',
+        None)
+    put('entries_on_rug_flagged_pools', shape['rug_entries'], '= 0', shape['rug_entries'] == 0)
     # Vanished (no mark beyond max hold + grace) and drained (liquidity 0 at exit) closes,
     # closes on a stale or unavailable quote, and an open position past its max hold
     # that still has no mark (it counts as a pending vanished close).
-    unpriced = sum(1 for row in rows if row.get('close_kind') in {'vanished', 'drained'}
-                   or row.get('quote_status') in {'stale', 'unavailable', 'vanished'})
     pending = int(unpriced_past_max_hold(book.get('position'), now))
-    share = (unpriced + pending) / (count + pending) if count + pending else None
+    share = (shape['unpriced'] + pending) / (number + pending) if number + pending else None
     put('vanished_or_unpriced_share', _round(share), f'< {GATE.max_vanished_or_unpriced_share}',
         bool(share is not None and share < GATE.max_vanished_or_unpriced_share))
+    # LAB_FORWARD_FILL_BASIS_V1: research-fill legs valued at the decision print (no later
+    # observation in 60 s) or closes without a valued shadow; pending shadows are excluded.
+    unobserved = coverage_rf['unobserved_leg_share']
+    put('research_fill_unobserved_leg_share', _round(unobserved),
+        f'< {GATE.max_research_fill_unobserved_leg_share}',
+        bool(unobserved is not None and unobserved < GATE.max_research_fill_unobserved_leg_share))
     evaluable = [item['pass'] for item in criteria.values() if item['pass'] is not None]
-    return {'version': PROMOTION_GATE_VERSION, 'book_id': book_id, 'control_book_id': CONTROL_OF[book_id],
-            'control_closed_trades_same_period': len(control_rows), 'control_mean_net50_usd': _round(control_mean),
-            'book_closed_trades_same_period': len(same_rows), 'book_mean_net50_usd_same_period': _round(same_mean),
+    not_evaluated = [name for name, item in criteria.items() if item['pass'] is None]
+    all_evaluable_pass = bool(evaluable) and all(evaluable)
+    gate_met = all_evaluable_pass and not not_evaluated
+    return {'version': PROMOTION_GATE_VERSION, 'book_id': book_id, 'control_book_id': control_id,
+            'fill_basis_version': FILL_BASIS_VERSION,
+            'control_closed_trades_same_period': same['booked']['control_closed_trades'],
+            'control_mean_net50_usd': same['booked']['control_mean_net50_usd'],
+            'book_closed_trades_same_period': same['booked']['book_closed_trades'],
+            'book_mean_net50_usd_same_period': same['booked']['book_mean_net50_usd'],
+            'same_period': same,
             'control_window': {key: value for key, value in window.items() if key != 'coverage'},
             'book_cash_state': cash_state(book),
             'control_cash_state': cash_state(control_book) if isinstance(control_book, dict) else None,
@@ -1717,12 +2254,23 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
             'signal_carry': {'book': signal_carry_counters(book, book_id),
                              'control': (signal_carry_counters(control_book, control_id)
                                          if isinstance(control_book, dict) else None)},
-            'book_max_drawdown_pct_booked': _round(_max_drawdown_pct(rows, START_BALANCE_USD), 4),
+            'research_fill': {'closed_trades': research['count'], 'pending': coverage_rf['pending'],
+                              'missing': coverage_rf['missing'], 'valuation_failed': coverage_rf['valuation_failed'],
+                              'legs': copy.deepcopy(coverage_rf['legs']),
+                              'mean_minus_booked_net50_usd': _round(coverage_rf['mean_minus_booked_net50_usd'])},
+            'book_max_drawdown_pct_booked': _round(shape['max_drawdown_pct'], 4),
             'criteria': criteria,
-            'all_evaluable_pass': bool(evaluable) and all(evaluable),
-            'not_evaluated': [name for name, item in criteria.items() if item['pass'] is None],
+            'all_evaluable_pass': all_evaluable_pass,
+            'not_evaluated': not_evaluated,
+            # Only a gate whose every criterion was evaluated can be met; the Lab cannot evaluate
+            # the 3-slot drawdown, so passing here means 'replay pending', never 'met'.
+            'gate_met': gate_met,
+            'gate_status': ('met' if gate_met else 'evaluable_criteria_pass_replay_pending'
+                            if all_evaluable_pass else 'not_met'),
             'automatic_promotion': AUTOMATIC_PROMOTION,
-            'note': 'Owner review only. Passing never promotes a book; the 3-slot drawdown needs an offline replay.'}
+            'note': ('Owner review only. Passing never promotes a book; the 3-slot drawdown needs an offline '
+                     'replay. Booked fills are the decision print and the triggering mark, not executable '
+                     'quotes; the research-fill basis re-prices them at the next DexScreener refresh.')}
 
 
 def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
@@ -1817,6 +2365,7 @@ def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
                                              'replaces_shared_lifecycle_heuristic': True,
                                              'cash_state_version': CASH_STATE_VERSION,
                                              'control_continuity_version': CONTROL_CONTINUITY_VERSION,
+                                             'fill_basis_version': FILL_BASIS_VERSION,
                                              **asdict(KILL_RULE)}})
     return review
 
@@ -1832,6 +2381,7 @@ def new_diagnostics(book_id) -> dict:
             # LAB_FORWARD_SIGNAL_CARRY_V1 in this refresh: carried signals retried on the pool's
             # current observation; 'signal_carry' (cumulative, per config hash) is added by the Lab.
             'carried_signals_retried': 0, 'price_crosscheck_pending_signals': 0,
+            'fill_basis_version': FILL_BASIS_VERSION,
             'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': False}
 
 
@@ -1873,6 +2423,7 @@ def config() -> dict:
             'promotion_gate': asdict(GATE), 'memory_version': MEMORY_VERSION, 'regime_version': REGIME_VERSION,
             'close_policy': asdict(CLOSE_POLICY), 'cash_state': asdict(CASH),
             'control_continuity': asdict(CONTROL_CONTINUITY), 'signal_carry': asdict(SIGNAL_CARRY),
+            'fill_basis': asdict(FILL_BASIS), 'fill_basis_version': FILL_BASIS_VERSION,
             'known_versions': list(KNOWN_VERSIONS),
             'cost_model': _hashable(asdict(COST_MODEL)), 'tape_pin_required': TAPE_PIN_REQUIRED,
             'universe_reasons': list(UNIVERSE_REASONS), 'signal_reasons': list(SIGNAL_REASONS),

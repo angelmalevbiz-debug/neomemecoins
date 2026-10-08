@@ -116,6 +116,17 @@ Rules fixed before the run:
 - **Basis.** Booked P&L is the Lab's shared spot model plus CALIB_V1 per leg. Every close
   also records `net50` = booked net − 50 bps per leg − 200 bps more on stop exits − 100 bps
   on trailing exits. The kill rule and the gate below use net50.
+- **Fill basis (`LAB_FORWARD_FILL_BASIS_V1`).** The books book an entry at the decision
+  observation's DexScreener print and an exit at the triggering mark. The research judged
+  every book on fills at the next DexScreener refresh (`harness_final` F1: the first later
+  exact-pool observation within 60 s whose price differs from the decision print). That
+  difference is not neutral: on the research data the next refresh averaged +0.335% above
+  the print at LAB_B signals and −0.171% at RND_LAB_B draws, so booked fills favour LAB_B
+  against its control (measured read-only by the code review). Each position and close
+  therefore carries a research-fill shadow, and each close gets `net50_research_fill_usd`:
+  the booked model re-run at the research fills, with the same stress. Booked results never
+  change. Legs with no later observation in 60 s are valued at the decision print and
+  counted. Neither basis is an executable quote.
 - **Drained and vanished pools (`LAB_FORWARD_CLOSE_POLICY_V1`).** A drained pool is
   booked with a constant-product exit, so liquidity 0 is worth 0, not the shared model's
   capped −21%. A pool with no usable mark beyond max hold + 10 min closes at its last mark
@@ -124,7 +135,9 @@ Rules fixed before the run:
 - **Kill rule (`LAB_FORWARD_KILL_RULE_V1`, each of the four books).** After ≥ 50 closes of
   the frozen config, the book is retired when mean net50 < 0 and the upper bound of the
   pair-bootstrap CI95 of mean net50 $/trade is < 0 (2,000 resamples, fixed seed; a
-  per-trade normal approximation under 3 pools). Retirement stops new entries only;
+  per-trade normal approximation under 3 pools, and below the 50 closes where no decision
+  depends on it). It is evaluated on the booked and on the research-fill net50, each on
+  its own closes; met on either retires. Retirement stops new entries only;
   balance, history and open exits are untouched, and it is never undone automatically.
   These books are not subject to the shared 12-close lifecycle heuristic.
 - **Control continuity (`LAB_FORWARD_CONTROL_CONTINUITY_V1`).** A random control exists
@@ -135,7 +148,12 @@ Rules fixed before the run:
   the research's control expectancy runs out after about 30–37 closes (about 1.5 days)
   or is retired at 50 closes, while LAB_A needs ≥ 150 closes over ≥ 3 days and LAB_B
   longer; `control_coverage` would have stayed near 0.2–0.3 and the gate could never
-  pass, even for a hypothesis with a true edge.
+  pass, even for a hypothesis with a true edge. This departs from the literal per-book
+  kill rule and needs the owner's explicit sign-off (it is a decision in the pull
+  request); declining it means retiring each control on its own kill rule and cash, with
+  new book ids. Zero-capital closes never enter realized P&L, the equity path or the
+  drawdown of the ledger tools (`paper_lab_metrics`, `paper_edge_report`); they are
+  reported separately and counted per trade.
 - **Cash state (`LAB_FORWARD_CASH_STATE_V1`).** A $500 book at a fixed $200 entry has
   about $300 of loss headroom. A hypothesis that cannot fund its next entry (balance
   below $200.10, no open position) is marked `cash_exhausted`, not `active`; its kill
@@ -145,22 +163,34 @@ Rules fixed before the run:
   for LAB_A and LAB_B for the owner's review. A hypothesis is a promotion candidate only
   when **all** of these hold on trades entered after the Lab start:
   - n ≥ 150 closed trades over ≥ 25 pairs and ≥ 3 days covering every UTC hour;
-  - mean net50 > 0 and the pair-bootstrap CI95 lower bound of mean $/trade > 0;
+  - mean net50 > 0 and the pair-bootstrap CI95 lower bound of mean $/trade > 0, on the
+    booked **and** the research-fill basis;
   - the random control could still enter (not retired, not out of cash; zero-capital
     continuity counts) for ≥ 90% of the hypothesis's trades and time window
     (`control_coverage`);
   - inside that same period, it beats the random control by more than the control's CI
-    half-width;
+    half-width, on both bases;
   - top pair share ≤ 0.20, it stays positive with the best pair removed, and no single day
     supplies more than 50% of the P&L;
   - a 3-slot $1000 book has a max drawdown ≤ 20% (an offline replay; the Lab books hold
     one position);
   - zero entries on pools flagged by the structural rug guard;
   - vanished, drained or unpriced closes (plus an open position past max hold without a
-    mark) < 10% of trades.
+    mark) < 10% of trades;
+  - fewer than 10% of the research-fill legs valued at the decision print for lack of a
+    later observation (`research_fill_unobserved_leg_share`).
 
+  The Lab publishes `gate_met` only when every criterion was evaluated and passes. It
+  cannot evaluate the 3-slot replay, so its best status is
+  `evaluable_criteria_pass_replay_pending`, and the dashboard says so instead of "met".
   Passing makes a book eligible for review only. Promotion to any engine account is a
   separate, reviewed and versioned change; the books stay TEST.
+
+  **Caveats.** Both bases are DexScreener prints with modeled costs, not the executable
+  quotes the research's run protocol asks for: the booked basis fills at the decision print
+  and the triggering mark, the research-fill basis at the next refresh. A pass on the
+  booked basis alone is not a pass. The control-continuity protocol above needs the owner's
+  sign-off before any gate result is read.
 - **Expected failure.** The research expects both hypotheses to fail the gate: about −3%
   per trade for LAB_A, and wide, regime-dependent uncertainty for LAB_B. A retirement
   under the kill rule is a valid result, not a reason to loosen filters, the cost cap or

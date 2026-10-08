@@ -278,6 +278,61 @@ def forward_exit_execution(c,pos,qty=None):
     return calibrated_exit_execution(c,num(pos.get('quantity')) if qty is None else qty,
                                      lab_forward.position_calib_bps(pos),drain_aware=True)
 
+# LAB_FORWARD_FILL_BASIS_V1: the booked model, re-run at the research fills of a close.
+def research_fill_entry_execution(c,notional,extra_bps):
+    return calibrated_entry_execution(c,notional,extra_bps)
+
+def research_fill_exit_execution(c,qty,extra_bps):
+    return calibrated_exit_execution(c,qty,extra_bps,drain_aware=True)
+
+def complete_forward_research_fill(row):
+    """Value a forward close's research-fill shadow once both legs are known (shadow fields only)."""
+    return lab_forward.complete_research_fill(row,research_fill_entry_execution,research_fill_exit_execution)
+
+def forward_fill_observations(key,prices,now,extra=()):
+    """Observations of one exact pool this loop (shared feed, exact-pair refresh), oldest first."""
+    coins=[coin for coin in (prices.get(key),*extra) if isinstance(coin,dict)]
+    return sorted(coins,key=lambda coin:num(lab_forward.observation_ms(coin,now)))
+
+def advance_forward_fill_legs(record,coins,now):
+    """Advance the pending research-fill legs of a forward position or close with this loop's observations."""
+    shadow=record.get('research_fill') if isinstance(record,dict) else None
+    if not isinstance(shadow,dict):
+        return False
+    key=(record.get('address'),record.get('pairAddress'))
+    changed=False
+    for side in ('entry','exit'):
+        leg=shadow.get(side)
+        for coin in coins:
+            changed=lab_forward.advance_fill_leg(leg,coin,now,key=key) or changed
+        changed=lab_forward.advance_fill_leg(leg,None,now,key=key) or changed
+    return changed
+
+# Forward books whose whole history was scanned for research-fill shadows left
+# pending (for example by a restart) in this process; later loops scan recent closes.
+FORWARD_FILL_FULL_SCAN=set()
+
+def advance_forward_research_fills(prices,now):
+    """LAB_FORWARD_FILL_BASIS_V1: resolve and value the research fills of recent forward closes.
+
+    Observations: the pool in the shared feed, else the exact-pair refresh (which
+    this schedules for a closed pool that left the feed). Only shadow fields change.
+    """
+    for book_id in lab_forward.BOOK_IDS:
+        book=STATE['books'].get(book_id)
+        if not isinstance(book,dict):
+            continue
+        full=book_id not in FORWARD_FILL_FULL_SCAN
+        rows=lab_forward.pending_fill_rows(book,now,full_scan=full)
+        FORWARD_FILL_FULL_SCAN.add(book_id)
+        for row in rows:
+            key=(row.get('address'),row.get('pairAddress'))
+            extra=()
+            if key not in prices and not lab_forward.fill_legs_resolved(row):
+                extra=(POSITION_MARK_FEED.resolve(row,prices,now),)
+            advance_forward_fill_legs(row,forward_fill_observations(key,prices,now,extra),now)
+            complete_forward_research_fill(row)
+
 def load_json(path,default):
     try: return json.loads(read_shared_text(path,encoding='utf-8'))
     except Exception: return default
@@ -703,8 +758,11 @@ def close_position(book,pos,coin,reason):
         trade.update(lab_forward.close_record(pos,trade,model_net_proceeds_usd=model['net_proceeds_usd'],
                                               reason=reason,capped_net_proceeds_usd=capped['net_proceeds_usd'],
                                               booked_net_proceeds_usd=quote['net_proceeds_usd'],
-                                              exit_liquidity_usd=lab_forward.reported_liquidity_usd(coin)))
+                                              exit_liquidity_usd=lab_forward.reported_liquidity_usd(coin),
+                                              exit_coin=coin,exit_at=trade['closed_at']))
         trade['balance_effect_usd']=0.0 if zero_capital else round(final_pnl,4)
+        # LAB_FORWARD_FILL_BASIS_V1: a VANISHED close has no exit fill, so its shadow may be complete now.
+        complete_forward_research_fill(trade)
     book['history'].insert(0,trade); book['position']=None
 
 def realize_partial(book,pos,coin,fraction,label):
@@ -777,6 +835,11 @@ def update_positions(flows,feed):
         is_rush=pos.get('strategy_id',book.get('id'))==rush_brain.STRATEGY_ID
         forward=lab_forward.is_forward_position(pos)
         coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
+        if forward:
+            # LAB_FORWARD_FILL_BASIS_V1: this loop's observations of the held pool decide where the
+            # research would have filled the entry (shadow only; booking and exits are unchanged).
+            advance_forward_fill_legs(pos,forward_fill_observations(
+                (pos.get('address'),pos.get('pairAddress')),prices,decision_at,(coin,)),decision_at)
         mark_stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
         rush_mark_fresh=(coin and coin.get('address')==pos.get('address')
                          and coin.get('pairAddress')==pos.get('pairAddress')
@@ -871,6 +934,9 @@ def update_positions(flows,feed):
         if is_rush: pos['peak_net_pct']=peak_net
         if forward: pos['model_pnl_pct']=round(model_live_pct,3)
         if reason: close_position(book,pos,coin,reason)
+    # LAB_FORWARD_FILL_BASIS_V1: research fills of recent forward closes (their exit legs
+    # resolve after the close); booked results are never changed.
+    advance_forward_research_fills(prices,now_ms())
 def cost_feasibility_summary(rows,cap):
     """Fee-and-buffer planning floor of the matched candidates; never an admission."""
     return {
@@ -1244,6 +1310,8 @@ def maybe_open(feed,flows):
                                     else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
             'max_entry_roundtrip_cost_pct':admission_cap,
+            # The cap is min(0.5 x net stop, this ceiling): the dashboard names the ceiling when it binds.
+            'max_entry_roundtrip_cost_ceiling_pct':activity.MAX_ENTRY_COST_PCT,
             'stop_loss_net_pct':(cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first
                                  else lab_forward.EXITS[strategy['id']].stop_loss_net_pct if is_forward
                                  else STOP_LOSS),
@@ -1251,6 +1319,9 @@ def maybe_open(feed,flows):
             'cost_feasibility':cost_feasibility_summary(cost_examples,admission_cap),
         }
         if is_forward:
+            # One fixed size is checked against the cap; it is never reduced to fit.
+            book['entry_diagnostics'].update({'entry_size_rule':'FIXED_NOTIONAL_NO_BACKOFF',
+                                              'fixed_notional_usd':lab_forward.NOTIONAL_USD})
             if strategy['id']==lab_forward.LAB_B_ID:
                 forward_diagnostics['regime']=forward_regime
             forward_diagnostics.update({

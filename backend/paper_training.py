@@ -58,6 +58,65 @@ def raw_int(value):
     raise ValueError("integer raw quantity required")
 
 
+# tempfile.mkstemp(prefix="." + name) appends exactly eight characters from
+# this alphabet; only such names are atomic_json temporaries of that checkpoint.
+TEMP_NAME_SUFFIX = re.compile(r"[a-z0-9_]{8}")
+# A live write keeps advancing its temporary's mtime; a hard-stopped one does not.
+STALE_TEMP_SECONDS = 600
+
+
+def _discard_temp(name):
+    # Best effort, and never raised: cleanup must not mask the write's own error
+    # or fail a completed replace. A scanner can briefly hold the file open on
+    # Windows; anything left is reclaimed by remove_stale_temp_files.
+    for _ in range(5):
+        try:
+            os.unlink(name)
+            return
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            time.sleep(.05)
+        except OSError:
+            return
+
+
+def remove_stale_temp_files(path, max_age_seconds=STALE_TEMP_SECONDS, now=None):
+    """Delete atomic_json temporaries of this checkpoint abandoned by a hard stop.
+
+    TerminateProcess/taskkill /F/power loss skip atomic_json's finally and leave
+    a full-size partial copy beside the checkpoint. Only names atomic_json
+    creates for this exact path, in its own directory, are candidates: the
+    checkpoint itself, observations.jsonl and every other file are never
+    touched. A younger temporary may belong to a write still in progress.
+    """
+    path = Path(path)
+    prefix = "." + path.name
+    now = time.time() if now is None else now
+    removed = []
+    try:
+        entries = list(os.scandir(path.parent))
+    except FileNotFoundError:
+        return removed
+    for entry in entries:
+        if not (entry.name.startswith(prefix)
+                and TEMP_NAME_SUFFIX.fullmatch(entry.name[len(prefix):])):
+            continue
+        try:
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            # os.stat, not the cached directory entry: Windows can report a
+            # stale mtime there for a file another handle is still writing.
+            if now - os.stat(entry.path, follow_symlinks=False).st_mtime < max_age_seconds:
+                continue
+            os.unlink(entry.path)
+        except OSError:
+            # Still open elsewhere or already gone; a later sweep retries.
+            continue
+        removed.append(entry.name)
+    return removed
+
+
 def atomic_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -81,8 +140,8 @@ def atomic_json(path, value):
                 # A brief concurrent reader or scanner can deny replacement.
                 time.sleep(.03)
     finally:
-        if os.path.exists(name):
-            os.unlink(name)
+        # Also runs on KeyboardInterrupt/SystemExit; a hard kill cannot run it.
+        _discard_temp(name)
 
 
 DEFAULT_CONFIG = {
@@ -213,6 +272,12 @@ def normalize_quote(quote, *, side, mint, pair, decimals, network_fee_usd=None,
 class PaperTrainingEngine:
     def __init__(self, state_path, config=None):
         self.path = Path(state_path)
+        # A service restart hard-stops the worker (TerminateProcess on Windows),
+        # often mid-checkpoint. Reclaim those copies now, and again after saves
+        # so the copy abandoned just before this start is not kept until the
+        # next restart.
+        remove_stale_temp_files(self.path)
+        self._next_temp_sweep = time.monotonic() + STALE_TEMP_SECONDS
         if self.path.exists():
             self.state = json.loads(self.path.read_text(encoding="utf-8"))
             if self.state.get("version") != VERSION or self.state.get("paper_only") is not True:
@@ -345,6 +410,9 @@ class PaperTrainingEngine:
 
     def save(self):
         atomic_json(self.path, self.state)
+        if time.monotonic() >= self._next_temp_sweep:
+            self._next_temp_sweep = time.monotonic() + STALE_TEMP_SECONDS
+            remove_stale_temp_files(self.path)
 
     def reset(self, initial_cash=None):
         """Explicit PAPER reset; no main/real account is read or written."""

@@ -61,6 +61,40 @@ For this layout, provide the private loopback diagnostic separately:
 
 The read-only Pages/backend check deliberately returns a nonzero exit code if the public gateway's CORS origin or shared backend schema is still old. It does not log in, bypass private account authentication, reset accounts, or certify financial results. See [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) for the latest measured deployment boundary.
 
+## Watchdog scheduled task
+
+`scripts/local_paper_watchdog.ps1` keeps the four owned services (main, tape, lab, gateway) running and is itself run by the Windows scheduled task `NEO Local PAPER Watchdog`. Install or update the task from the checkout that owns the services (on this PC `C:\Users\Chavd\neomemecoins`, not the dev checkout), as the signed-in Windows user:
+
+```powershell
+.\scripts\install_local_paper_watchdog.ps1
+```
+
+The task is a limited interactive task without stored credentials. It has two triggers: at logon, and a `-Once` trigger that repeats every 5 minutes (`-RepeatMinutes`) with no end. `MultipleInstances IgnoreNew` makes a tick a no-op while the watchdog runs, and the watchdog's named mutex exits a second copy immediately, so the repeat only matters after the instance has died. Re-running the installer updates the definition and leaves a running instance alone. Remove it with `-Remove`.
+
+Verify from the owning checkout:
+
+```powershell
+Get-ScheduledTask -TaskName 'NEO Local PAPER Watchdog' | Select-Object State
+Get-ScheduledTaskInfo -TaskName 'NEO Local PAPER Watchdog' | Select-Object LastRunTime, LastTaskResult, NextRunTime
+.\scripts\local_paper_watchdog.ps1 -Probe
+```
+
+`State` must be `Running`, `NextRunTime` must be set, and the probe must list every manifest service as running with main/gateway listening. The probe is read-only: it writes no log line, takes no lock and starts nothing. It also lists the per-user engines (`owner = gateway`, one row per engine worker with its listening port). Those engines are spawned, health-checked and revived by the gateway itself (`ensure_engine` and `revive_known_engines` in `backend/user_gateway.py`); they carry no `--service` argument and no manifest record, so the watchdog reports them and never stops or starts one. The loop writes a `Per-user engines` line to `.runtime/accounts/services/watchdog.log` whenever the set of engine PIDs or ports changes.
+
+### 2026-10-07 outage of the watchdog task
+
+Observed on this PC on 2026-10-08: the task showed `State Ready`, `LastTaskResult 0xC000013A`, `LastRunTime 2026-10-07 17:32:44`, empty `NextRunTime`, and no watchdog process. The watchdog log ended at `23:15:53 Recovery: requesting Start.` without `Watchdog stopped.`, and the running cohort (started 23:15:54–23:16:03) was parented to the dead watchdog PID. Findings:
+
+- `0xC000013A` is `STATUS_CONTROL_C_EXIT`: the hidden PowerShell console received a close or Ctrl+C event. The `finally` block never ran, the PowerShell engine log has a start (event 400) but no stop (event 403) for that process, and the user stayed logged on (the services survived). The `NEO Local Gateway Tunnel` supervisor task shows the same result code while its `cloudflared` child kept running, so whatever closed the consoles targeted the PowerShell hosts, not their process trees. The exact sender is unknown because the `Microsoft-Windows-TaskScheduler/Operational` log is disabled on this PC, so no task history (events 110/111/330) exists. It was not a Task Scheduler timeout (`ExecutionTimeLimit PT0S`), not a logoff, and not a crash (no Application log entry).
+- The task had only an at-logon trigger, so nothing fired again after the instance died. Its `RestartOnFailure` (3 × 1 min) did not re-launch it either: `LastRunTime` stayed at 17:32:44. The fix above adds the repeating trigger instead of relying on restart-on-failure.
+- The same evening, cohorts that were started outside the watchdog (20:01, 22:24, 23:08) all ended within minutes without the normal `stopped with persistent state` line, each time while a tool sandbox session was starting or ending, and the watchdog restarted them (20:06, 22:40, 23:15). Start and stop the PAPER services through the watchdog or the installer, not from a tool job's console, so the services do not die with that console.
+
+To get task history for the next incident, an administrator can enable the log once (system setting, not done by the installer):
+
+```powershell
+wevtutil set-log Microsoft-Windows-TaskScheduler/Operational /enabled:true
+```
+
 ## Start a separate PAPER account
 
 Set isolated paths and declared risk values before starting. The following creates a new $1,000 main account, with conservative explicit risk limits and independently funded $500 learning books. It changes no existing server account.

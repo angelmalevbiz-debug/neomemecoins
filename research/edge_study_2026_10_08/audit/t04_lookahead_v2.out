@@ -1,0 +1,13 @@
+module C:\Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit\harness_v2.py
+ago/window brute-force mismatches: 0
+P.static("price") raised LookAhead static('price') is a time series; use P('price') / P.ago / P.window -> guarded
+P.s accessible directly: True
+ticker-index brute-force mismatches: 0
+eligible pairs 277
+poisoned-future: decision calls before T*: 147098 vs 147098, identical=True
+poisoned-future: exit_fn calls before T*: 55106 vs 55106, identical=True
+poisoned-future: trades closed before T*: 1109 vs 1109, identical=True
+signal call order: time inversions between consecutive calls = 0 of 359093 (per-pair iteration => global state inside a signal can see other pairs' future)
+random trades 2882 overlaps 0 cooldown violations (entry within 300 s of previous exit) 0
+forward_net(3600) samples: ok 61527, None because pair vanished before horizon (dataset continued) 39, None near dataset end/lag 3634
+secs 19.2

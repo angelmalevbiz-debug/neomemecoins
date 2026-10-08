@@ -1,0 +1,6 @@
+engine_unavailable 37588
+rows 135512
+fee tier mismatches harness vs engine: {}
+abs cost diff pct: max 0 p99 0
+kept pumpswap-SOL series points with missing/non-positive inputs: {'points': 802672, 'liq_bad': 570}
+sol_usd implied p1 114.53 p50 116.18 p99 118.81

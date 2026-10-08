@@ -1,0 +1,587 @@
+train non-rug samples 42361
+=== universe LOWFEE_big samples 3313 pairs 12
+   ALL                        n= 3311 pr=  12 | f15  -1.92 | f30  -1.69 (pairavg  -4.34, win 13.4) | f60  -0.86 (pairavg  -4.00) | mfe30med   0.6
+  -- va1h cov 3313 edges [0.129, 0.386, 0.681, 1.082]
+   (-inf, 0.129]              n=  665 pr=   5 | f15  -1.62 | f30  -1.21 (pairavg  -3.79, win  7.4) | f60  -0.87 (pairavg  -3.30) | mfe30med   0.4
+   (0.129, 0.386]             n=  661 pr=   6 | f15  -1.49 | f30  -1.07 (pairavg  -3.33, win 11.5) | f60   0.48 (pairavg  -2.15) | mfe30med   0.5
+   (0.386, 0.681]             n=  661 pr=   8 | f15  -2.69 | f30  -2.82 (pairavg  -4.11, win  9.7) | f60  -1.71 (pairavg  -3.44) | mfe30med   0.5
+   (0.681, 1.08]              n=  662 pr=  10 | f15  -1.74 | f30  -1.80 (pairavg  -2.37, win 22.1) | f60  -1.39 (pairavg  -2.18) | mfe30med   1.2
+   (1.08, inf]                n=  662 pr=   9 | f15  -2.05 | f30  -1.54 (pairavg  -4.38, win 16.5) | f60  -0.82 (pairavg  -4.30) | mfe30med   1.0
+  -- va6h cov 3313 edges [0.136, 0.322, 0.543, 0.953]
+   (-inf, 0.136]              n=  663 pr=   5 | f15  -1.20 | f30  -0.61 (pairavg  -3.20, win  8.4) | f60   0.49 (pairavg  -2.32) | mfe30med   0.4
+   (0.136, 0.322]             n=  663 pr=   7 | f15  -1.83 | f30  -1.11 (pairavg  -3.04, win 15.7) | f60   0.72 (pairavg  -1.65) | mfe30med   0.5
+   (0.322, 0.543]             n=  662 pr=   7 | f15  -1.63 | f30  -1.87 (pairavg  -3.90, win 17.2) | f60  -1.18 (pairavg  -3.18) | mfe30med   0.8
+   (0.543, 0.953]             n=  661 pr=   9 | f15  -2.68 | f30  -2.92 (pairavg  -3.30, win 14.2) | f60  -3.21 (pairavg  -3.39) | mfe30med   0.7
+   (0.953, inf]               n=  662 pr=  11 | f15  -2.25 | f30  -1.94 (pairavg  -4.83, win 11.5) | f60  -1.14 (pairavg  -4.97) | mfe30med   0.6
+  -- va1h6h cov 3313 edges [0.456, 0.832, 1.28, 1.736]
+   (-inf, 0.456]              n=  663 pr=   6 | f15  -1.47 | f30  -1.24 (pairavg  -3.39, win 23.4) | f60  -0.19 (pairavg  -3.47) | mfe30med   0.8
+   (0.456, 0.832]             n=  665 pr=   7 | f15  -0.84 | f30   0.62 (pairavg  -3.63, win 11.7) | f60   4.15 (pairavg  -2.13) | mfe30med   0.6
+   (0.832, 1.28]              n=  659 pr=   9 | f15  -2.15 | f30  -2.24 (pairavg  -1.91, win 18.5) | f60  -1.98 (pairavg  -1.63) | mfe30med   0.8
+   (1.28, 1.74]               n=  662 pr=   7 | f15  -2.80 | f30  -3.01 (pairavg  -4.38, win 10.9) | f60  -3.37 (pairavg  -4.83) | mfe30med   0.7
+   (1.74, inf]                n=  662 pr=   8 | f15  -2.33 | f30  -2.58 (pairavg  -7.06, win  2.6) | f60  -2.96 (pairavg  -6.94) | mfe30med   0.3
+  -- ba1h cov 3313 edges [0.196, 0.545, 0.824, 1.031]
+   (-inf, 0.196]              n=  664 pr=   5 | f15  -2.04 | f30  -1.64 (pairavg  -4.16, win  6.6) | f60  -1.31 (pairavg  -3.76) | mfe30med   0.5
+   (0.196, 0.545]             n=  666 pr=   7 | f15  -1.86 | f30  -0.45 (pairavg  -3.45, win 16.5) | f60   0.78 (pairavg  -1.28) | mfe30med   0.5
+   (0.545, 0.824]             n=  659 pr=   8 | f15  -1.66 | f30  -2.07 (pairavg  -3.56, win 13.7) | f60  -0.93 (pairavg  -2.67) | mfe30med   0.8
+   (0.824, 1.03]              n=  660 pr=  10 | f15  -2.20 | f30  -2.30 (pairavg  -2.73, win 18.5) | f60  -1.29 (pairavg  -2.23) | mfe30med   0.8
+   (1.03, inf]                n=  662 pr=  10 | f15  -1.83 | f30  -1.99 (pairavg  -3.58, win 11.8) | f60  -1.56 (pairavg  -3.79) | mfe30med   0.6
+  -- bshare5 cov 3268 edges [0.2, 0.438, 0.625, 0.797]
+   (-inf, 0.2]                n=  664 pr=   5 | f15  -1.85 | f30  -0.85 (pairavg  -1.26, win 15.1) | f60   0.09 (pairavg  -0.49) | mfe30med   0.6
+   (0.2, 0.438]               n=  649 pr=   6 | f15  -1.44 | f30  -0.55 (pairavg  -3.13, win 10.2) | f60   0.90 (pairavg  -2.11) | mfe30med   0.6
+   (0.438, 0.625]             n=  648 pr=   9 | f15  -2.35 | f30  -2.85 (pairavg  -4.22, win  5.6) | f60  -1.86 (pairavg  -4.00) | mfe30med   0.7
+   (0.625, 0.797]             n=  652 pr=   9 | f15  -1.88 | f30  -2.22 (pairavg  -2.90, win 25.6) | f60  -2.16 (pairavg  -2.84) | mfe30med   1.7
+   (0.797, inf]               n=  653 pr=   7 | f15  -2.04 | f30  -1.96 (pairavg  -4.73, win 11.5) | f60  -1.20 (pairavg  -4.02) | mfe30med   0.3
+  -- bshare1h cov 3313 edges [0.362, 0.47, 0.578, 0.741]
+   (-inf, 0.362]              n=  663 pr=   5 | f15  -1.23 | f30  -0.21 (pairavg  -0.04, win 16.7) | f60  -0.45 (pairavg  -1.12) | mfe30med   0.5
+   (0.362, 0.47]              n=  665 pr=   5 | f15  -1.29 | f30  -0.62 (pairavg  -1.14, win 12.3) | f60   3.14 (pairavg   2.09) | mfe30med   0.5
+   (0.47, 0.578]              n=  660 pr=   6 | f15  -1.77 | f30  -1.73 (pairavg  -3.79, win  4.2) | f60  -1.63 (pairavg  -4.17) | mfe30med   0.8
+   (0.578, 0.741]             n=  661 pr=   9 | f15  -4.16 | f30  -5.04 (pairavg  -3.81, win  7.7) | f60  -4.86 (pairavg  -3.30) | mfe30med   0.5
+   (0.741, inf]               n=  662 pr=   6 | f15  -1.13 | f30  -0.85 (pairavg  -4.66, win 26.0) | f60  -0.54 (pairavg  -4.44) | mfe30med   0.6
+  -- tx5 cov 3313 edges [5.0, 12.0, 18.0, 80.0]
+   (-inf, 5]                  n=  733 pr=   5 | f15  -1.46 | f30  -1.18 (pairavg   0.89, win  8.2) | f60  -1.20 (pairavg   1.92) | mfe30med   0.4
+   (5, 12]                    n=  677 pr=   7 | f15  -1.74 | f30  -0.83 (pairavg  -3.50, win 10.0) | f60  -0.20 (pairavg  -3.25) | mfe30med   0.5
+   (12, 18]                   n=  595 pr=   7 | f15  -1.32 | f30  -1.31 (pairavg  -5.31, win 13.1) | f60   1.28 (pairavg  -3.92) | mfe30med   0.7
+   (18, 80]                   n=  644 pr=  10 | f15  -2.90 | f30  -2.74 (pairavg  -4.09, win 12.9) | f60  -1.74 (pairavg  -3.54) | mfe30med   0.7
+   (80, inf]                  n=  662 pr=   5 | f15  -2.18 | f30  -2.43 (pairavg  -2.43, win 23.4) | f60  -2.24 (pairavg  -2.59) | mfe30med   1.2
+  -- avg_tx_usd cov 3268 edges [37.843, 63.568, 97.855, 243.457]
+   (-inf, 37.8]               n=  653 pr=   9 | f15  -1.91 | f30  -1.91 (pairavg  -3.18, win  6.6) | f60  -1.30 (pairavg  -3.03) | mfe30med   0.4
+   (37.8, 63.6]               n=  654 pr=   6 | f15  -1.83 | f30  -1.47 (pairavg  -1.43, win 17.6) | f60  -0.23 (pairavg  -0.53) | mfe30med   0.7
+   (63.6, 97.9]               n=  657 pr=   6 | f15  -1.91 | f30  -2.22 (pairavg  -2.09, win 18.4) | f60  -1.60 (pairavg  -1.11) | mfe30med   1.1
+   (97.9, 243]                n=  649 pr=   6 | f15  -1.15 | f30  -0.18 (pairavg  -2.68, win 14.5) | f60   0.53 (pairavg  -2.53) | mfe30med   0.6
+   (243, inf]                 n=  653 pr=   7 | f15  -2.76 | f30  -2.62 (pairavg  -4.55, win 10.9) | f60  -1.60 (pairavg  -3.57) | mfe30med   0.6
+  -- dv5_60 cov 3243 edges [0.769, 0.982, 1.018, 1.226]
+   (-inf, 0.769]              n=  649 pr=   7 | f15  -1.48 | f30  -1.05 (pairavg  -2.90, win 11.6) | f60   0.09 (pairavg  -2.53) | mfe30med   0.5
+   (0.769, 0.982]             n=  649 pr=   8 | f15  -2.78 | f30  -2.32 (pairavg  -4.36, win 14.9) | f60  -1.50 (pairavg  -3.88) | mfe30med   0.7
+   (0.982, 1.02]              n=  648 pr=   9 | f15  -1.23 | f30  -1.06 (pairavg  -3.99, win 15.0) | f60  -0.50 (pairavg  -3.55) | mfe30med   0.6
+   (1.02, 1.23]               n=  648 pr=   8 | f15  -2.26 | f30  -2.38 (pairavg  -4.63, win 14.7) | f60  -1.59 (pairavg  -4.12) | mfe30med   0.7
+   (1.23, inf]                n=  647 pr=   7 | f15  -1.73 | f30  -1.45 (pairavg  -2.65, win 11.7) | f60  -0.52 (pairavg  -2.32) | mfe30med   0.6
+  -- dv5_120 cov 3228 edges [0.559, 0.905, 1.07, 1.65]
+   (-inf, 0.559]              n=  646 pr=   7 | f15  -1.71 | f30  -1.11 (pairavg  -2.39, win 12.8) | f60   0.18 (pairavg  -1.90) | mfe30med   0.5
+   (0.559, 0.905]             n=  646 pr=   8 | f15  -1.89 | f30  -1.89 (pairavg  -4.04, win 14.9) | f60  -1.21 (pairavg  -3.78) | mfe30med   0.6
+   (0.905, 1.07]              n=  645 pr=   8 | f15  -2.11 | f30  -2.02 (pairavg  -3.95, win 15.0) | f60  -1.31 (pairavg  -3.38) | mfe30med   0.7
+   (1.07, 1.65]               n=  645 pr=   8 | f15  -1.93 | f30  -1.93 (pairavg  -4.09, win 14.1) | f60  -1.20 (pairavg  -3.67) | mfe30med   0.7
+   (1.65, inf]                n=  644 pr=   7 | f15  -1.76 | f30  -1.18 (pairavg  -2.26, win 11.0) | f60  -0.34 (pairavg  -2.53) | mfe30med   0.5
+  -- db5_60 cov 3290 edges [-2.0, 0.0, 0.0, 2.0]
+   (-inf, -2]                 n=  671 pr=   8 | f15  -2.01 | f30  -1.92 (pairavg  -4.15, win 17.7) | f60  -1.32 (pairavg  -3.86) | mfe30med   0.7
+   (-2, 0]                    n= 1460 pr=   8 | f15  -1.67 | f30  -1.12 (pairavg  -3.37, win 11.2) | f60  -0.25 (pairavg  -2.66) | mfe30med   0.5
+   (0, 2]                     n=  626 pr=   8 | f15  -2.00 | f30  -1.82 (pairavg  -4.40, win 11.3) | f60  -0.43 (pairavg  -3.31) | mfe30med   0.6
+   (2, inf]                   n=  531 pr=   8 | f15  -2.27 | f30  -2.61 (pairavg  -4.48, win 16.4) | f60  -2.24 (pairavg  -4.44) | mfe30med   0.8
+  -- db5_120 cov 3273 edges [-2.0, -1.0, 1.0, 3.0]
+   (-inf, -2]                 n=  881 pr=   8 | f15  -1.88 | f30  -1.90 (pairavg  -4.05, win 17.4) | f60  -0.76 (pairavg  -3.48) | mfe30med   0.7
+   (-2, -1]                   n=  449 pr=   8 | f15  -1.98 | f30  -0.86 (pairavg  -3.03, win 11.4) | f60   0.37 (pairavg  -2.04) | mfe30med   0.6
+   (-1, 1]                    n= 1015 pr=   8 | f15  -1.66 | f30  -1.35 (pairavg  -3.60, win  9.4) | f60  -0.90 (pairavg  -3.18) | mfe30med   0.5
+   (1, 3]                     n=  337 pr=   8 | f15  -1.72 | f30  -0.95 (pairavg  -3.50, win 16.0) | f60   0.57 (pairavg  -2.40) | mfe30med   0.5
+   (3, inf]                   n=  589 pr=   7 | f15  -2.29 | f30  -2.69 (pairavg  -3.40, win 14.4) | f60  -2.34 (pairavg  -3.33) | mfe30med   0.8
+  -- uw5 cov 2565 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 2364 pr=  12 | f15  -1.74 | f30  -1.52 (pairavg  -4.25, win 13.7) | f60  -0.62 (pairavg  -3.87) | mfe30med   0.6
+   (0, inf]                   n=  199 pr=   3 | f15  -4.06 | f30  -3.80 (pairavg  -3.34, win 18.1) | f60  -4.44 (pairavg  -3.39) | mfe30med   0.8
+  -- rb5 cov 2565 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 2399 pr=  12 | f15  -1.75 | f30  -1.54 (pairavg  -4.26, win 13.5) | f60  -0.65 (pairavg  -3.88) | mfe30med   0.6
+   (0, inf]                   n=  164 pr=   3 | f15  -4.41 | f30  -3.98 (pairavg  -3.45, win 21.3) | f60  -4.81 (pairavg  -3.82) | mfe30med   1.0
+  -- uw_per_tx cov 2532 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 2331 pr=  12 | f15  -1.73 | f30  -1.51 (pairavg  -4.25, win 13.9) | f60  -0.59 (pairavg  -3.87) | mfe30med   0.6
+   (0, inf]                   n=  199 pr=   3 | f15  -4.06 | f30  -3.80 (pairavg  -3.34, win 18.1) | f60  -4.44 (pairavg  -3.39) | mfe30med   0.8
+  -- sf_w cov 2565 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 2364 pr=  12 | f15  -1.74 | f30  -1.52 (pairavg  -4.25, win 13.7) | f60  -0.62 (pairavg  -3.87) | mfe30med   0.6
+   (0, inf]                   n=  199 pr=   3 | f15  -4.06 | f30  -3.80 (pairavg  -3.34, win 18.1) | f60  -4.44 (pairavg  -3.39) | mfe30med   0.8
+   sf_bshare coverage too low 199
+   vf_w coverage too low 84
+   vf_tr coverage too low 84
+   vf_bshare coverage too low 80
+  -- pc5 cov 3313 edges [-0.56, -0.17, 0.04, 0.46]
+   (-inf, -0.56]              n=  664 pr=   8 | f15  -0.73 | f30  -0.78 (pairavg  -3.34, win 24.2) | f60  -0.01 (pairavg  -2.58) | mfe30med   1.3
+   (-0.56, -0.17]             n=  679 pr=   9 | f15  -2.21 | f30  -1.99 (pairavg  -3.62, win 11.2) | f60  -1.08 (pairavg  -3.27) | mfe30med   0.6
+   (-0.17, 0.04]              n=  660 pr=   9 | f15  -1.72 | f30  -0.89 (pairavg  -3.17, win  9.4) | f60   0.10 (pairavg  -2.76) | mfe30med   0.5
+   (0.04, 0.46]               n=  663 pr=   9 | f15  -2.34 | f30  -2.14 (pairavg  -5.02, win 10.1) | f60  -1.09 (pairavg  -4.46) | mfe30med   0.4
+   (0.46, inf]                n=  645 pr=  10 | f15  -2.60 | f30  -2.65 (pairavg  -4.39, win 12.1) | f60  -2.26 (pairavg  -4.21) | mfe30med   0.6
+  -- pc1h cov 3313 edges [-1.94, -0.7, 0.15, 2.11]
+   (-inf, -1.94]              n=  663 pr=   6 | f15  -0.72 | f30  -0.25 (pairavg  -0.14, win 27.5) | f60  -0.06 (pairavg   0.04) | mfe30med   1.7
+   (-1.94, -0.7]              n=  668 pr=   6 | f15  -1.80 | f30  -1.88 (pairavg  -1.67, win  7.5) | f60  -1.37 (pairavg  -1.55) | mfe30med   0.6
+   (-0.7, 0.15]               n=  660 pr=   8 | f15  -2.15 | f30  -2.18 (pairavg  -0.90, win  8.9) | f60  -1.60 (pairavg  -0.96) | mfe30med   0.4
+   (0.15, 2.11]               n=  659 pr=  10 | f15  -1.35 | f30   0.29 (pairavg  -3.42, win 15.5) | f60   3.16 (pairavg  -2.63) | mfe30med   0.5
+   (2.11, inf]                n=  661 pr=   7 | f15  -3.56 | f30  -4.43 (pairavg  -5.56, win  7.7) | f60  -4.42 (pairavg  -5.99) | mfe30med   0.5
+  -- r60 cov 3290 edges [-0.283, 0.0, 0.0, 0.245]
+   (-inf, -0.283]             n=  659 pr=   8 | f15  -1.38 | f30  -1.03 (pairavg  -3.51, win 21.2) | f60  -0.37 (pairavg  -2.94) | mfe30med   1.0
+   (-0.283, 0]                n= 1620 pr=   8 | f15  -1.69 | f30  -1.30 (pairavg  -3.27, win 10.3) | f60  -0.45 (pairavg  -2.85) | mfe30med   0.5
+   (0, 0.245]                 n=  352 pr=   8 | f15  -2.37 | f30  -2.54 (pairavg  -5.06, win 11.4) | f60  -1.20 (pairavg  -4.14) | mfe30med   0.5
+   (0.245, inf]               n=  657 pr=   9 | f15  -2.69 | f30  -2.68 (pairavg  -5.22, win 14.2) | f60  -2.00 (pairavg  -4.83) | mfe30med   0.7
+  -- r300 cov 3228 edges [-0.574, -0.187, 0.071, 0.487]
+   (-inf, -0.574]             n=  646 pr=   8 | f15  -0.56 | f30  -0.62 (pairavg  -3.16, win 25.1) | f60   0.19 (pairavg  -2.32) | mfe30med   1.2
+   (-0.574, -0.187]           n=  645 pr=   8 | f15  -2.13 | f30  -1.37 (pairavg  -3.77, win 11.6) | f60  -0.66 (pairavg  -3.40) | mfe30med   0.6
+   (-0.187, 0.0711]           n=  644 pr=   8 | f15  -1.92 | f30  -1.25 (pairavg  -3.97, win  8.1) | f60  -0.24 (pairavg  -3.28) | mfe30med   0.4
+   (0.0711, 0.487]            n=  646 pr=   8 | f15  -1.99 | f30  -2.08 (pairavg  -3.95, win  9.6) | f60  -1.16 (pairavg  -3.59) | mfe30med   0.3
+   (0.487, inf]               n=  645 pr=   7 | f15  -2.64 | f30  -2.52 (pairavg  -2.86, win 12.4) | f60  -1.99 (pairavg  -2.58) | mfe30med   0.8
+  -- r900 cov 3095 edges [-0.964, -0.356, 0.095, 0.876]
+   (-inf, -0.964]             n=  620 pr=   7 | f15  -1.01 | f30  -0.70 (pairavg  -1.72, win 29.4) | f60  -0.55 (pairavg  -1.49) | mfe30med   1.7
+   (-0.964, -0.356]           n=  625 pr=   8 | f15  -1.72 | f30  -0.65 (pairavg  -2.99, win 10.2) | f60   0.29 (pairavg  -2.42) | mfe30med   0.6
+   (-0.356, 0.0953]           n=  617 pr=   7 | f15  -1.46 | f30  -0.95 (pairavg  -2.92, win  8.6) | f60  -0.12 (pairavg  -2.80) | mfe30med   0.4
+   (0.0953, 0.876]            n=  615 pr=   7 | f15  -1.83 | f30  -1.54 (pairavg  -2.72, win  7.5) | f60  -0.71 (pairavg  -2.43) | mfe30med   0.4
+   (0.876, inf]               n=  618 pr=   6 | f15  -2.91 | f30  -3.23 (pairavg  -3.56, win 11.0) | f60  -2.16 (pairavg  -2.86) | mfe30med   0.7
+  -- dliq300 cov 3228 edges [-0.323, -0.11, 0.033, 0.255]
+   (-inf, -0.323]             n=  646 pr=   8 | f15  -1.05 | f30  -0.71 (pairavg  -3.05, win 25.5) | f60  -0.03 (pairavg  -2.29) | mfe30med   1.2
+   (-0.323, -0.11]            n=  645 pr=   8 | f15  -1.45 | f30  -1.04 (pairavg  -3.80, win 10.5) | f60  -0.05 (pairavg  -3.56) | mfe30med   0.5
+   (-0.11, 0.0328]            n=  644 pr=   8 | f15  -2.15 | f30  -1.53 (pairavg  -4.06, win  8.4) | f60  -0.77 (pairavg  -3.39) | mfe30med   0.5
+   (0.0328, 0.255]            n=  646 pr=   8 | f15  -1.98 | f30  -2.08 (pairavg  -4.06, win  9.8) | f60  -0.95 (pairavg  -3.44) | mfe30med   0.4
+   (0.255, inf]               n=  645 pr=   7 | f15  -2.62 | f30  -2.48 (pairavg  -2.86, win 12.6) | f60  -2.06 (pairavg  -2.78) | mfe30med   0.8
+  -- age cov 3313 edges [105029.1, 162322.3, 162751.6, 761426.2]
+   (-inf, 1.05e+05]           n=  661 pr=   8 | f15  -3.15 | f30  -3.77 (pairavg  -5.78, win 25.9) | f60  -3.72 (pairavg  -5.82) | mfe30med   2.2
+   (1.05e+05, 1.62e+05]       n=  663 pr=   2 | f15  -0.11 | f30   1.63 (pairavg  -0.54, win 11.0) | f60   5.42 (pairavg   1.40) | mfe30med   0.5
+   (1.62e+05, 1.63e+05]       n=  662 pr=   1 | f15  -1.92 | f30  -1.81 (pairavg  -1.81, win 19.2) | f60  -1.43 (pairavg  -1.43) | mfe30med   0.6
+   (1.63e+05, 7.61e+05]       n=  663 pr=   3 | f15  -2.18 | f30  -2.11 (pairavg  -1.80, win  6.2) | f60  -2.14 (pairavg  -2.02) | mfe30med   0.9
+   (7.61e+05, inf]            n=  662 pr=   2 | f15  -2.23 | f30  -2.39 (pairavg  -2.36, win  4.8) | f60  -2.46 (pairavg  -2.23) | mfe30med   0.3
+=== universe MIDFEE_50k+ samples 10211 pairs 22
+   ALL                        n=10209 pr=  22 | f15  -3.61 | f30  -3.89 (pairavg  -7.67, win 21.1) | f60  -4.41 (pairavg  -7.77) | mfe30med   2.0
+  -- va1h cov 10211 edges [0.269, 0.541, 0.815, 1.22]
+   (-inf, 0.269]              n= 2043 pr=  14 | f15  -3.59 | f30  -3.68 (pairavg  -3.96, win 19.9) | f60  -5.53 (pairavg  -4.73) | mfe30med   1.5
+   (0.269, 0.541]             n= 2040 pr=  15 | f15  -3.55 | f30  -3.99 (pairavg  -4.23, win 22.4) | f60  -5.73 (pairavg  -5.59) | mfe30med   2.4
+   (0.541, 0.815]             n= 2042 pr=  17 | f15  -3.65 | f30  -3.97 (pairavg  -3.83, win 21.6) | f60  -3.32 (pairavg  -3.84) | mfe30med   2.2
+   (0.815, 1.22]              n= 2042 pr=  18 | f15  -3.56 | f30  -3.52 (pairavg  -4.57, win 21.0) | f60  -3.09 (pairavg  -3.70) | mfe30med   1.9
+   (1.22, inf]                n= 2042 pr=  20 | f15  -3.68 | f30  -4.28 (pairavg  -8.75, win 20.6) | f60  -4.36 (pairavg  -9.18) | mfe30med   1.9
+  -- va6h cov 10211 edges [0.199, 0.423, 0.701, 1.056]
+   (-inf, 0.199]              n= 2043 pr=  14 | f15  -3.89 | f30  -4.77 (pairavg  -5.48, win 14.1) | f60  -5.67 (pairavg  -5.76) | mfe30med   1.3
+   (0.199, 0.423]             n= 2040 pr=  15 | f15  -4.48 | f30  -5.17 (pairavg  -5.00, win 19.8) | f60  -7.49 (pairavg  -6.19) | mfe30med   2.3
+   (0.423, 0.701]             n= 2043 pr=  16 | f15  -3.65 | f30  -3.52 (pairavg  -4.06, win 23.8) | f60  -4.20 (pairavg  -4.66) | mfe30med   2.1
+   (0.701, 1.06]              n= 2041 pr=  17 | f15  -2.68 | f30  -2.56 (pairavg  -3.52, win 21.0) | f60  -1.20 (pairavg  -2.86) | mfe30med   1.8
+   (1.06, inf]                n= 2042 pr=  21 | f15  -3.34 | f30  -3.43 (pairavg  -7.99, win 26.8) | f60  -3.47 (pairavg  -8.26) | mfe30med   2.7
+  -- va1h6h cov 10211 edges [0.548, 0.772, 0.983, 1.22]
+   (-inf, 0.548]              n= 2042 pr=  13 | f15  -5.13 | f30  -6.67 (pairavg  -9.05, win  9.2) | f60  -7.14 (pairavg  -7.57) | mfe30med   1.2
+   (0.548, 0.772]             n= 2041 pr=  14 | f15  -3.58 | f30  -4.33 (pairavg  -5.23, win 15.3) | f60  -6.02 (pairavg  -7.74) | mfe30med   1.8
+   (0.772, 0.983]             n= 2042 pr=  16 | f15  -3.43 | f30  -3.10 (pairavg  -3.29, win 26.5) | f60  -2.58 (pairavg  -2.92) | mfe30med   2.6
+   (0.983, 1.22]              n= 2042 pr=  18 | f15  -2.80 | f30  -2.07 (pairavg  -2.46, win 24.8) | f60  -1.20 (pairavg  -2.08) | mfe30med   1.9
+   (1.22, inf]                n= 2042 pr=  19 | f15  -3.09 | f30  -3.27 (pairavg  -8.22, win 29.7) | f60  -5.08 (pairavg  -9.43) | mfe30med   3.3
+  -- ba1h cov 10211 edges [0.301, 0.569, 0.845, 1.185]
+   (-inf, 0.301]              n= 2043 pr=  14 | f15  -3.03 | f30  -2.69 (pairavg  -1.64, win 19.9) | f60  -3.32 (pairavg  -2.14) | mfe30med   1.5
+   (0.301, 0.569]             n= 2041 pr=  15 | f15  -3.66 | f30  -3.84 (pairavg  -4.34, win 23.6) | f60  -5.53 (pairavg  -5.55) | mfe30med   2.4
+   (0.569, 0.845]             n= 2047 pr=  17 | f15  -3.92 | f30  -4.77 (pairavg  -3.99, win 20.1) | f60  -5.68 (pairavg  -4.70) | mfe30med   2.4
+   (0.845, 1.18]              n= 2036 pr=  18 | f15  -3.93 | f30  -4.14 (pairavg  -4.39, win 21.7) | f60  -3.40 (pairavg  -4.39) | mfe30med   2.1
+   (1.18, inf]                n= 2042 pr=  20 | f15  -3.49 | f30  -3.99 (pairavg  -8.50, win 20.3) | f60  -4.10 (pairavg  -8.77) | mfe30med   1.9
+  -- bshare5 cov 10156 edges [0.333, 0.5, 0.609, 0.727]
+   (-inf, 0.333]              n= 2146 pr=  13 | f15  -3.64 | f30  -4.28 (pairavg  -4.74, win 15.1) | f60  -4.48 (pairavg  -4.74) | mfe30med   1.3
+   (0.333, 0.5]               n= 2185 pr=  15 | f15  -3.57 | f30  -3.65 (pairavg  -5.36, win 22.4) | f60  -4.65 (pairavg  -6.53) | mfe30med   2.0
+   (0.5, 0.609]               n= 1798 pr=  16 | f15  -3.76 | f30  -3.67 (pairavg  -3.38, win 21.1) | f60  -4.59 (pairavg  -4.25) | mfe30med   1.9
+   (0.609, 0.727]             n= 2003 pr=  18 | f15  -3.63 | f30  -4.21 (pairavg  -7.49, win 25.6) | f60  -4.77 (pairavg  -7.61) | mfe30med   3.0
+   (0.727, inf]               n= 2022 pr=  19 | f15  -3.44 | f30  -3.60 (pairavg  -8.18, win 22.1) | f60  -3.53 (pairavg  -8.02) | mfe30med   2.4
+  -- bshare1h cov 10211 edges [0.439, 0.522, 0.596, 0.661]
+   (-inf, 0.439]              n= 2043 pr=  11 | f15  -4.11 | f30  -5.23 (pairavg  -5.48, win 13.3) | f60  -6.06 (pairavg  -5.82) | mfe30med   1.4
+   (0.439, 0.522]             n= 2041 pr=  14 | f15  -3.86 | f30  -4.30 (pairavg  -5.38, win 16.1) | f60  -6.13 (pairavg  -7.14) | mfe30med   1.3
+   (0.522, 0.596]             n= 2044 pr=  15 | f15  -3.04 | f30  -2.63 (pairavg  -3.52, win 26.1) | f60  -2.74 (pairavg  -4.94) | mfe30med   2.5
+   (0.596, 0.661]             n= 2040 pr=  14 | f15  -3.92 | f30  -4.62 (pairavg  -3.17, win 17.8) | f60  -3.53 (pairavg  -1.23) | mfe30med   1.9
+   (0.661, inf]               n= 2041 pr=  12 | f15  -3.11 | f30  -2.66 (pairavg  -9.16, win 32.3) | f60  -3.57 (pairavg  -8.13) | mfe30med   4.2
+  -- tx5 cov 10211 edges [9.0, 16.0, 26.0, 99.0]
+   (-inf, 9]                  n= 2227 pr=  13 | f15  -3.43 | f30  -3.70 (pairavg  -3.24, win 14.0) | f60  -3.95 (pairavg  -2.07) | mfe30med   1.1
+   (9, 16]                    n= 2025 pr=  15 | f15  -3.73 | f30  -4.26 (pairavg  -5.85, win 15.4) | f60  -5.46 (pairavg  -6.93) | mfe30med   1.8
+   (16, 26]                   n= 1957 pr=  15 | f15  -3.48 | f30  -3.73 (pairavg  -4.52, win 17.1) | f60  -4.52 (pairavg  -4.74) | mfe30med   1.4
+   (26, 99]                   n= 1966 pr=  14 | f15  -3.73 | f30  -3.85 (pairavg  -4.05, win 23.6) | f60  -4.01 (pairavg  -4.31) | mfe30med   2.0
+   (99, inf]                  n= 2034 pr=  16 | f15  -3.68 | f30  -3.91 (pairavg  -7.20, win 36.1) | f60  -4.14 (pairavg  -7.12) | mfe30med   6.7
+  -- avg_tx_usd cov 10156 edges [29.735, 57.086, 96.565, 165.216]
+   (-inf, 29.7]               n= 2033 pr=  18 | f15  -3.54 | f30  -3.79 (pairavg  -4.68, win 22.5) | f60  -4.28 (pairavg  -4.58) | mfe30med   1.9
+   (29.7, 57.1]               n= 2030 pr=  17 | f15  -3.94 | f30  -4.44 (pairavg  -4.53, win 18.5) | f60  -4.26 (pairavg  -3.65) | mfe30med   2.0
+   (57.1, 96.6]               n= 2029 pr=  17 | f15  -3.73 | f30  -3.98 (pairavg  -6.34, win 24.1) | f60  -4.96 (pairavg  -7.99) | mfe30med   2.4
+   (96.6, 165]                n= 2031 pr=  15 | f15  -3.63 | f30  -3.86 (pairavg  -4.46, win 21.0) | f60  -4.42 (pairavg  -5.04) | mfe30med   1.8
+   (165, inf]                 n= 2031 pr=  14 | f15  -3.21 | f30  -3.36 (pairavg  -5.59, win 19.8) | f60  -4.11 (pairavg  -6.61) | mfe30med   2.0
+  -- dv5_60 cov 10120 edges [0.765, 0.965, 1.04, 1.258]
+   (-inf, 0.765]              n= 2024 pr=  17 | f15  -3.71 | f30  -4.07 (pairavg  -4.15, win 18.5) | f60  -4.74 (pairavg  -4.76) | mfe30med   1.8
+   (0.765, 0.965]             n= 2023 pr=  18 | f15  -3.60 | f30  -3.75 (pairavg  -7.35, win 22.5) | f60  -3.92 (pairavg  -6.94) | mfe30med   2.2
+   (0.965, 1.04]              n= 2024 pr=  19 | f15  -3.59 | f30  -3.90 (pairavg  -7.50, win 19.7) | f60  -4.42 (pairavg  -7.28) | mfe30med   1.8
+   (1.04, 1.26]               n= 2024 pr=  18 | f15  -3.52 | f30  -3.70 (pairavg  -6.70, win 23.8) | f60  -4.03 (pairavg  -7.21) | mfe30med   2.5
+   (1.26, inf]                n= 2023 pr=  18 | f15  -3.62 | f30  -3.99 (pairavg  -4.58, win 21.5) | f60  -4.87 (pairavg  -4.82) | mfe30med   2.0
+  -- dv5_120 cov 10091 edges [0.617, 0.907, 1.091, 1.527]
+   (-inf, 0.617]              n= 2017 pr=  15 | f15  -3.80 | f30  -4.15 (pairavg  -4.53, win 18.7) | f60  -4.59 (pairavg  -4.86) | mfe30med   1.6
+   (0.617, 0.907]             n= 2018 pr=  17 | f15  -3.59 | f30  -3.52 (pairavg  -3.83, win 22.8) | f60  -3.94 (pairavg  -4.14) | mfe30med   2.2
+   (0.907, 1.09]              n= 2018 pr=  18 | f15  -3.51 | f30  -3.79 (pairavg  -7.24, win 19.7) | f60  -4.22 (pairavg  -6.97) | mfe30med   2.0
+   (1.09, 1.53]               n= 2018 pr=  18 | f15  -3.49 | f30  -3.85 (pairavg  -6.96, win 24.3) | f60  -4.26 (pairavg  -7.36) | mfe30med   2.5
+   (1.53, inf]                n= 2018 pr=  17 | f15  -3.65 | f30  -4.10 (pairavg  -4.36, win 20.6) | f60  -4.93 (pairavg  -4.93) | mfe30med   1.9
+  -- db5_60 cov 10175 edges [-3.0, 0.0, 0.0, 2.0]
+   (-inf, -3]                 n= 2064 pr=  18 | f15  -3.58 | f30  -3.70 (pairavg  -6.68, win 26.4) | f60  -3.97 (pairavg  -6.87) | mfe30med   2.9
+   (-3, 0]                    n= 4062 pr=  18 | f15  -3.64 | f30  -3.94 (pairavg  -4.56, win 16.5) | f60  -4.44 (pairavg  -4.50) | mfe30med   1.4
+   (0, 2]                     n= 2025 pr=  17 | f15  -3.54 | f30  -3.87 (pairavg  -3.94, win 18.5) | f60  -4.76 (pairavg  -3.90) | mfe30med   1.7
+   (2, inf]                   n= 2022 pr=  18 | f15  -3.64 | f30  -3.97 (pairavg  -4.20, win 27.7) | f60  -4.39 (pairavg  -4.50) | mfe30med   3.5
+  -- db5_120 cov 10143 edges [-4.0, -1.0, 1.0, 4.0]
+   (-inf, -4]                 n= 2273 pr=  18 | f15  -3.74 | f30  -3.77 (pairavg  -6.80, win 25.1) | f60  -4.06 (pairavg  -7.09) | mfe30med   2.6
+   (-4, -1]                   n= 2157 pr=  17 | f15  -3.39 | f30  -3.75 (pairavg  -4.36, win 18.6) | f60  -4.14 (pairavg  -3.46) | mfe30med   1.5
+   (-1, 1]                    n= 2318 pr=  17 | f15  -3.58 | f30  -3.92 (pairavg  -4.13, win 15.7) | f60  -4.62 (pairavg  -4.31) | mfe30med   1.3
+   (1, 4]                     n= 1506 pr=  17 | f15  -3.66 | f30  -3.96 (pairavg  -3.11, win 19.2) | f60  -4.88 (pairavg  -4.12) | mfe30med   1.9
+   (4, inf]                   n= 1887 pr=  17 | f15  -3.69 | f30  -4.07 (pairavg  -4.13, win 27.7) | f60  -4.40 (pairavg  -4.24) | mfe30med   3.3
+  -- uw5 cov 8637 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 7169 pr=  22 | f15  -3.69 | f30  -4.03 (pairavg  -7.87, win 20.1) | f60  -4.41 (pairavg  -7.96) | mfe30med   1.9
+   (0, inf]                   n= 1468 pr=  15 | f15  -3.37 | f30  -3.20 (pairavg  -3.04, win 31.5) | f60  -4.57 (pairavg  -1.63) | mfe30med   4.6
+  -- rb5 cov 8637 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 7630 pr=  22 | f15  -3.71 | f30  -4.01 (pairavg  -7.89, win 20.4) | f60  -4.46 (pairavg  -8.06) | mfe30med   1.9
+   (0, inf]                   n= 1007 pr=  13 | f15  -3.05 | f30  -3.00 (pairavg  -4.01, win 34.4) | f60  -4.23 (pairavg  -3.99) | mfe30med   6.4
+  -- uw_per_tx cov 8592 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 7124 pr=  22 | f15  -3.69 | f30  -4.03 (pairavg  -7.86, win 20.2) | f60  -4.41 (pairavg  -7.96) | mfe30med   2.0
+   (0, inf]                   n= 1468 pr=  15 | f15  -3.37 | f30  -3.20 (pairavg  -3.04, win 31.5) | f60  -4.57 (pairavg  -1.63) | mfe30med   4.6
+  -- sf_w cov 8637 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 7169 pr=  22 | f15  -3.69 | f30  -4.03 (pairavg  -7.87, win 20.1) | f60  -4.41 (pairavg  -7.96) | mfe30med   1.9
+   (0, inf]                   n= 1468 pr=  15 | f15  -3.37 | f30  -3.20 (pairavg  -3.04, win 31.5) | f60  -4.57 (pairavg  -1.63) | mfe30med   4.6
+  -- sf_bshare cov 1468 edges [0.288, 0.46, 0.573, 0.714]
+   (-inf, 0.288]              n=  295 pr=  11 | f15  -3.14 | f30  -2.26 (pairavg  -0.68, win 35.9) | f60  -4.73 (pairavg  -0.96) | mfe30med   4.0
+   (0.288, 0.46]              n=  293 pr=  11 | f15  -3.03 | f30  -3.96 (pairavg  -3.01, win 32.1) | f60  -4.99 (pairavg   0.64) | mfe30med   5.7
+   (0.46, 0.573]              n=  293 pr=  10 | f15  -0.54 | f30   0.11 (pairavg  -3.06, win 33.1) | f60   4.67 (pairavg  -0.27) | mfe30med   4.7
+   (0.573, 0.714]             n=  294 pr=  11 | f15  -5.38 | f30  -5.09 (pairavg  -3.98, win 29.9) | f60  -9.29 (pairavg  -5.81) | mfe30med   4.2
+   (0.714, inf]               n=  293 pr=  13 | f15  -4.75 | f30  -4.81 (pairavg  -2.30, win 26.6) | f60  -8.51 (pairavg  -2.71) | mfe30med   4.4
+  -- vf_w cov 517 edges [2.0, 5.0, 14.0, 17.0]
+   (-inf, 2]                  n=  133 pr=  12 | f15  -2.75 | f30  -2.09 (pairavg   1.63, win 22.6) | f60  -3.34 (pairavg   2.93) | mfe30med   2.1
+   (2, 5]                     n=   76 pr=   9 | f15  -3.16 | f30  -2.80 (pairavg  -4.33, win 15.8) | f60  -3.40 (pairavg  -6.09) | mfe30med   0.9
+   (5, 14]                    n=  116 pr=   8 | f15  -2.79 | f30  -2.69 (pairavg  -5.63, win 33.6) | f60 -10.98 (pairavg  -6.95) | mfe30med   6.9
+   (14, 17]                   n=  119 pr=   3 | f15  -0.81 | f30   1.16 (pairavg  -2.21, win 56.3) | f60   8.32 (pairavg   5.95) | mfe30med  14.6
+   (17, inf]                  n=   73 pr=   3 | f15  -1.57 | f30   2.74 (pairavg  -0.35, win 50.7) | f60   4.41 (pairavg  10.41) | mfe30med  25.3
+  -- vf_tr cov 517 edges [2.0, 8.0, 22.0, 28.0]
+   (-inf, 2]                  n=  125 pr=  11 | f15  -2.73 | f30  -2.14 (pairavg   2.13, win 21.6) | f60  -3.51 (pairavg   3.73) | mfe30med   2.1
+   (2, 8]                     n=   83 pr=   9 | f15  -3.23 | f30  -3.11 (pairavg  -4.63, win 13.3) | f60  -3.58 (pairavg  -5.81) | mfe30med   0.9
+   (8, 22]                    n=  116 pr=   6 | f15  -4.00 | f30  -4.54 (pairavg  -4.80, win 37.1) | f60  -8.34 (pairavg  -6.80) | mfe30med   6.9
+   (22, 28]                   n=  114 pr=   2 | f15  -1.60 | f30  -1.21 (pairavg  -3.64, win 43.0) | f60   1.28 (pairavg   6.85) | mfe30med  23.2
+   (28, inf]                  n=   79 pr=   3 | f15   1.44 | f30   9.19 (pairavg   1.92, win 69.6) | f60  11.33 (pairavg  13.08) | mfe30med  26.9
+  -- vf_bshare cov 472 edges [0.293, 0.542, 0.717, 0.872]
+   (-inf, 0.293]              n=   95 pr=  11 | f15  -2.60 | f30  -1.10 (pairavg  -3.96, win 32.6) | f60   0.73 (pairavg  -2.81) | mfe30med   3.5
+   (0.293, 0.542]             n=   94 pr=  10 | f15  -1.58 | f30  -2.19 (pairavg  -3.79, win 25.5) | f60  -2.37 (pairavg  -1.01) | mfe30med   4.0
+   (0.542, 0.717]             n=   95 pr=   6 | f15   0.49 | f30   4.02 (pairavg  -1.09, win 46.3) | f60   3.15 (pairavg   1.25) | mfe30med   8.1
+   (0.717, 0.872]             n=   94 pr=   6 | f15  -3.79 | f30  -2.85 (pairavg  -4.68, win 44.7) | f60  -1.72 (pairavg  -4.14) | mfe30med   9.8
+   (0.872, inf]               n=   94 pr=  10 | f15  -3.24 | f30  -1.85 (pairavg  -1.86, win 34.0) | f60  -4.90 (pairavg  -4.20) | mfe30med   5.0
+  -- pc5 cov 10211 edges [-1.51, -0.44, 0.2, 1.33]
+   (-inf, -1.51]              n= 2048 pr=  16 | f15  -3.76 | f30  -4.05 (pairavg  -3.79, win 28.4) | f60  -4.76 (pairavg  -3.98) | mfe30med   3.4
+   (-1.51, -0.44]             n= 2037 pr=  17 | f15  -3.47 | f30  -3.50 (pairavg  -3.47, win 19.0) | f60  -4.18 (pairavg  -3.83) | mfe30med   1.7
+   (-0.44, 0.2]               n= 2060 pr=  18 | f15  -3.31 | f30  -3.63 (pairavg  -4.35, win 14.0) | f60  -3.95 (pairavg  -4.17) | mfe30med   1.1
+   (0.2, 1.33]                n= 2029 pr=  19 | f15  -3.18 | f30  -3.25 (pairavg  -3.60, win 19.1) | f60  -3.64 (pairavg  -3.51) | mfe30med   1.5
+   (1.33, inf]                n= 2035 pr=  18 | f15  -4.33 | f30  -5.02 (pairavg  -8.19, win 25.1) | f60  -5.50 (pairavg  -8.65) | mfe30med   3.3
+  -- pc1h cov 10211 edges [-6.38, -2.03, 0.68, 5.4]
+   (-inf, -6.38]              n= 2042 pr=  13 | f15  -3.34 | f30  -3.70 (pairavg  -3.37, win 33.0) | f60  -4.24 (pairavg  -3.80) | mfe30med   4.3
+   (-6.38, -2.03]             n= 2046 pr=  15 | f15  -3.14 | f30  -2.66 (pairavg  -0.27, win 24.4) | f60  -2.42 (pairavg  -0.31) | mfe30med   2.0
+   (-2.03, 0.68]              n= 2037 pr=  18 | f15  -3.33 | f30  -3.34 (pairavg  -5.39, win 15.1) | f60  -3.64 (pairavg  -5.30) | mfe30med   1.2
+   (0.68, 5.4]                n= 2045 pr=  18 | f15  -3.57 | f30  -4.00 (pairavg  -3.95, win 13.9) | f60  -4.78 (pairavg  -4.04) | mfe30med   1.1
+   (5.4, inf]                 n= 2039 pr=  16 | f15  -4.66 | f30  -5.74 (pairavg  -9.89, win 19.1) | f60  -6.96 (pairavg -10.20) | mfe30med   2.4
+  -- r60 cov 10175 edges [-0.783, -0.049, 0.068, 0.822]
+   (-inf, -0.783]             n= 2036 pr=  18 | f15  -3.18 | f30  -3.21 (pairavg  -3.44, win 27.8) | f60  -3.62 (pairavg  -3.82) | mfe30med   3.1
+   (-0.783, -0.0493]          n= 2034 pr=  17 | f15  -3.60 | f30  -3.84 (pairavg  -3.95, win 19.7) | f60  -4.05 (pairavg  -3.31) | mfe30med   1.9
+   (-0.0493, 0.0681]          n= 2035 pr=  18 | f15  -3.54 | f30  -3.96 (pairavg  -5.53, win 11.4) | f60  -4.40 (pairavg  -5.06) | mfe30med   1.1
+   (0.0681, 0.822]            n= 2035 pr=  17 | f15  -3.45 | f30  -3.78 (pairavg  -4.09, win 21.6) | f60  -4.47 (pairavg  -4.13) | mfe30med   1.9
+   (0.822, inf]               n= 2033 pr=  18 | f15  -4.28 | f30  -4.63 (pairavg  -7.42, win 25.1) | f60  -5.46 (pairavg  -7.96) | mfe30med   3.1
+  -- r300 cov 10056 edges [-1.66, -0.518, 0.207, 1.478]
+   (-inf, -1.66]              n= 2013 pr=  16 | f15  -3.77 | f30  -3.95 (pairavg  -3.24, win 29.3) | f60  -4.62 (pairavg  -3.50) | mfe30med   3.4
+   (-1.66, -0.518]            n= 2009 pr=  17 | f15  -3.49 | f30  -3.75 (pairavg  -3.31, win 18.9) | f60  -3.99 (pairavg  -3.44) | mfe30med   1.7
+   (-0.518, 0.207]            n= 2011 pr=  17 | f15  -3.23 | f30  -3.57 (pairavg  -3.09, win 13.3) | f60  -4.05 (pairavg  -4.06) | mfe30med   1.2
+   (0.207, 1.48]              n= 2011 pr=  17 | f15  -3.36 | f30  -3.45 (pairavg  -3.34, win 18.6) | f60  -3.83 (pairavg  -3.18) | mfe30med   1.3
+   (1.48, inf]                n= 2010 pr=  17 | f15  -4.24 | f30  -4.67 (pairavg  -8.13, win 26.1) | f60  -5.28 (pairavg  -8.77) | mfe30med   3.5
+  -- r900 cov 9796 edges [-3.352, -0.903, 0.351, 2.464]
+   (-inf, -3.35]              n= 1959 pr=  16 | f15  -3.77 | f30  -3.19 (pairavg  -2.05, win 31.7) | f60  -4.12 (pairavg  -2.09) | mfe30med   3.3
+   (-3.35, -0.903]            n= 1959 pr=  17 | f15  -3.46 | f30  -3.55 (pairavg  -3.34, win 24.1) | f60  -3.87 (pairavg  -3.31) | mfe30med   1.9
+   (-0.903, 0.351]            n= 1959 pr=  17 | f15  -3.15 | f30  -3.39 (pairavg  -3.76, win 15.3) | f60  -3.58 (pairavg  -4.40) | mfe30med   1.2
+   (0.351, 2.46]              n= 1959 pr=  17 | f15  -3.44 | f30  -3.97 (pairavg  -3.33, win 14.7) | f60  -4.45 (pairavg  -4.69) | mfe30med   1.2
+   (2.46, inf]                n= 1958 pr=  16 | f15  -4.29 | f30  -5.24 (pairavg  -8.68, win 20.9) | f60  -5.37 (pairavg  -9.03) | mfe30med   2.9
+  -- dliq300 cov 10056 edges [-0.855, -0.269, 0.111, 0.753]
+   (-inf, -0.855]             n= 2011 pr=  16 | f15  -3.79 | f30  -3.95 (pairavg  -3.17, win 29.2) | f60  -4.63 (pairavg  -3.43) | mfe30med   3.4
+   (-0.855, -0.269]           n= 2011 pr=  17 | f15  -3.47 | f30  -3.83 (pairavg  -3.40, win 18.9) | f60  -4.06 (pairavg  -3.52) | mfe30med   1.7
+   (-0.269, 0.111]            n= 2011 pr=  17 | f15  -3.28 | f30  -3.54 (pairavg  -3.11, win 13.2) | f60  -4.00 (pairavg  -3.89) | mfe30med   1.1
+   (0.111, 0.753]             n= 2011 pr=  17 | f15  -3.24 | f30  -3.29 (pairavg  -3.15, win 19.1) | f60  -3.69 (pairavg  -3.09) | mfe30med   1.4
+   (0.753, inf]               n= 2010 pr=  17 | f15  -4.31 | f30  -4.79 (pairavg  -8.15, win 25.7) | f60  -5.40 (pairavg  -8.82) | mfe30med   3.5
+  -- age cov 10211 edges [888.3, 5097.8, 13584.4, 31714.6]
+   (-inf, 888]                n= 2043 pr=   7 | f15  -2.11 | f30  -0.78 (pairavg -11.73, win 35.3) | f60   1.17 (pairavg -10.05) | mfe30med   4.7
+   (888, 5.1e+03]             n= 2041 pr=   8 | f15  -5.14 | f30  -7.20 (pairavg  -7.97, win 13.3) | f60 -10.23 (pairavg  -9.89) | mfe30med   1.9
+   (5.1e+03, 1.36e+04]        n= 2042 pr=   5 | f15  -4.13 | f30  -4.35 (pairavg  -5.60, win 26.2) | f60  -5.59 (pairavg  -5.64) | mfe30med   3.1
+   (1.36e+04, 3.17e+04]       n= 2041 pr=   4 | f15  -3.40 | f30  -3.65 (pairavg  -3.82, win 17.1) | f60  -4.05 (pairavg  -3.13) | mfe30med   1.3
+   (3.17e+04, inf]            n= 2042 pr=   5 | f15  -3.26 | f30  -3.47 (pairavg  -4.08, win 13.7) | f60  -3.35 (pairavg  -4.07) | mfe30med   1.1
+=== universe HIFEE_50-250k samples 7791 pairs 82
+   ALL                        n= 7783 pr=  82 | f15  -6.01 | f30  -6.08 (pairavg -15.67, win 26.0) | f60  -6.57 (pairavg -14.92) | mfe30med   4.0
+  -- va1h cov 7201 edges [0.407, 0.625, 0.898, 1.399]
+   (-inf, 0.407]              n= 1438 pr=  12 | f15  -3.53 | f30  -3.61 (pairavg -11.17, win 33.0) | f60  -4.07 (pairavg -13.71) | mfe30med   3.7
+   (0.407, 0.625]             n= 1438 pr=  17 | f15  -4.28 | f30  -3.74 (pairavg   3.52, win 31.1) | f60  -2.82 (pairavg  -2.22) | mfe30med   5.0
+   (0.625, 0.898]             n= 1439 pr=  17 | f15  -5.49 | f30  -3.26 (pairavg  -6.01, win 31.5) | f60  -5.99 (pairavg  -7.30) | mfe30med   5.3
+   (0.898, 1.4]               n= 1440 pr=  18 | f15  -6.54 | f30  -7.97 (pairavg -31.34, win 27.4) | f60  -9.61 (pairavg -19.46) | mfe30med   5.3
+   (1.4, inf]                 n= 1438 pr=  76 | f15 -10.88 | f30 -12.53 (pairavg -16.83, win 17.5) | f60 -11.23 (pairavg -13.78) | mfe30med   4.6
+  -- va6h cov 7623 edges [0.316, 0.591, 0.916, 1.72]
+   (-inf, 0.316]              n= 1523 pr=  10 | f15  -4.72 | f30  -5.63 (pairavg  -9.13, win 18.5) | f60  -7.58 (pairavg -12.42) | mfe30med   1.1
+   (0.316, 0.591]             n= 1522 pr=  10 | f15  -4.33 | f30  -3.75 (pairavg  -6.90, win 29.1) | f60  -4.84 (pairavg  -8.86) | mfe30med   4.5
+   (0.591, 0.916]             n= 1524 pr=  11 | f15  -4.42 | f30  -4.73 (pairavg  -6.91, win 31.1) | f60  -4.86 (pairavg  -7.56) | mfe30med   5.9
+   (0.916, 1.72]              n= 1525 pr=  13 | f15  -3.61 | f30  -3.40 (pairavg -14.55, win 31.2) | f60  -5.33 (pairavg -18.73) | mfe30med   4.8
+   (1.72, inf]                n= 1521 pr=  82 | f15 -13.16 | f30 -13.10 (pairavg -15.63, win 22.9) | f60 -10.46 (pairavg -14.78) | mfe30med   5.9
+  -- va1h6h cov 7623 edges [0.602, 0.839, 1.221, 1.704]
+   (-inf, 0.602]              n= 1523 pr=  11 | f15  -6.37 | f30  -7.99 (pairavg  -8.69, win 12.0) | f60 -11.09 (pairavg -14.33) | mfe30med   1.4
+   (0.602, 0.839]             n= 1524 pr=   9 | f15  -3.73 | f30  -4.78 (pairavg  -5.80, win 27.3) | f60  -7.75 (pairavg  -9.39) | mfe30med   4.1
+   (0.839, 1.22]              n= 1522 pr=   9 | f15  -5.86 | f30  -4.39 (pairavg -11.40, win 29.6) | f60  -4.34 (pairavg -13.67) | mfe30med   4.5
+   (1.22, 1.7]                n= 1525 pr=  12 | f15  -3.23 | f30  -3.27 (pairavg -24.50, win 35.9) | f60  -2.24 (pairavg -25.57) | mfe30med   6.1
+   (1.7, inf]                 n= 1521 pr=  81 | f15 -11.05 | f30 -10.18 (pairavg -15.05, win 28.0) | f60  -7.65 (pairavg -14.20) | mfe30med   5.2
+  -- ba1h cov 7201 edges [0.525, 0.803, 0.942, 1.224]
+   (-inf, 0.525]              n= 1439 pr=  13 | f15  -3.91 | f30  -3.82 (pairavg -14.51, win 31.2) | f60  -5.35 (pairavg -17.20) | mfe30med   3.7
+   (0.525, 0.803]             n= 1436 pr=  14 | f15  -5.19 | f30  -6.13 (pairavg -25.75, win 30.9) | f60  -6.14 (pairavg -27.92) | mfe30med   5.5
+   (0.803, 0.942]             n= 1440 pr=  16 | f15  -5.63 | f30  -6.23 (pairavg  -5.90, win 31.1) | f60  -9.66 (pairavg  -9.04) | mfe30med   5.9
+   (0.942, 1.22]              n= 1439 pr=  15 | f15  -5.87 | f30  -5.12 (pairavg  -3.77, win 28.0) | f60  -5.36 (pairavg  -5.60) | mfe30med   5.3
+   (1.22, inf]                n= 1439 pr=  78 | f15 -10.13 | f30  -9.81 (pairavg -14.45, win 19.3) | f60  -7.22 (pairavg -12.81) | mfe30med   4.4
+  -- bshare5 cov 7110 edges [0.471, 0.552, 0.622, 0.715]
+   (-inf, 0.471]              n= 1432 pr=  10 | f15  -5.19 | f30  -5.40 (pairavg -15.44, win 34.4) | f60  -6.43 (pairavg -18.27) | mfe30med   5.5
+   (0.471, 0.552]             n= 1408 pr=  18 | f15  -5.80 | f30  -4.96 (pairavg -18.57, win 33.7) | f60  -4.87 (pairavg -19.76) | mfe30med   7.7
+   (0.552, 0.622]             n= 1421 pr=  30 | f15  -7.20 | f30  -6.04 (pairavg -17.60, win 30.3) | f60  -5.54 (pairavg -12.76) | mfe30med   7.4
+   (0.622, 0.715]             n= 1421 pr=  13 | f15  -3.57 | f30  -3.45 (pairavg -20.57, win 31.5) | f60  -3.99 (pairavg -21.53) | mfe30med   5.2
+   (0.715, inf]               n= 1420 pr=  58 | f15  -8.91 | f30 -11.03 (pairavg -13.56, win 12.5) | f60 -12.42 (pairavg -14.58) | mfe30med   2.7
+  -- bshare1h cov 7201 edges [0.503, 0.538, 0.588, 0.71]
+   (-inf, 0.503]              n= 1440 pr=  10 | f15  -5.25 | f30  -4.54 (pairavg -17.93, win 35.6) | f60  -1.51 (pairavg -16.97) | mfe30med   5.6
+   (0.503, 0.538]             n= 1436 pr=  12 | f15  -5.93 | f30  -6.62 (pairavg -28.14, win 30.6) | f60  -8.44 (pairavg -29.87) | mfe30med   6.7
+   (0.538, 0.588]             n= 1438 pr=  28 | f15  -7.64 | f30  -4.73 (pairavg -17.13, win 31.2) | f60  -2.50 (pairavg -14.03) | mfe30med   7.6
+   (0.588, 0.71]              n= 1440 pr=  13 | f15  -4.12 | f30  -5.26 (pairavg -12.44, win 34.7) | f60  -9.83 (pairavg -13.92) | mfe30med   7.2
+   (0.71, inf]                n= 1439 pr=  52 | f15  -7.79 | f30  -9.97 (pairavg -14.17, win  8.5) | f60 -11.45 (pairavg -14.91) | mfe30med   1.8
+  -- tx5 cov 7791 edges [17.0, 32.0, 96.0, 238.0]
+   (-inf, 17]                 n= 1565 pr=  25 | f15  -4.19 | f30  -3.96 (pairavg  -9.48, win 16.4) | f60  -4.78 (pairavg  -9.60) | mfe30med   0.3
+   (17, 32]                   n= 1557 pr=  16 | f15  -3.25 | f30  -1.98 (pairavg  -6.84, win 32.2) | f60  -0.33 (pairavg  -6.36) | mfe30med   3.8
+   (32, 96]                   n= 1551 pr=  28 | f15  -4.55 | f30  -5.19 (pairavg -10.46, win 24.0) | f60  -5.54 (pairavg -11.05) | mfe30med   4.5
+   (96, 238]                  n= 1557 pr=  21 | f15  -7.21 | f30  -6.83 (pairavg  -5.28, win 30.0) | f60  -7.82 (pairavg  -7.63) | mfe30med   4.8
+   (238, inf]                 n= 1553 pr=  36 | f15 -10.86 | f30 -12.46 (pairavg -22.79, win 27.3) | f60 -14.40 (pairavg -17.31) | mfe30med   8.8
+  -- avg_tx_usd cov 7110 edges [23.512, 35.748, 54.612, 86.929]
+   (-inf, 23.5]               n= 1423 pr=  29 | f15  -4.35 | f30  -4.81 (pairavg -11.90, win 20.7) | f60  -5.87 (pairavg -11.87) | mfe30med   2.9
+   (23.5, 35.7]               n= 1421 pr=  13 | f15  -3.82 | f30  -4.14 (pairavg  -8.13, win 30.5) | f60  -7.04 (pairavg  -9.17) | mfe30med   7.2
+   (35.7, 54.6]               n= 1420 pr=  15 | f15  -4.16 | f30  -4.06 (pairavg -14.52, win 33.0) | f60  -3.36 (pairavg -15.23) | mfe30med   6.7
+   (54.6, 86.9]               n= 1420 pr=  21 | f15  -7.06 | f30  -6.89 (pairavg -18.72, win 32.0) | f60  -6.44 (pairavg -21.01) | mfe30med   6.7
+   (86.9, inf]                n= 1418 pr=  54 | f15 -11.29 | f30 -10.99 (pairavg -16.32, win 26.2) | f60 -10.55 (pairavg -14.71) | mfe30med   5.4
+  -- dv5_60 cov 6967 edges [0.826, 0.97, 1.038, 1.2]
+   (-inf, 0.826]              n= 1394 pr=  19 | f15  -5.66 | f30  -5.13 (pairavg -29.26, win 28.5) | f60  -4.41 (pairavg -20.36) | mfe30med   4.3
+   (0.826, 0.97]              n= 1389 pr=  19 | f15  -6.72 | f30  -6.10 (pairavg -16.70, win 30.7) | f60  -6.88 (pairavg -17.15) | mfe30med   5.4
+   (0.97, 1.04]               n= 1393 pr=  29 | f15  -6.60 | f30  -6.36 (pairavg -19.28, win 29.6) | f60  -8.27 (pairavg -18.79) | mfe30med   6.5
+   (1.04, 1.2]                n= 1392 pr=  24 | f15  -6.19 | f30  -6.96 (pairavg -15.97, win 27.6) | f60  -7.42 (pairavg -15.32) | mfe30med   5.4
+   (1.2, inf]                 n= 1391 pr=  22 | f15  -4.86 | f30  -5.66 (pairavg -19.56, win 28.1) | f60  -5.85 (pairavg -20.71) | mfe30med   4.0
+  -- dv5_120 cov 6916 edges [0.713, 0.94, 1.065, 1.376]
+   (-inf, 0.713]              n= 1384 pr=  14 | f15  -5.32 | f30  -4.82 (pairavg -13.01, win 28.1) | f60  -3.87 (pairavg  -3.30) | mfe30med   4.2
+   (0.713, 0.94]              n= 1382 pr=  19 | f15  -6.36 | f30  -4.10 (pairavg -14.27, win 32.2) | f60  -4.90 (pairavg -14.68) | mfe30med   5.8
+   (0.94, 1.06]               n= 1382 pr=  19 | f15  -6.79 | f30  -7.58 (pairavg -21.70, win 27.9) | f60 -10.28 (pairavg -23.84) | mfe30med   6.4
+   (1.06, 1.38]               n= 1381 pr=  20 | f15  -6.37 | f30  -7.55 (pairavg -18.97, win 29.0) | f60  -7.56 (pairavg -15.72) | mfe30med   5.3
+   (1.38, inf]                n= 1379 pr=  15 | f15  -5.03 | f30  -6.03 (pairavg -20.53, win 27.5) | f60  -6.19 (pairavg -21.31) | mfe30med   4.4
+  -- db5_60 cov 7645 edges [-5.0, 0.0, 1.0, 5.0]
+   (-inf, -5]                 n= 1544 pr=  20 | f15  -8.37 | f30  -7.24 (pairavg -24.94, win 26.9) | f60  -8.14 (pairavg -22.17) | mfe30med   5.3
+   (-5, 0]                    n= 2854 pr=  22 | f15  -4.29 | f30  -4.21 (pairavg -19.55, win 23.7) | f60  -4.30 (pairavg -21.83) | mfe30med   2.4
+   (0, 1]                     n=  558 pr=  13 | f15  -4.64 | f30  -4.70 (pairavg -17.86, win 29.6) | f60  -5.30 (pairavg -22.85) | mfe30med   3.9
+   (1, 5]                     n= 1243 pr=  15 | f15  -4.26 | f30  -4.08 (pairavg  -4.92, win 31.7) | f60  -4.38 (pairavg  -9.07) | mfe30med   4.9
+   (5, inf]                   n= 1438 pr=  30 | f15  -8.29 | f30 -10.15 (pairavg -18.12, win 25.1) | f60 -11.34 (pairavg -15.18) | mfe30med   6.2
+  -- db5_120 cov 7592 edges [-8.0, -1.0, 1.0, 8.0]
+   (-inf, -8]                 n= 1541 pr=  20 | f15  -8.65 | f30  -7.69 (pairavg -26.03, win 26.4) | f60  -8.68 (pairavg -23.30) | mfe30med   5.2
+   (-8, -1]                   n= 1697 pr=  16 | f15  -3.53 | f30  -2.96 (pairavg  -4.17, win 33.1) | f60  -2.93 (pairavg  -7.52) | mfe30med   5.0
+   (-1, 1]                    n= 1398 pr=  14 | f15  -4.78 | f30  -4.69 (pairavg -27.09, win 16.1) | f60  -5.15 (pairavg -30.12) | mfe30med   0.3
+   (1, 8]                     n= 1549 pr=  15 | f15  -4.85 | f30  -4.29 (pairavg  -1.08, win 30.1) | f60  -4.80 (pairavg  -5.86) | mfe30med   4.1
+   (8, inf]                   n= 1399 pr=  20 | f15  -7.81 | f30 -10.64 (pairavg -20.40, win 24.2) | f60 -11.55 (pairavg -15.74) | mfe30med   6.4
+  -- uw5 cov 7058 edges [0.0, 0.0, 0.0, 3.0]
+   (-inf, 0]                  n= 5551 pr=  78 | f15  -5.44 | f30  -4.71 (pairavg -14.22, win 27.3) | f60  -4.18 (pairavg -13.96) | mfe30med   3.5
+   (0, 3]                     n=  119 pr=  12 | f15  -5.48 | f30  -8.34 (pairavg -20.92, win 13.4) | f60  -6.91 (pairavg  -4.54) | mfe30med   3.4
+   (3, inf]                   n= 1381 pr=  18 | f15  -8.53 | f30 -11.42 (pairavg -15.53, win 24.2) | f60 -16.28 (pairavg -13.92) | mfe30med   8.5
+  -- rb5 cov 7058 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 6005 pr=  79 | f15  -5.51 | f30  -4.73 (pairavg -14.93, win 26.8) | f60  -4.54 (pairavg -14.64) | mfe30med   3.6
+   (0, inf]                   n= 1046 pr=  14 | f15  -9.13 | f30 -13.86 (pairavg -25.66, win 24.3) | f60 -18.41 (pairavg -11.93) | mfe30med   9.4
+  -- uw_per_tx cov 6515 edges [0.0, 0.0, 0.0, 0.074]
+   (-inf, 0]                  n= 5008 pr=  78 | f15  -5.52 | f30  -4.67 (pairavg -14.21, win 30.3) | f60  -4.02 (pairavg -14.06) | mfe30med   4.3
+   (0, 0.0741]                n=  198 pr=  15 | f15 -14.54 | f30  -9.36 (pairavg -16.64, win 19.2) | f60  -6.26 (pairavg -13.15) | mfe30med   4.7
+   (0.0741, inf]              n= 1302 pr=  16 | f15  -7.34 | f30 -11.45 (pairavg -13.25, win 24.0) | f60 -16.95 (pairavg  -8.61) | mfe30med   8.4
+  -- sf_w cov 7058 edges [0.0, 0.0, 0.0, 3.0]
+   (-inf, 0]                  n= 5551 pr=  78 | f15  -5.44 | f30  -4.71 (pairavg -14.22, win 27.3) | f60  -4.18 (pairavg -13.96) | mfe30med   3.5
+   (0, 3]                     n=  119 pr=  12 | f15  -5.48 | f30  -8.34 (pairavg -20.92, win 13.4) | f60  -6.91 (pairavg  -4.54) | mfe30med   3.4
+   (3, inf]                   n= 1381 pr=  18 | f15  -8.53 | f30 -11.42 (pairavg -15.53, win 24.2) | f60 -16.28 (pairavg -13.92) | mfe30med   8.5
+  -- sf_bshare cov 1500 edges [0.356, 0.479, 0.527, 0.602]
+   (-inf, 0.356]              n=  301 pr=  11 | f15  -7.72 | f30 -11.06 (pairavg -22.90, win 15.3) | f60 -15.98 (pairavg -25.20) | mfe30med   3.4
+   (0.356, 0.479]             n=  300 pr=  11 | f15  -8.87 | f30 -12.93 (pairavg -25.64, win 28.3) | f60 -16.20 (pairavg -11.43) | mfe30med  10.7
+   (0.479, 0.527]             n=  300 pr=   8 | f15 -12.18 | f30  -9.17 (pairavg   7.72, win 25.0) | f60 -13.98 (pairavg   6.79) | mfe30med  10.4
+   (0.527, 0.602]             n=  300 pr=   8 | f15  -8.35 | f30 -15.02 (pairavg   5.69, win 24.0) | f60 -22.35 (pairavg  -1.48) | mfe30med   8.8
+   (0.602, inf]               n=  299 pr=  15 | f15  -4.31 | f30  -7.67 (pairavg -21.45, win 24.1) | f60  -9.14 (pairavg -23.52) | mfe30med   7.0
+  -- vf_w cov 214 edges [2.0, 10.0, 28.0, 34.0]
+   (-inf, 2]                  n=   55 pr=   5 | f15  -5.60 | f30  -6.97 (pairavg  -5.13, win  9.1) | f60  -6.72 (pairavg -10.49) | mfe30med   1.8
+   (2, 10]                    n=   31 pr=   5 | f15  -6.17 | f30  -9.68 (pairavg  -9.59, win 16.1) | f60 -16.50 (pairavg  -9.40) | mfe30med   4.8
+   (10, 28]                   n=   47 pr=   4 | f15 -27.60 | f30 -44.71 (pairavg -37.63, win 23.4) | f60 -62.61 (pairavg -55.09) | mfe30med  11.9
+   (28, 34]                   n=   44 pr=   2 | f15  -5.04 | f30  -2.77 (pairavg  -8.36, win 45.5) | f60  -9.11 (pairavg -11.60) | mfe30med  10.2
+   (34, inf]                  n=   37 pr=   1 | f15  -7.66 | f30 -12.03 (pairavg -12.03, win 21.6) | f60 -13.39 (pairavg -13.39) | mfe30med   8.8
+  -- vf_tr cov 214 edges [3.0, 14.0, 39.0, 49.0]
+   (-inf, 3]                  n=   53 pr=   5 | f15  -5.39 | f30  -6.48 (pairavg  -8.16, win 11.3) | f60  -7.54 (pairavg -11.56) | mfe30med   2.1
+   (3, 14]                    n=   34 pr=   6 | f15  -5.15 | f30 -11.09 (pairavg -24.38, win 14.7) | f60 -17.03 (pairavg -24.19) | mfe30med   3.9
+   (14, 39]                   n=   42 pr=   6 | f15 -31.53 | f30 -50.63 (pairavg -36.21, win 19.0) | f60 -70.63 (pairavg -43.62) | mfe30med  11.9
+   (39, 49]                   n=   46 pr=   1 | f15  -3.53 | f30  -1.68 (pairavg  -1.68, win 45.7) | f60  -9.08 (pairavg  -9.08) | mfe30med  12.0
+   (49, inf]                  n=   39 pr=   1 | f15  -9.09 | f30 -10.97 (pairavg -10.97, win 23.1) | f60  -9.15 (pairavg  -9.15) | mfe30med   6.2
+   vf_bshare coverage too low 199
+  -- pc5 cov 7791 edges [-3.06, -0.16, 0.49, 3.36]
+   (-inf, -3.06]              n= 1558 pr=  18 | f15  -6.34 | f30  -5.57 (pairavg -15.84, win 34.7) | f60  -5.80 (pairavg -13.03) | mfe30med   8.1
+   (-3.06, -0.16]             n= 1556 pr=  20 | f15  -3.74 | f30  -3.63 (pairavg -11.92, win 30.8) | f60  -4.22 (pairavg -10.16) | mfe30med   4.0
+   (-0.16, 0.49]              n= 1564 pr=  21 | f15  -4.19 | f30  -4.27 (pairavg -12.26, win 12.9) | f60  -4.50 (pairavg -14.88) | mfe30med   0.5
+   (0.49, 3.36]               n= 1553 pr=  25 | f15  -5.13 | f30  -4.31 (pairavg -10.87, win 27.6) | f60  -5.21 (pairavg -14.92) | mfe30med   3.8
+   (3.36, inf]                n= 1552 pr=  67 | f15 -10.66 | f30 -12.63 (pairavg -18.54, win 23.8) | f60 -13.15 (pairavg -16.71) | mfe30med   7.4
+  -- pc1h cov 7791 edges [-10.69, 0.0, 4.11, 18.07]
+   (-inf, -10.7]              n= 1554 pr=  10 | f15  -4.21 | f30  -2.10 (pairavg -11.38, win 40.2) | f60  -1.44 (pairavg  -9.76) | mfe30med   7.0
+   (-10.7, 0]                 n= 2070 pr=  19 | f15  -5.49 | f30  -6.25 (pairavg -13.62, win 15.5) | f60  -6.78 (pairavg -14.70) | mfe30med   1.9
+   (0, 4.11]                  n= 1047 pr=  20 | f15  -5.55 | f30  -5.60 (pairavg -14.79, win 15.1) | f60  -7.41 (pairavg -15.40) | mfe30med   2.3
+   (4.11, 18.1]               n= 1556 pr=  24 | f15  -2.63 | f30  -3.50 (pairavg -10.42, win 27.0) | f60  -5.84 (pairavg -12.50) | mfe30med   3.6
+   (18.1, inf]                n= 1556 pr=  53 | f15 -12.18 | f30 -12.73 (pairavg -17.93, win 32.0) | f60 -11.58 (pairavg -16.60) | mfe30med  10.2
+  -- r60 cov 7645 edges [-1.27, -0.086, 0.097, 1.332]
+   (-inf, -1.27]              n= 1527 pr=  21 | f15  -7.08 | f30  -7.36 (pairavg -16.64, win 32.4) | f60  -7.49 (pairavg -12.37) | mfe30med   8.0
+   (-1.27, -0.0864]           n= 1527 pr=  18 | f15  -4.59 | f30  -4.38 (pairavg  -9.96, win 29.3) | f60  -4.92 (pairavg -12.41) | mfe30med   4.3
+   (-0.0864, 0.0975]          n= 1529 pr=  17 | f15  -4.11 | f30  -4.34 (pairavg -12.45, win 12.4) | f60  -4.51 (pairavg -14.35) | mfe30med   0.4
+   (0.0975, 1.33]             n= 1529 pr=  17 | f15  -4.00 | f30  -3.30 (pairavg  -2.79, win 28.9) | f60  -4.61 (pairavg -10.12) | mfe30med   3.9
+   (1.33, inf]                n= 1525 pr=  30 | f15  -9.68 | f30 -10.40 (pairavg -22.71, win 28.7) | f60 -10.93 (pairavg -19.98) | mfe30med   7.0
+  -- r300 cov 7505 edges [-3.403, -0.276, 0.46, 3.177]
+   (-inf, -3.4]               n= 1500 pr=  16 | f15  -6.90 | f30  -6.54 (pairavg -14.46, win 34.2) | f60  -6.70 (pairavg -12.00) | mfe30med   7.7
+   (-3.4, -0.276]             n= 1499 pr=  16 | f15  -3.76 | f30  -3.51 (pairavg -12.09, win 31.8) | f60  -4.27 (pairavg -13.83) | mfe30med   4.5
+   (-0.276, 0.46]             n= 1500 pr=  14 | f15  -4.00 | f30  -3.66 (pairavg   3.79, win 13.7) | f60  -4.12 (pairavg   1.85) | mfe30med   0.5
+   (0.46, 3.18]               n= 1501 pr=  15 | f15  -4.27 | f30  -3.80 (pairavg  -3.04, win 26.6) | f60  -4.69 (pairavg  -9.15) | mfe30med   3.5
+   (3.18, inf]                n= 1497 pr=  18 | f15 -10.08 | f30 -11.62 (pairavg -27.88, win 25.5) | f60 -12.49 (pairavg -23.20) | mfe30med   7.7
+  -- r900 cov 7243 edges [-6.771, -0.687, 0.949, 5.486]
+   (-inf, -6.77]              n= 1446 pr=  15 | f15  -7.28 | f30  -7.69 (pairavg  -3.75, win 32.4) | f60  -6.43 (pairavg  -6.03) | mfe30med   6.9
+   (-6.77, -0.687]            n= 1447 pr=  13 | f15  -4.19 | f30  -4.33 (pairavg -11.29, win 28.5) | f60  -5.63 (pairavg -18.89) | mfe30med   4.3
+   (-0.687, 0.949]            n= 1447 pr=  13 | f15  -4.26 | f30  -4.22 (pairavg  -9.15, win 12.8) | f60  -4.57 (pairavg -10.24) | mfe30med   0.4
+   (0.949, 5.49]              n= 1449 pr=  12 | f15  -2.92 | f30  -2.69 (pairavg -12.25, win 28.9) | f60  -4.58 (pairavg -14.96) | mfe30med   3.5
+   (5.49, inf]                n= 1446 pr=  15 | f15  -7.88 | f30  -9.20 (pairavg -33.71, win 28.7) | f60  -9.51 (pairavg -34.44) | mfe30med   8.3
+  -- dliq300 cov 7505 edges [-1.753, -0.156, 0.248, 1.637]
+   (-inf, -1.75]              n= 1500 pr=  16 | f15  -6.72 | f30  -6.64 (pairavg -14.72, win 33.9) | f60  -6.78 (pairavg -12.03) | mfe30med   7.7
+   (-1.75, -0.156]            n= 1499 pr=  17 | f15  -3.93 | f30  -3.68 (pairavg -11.54, win 31.6) | f60  -4.44 (pairavg -13.69) | mfe30med   4.5
+   (-0.156, 0.248]            n= 1500 pr=  13 | f15  -3.96 | f30  -3.62 (pairavg   4.18, win 13.9) | f60  -4.00 (pairavg   2.04) | mfe30med   0.5
+   (0.248, 1.64]              n= 1501 pr=  15 | f15  -4.27 | f30  -3.52 (pairavg  -2.68, win 26.7) | f60  -4.53 (pairavg  -8.81) | mfe30med   3.6
+   (1.64, inf]                n= 1497 pr=  18 | f15 -10.13 | f30 -11.68 (pairavg -27.97, win 25.5) | f60 -12.53 (pairavg -23.27) | mfe30med   7.7
+  -- age cov 7791 edges [1168.9, 2432.1, 5301.2, 47125.7]
+   (-inf, 1.17e+03]           n= 1559 pr=  73 | f15 -12.23 | f30 -12.72 (pairavg -16.44, win 19.8) | f60 -14.84 (pairavg -15.52) | mfe30med   6.9
+   (1.17e+03, 2.43e+03]       n= 1557 pr=   7 | f15  -6.65 | f30  -7.49 (pairavg -12.52, win 38.8) | f60  -7.81 (pairavg -13.46) | mfe30med  11.1
+   (2.43e+03, 5.3e+03]        n= 1554 pr=   4 | f15  -2.35 | f30  -1.42 (pairavg   2.09, win 39.0) | f60  -1.19 (pairavg   1.26) | mfe30med   8.6
+   (5.3e+03, 4.71e+04]        n= 1555 pr=   3 | f15  -4.65 | f30  -4.65 (pairavg  -3.99, win 22.6) | f60  -4.86 (pairavg  -3.70) | mfe30med   3.0
+   (4.71e+04, inf]            n= 1558 pr=   2 | f15  -4.14 | f30  -4.09 (pairavg  -4.19, win  9.7) | f60  -4.13 (pairavg  -4.31) | mfe30med   0.6
+=== universe HIFEE_20-50k samples 6699 pairs 148
+   ALL                        n= 6693 pr= 148 | f15  -6.45 | f30  -7.26 (pairavg -20.66, win 23.2) | f60  -9.51 (pairavg -22.43) | mfe30med   4.7
+  -- va1h cov 6667 edges [0.138, 0.434, 0.759, 1.384]
+   (-inf, 0.138]              n= 1333 pr=  17 | f15  -7.11 | f30  -7.44 (pairavg  -9.20, win  7.5) | f60  -8.23 (pairavg -10.33) | mfe30med   1.1
+   (0.138, 0.434]             n= 1330 pr=  29 | f15  -1.75 | f30  -1.07 (pairavg  -6.84, win 27.3) | f60  -1.80 (pairavg -12.60) | mfe30med   6.7
+   (0.434, 0.759]             n= 1333 pr=  30 | f15  -7.47 | f30  -7.43 (pairavg  -9.14, win 29.3) | f60  -9.85 (pairavg -13.48) | mfe30med   7.5
+   (0.759, 1.38]              n= 1332 pr=  30 | f15  -5.04 | f30  -5.42 (pairavg -23.86, win 32.1) | f60  -9.29 (pairavg -27.98) | mfe30med   9.2
+   (1.38, inf]                n= 1333 pr= 139 | f15 -10.88 | f30 -14.85 (pairavg -23.73, win 20.5) | f60 -18.35 (pairavg -25.25) | mfe30med   3.9
+  -- va6h cov 6699 edges [0.066, 0.356, 0.773, 1.773]
+   (-inf, 0.0664]             n= 1340 pr=  12 | f15  -6.78 | f30  -6.63 (pairavg  -9.77, win  6.8) | f60  -7.62 (pairavg  -9.66) | mfe30med   1.1
+   (0.0664, 0.356]            n= 1338 pr=  16 | f15  -6.77 | f30  -6.73 (pairavg -10.23, win 23.1) | f60  -5.14 (pairavg -11.52) | mfe30med   4.8
+   (0.356, 0.773]             n= 1339 pr=  20 | f15  -7.62 | f30 -11.17 (pairavg -13.71, win 27.3) | f60 -13.26 (pairavg -16.03) | mfe30med   7.1
+   (0.773, 1.77]              n= 1340 pr=  22 | f15  -4.59 | f30  -3.18 (pairavg  -8.39, win 36.9) | f60  -8.75 (pairavg -17.94) | mfe30med  12.4
+   (1.77, inf]                n= 1336 pr= 144 | f15  -6.49 | f30  -8.61 (pairavg -20.90, win 21.9) | f60 -12.81 (pairavg -22.56) | mfe30med   5.6
+  -- va1h6h cov 6699 edges [0.461, 0.753, 1.256, 2.283]
+   (-inf, 0.461]              n= 1345 pr=  10 | f15  -5.46 | f30  -4.41 (pairavg  -5.75, win 18.3) | f60  -4.13 (pairavg  -3.45) | mfe30med   2.1
+   (0.461, 0.753]             n= 1334 pr=  12 | f15  -6.50 | f30  -6.54 (pairavg  -9.25, win 22.6) | f60  -6.21 (pairavg -10.13) | mfe30med   3.8
+   (0.753, 1.26]              n= 1340 pr=  16 | f15  -4.22 | f30  -5.16 (pairavg -11.82, win 31.6) | f60  -9.91 (pairavg -22.12) | mfe30med   8.8
+   (1.26, 2.28]               n= 1337 pr=  17 | f15  -7.64 | f30 -10.67 (pairavg -14.71, win 24.1) | f60 -14.26 (pairavg -20.40) | mfe30med   6.7
+   (2.28, inf]                n= 1337 pr= 138 | f15  -8.43 | f30  -9.56 (pairavg -21.39, win 19.4) | f60 -13.08 (pairavg -22.97) | mfe30med   4.6
+  -- ba1h cov 6571 edges [0.242, 0.593, 0.89, 1.456]
+   (-inf, 0.242]              n= 1313 pr=  16 | f15  -5.73 | f30  -6.26 (pairavg  -4.45, win 11.2) | f60  -7.54 (pairavg  -5.84) | mfe30med   1.2
+   (0.242, 0.593]             n= 1314 pr=  23 | f15  -2.13 | f30  -1.33 (pairavg   2.95, win 30.7) | f60  -2.48 (pairavg  -2.61) | mfe30med   6.2
+   (0.593, 0.89]              n= 1310 pr=  28 | f15  -4.56 | f30  -5.65 (pairavg -10.17, win 26.6) | f60  -8.37 (pairavg -13.21) | mfe30med   7.5
+   (0.89, 1.46]               n= 1314 pr=  27 | f15  -7.07 | f30  -5.11 (pairavg  -6.66, win 32.0) | f60  -7.89 (pairavg -12.57) | mfe30med   9.2
+   (1.46, inf]                n= 1314 pr= 138 | f15 -12.83 | f30 -17.88 (pairavg -23.50, win 17.7) | f60 -21.22 (pairavg -25.02) | mfe30med   3.4
+  -- bshare5 cov 5967 edges [0.405, 0.507, 0.596, 0.714]
+   (-inf, 0.405]              n= 1197 pr=  14 | f15  -6.96 | f30  -8.57 (pairavg -14.39, win 16.3) | f60  -9.65 (pairavg -13.28) | mfe30med   3.4
+   (0.405, 0.507]             n= 1188 pr=  24 | f15  -3.57 | f30  -0.16 (pairavg  -5.96, win 28.5) | f60   0.50 (pairavg  -7.67) | mfe30med   5.1
+   (0.507, 0.596]             n= 1192 pr=  45 | f15  -3.31 | f30  -1.27 (pairavg -21.67, win 36.2) | f60  -2.90 (pairavg -24.65) | mfe30med  10.9
+   (0.596, 0.714]             n= 1206 pr=  39 | f15  -5.44 | f30  -8.33 (pairavg -13.62, win 33.5) | f60 -16.30 (pairavg -20.03) | mfe30med  13.0
+   (0.714, inf]               n= 1178 pr= 103 | f15 -13.25 | f30 -18.64 (pairavg -15.91, win 15.7) | f60 -20.92 (pairavg -15.58) | mfe30med   3.9
+  -- bshare1h cov 6667 edges [0.471, 0.516, 0.566, 0.664]
+   (-inf, 0.471]              n= 1334 pr=  13 | f15  -6.47 | f30  -7.14 (pairavg  -4.30, win 14.8) | f60  -9.00 (pairavg  -2.63) | mfe30med   3.0
+   (0.471, 0.516]             n= 1332 pr=  15 | f15  -6.85 | f30  -7.31 (pairavg -25.91, win 17.0) | f60  -5.70 (pairavg -24.42) | mfe30med   2.5
+   (0.516, 0.566]             n= 1333 pr=  32 | f15   1.19 | f30   2.80 (pairavg -24.77, win 41.1) | f60   5.50 (pairavg -25.84) | mfe30med  11.8
+   (0.566, 0.664]             n= 1330 pr=  36 | f15  -6.64 | f30  -6.08 (pairavg -16.83, win 30.1) | f60 -14.78 (pairavg -21.82) | mfe30med  12.5
+   (0.664, inf]               n= 1332 pr=  99 | f15 -13.49 | f30 -18.52 (pairavg -17.48, win 13.6) | f60 -23.58 (pairavg -18.18) | mfe30med   1.5
+  -- tx5 cov 6699 edges [3.0, 17.0, 37.0, 123.0]
+   (-inf, 3]                  n= 1358 pr=  11 | f15  -7.20 | f30  -7.48 (pairavg -11.09, win  3.4) | f60  -8.25 (pairavg -11.99) | mfe30med   0.9
+   (3, 17]                    n= 1392 pr=  20 | f15  -5.90 | f30  -6.46 (pairavg  -1.85, win 22.6) | f60  -5.72 (pairavg   0.54) | mfe30med   3.8
+   (17, 37]                   n= 1285 pr=  16 | f15  -2.37 | f30   0.28 (pairavg   0.17, win 36.1) | f60   3.40 (pairavg   3.01) | mfe30med   6.6
+   (37, 123]                  n= 1329 pr=  54 | f15   1.33 | f30   4.01 (pairavg  -4.63, win 37.8) | f60  -1.18 (pairavg  -7.96) | mfe30med  11.0
+   (123, inf]                 n= 1329 pr=  97 | f15 -17.98 | f30 -26.44 (pairavg -26.36, win 17.1) | f60 -35.60 (pairavg -29.14) | mfe30med  11.3
+  -- avg_tx_usd cov 5967 edges [15.455, 31.994, 46.697, 65.662]
+   (-inf, 15.5]               n= 1192 pr=  70 | f15  -9.99 | f30  -9.21 (pairavg -15.10, win 12.8) | f60 -11.01 (pairavg -15.22) | mfe30med   2.4
+   (15.5, 32]                 n= 1193 pr=  34 | f15  -7.82 | f30 -10.17 (pairavg -11.58, win 24.0) | f60  -9.70 (pairavg -11.57) | mfe30med   4.5
+   (32, 46.7]                 n= 1194 pr=  35 | f15  -6.97 | f30  -6.55 (pairavg -23.66, win 34.3) | f60  -6.84 (pairavg -24.22) | mfe30med   8.6
+   (46.7, 65.7]               n= 1191 pr=  43 | f15  -6.03 | f30  -6.04 (pairavg -24.11, win 35.1) | f60  -8.86 (pairavg -27.64) | mfe30med  12.4
+   (65.7, inf]                n= 1191 pr=  57 | f15  -1.64 | f30  -4.91 (pairavg -19.47, win 24.0) | f60 -12.84 (pairavg -23.77) | mfe30med   9.1
+  -- dv5_60 cov 5722 edges [0.791, 0.962, 1.025, 1.215]
+   (-inf, 0.791]              n= 1145 pr=  35 | f15  -7.65 | f30  -8.31 (pairavg -15.44, win 24.6) | f60  -9.44 (pairavg -19.37) | mfe30med   4.9
+   (0.791, 0.962]             n= 1143 pr=  35 | f15  -4.32 | f30  -5.62 (pairavg -17.85, win 30.0) | f60  -9.68 (pairavg -22.65) | mfe30med   9.0
+   (0.962, 1.03]              n= 1142 pr=  37 | f15  -4.70 | f30  -6.04 (pairavg -14.14, win 21.3) | f60  -6.92 (pairavg -15.40) | mfe30med   4.2
+   (1.03, 1.21]               n= 1143 pr=  35 | f15  -6.56 | f30  -7.42 (pairavg -20.86, win 28.9) | f60 -10.95 (pairavg -24.79) | mfe30med   8.7
+   (1.21, inf]                n= 1143 pr=  47 | f15  -7.51 | f30  -7.09 (pairavg -27.06, win 29.2) | f60  -9.67 (pairavg -30.94) | mfe30med   6.5
+  -- dv5_120 cov 5646 edges [0.629, 0.898, 1.046, 1.395]
+   (-inf, 0.629]              n= 1130 pr=  28 | f15  -7.38 | f30  -7.85 (pairavg -18.04, win 23.0) | f60  -8.85 (pairavg -21.25) | mfe30med   4.3
+   (0.629, 0.898]             n= 1127 pr=  33 | f15  -7.45 | f30  -8.55 (pairavg -13.22, win 28.5) | f60 -12.00 (pairavg -18.03) | mfe30med   8.6
+   (0.898, 1.05]              n= 1126 pr=  33 | f15  -2.86 | f30  -2.87 (pairavg -15.55, win 24.2) | f60  -5.47 (pairavg -19.99) | mfe30med   5.7
+   (1.05, 1.4]                n= 1129 pr=  34 | f15  -6.05 | f30  -6.70 (pairavg -19.80, win 31.9) | f60  -8.83 (pairavg -22.69) | mfe30med   9.2
+   (1.4, inf]                 n= 1128 pr=  34 | f15  -7.33 | f30  -7.71 (pairavg -23.77, win 27.1) | f60 -10.44 (pairavg -27.57) | mfe30med   5.8
+  -- db5_60 cov 6449 edges [-3.0, 0.0, 0.0, 2.0]
+   (-inf, -3]                 n= 1320 pr=  37 | f15  -9.02 | f30 -10.40 (pairavg -21.11, win 28.8) | f60 -15.79 (pairavg -24.76) | mfe30med  10.5
+   (-3, 0]                    n= 2872 pr=  31 | f15  -4.37 | f30  -4.38 (pairavg  -2.46, win 17.8) | f60  -4.61 (pairavg  -6.72) | mfe30med   2.1
+   (0, 2]                     n= 1004 pr=  25 | f15  -4.41 | f30  -2.94 (pairavg   8.60, win 29.7) | f60  -2.59 (pairavg   4.11) | mfe30med   5.8
+   (2, inf]                   n= 1247 pr=  51 | f15  -8.58 | f30 -11.85 (pairavg -21.76, win 27.7) | f60 -17.31 (pairavg -25.62) | mfe30med  10.2
+  -- db5_120 cov 6367 edges [-4.0, -1.0, 0.0, 3.0]
+   (-inf, -4]                 n= 1394 pr=  33 | f15  -6.82 | f30  -7.84 (pairavg -16.97, win 30.5) | f60 -12.35 (pairavg -20.56) | mfe30med  10.5
+   (-4, -1]                   n= 1197 pr=  21 | f15  -4.97 | f30  -4.99 (pairavg  -6.73, win 24.1) | f60  -4.77 (pairavg -11.34) | mfe30med   4.2
+   (-1, 0]                    n= 1412 pr=  19 | f15  -6.26 | f30  -6.56 (pairavg -10.06, win  9.8) | f60  -7.09 (pairavg -13.70) | mfe30med   1.1
+   (0, 3]                     n= 1118 pr=  25 | f15  -4.52 | f30  -2.84 (pairavg   9.86, win 28.6) | f60  -3.33 (pairavg   3.98) | mfe30med   5.0
+   (3, inf]                   n= 1240 pr=  37 | f15  -8.13 | f30 -10.68 (pairavg -18.16, win 28.2) | f60 -15.81 (pairavg -22.13) | mfe30med  10.3
+  -- uw5 cov 5923 edges [0.0, 0.0, 0.0, 5.0]
+   (-inf, 0]                  n= 4219 pr= 135 | f15  -8.07 | f30 -10.29 (pairavg -19.73, win 18.0) | f60 -14.24 (pairavg -22.09) | mfe30med   3.6
+   (0, 5]                     n=  539 pr=  15 | f15  -1.47 | f30   1.46 (pairavg -11.43, win 39.3) | f60   6.01 (pairavg -14.68) | mfe30med   8.0
+   (5, inf]                   n= 1160 pr=  35 | f15  -2.10 | f30  -0.48 (pairavg -14.95, win 38.5) | f60  -1.16 (pairavg -20.63) | mfe30med  14.0
+  -- rb5 cov 5923 edges [0.0, 0.0, 0.0, 0.0]
+   (-inf, 0]                  n= 5280 pr= 139 | f15  -6.49 | f30  -7.75 (pairavg -19.79, win 22.4) | f60 -10.38 (pairavg -21.67) | mfe30med   4.6
+   (0, inf]                   n=  638 pr=  24 | f15  -4.66 | f30  -3.56 (pairavg -19.37, win 36.8) | f60  -5.30 (pairavg -29.13) | mfe30med  15.7
+  -- uw_per_tx cov 5324 edges [0.0, 0.0, 0.0, 0.172]
+   (-inf, 0]                  n= 3620 pr= 135 | f15  -8.38 | f30 -10.93 (pairavg -19.75, win 20.9) | f60 -15.46 (pairavg -22.10) | mfe30med   5.0
+   (0, 0.172]                 n=  640 pr=  34 | f15  -6.84 | f30  -9.28 (pairavg -14.82, win 25.8) | f60 -11.11 (pairavg -20.38) | mfe30med   7.3
+   (0.172, inf]               n= 1059 pr=  22 | f15   1.09 | f30   5.83 (pairavg   5.23, win 46.6) | f60   8.50 (pairavg  -1.67) | mfe30med  17.2
+  -- sf_w cov 5923 edges [0.0, 0.0, 0.0, 5.0]
+   (-inf, 0]                  n= 4219 pr= 135 | f15  -8.07 | f30 -10.29 (pairavg -19.73, win 18.0) | f60 -14.24 (pairavg -22.09) | mfe30med   3.6
+   (0, 5]                     n=  539 pr=  15 | f15  -1.47 | f30   1.46 (pairavg -11.43, win 39.3) | f60   6.01 (pairavg -14.68) | mfe30med   8.0
+   (5, inf]                   n= 1160 pr=  35 | f15  -2.10 | f30  -0.48 (pairavg -14.95, win 38.5) | f60  -1.16 (pairavg -20.63) | mfe30med  14.0
+  -- sf_bshare cov 1701 edges [0.137, 0.408, 0.566, 0.775]
+   (-inf, 0.137]              n=  342 pr=  16 | f15  -1.23 | f30  -1.91 (pairavg  -7.41, win 34.2) | f60  -1.59 (pairavg  -9.20) | mfe30med   7.4
+   (0.137, 0.408]             n=  337 pr=  24 | f15  -2.69 | f30  -1.75 (pairavg -20.67, win 32.9) | f60   0.53 (pairavg -25.08) | mfe30med   8.8
+   (0.408, 0.566]             n=  338 pr=  25 | f15   0.64 | f30   1.74 (pairavg  -6.74, win 37.9) | f60   0.18 (pairavg -15.66) | mfe30med  13.5
+   (0.566, 0.775]             n=  340 pr=  18 | f15  -7.22 | f30  -2.91 (pairavg -11.06, win 40.9) | f60  -2.94 (pairavg -20.43) | mfe30med  15.2
+   (0.775, inf]               n=  340 pr=  14 | f15   1.03 | f30   5.56 (pairavg -14.97, win 48.2) | f60   9.22 (pairavg -18.89) | mfe30med  13.2
+  -- vf_w cov 311 edges [1.0, 2.0, 3.0, 7.0]
+   (-inf, 1]                  n=  106 pr=   9 | f15  -1.31 | f30   2.16 (pairavg   3.97, win 47.2) | f60   9.05 (pairavg  -0.38) | mfe30med   9.0
+   (1, 2]                     n=   46 pr=   7 | f15  -2.41 | f30   0.40 (pairavg   0.89, win 37.0) | f60   6.48 (pairavg  13.13) | mfe30med   9.7
+   (2, 3]                     n=   37 pr=   5 | f15  -4.68 | f30   5.05 (pairavg  -3.86, win 35.1) | f60   8.42 (pairavg  -3.68) | mfe30med   5.1
+   (3, 7]                     n=   64 pr=   7 | f15   7.47 | f30  11.52 (pairavg   8.84, win 50.0) | f60  17.89 (pairavg   2.57) | mfe30med  19.3
+   (7, inf]                   n=   57 pr=   7 | f15  -3.57 | f30  -1.66 (pairavg   8.92, win 33.3) | f60  -8.06 (pairavg   8.76) | mfe30med  25.2
+  -- vf_tr cov 311 edges [1.0, 2.0, 4.0, 10.0]
+   (-inf, 1]                  n=   98 pr=   9 | f15  -0.75 | f30   2.94 (pairavg   4.24, win 49.0) | f60   9.32 (pairavg  -0.35) | mfe30med  11.1
+   (1, 2]                     n=   39 pr=   7 | f15  -3.32 | f30  -1.44 (pairavg   0.18, win 33.3) | f60   6.08 (pairavg  12.42) | mfe30med   7.9
+   (2, 4]                     n=   69 pr=   7 | f15  -2.02 | f30   6.03 (pairavg   6.91, win 40.6) | f60  17.63 (pairavg   7.96) | mfe30med  12.5
+   (4, 10]                    n=   48 pr=   7 | f15   9.85 | f30  14.82 (pairavg  12.12, win 52.1) | f60  12.97 (pairavg   5.48) | mfe30med  24.0
+   (10, inf]                  n=   56 pr=   6 | f15  -4.98 | f30  -5.04 (pairavg   6.05, win 30.4) | f60 -13.14 (pairavg   3.47) | mfe30med  22.7
+  -- vf_bshare cov 259 edges [0.005, 0.357, 0.65, 0.993]
+   (-inf, 0.00508]            n=   52 pr=   8 | f15   4.13 | f30   6.59 (pairavg   8.24, win 50.0) | f60  10.01 (pairavg   2.70) | mfe30med  11.5
+   (0.00508, 0.357]           n=   52 pr=   7 | f15  -5.91 | f30  -4.21 (pairavg -12.98, win 30.8) | f60  -8.48 (pairavg -21.47) | mfe30med  11.9
+   (0.357, 0.65]              n=   52 pr=   6 | f15  -0.34 | f30   5.09 (pairavg  28.32, win 42.3) | f60   6.96 (pairavg  34.13) | mfe30med  18.6
+   (0.65, 0.993]              n=   52 pr=  10 | f15   3.16 | f30   8.36 (pairavg   4.40, win 46.2) | f60   9.02 (pairavg   5.68) | mfe30med  21.8
+   (0.993, inf]               n=   50 pr=   6 | f15  -1.67 | f30   5.43 (pairavg  12.21, win 40.0) | f60  18.81 (pairavg  22.47) | mfe30med  13.4
+  -- pc5 cov 6699 edges [-3.54, -0.43, 0.24, 3.61]
+   (-inf, -3.54]              n= 1341 pr=  36 | f15  -4.27 | f30  -6.42 (pairavg -11.57, win 31.8) | f60 -12.04 (pairavg -15.50) | mfe30med  11.5
+   (-3.54, -0.43]             n= 1341 pr=  26 | f15  -5.50 | f30  -5.86 (pairavg   0.77, win 24.7) | f60  -5.21 (pairavg  -1.76) | mfe30med   4.5
+   (-0.43, 0.24]              n= 1338 pr=  34 | f15  -6.93 | f30  -6.63 (pairavg -17.39, win  7.8) | f60  -6.42 (pairavg -16.74) | mfe30med   1.0
+   (0.24, 3.61]               n= 1335 pr=  68 | f15  -6.46 | f30  -5.86 (pairavg -11.64, win 22.2) | f60  -6.88 (pairavg -13.28) | mfe30med   3.8
+   (3.61, inf]                n= 1338 pr=  90 | f15  -9.09 | f30 -11.55 (pairavg -22.31, win 29.4) | f60 -17.00 (pairavg -25.26) | mfe30med  12.0
+  -- pc1h cov 6699 edges [-14.28, -4.17, 1.5, 26.18]
+   (-inf, -14.3]              n= 1339 pr=  17 | f15  -9.37 | f30 -15.53 (pairavg -16.59, win 26.8) | f60 -20.80 (pairavg -19.88) | mfe30med   9.7
+   (-14.3, -4.17]             n= 1340 pr=  19 | f15  -5.89 | f30  -4.93 (pairavg -14.27, win 25.1) | f60  -4.19 (pairavg -20.15) | mfe30med   5.3
+   (-4.17, 1.5]               n= 1339 pr=  61 | f15  -7.14 | f30  -6.59 (pairavg -12.87, win 10.9) | f60  -7.12 (pairavg -15.16) | mfe30med   1.0
+   (1.5, 26.2]                n= 1338 pr=  60 | f15  -5.94 | f30  -5.00 (pairavg -16.10, win 20.0) | f60  -8.06 (pairavg -19.15) | mfe30med   2.1
+   (26.2, inf]                n= 1337 pr=  59 | f15  -3.90 | f30  -4.27 (pairavg -26.78, win 33.2) | f60  -7.40 (pairavg -31.46) | mfe30med  14.0
+  -- r60 cov 6449 edges [-1.516, -0.048, 0.0, 1.401]
+   (-inf, -1.52]              n= 1290 pr=  39 | f15  -5.77 | f30  -8.05 (pairavg -17.83, win 30.7) | f60 -13.83 (pairavg -21.94) | mfe30med  12.0
+   (-1.52, -0.0477]           n= 1289 pr=  27 | f15  -4.17 | f30  -4.05 (pairavg  -2.18, win 26.5) | f60  -4.27 (pairavg  -8.31) | mfe30med   5.0
+   (-0.0477, 0]               n= 1513 pr=  23 | f15  -6.62 | f30  -7.06 (pairavg   1.30, win  5.6) | f60  -7.75 (pairavg   0.63) | mfe30med   1.0
+   (0, 1.4]                   n= 1064 pr=  33 | f15  -4.69 | f30  -4.96 (pairavg  -9.50, win 31.3) | f60  -4.20 (pairavg -11.52) | mfe30med   6.5
+   (1.4, inf]                 n= 1287 pr=  52 | f15  -9.13 | f30  -9.69 (pairavg -24.11, win 29.4) | f60 -14.55 (pairavg -28.16) | mfe30med  10.4
+  -- r300 cov 6229 edges [-4.212, -0.735, 0.049, 3.098]
+   (-inf, -4.21]              n= 1246 pr=  28 | f15  -4.69 | f30  -7.16 (pairavg  -5.23, win 31.5) | f60 -12.68 (pairavg  -9.16) | mfe30med  11.0
+   (-4.21, -0.735]            n= 1244 pr=  25 | f15  -5.15 | f30  -4.49 (pairavg  -3.61, win 25.6) | f60  -2.92 (pairavg  -5.32) | mfe30med   4.7
+   (-0.735, 0.0491]           n= 1247 pr=  19 | f15  -6.46 | f30  -6.27 (pairavg -13.17, win  8.6) | f60  -6.37 (pairavg -18.81) | mfe30med   1.1
+   (0.0491, 3.1]              n= 1243 pr=  27 | f15  -6.24 | f30  -5.04 (pairavg  -3.34, win 22.4) | f60  -6.50 (pairavg  -7.71) | mfe30med   3.9
+   (3.1, inf]                 n= 1243 pr=  31 | f15  -7.77 | f30  -9.09 (pairavg -27.32, win 32.1) | f60 -13.49 (pairavg -32.21) | mfe30med  11.9
+  -- r900 cov 5867 edges [-9.258, -2.204, 0.269, 4.794]
+   (-inf, -9.26]              n= 1173 pr=  26 | f15  -5.21 | f30  -7.61 (pairavg -11.90, win 27.5) | f60 -14.24 (pairavg -16.52) | mfe30med   8.8
+   (-9.26, -2.2]              n= 1171 pr=  20 | f15  -5.60 | f30  -4.12 (pairavg  -5.71, win 30.9) | f60  -1.81 (pairavg  -8.14) | mfe30med   5.7
+   (-2.2, 0.269]              n= 1175 pr=  19 | f15  -5.49 | f30  -5.57 (pairavg  -8.24, win 12.4) | f60  -4.61 (pairavg  -9.40) | mfe30med   1.2
+   (0.269, 4.79]              n= 1171 pr=  22 | f15  -5.90 | f30  -4.88 (pairavg -17.24, win 18.1) | f60  -6.02 (pairavg -19.43) | mfe30med   2.3
+   (4.79, inf]                n= 1171 pr=  26 | f15  -6.13 | f30  -6.34 (pairavg -20.24, win 30.0) | f60 -11.46 (pairavg -24.46) | mfe30med   8.9
+  -- dliq300 cov 6229 edges [-2.251, -0.403, 0.011, 1.661]
+   (-inf, -2.25]              n= 1245 pr=  28 | f15  -4.54 | f30  -6.98 (pairavg  -5.21, win 31.8) | f60 -12.42 (pairavg  -9.15) | mfe30med  11.1
+   (-2.25, -0.403]            n= 1245 pr=  25 | f15  -5.10 | f30  -4.48 (pairavg  -4.78, win 25.3) | f60  -3.01 (pairavg  -6.62) | mfe30med   4.6
+   (-0.403, 0.0114]           n= 1245 pr=  20 | f15  -6.67 | f30  -6.59 (pairavg -13.10, win  8.9) | f60  -6.72 (pairavg -17.19) | mfe30med   1.1
+   (0.0114, 1.66]             n= 1245 pr=  26 | f15  -6.12 | f30  -4.85 (pairavg  -1.49, win 21.9) | f60  -6.24 (pairavg  -5.82) | mfe30med   3.9
+   (1.66, inf]                n= 1243 pr=  31 | f15  -7.87 | f30  -9.15 (pairavg -27.25, win 32.2) | f60 -13.58 (pairavg -32.08) | mfe30med  11.9
+  -- age cov 6699 edges [203.5, 1256.8, 1517.9, 6519.0]
+   (-inf, 204]                n= 1338 pr= 134 | f15  -7.88 | f30 -10.12 (pairavg -21.36, win 21.0) | f60 -16.46 (pairavg -22.98) | mfe30med  10.7
+   (204, 1.26e+03]            n= 1340 pr=   5 | f15  -3.14 | f30  -2.21 (pairavg  -6.06, win 39.5) | f60  -1.24 (pairavg  -8.52) | mfe30med  12.2
+   (1.26e+03, 1.52e+03]       n= 1338 pr=   6 | f15  -8.21 | f30  -9.41 (pairavg -20.85, win 23.5) | f60  -9.87 (pairavg -21.10) | mfe30med   5.1
+   (1.52e+03, 6.52e+03]       n= 1339 pr=   5 | f15  -6.18 | f30  -6.53 (pairavg  -5.18, win 23.2) | f60  -8.39 (pairavg  -3.83) | mfe30med   3.6
+   (6.52e+03, inf]            n= 1338 pr=   4 | f15  -6.85 | f30  -8.05 (pairavg -12.21, win  8.7) | f60 -11.63 (pairavg -19.30) | mfe30med   1.1
+bins screened 469

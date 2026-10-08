@@ -1,0 +1,18 @@
+pools per group Counter({'LP_FAMILY': 232, 'OTHER': 178, 'OTHER_DRAINED': 123, 'FAKE_FAMILY': 54})
+drained per group Counter({'OTHER_DRAINED': 123, 'LP_FAMILY': 24, 'FAKE_FAMILY': 10, 'OTHER': 2})
+== FAKE_FAMILY rows 347086
+   unnatural buy imbalance (b5/s5>5): 61.1% | weak liq/MC (<3%): 92.7% | GOOD liq/MC (>=15%, +9 score): 7.3%
+   mean engine score 49.3 | posture SETUP 1.4% WAIT 90.8% SKIP 7.8% | safety.allowed 0.0%
+   rejection reasons (row share): winner_signal 63.97%
+== LP_FAMILY rows 55019
+   unnatural buy imbalance (b5/s5>5): 8.4% | weak liq/MC (<3%): 0.1% | GOOD liq/MC (>=15%, +9 score): 98.6%
+   mean engine score 86.7 | posture SETUP 96.9% WAIT 1.7% SKIP 1.4% | safety.allowed 0.0%
+   rejection reasons (row share): promoted_verified_flow_unavailable 31.77%, winner_signal 31.09%, promoted_verified_flow_stale 0.08%, stale_feed 0.00%
+== OTHER_DRAINED rows 418870
+   unnatural buy imbalance (b5/s5>5): 6.4% | weak liq/MC (<3%): 0.0% | GOOD liq/MC (>=15%, +9 score): 70.3%
+   mean engine score 60.0 | posture SETUP 60.0% WAIT 6.9% SKIP 33.1% | safety.allowed 19.5%
+   rejection reasons (row share): winner_signal 54.52%, promoted_verified_flow_unavailable 6.02%, promoted_buy_pressure_unconfirmed 0.99%, quote_retry_cooldown 0.76%, quote_inconsistent 0.57%, reported_linked_insiders 0.16%, promoted_verified_flow_stale 0.15%, roundtrip_cost 0.13%, worst_case_cost 0.13%, risk_check_pending 0.05%
+== OTHER rows 1014596
+   unnatural buy imbalance (b5/s5>5): 5.3% | weak liq/MC (<3%): 9.6% | GOOD liq/MC (>=15%, +9 score): 14.9%
+   mean engine score 65.5 | posture SETUP 61.4% WAIT 26.2% SKIP 12.4% | safety.allowed 10.7%
+   rejection reasons (row share): winner_signal 58.67%, promoted_verified_flow_unavailable 2.64%, cooldown 0.92%, promoted_buy_pressure_unconfirmed 0.44%, promoted_verified_flow_stale 0.34%, quote_retry_cooldown 0.15%, quote_inconsistent 0.12%, reported_linked_insiders 0.12%, roundtrip_cost 0.02%, worst_case_cost 0.02%

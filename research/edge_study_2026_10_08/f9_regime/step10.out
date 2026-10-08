@@ -1,0 +1,12 @@
+== DIP systematic (med15<-0.2) E2 avg model RT cost 3.21% (+1.00 stress)
+   train    n=54 pairs=22 mean50=0.428 median=-1.541 win=42.6 pf=1.053 ci$=[-8.313, 10.682]
+   holdout  n=14 pairs=8 mean50=-0.372 median=-0.998 win=42.9 pf=0.945 ci$=[-16.467, 17.364]
+== DIP idiosyncratic (med15>=-0.2) E2 avg model RT cost 3.19% (+1.00 stress)
+   train    n=89 pairs=20 mean50=-4.152 median=-14.152 win=36.0 pf=0.628 ci$=[-17.408, 1.276]
+   holdout  n=36 pairs=13 mean50=-4.698 median=-4.891 win=33.3 pf=0.559 ci$=[-26.967, 7.68]
+== DIP systematic (med15<-0.2) H30 avg model RT cost 3.21% (+1.00 stress)
+   train    n=48 pairs=22 mean50=0.09 median=-3.278 win=39.6 pf=1.008 ci$=[-22.208, 29.867]
+   holdout  n=13 pairs=8 mean50=-3.798 median=-3.831 win=38.5 pf=0.687 ci$=[-48.358, 22.696]
+== DIP idiosyncratic (med15>=-0.2) H30 avg model RT cost 3.15% (+1.00 stress)
+   train    n=73 pairs=20 mean50=-2.804 median=-2.413 win=39.7 pf=0.717 ci$=[-17.774, 5.97]
+   holdout  n=35 pairs=13 mean50=-5.015 median=-3.459 win=28.6 pf=0.48 ci$=[-28.574, 5.768]

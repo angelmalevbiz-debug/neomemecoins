@@ -1,0 +1,18 @@
+train surge events 361 secs 1.1
+== SURGE_B3 (rug-screened, TRAIN, NET50)
+  fee55-95 liq>=250k pc5 down                  pairs   5 | 60s:n16 m-2.41 med-2.66 w6% 180s:n16 m-1.85 med-2.19 w12% 300s:n16 m-2.18 med-2.58 w12% 600s:n16 m-2.93 med-2.85 w6% 900s:n16 m-2.81 med-3.29 w12% 1800s:n16 m-4.02 med-3.05 w25% 3600s:n16 m-3.66 med-2.08 w25%
+  fee55-95 liq50-250k pc5 down                 pairs   7 | 60s:n21 m-5.50 med-4.13 w23% 180s:n21 m-3.54 med-3.02 w23% 300s:n21 m-2.41 med-1.92 w33% 600s:n21 m-1.31 med-1.69 w33% 900s:n21 m-3.24 med-2.90 w38% 1800s:n21 m-3.53 med-0.46 w47% 3600s:n21 m-6.85 med-0.94 w42%
+  fee100-125 liq50-250k pc5 up                 pairs  10 | 60s:n17 m-6.02 med-4.56 w11% 180s:n17 m-5.54 med-4.53 w17% 300s:n17 m-2.69 med-4.72 w23% 600s:n17 m-5.65 med-6.42 w17% 900s:n17 m-8.39 med-5.52 w11% 1800s:n17 m-10.38 med-10.08 w5% 3600s:n17 m-8.64 med-8.42 w29%
+  fee100-125 liq50-250k pc5 down               pairs   5 | 60s:n19 m+0.08 med-4.18 w15% 180s:n19 m+4.28 med-4.20 w15% 300s:n19 m+7.31 med-4.27 w21% 600s:n19 m-7.47 med-4.53 w26% 900s:n19 m-6.16 med-5.84 w26% 1800s:n19 m-7.02 med-3.95 w36% 3600s:n19 m-8.14 med-6.60 w42%
+  with attention list flag (any bucket)        pairs  13 | 60s:n38 m-4.91 med-4.18 w21% 180s:n38 m-2.65 med-4.72 w21% 300s:n38 m-0.79 med-4.60 w26% 600s:n38 m-9.45 med-4.42 w26% 900s:n38 m-17.75 med-5.43 w21% 1800s:n38 m-22.14 med-4.68 w23% 3600s:n38 m-25.49 med-12.05 w31%
+== SURGE_B5 (rug-screened, TRAIN, NET50)
+== SURGE_V3 (rug-screened, TRAIN, NET50)
+  fee<=50 liq>=250k pc5 up                     pairs   5 | 60s:n17 m-1.99 med-2.03 w0% 180s:n17 m-1.81 med-2.03 w5% 300s:n17 m-1.97 med-2.26 w5% 600s:n17 m-1.91 med-1.85 w0% 900s:n17 m-2.19 med-2.10 w5% 1800s:n17 m-2.31 med-2.43 w5% 3600s:n17 m-2.23 med-2.14 w5%
+  fee55-95 liq>=250k pc5 down                  pairs   6 | 60s:n23 m-2.93 med-2.80 w0% 180s:n23 m-2.78 med-2.69 w0% 300s:n23 m-2.84 med-2.68 w0% 600s:n23 m-2.84 med-2.38 w4% 900s:n23 m-2.71 med-2.57 w8% 1800s:n23 m-2.91 med-2.65 w21% 3600s:n23 m-2.75 med-1.24 w26%
+  fee100-125 liq50-250k pc5 up                 pairs  11 | 60s:n28 m-2.50 med-5.89 w21% 180s:n28 m-4.23 med-3.33 w28% 300s:n28 m-2.88 med-3.74 w28% 600s:n28 m-7.97 med-9.06 w17% 900s:n28 m-9.18 med-11.45 w14% 1800s:n28 m-14.76 med-10.37 w17% 3600s:n28 m-15.76 med-10.74 w17%
+  fee100-125 liq50-250k pc5 down               pairs  10 | 60s:n23 m-6.47 med-4.32 w8% 180s:n23 m-5.79 med-4.25 w8% 300s:n23 m-5.77 med-4.27 w4% 600s:n23 m-5.78 med-4.61 w21% 900s:n23 m-4.50 med-4.37 w26% 1800s:n23 m-9.98 med-5.25 w13% 3600s:n23 m-9.74 med-3.69 w30%
+  fee100-125 liq<50k pc5 down                  pairs   9 | 60s:n16 m-11.20 med-6.45 w18% 180s:n16 m-11.13 med-4.62 w31% 300s:n16 m-13.18 med-9.55 w0% 600s:n16 m-10.59 med-7.24 w18% 900s:n16 m-12.04 med-6.16 w18% 1800s:n16 m-18.58 med-10.97 w31% 3600s:n16 m-29.29 med-29.75 w18%
+  with attention list flag (any bucket)        pairs  15 | 60s:n54 m-6.99 med-5.68 w16% 180s:n54 m-7.35 med-4.37 w24% 300s:n54 m-6.79 med-5.50 w18% 600s:n54 m-5.73 med-5.32 w18% 900s:n54 m-5.30 med-4.37 w24% 1800s:n54 m-12.41 med-3.27 w33% 3600s:n54 m-19.49 med-10.28 w27%
+== SURGE_V5 (rug-screened, TRAIN, NET50)
+  with attention list flag (any bucket)        pairs   4 | 60s:n10 m+8.63 med-6.45 w30% 180s:n10 m-3.53 med-8.26 w10% 300s:n10 m+3.34 med-4.54 w20% 600s:n10 m-11.86 med-8.66 w20% 900s:n10 m-12.29 med-7.00 w20% 1800s:n10 m-21.37 med-5.33 w40% 3600s:n10 m-32.41 med-27.83 w20%
+done 1.1

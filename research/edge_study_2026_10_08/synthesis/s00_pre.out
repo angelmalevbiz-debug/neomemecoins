@@ -1,0 +1,8 @@
+meta {'rows': 3116792, 'points': 1128649, 'pairs': 2042, 't0': 1791362460712.0, 't1': 1791444401772.0}
+S1 pre-cutoff minute samples 34810 v5/liq q50 0.0167 q80 0.0953 q90 0.2384
+swordinu 69fyvgoT sym=swordinu last_t=1791444400089 price=0.00545 liq=232958 mcap=5411251 age_min=2213 fee=60.0
+VSOF AGZjpu5v sym=VSOF last_t=1791444400504 price=0.00795 liq=255427 mcap=7940607 age_min=6546 fee=47.5
+GOIF D2pVedgH sym=GOIF last_t=1791444400791 price=0.195 liq=1260346 mcap=195423496 age_min=389 fee=30.0
+WOSE GhBPuDpt sym=WOSE last_t=1791444400895 price=0.24 liq=1397467 mcap=240197464 age_min=435 fee=30.0
+SARP HiPe6mDS sym=SARP last_t=1791444400852 price=0.0834 liq=823057 mcap=83431844 age_min=722 fee=30.0
+wrote pre_constants.json

@@ -1,0 +1,58 @@
+[   0.5s] loaded series 2042 pairs; cut 1791411625348.0
+[   2.7s] tape built 349 pools {'rows': 185465, 'confirmed': 185465, 'buy_sell': 185465, 'non_wsol_quote': 53, 'bad_q': 0, 'et_gt_av': 0, 'payload_av_mismatch': 0}
+[   2.8s] stored guard holdout 11 6.106
+[   6.3s] family rerun guard n 66 identical to stored: True
+[  10.4s] reimpl guard n 66 holdout 11 6.106
+[  14.7s] reimpl orig n 91 holdout 22 0.943
+[  14.7s] overlap guard {'a': 66, 'b': 66, 'both': 64, 'only_a': 2, 'only_b': 2} holdout {'a': 11, 'b': 11, 'both': 11, 'only_a': 0, 'only_b': 0}
+[  18.8s] lag 30000 holdout 12 1.798
+[  22.7s] lag 120000 holdout 13 -0.676
+[  31.0s] random vA holdout n 54 -5.584
+[  34.9s] random vB holdout n 61 -11.472
+[  39.1s] random vC holdout n 53 -5.901
+[  43.2s] random vD holdout n 57 -9.231
+[  47.1s] random vE holdout n 57 -5.578
+[  51.2s] random vF holdout n 58 -7.678
+[  51.4s] pair-matched random pA n 29 -6.009
+[  51.6s] pair-matched random pB n 32 -4.122
+[  51.8s] pair-matched random pC n 28 -5.386
+[  52.1s] pair-matched random pD n 29 -3.476
+[  52.3s] pair-matched random pE n 29 -7.162
+[  52.5s] pair-matched random pF n 28 -3.972
+[  52.7s] pair-matched random pG n 29 -5.096
+[  52.9s] pair-matched random pH n 25 -4.857
+[  52.9s] done
+CHAIN {'pair': '2B8tftZ5', 'sym': 'CRAWL', 'reason': 'TP', 'net50': 8.74, 'hold_min': 4.6, 'tape_swaps_during_trade': 47, 'tape_last_swap_before_exit_s': 110.7, 'ds_entry_vs_tape_pct': -0.05, 'ds_exit_vs_tape_pct': 7.01, 'ds_gross_ret_pct': 12.55, 'tape_gross_ret_pct': 5.12, 'tape_n_entry_win': 77, 'tape_n_exit_win': 52}
+CHAIN {'pair': '4R8CiMnJ', 'sym': 'JEANPHIL', 'reason': 'TP', 'net50': 3.92, 'hold_min': 9.3, 'tape_swaps_during_trade': 50, 'tape_last_swap_before_exit_s': 157.2, 'ds_entry_vs_tape_pct': -0.54, 'ds_exit_vs_tape_pct': 1.51, 'ds_gross_ret_pct': 7.11, 'tape_gross_ret_pct': 4.95, 'tape_n_entry_win': 47, 'tape_n_exit_win': 33}
+CHAIN {'pair': '867dKvaC', 'sym': 'MISTAKE', 'reason': 'HOLD', 'net50': -4.7, 'hold_min': 30.1, 'tape_swaps_during_trade': 813, 'tape_last_swap_before_exit_s': 501.6, 'ds_entry_vs_tape_pct': -0.2, 'ds_exit_vs_tape_pct': None, 'ds_gross_ret_pct': -1.49, 'tape_gross_ret_pct': None, 'tape_n_entry_win': 263, 'tape_n_exit_win': 0}
+CHAIN {'pair': '2B8tftZ5', 'sym': 'CRAWL', 'reason': 'TP', 'net50': 12.84, 'hold_min': 14.6, 'tape_swaps_during_trade': 33, 'tape_last_swap_before_exit_s': 72.0, 'ds_entry_vs_tape_pct': 0.95, 'ds_exit_vs_tape_pct': -3.71, 'ds_gross_ret_pct': 16.54, 'tape_gross_ret_pct': 22.19, 'tape_n_entry_win': 50, 'tape_n_exit_win': 80}
+CHAIN {'pair': '2B8tftZ5', 'sym': 'CRAWL', 'reason': 'TP', 'net50': 7.78, 'hold_min': 10.0, 'tape_swaps_during_trade': 64, 'tape_last_swap_before_exit_s': 76.0, 'ds_entry_vs_tape_pct': -0.91, 'ds_exit_vs_tape_pct': -0.26, 'ds_gross_ret_pct': 11.47, 'tape_gross_ret_pct': 10.74, 'tape_n_entry_win': 68, 'tape_n_exit_win': 86}
+CHAIN {'pair': 'AFaYrFH7', 'sym': 'LMAO!', 'reason': 'HOLD', 'net50': -6.62, 'hold_min': 31.0, 'tape_swaps_during_trade': 13, 'tape_last_swap_before_exit_s': 1675.8, 'ds_entry_vs_tape_pct': 1.03, 'ds_exit_vs_tape_pct': None, 'ds_gross_ret_pct': -3.06, 'tape_gross_ret_pct': None, 'tape_n_entry_win': 57, 'tape_n_exit_win': 0}
+CHAIN {'pair': '8ewuF2o8', 'sym': 'swordcat', 'reason': 'TP', 'net50': 7.15, 'hold_min': 6.9, 'tape_swaps_during_trade': 3, 'tape_last_swap_before_exit_s': 184.8, 'ds_entry_vs_tape_pct': -4.8, 'ds_exit_vs_tape_pct': 4.77, 'ds_gross_ret_pct': 11.42, 'tape_gross_ret_pct': 1.24, 'tape_n_entry_win': 39, 'tape_n_exit_win': 3}
+CHAIN {'pair': '8ewuF2o8', 'sym': 'swordcat', 'reason': 'TP', 'net50': 6.19, 'hold_min': 3.1, 'tape_swaps_during_trade': 86, 'tape_last_swap_before_exit_s': 53.5, 'ds_entry_vs_tape_pct': 0.39, 'ds_exit_vs_tape_pct': 0.81, 'ds_gross_ret_pct': 10.5, 'tape_gross_ret_pct': 10.03, 'tape_n_entry_win': 104, 'tape_n_exit_win': 104}
+CHAIN {'pair': '867dKvaC', 'sym': 'MISTAKE', 'reason': 'TP', 'net50': 9.12, 'hold_min': 11.9, 'tape_swaps_during_trade': 473, 'tape_last_swap_before_exit_s': 1.6, 'ds_entry_vs_tape_pct': -1.35, 'ds_exit_vs_tape_pct': -0.95, 'ds_gross_ret_pct': 12.7, 'tape_gross_ret_pct': 12.25, 'tape_n_entry_win': 301, 'tape_n_exit_win': 318}
+CHAIN {'pair': '8ewuF2o8', 'sym': 'swordcat', 'reason': 'HOLD', 'net50': -8.1, 'hold_min': 30.5, 'tape_swaps_during_trade': 249, 'tape_last_swap_before_exit_s': 1313.0, 'ds_entry_vs_tape_pct': -0.85, 'ds_exit_vs_tape_pct': None, 'ds_gross_ret_pct': -5.21, 'tape_gross_ret_pct': None, 'tape_n_entry_win': 97, 'tape_n_exit_win': 0}
+CHAIN {'pair': '2B8tftZ5', 'sym': 'CRAWL', 'reason': 'HOLD', 'net50': -2.74, 'hold_min': 30.2, 'tape_swaps_during_trade': 0, 'tape_last_swap_before_exit_s': 1967.1, 'ds_entry_vs_tape_pct': 0.57, 'ds_exit_vs_tape_pct': None, 'ds_gross_ret_pct': 0.42, 'tape_gross_ret_pct': None, 'tape_n_entry_win': 12, 'tape_n_exit_win': 0}
+events/h [1915, 0, 9004, 16040, 14550, 7013, 8058, 8522, 8677, 8043, 7096, 7918, 7522, 4147, 504, 3821, 6096, 5749, 5335, 4114, 7108, 4509, 2932]
+pools/h [3, 0, 15, 17, 25, 30, 28, 29, 31, 26, 36, 52, 54, 46, 14, 27, 31, 30, 24, 34, 29, 36, 23]
+cut hour 13.656843333333333
+ingest lag {'train': {'n': 107662, 'p50': 4.035, 'p90': 26.667, 'p99': 92.323}, 'holdout': {'n': 41011, 'p50': 2.955, 'p90': 21.439, 'p99': 39.848}}
+ablation no interim 27 -1.874 train 96 -6.685
+REMOVED ('holdout', ('YOUNG_POOL',)) n 11 sum usd50 -46.42
+REMOVED ('train', ('YOUNG_POOL',)) n 14 sum usd50 -149.27
+ablation structural_only holdout 22 0.943 train 69 -7.336
+PERT {'params': {'ub': 8, 'newb': 5, 'top': 0.3, 'lo': -2.0, 'hi': 5.0}, 'train_n': 55, 'train_mean_usd': -6.447, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 5.824}
+PERT {'params': {'ub': 12, 'newb': 5, 'top': 0.3, 'lo': -2.0, 'hi': 5.0}, 'train_n': 55, 'train_mean_usd': -6.576, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 6.563}
+PERT {'params': {'ub': 10, 'newb': 3, 'top': 0.3, 'lo': -2.0, 'hi': 5.0}, 'train_n': 56, 'train_mean_usd': -7.436, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 6.106}
+PERT {'params': {'ub': 10, 'newb': 7, 'top': 0.3, 'lo': -2.0, 'hi': 5.0}, 'train_n': 54, 'train_mean_usd': -7.588, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 6.106}
+PERT {'params': {'ub': 10, 'newb': 5, 'top': 0.25, 'lo': -2.0, 'hi': 5.0}, 'train_n': 52, 'train_mean_usd': -7.423, 'holdout_n': 8, 'holdout_pairs': 3, 'holdout_mean_usd': 4.931}
+PERT {'params': {'ub': 10, 'newb': 5, 'top': 0.35, 'lo': -2.0, 'hi': 5.0}, 'train_n': 62, 'train_mean_usd': -8.092, 'holdout_n': 14, 'holdout_pairs': 7, 'holdout_mean_usd': 3.06}
+PERT {'params': {'ub': 10, 'newb': 5, 'top': 0.3, 'lo': -3.0, 'hi': 5.0}, 'train_n': 56, 'train_mean_usd': -6.574, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 6.033}
+PERT {'params': {'ub': 10, 'newb': 5, 'top': 0.3, 'lo': -2.0, 'hi': 4.0}, 'train_n': 54, 'train_mean_usd': -5.889, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 5.931}
+PERT {'params': {'ub': 10, 'newb': 5, 'top': 0.3, 'lo': -2.0, 'hi': 6.0}, 'train_n': 55, 'train_mean_usd': -6.622, 'holdout_n': 11, 'holdout_pairs': 5, 'holdout_mean_usd': 6.229}
+PERT {'exits': {'stop': -8.0, 'tp': 6.0, 'hold_min': 30.0}, 'train_n': 60, 'train_mean_usd': -6.992, 'holdout_n': 11, 'holdout_mean_usd': 6.106}
+PERT {'exits': {'stop': -10.0, 'tp': 5.0, 'hold_min': 30.0}, 'train_n': 58, 'train_mean_usd': -7.756, 'holdout_n': 11, 'holdout_mean_usd': 4.583}
+PERT {'exits': {'stop': -10.0, 'tp': 8.0, 'hold_min': 30.0}, 'train_n': 53, 'train_mean_usd': -8.314, 'holdout_n': 11, 'holdout_mean_usd': 6.336}
+PERT {'exits': {'stop': -10.0, 'tp': 6.0, 'hold_min': 20.0}, 'train_n': 57, 'train_mean_usd': -7.173, 'holdout_n': 11, 'holdout_mean_usd': 7.901}
+PERT {'exits': {'stop': -10.0, 'tp': 6.0, 'hold_min': 45.0}, 'train_n': 54, 'train_mean_usd': -7.031, 'holdout_n': 11, 'holdout_mean_usd': 6.468}
+done

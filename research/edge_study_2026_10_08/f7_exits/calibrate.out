@@ -1,0 +1,3 @@
+F7_MOM_HI20_TRAIL3x2 train n 109 baseline train n by prob [(0.005, 76), (0.01, 103), (0.02, 127), (0.04, 161), (0.08, 196)]
+F7_MOM_HI20_TAIL40 train n 92 baseline train n by prob [(0.005, 53), (0.01, 69), (0.02, 86), (0.04, 112), (0.08, 143)]
+F7_RANDOM_ALL50_BEST_EXIT train n 182 baseline train n by prob [(0.005, 146), (0.01, 178), (0.02, 202), (0.04, 219), (0.08, 234)]

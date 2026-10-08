@@ -1,0 +1,20 @@
+== PumpSwap quote_sol=1 pools 1549, terminal drains 157 (recovered/glitch 3)
+   by first-trigger kinds: {'LIQ_FAST+PRICE_FAST+PRICE_SLOW': 30, 'LIQ_FAST': 29, 'PRICE_FAST+PRICE_SLOW': 56, 'PRICE_SLOW': 42}
+   fast (<=10 min) drains: 115, slow price collapses only: 42
+   pre-drain family signature: {'YOUNG<60m': 104, 'LP_PULLABLE': 25, 'YOUNG1-12h': 9, 'OLDER': 9, 'FAKE_MCAP': 10}
+   pre-drain liquidity bucket: {'<20k': 90, '50-250k': 18, '20-50k': 30, '>=250k': 19}
+   pair age at drain (min) p10/25/50/75/90: 1.6/3.1/12.8/49.1/1.08e+03
+   minutes observed before drain p10/25/50/75/90: 0.545/2.31/10.5/37.4/333
+   drains per 2-hour bin of the dataset (hour offset: count): {0: 4, 2: 7, 4: 16, 6: 14, 8: 21, 10: 13, 12: 26, 14: 10, 16: 19, 18: 16, 20: 9, 22: 2}
+   train/holdout drains: 97 60
+   drained pools that had >= $250k liquidity: 19 -> by signature {'LP_PULLABLE': 9, 'FAKE_MCAP': 10}
+== PumpSwap quote_sol=0 pools 51, terminal drains 22 (recovered/glitch 2)
+   by first-trigger kinds: {'PRICE_SLOW': 7, 'PRICE_FAST+PRICE_SLOW': 12, 'LIQ_FAST+PRICE_FAST+PRICE_SLOW': 3}
+   fast (<=10 min) drains: 15, slow price collapses only: 7
+   pre-drain family signature: {'YOUNG<60m': 18, 'OLDER': 1, 'YOUNG1-12h': 3}
+   pre-drain liquidity bucket: {'20-50k': 2, '<20k': 19, '50-250k': 1}
+   pair age at drain (min) p10/25/50/75/90: 4.8/9/13.8/32.3/96.9
+   minutes observed before drain p10/25/50/75/90: 4.06/8.51/10.3/31.7/64.9
+   drains per 2-hour bin of the dataset (hour offset: count): {0: 1, 2: 2, 4: 2, 6: 5, 8: 1, 10: 3, 12: 2, 16: 2, 18: 1, 20: 2, 22: 1}
+   train/holdout drains: 16 6
+   drained pools that had >= $250k liquidity: 0 -> by signature {}

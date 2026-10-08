@@ -1,0 +1,73 @@
+== DIP with contrarian market filters (TRAIN)
+  DIP E2 unfiltered                                n=102 pairs=24 hrs=14 mean50= -3.00 med= -8.83 win=33.3 pf=0.697 top=0.20 ci=[-13.32, 1.643] LOHO[min=-4.11 max=-1.71] exits={'TP': 27, 'HOLD': 26, 'STOP': 49}
+  DIP E2 med15<0.3                                 n= 85 pairs=23 hrs=14 mean50= -4.15 med=-14.15 win=32.9 pf=0.585 top=0.19 ci=[-15.008, -1.12] LOHO[min=-5.74 max=-2.98] exits={'TP': 21, 'HOLD': 21, 'STOP': 43}
+  DIP E2 med15<0.0                                 n= 62 pairs=23 hrs=12 mean50= -2.35 med= -5.88 win=35.5 pf=0.742 top=0.19 ci=[-13.595, 4.913] LOHO[min=-4.20 max=-0.54] exits={'TP': 18, 'HOLD': 15, 'STOP': 29}
+  DIP E2 med15<-0.1                                n= 56 pairs=22 hrs=10 mean50= -1.00 med= -4.58 win=39.3 pf=0.883 top=0.21 ci=[-11.333, 7.733] LOHO[min=-2.70 max=0.79] exits={'TP': 18, 'HOLD': 13, 'STOP': 25}
+  DIP E2 med15<-0.2                                n= 54 pairs=22 hrs=10 mean50=  0.43 med= -1.54 win=42.6 pf=1.053 top=0.20 ci=[-8.313, 10.682] LOHO[min=-1.75 max=2.50] exits={'TP': 18, 'HOLD': 12, 'STOP': 24}
+  DIP E2 med15<-0.3                                n= 50 pairs=20 hrs=10 mean50=  0.21 med= -1.54 win=44.0 pf=1.025 top=0.22 ci=[-9.477, 10.231] LOHO[min=-1.42 max=2.44] exits={'TP': 17, 'HOLD': 11, 'STOP': 22}
+  DIP E2 br15<0.50                                 n= 69 pairs=23 hrs=13 mean50= -2.42 med= -8.25 win=36.2 pf=0.74 top=0.19 ci=[-13.114, 4.072] LOHO[min=-4.05 max=-1.21] exits={'TP': 20, 'HOLD': 17, 'STOP': 32}
+  DIP E2 br15<0.45                                 n= 57 pairs=23 hrs=11 mean50= -2.72 med= -7.97 win=35.1 pf=0.704 top=0.21 ci=[-14.333, 4.776] LOHO[min=-5.30 max=-1.51] exits={'TP': 15, 'HOLD': 15, 'STOP': 27}
+  DIP E2 br15<0.40                                 n= 47 pairs=20 hrs= 9 mean50= -1.48 med= -4.58 win=38.3 pf=0.828 top=0.21 ci=[-13.513, 8.657] LOHO[min=-3.91 max=-0.26] exits={'TP': 14, 'HOLD': 13, 'STOP': 20}
+  DIP E3 unfiltered                                n= 88 pairs=24 hrs=14 mean50= -2.48 med= -4.17 win=36.4 pf=0.761 top=0.15 ci=[-18.889, 12.024] LOHO[min=-5.93 max=-1.18] exits={'HOLD': 86, 'STOP': 2}
+  DIP E3 med15<0.3                                 n= 75 pairs=23 hrs=14 mean50= -3.32 med= -5.14 win=32.0 pf=0.708 top=0.16 ci=[-23.545, 13.735] LOHO[min=-7.57 max=-1.72] exits={'HOLD': 73, 'STOP': 2}
+  DIP E3 med15<0.0                                 n= 57 pairs=23 hrs=13 mean50= -0.66 med= -1.99 win=40.4 pf=0.936 top=0.18 ci=[-21.359, 23.106] LOHO[min=-4.61 max=2.11] exits={'HOLD': 55, 'STOP': 2}
+  DIP E3 med15<-0.1                                n= 51 pairs=22 hrs=11 mean50= -0.41 med= -3.28 win=39.2 pf=0.962 top=0.20 ci=[-22.275, 26.892] LOHO[min=-4.55 max=2.72] exits={'HOLD': 49, 'STOP': 2}
+  DIP E3 med15<-0.2                                n= 48 pairs=22 hrs=10 mean50=  0.09 med= -3.28 win=39.6 pf=1.008 top=0.19 ci=[-22.208, 29.867] LOHO[min=-4.36 max=3.24] exits={'HOLD': 46, 'STOP': 2}
+  DIP E3 med15<-0.3                                n= 46 pairs=20 hrs=10 mean50=  0.44 med= -1.99 win=41.3 pf=1.04 top=0.20 ci=[-22.606, 32.295] LOHO[min=-4.18 max=3.76] exits={'HOLD': 44, 'STOP': 2}
+  DIP E3 br15<0.50                                 n= 63 pairs=23 hrs=13 mean50= -2.14 med= -4.36 win=38.1 pf=0.816 top=0.17 ci=[-23.637, 19.217] LOHO[min=-7.09 max=0.14] exits={'HOLD': 60, 'STOP': 3}
+  DIP E3 br15<0.45                                 n= 53 pairs=23 hrs=11 mean50= -0.73 med= -4.36 win=37.7 pf=0.933 top=0.21 ci=[-23.862, 26.359] LOHO[min=-4.65 max=2.25] exits={'HOLD': 51, 'STOP': 2}
+  DIP E3 br15<0.40                                 n= 46 pairs=20 hrs=10 mean50= -2.38 med= -2.40 win=34.8 pf=0.75 top=0.20 ci=[-19.636, 8.667] LOHO[min=-5.30 max=0.74] exits={'HOLD': 45, 'STOP': 1}
+== MOMO with contrarian market filters (TRAIN)
+  MOMO E2 unfiltered                               n=169 pairs=33 hrs=14 mean50= -5.42 med=-11.62 win=32.0 pf=0.513 top=0.15 ci=[-16.964, -5.246] LOHO[min=-6.36 max=-4.09] exits={'TP': 35, 'STOP': 80, 'HOLD': 54}
+  MOMO E2 med15<0.0                                n= 97 pairs=28 hrs=13 mean50= -3.25 med= -7.54 win=39.2 pf=0.664 top=0.16 ci=[-12.941, 0.613] LOHO[min=-4.78 max=-1.83] exits={'STOP': 40, 'HOLD': 35, 'TP': 22}
+  MOMO E2 med15<-0.1                               n= 86 pairs=27 hrs=12 mean50= -5.28 med=-11.07 win=33.7 pf=0.507 top=0.19 ci=[-18.025, -3.091] LOHO[min=-7.61 max=-3.92] exits={'STOP': 39, 'HOLD': 30, 'TP': 17}
+  MOMO E2 med15<-0.2                               n= 76 pairs=24 hrs=10 mean50= -3.73 med= -7.54 win=36.8 pf=0.626 top=0.21 ci=[-15.133, 0.627] LOHO[min=-6.37 max=-2.84] exits={'STOP': 33, 'HOLD': 26, 'TP': 17}
+  MOMO E2 tide<-3.0                                n=108 pairs=29 hrs=11 mean50= -3.77 med= -8.47 win=34.3 pf=0.642 top=0.16 ci=[-15.149, -0.347] LOHO[min=-4.93 max=-1.90] exits={'HOLD': 33, 'TP': 27, 'STOP': 48}
+  MOMO E2 tide<-4.5                                n= 77 pairs=23 hrs= 9 mean50= -4.91 med=-13.49 win=29.9 pf=0.529 top=0.14 ci=[-17.551, -1.818] LOHO[min=-5.61 max=-4.02] exits={'HOLD': 25, 'TP': 14, 'STOP': 38}
+  MOMO E3 unfiltered                               n=161 pairs=33 hrs=14 mean50= -8.39 med= -5.30 win=26.1 pf=0.298 top=0.11 ci=[-23.401, -10.254] LOHO[min=-9.15 max=-7.51] exits={'HOLD': 155, 'STOP': 4, 'OPEN_AT_END/VANISHED': 2}
+  MOMO E3 med15<0.0                                n= 96 pairs=28 hrs=13 mean50= -3.54 med= -4.29 win=35.4 pf=0.658 top=0.15 ci=[-19.108, 6.076] LOHO[min=-5.33 max=-1.10] exits={'HOLD': 93, 'STOP': 2, 'OPEN_AT_END/VANISHED': 1}
+  MOMO E3 med15<-0.1                               n= 83 pairs=27 hrs=12 mean50= -4.11 med= -4.29 win=32.5 pf=0.626 top=0.17 ci=[-21.935, 7.807] LOHO[min=-5.52 max=-1.31] exits={'HOLD': 80, 'STOP': 2, 'OPEN_AT_END/VANISHED': 1}
+  MOMO E3 med15<-0.2                               n= 72 pairs=24 hrs=10 mean50= -1.44 med= -4.00 win=36.1 pf=0.839 top=0.18 ci=[-17.029, 14.891] LOHO[min=-3.16 max=-0.25] exits={'HOLD': 71, 'STOP': 1}
+  MOMO E3 tide<-3.0                                n=102 pairs=29 hrs=11 mean50= -8.17 med= -4.29 win=27.5 pf=0.286 top=0.12 ci=[-26.114, -7.217] LOHO[min=-8.75 max=-7.20] exits={'HOLD': 97, 'STOP': 4, 'OPEN_AT_END/VANISHED': 1}
+  MOMO E3 tide<-4.5                                n= 74 pairs=23 hrs= 9 mean50= -4.06 med= -4.89 win=32.4 pf=0.458 top=0.11 ci=[-14.414, -1.517] LOHO[min=-4.62 max=-3.18] exits={'HOLD': 73, 'OPEN_AT_END/VANISHED': 1}
+== RANDOM with contrarian market filters (TRAIN)
+  RANDOM E2 unfiltered                             n=186 pairs=43 hrs=14 mean50= -5.02 med= -5.74 win=24.7 pf=0.448 top=0.06 ci=[-14.509, -5.142] LOHO[min=-5.81 max=-4.46] exits={'TP': 26, 'HOLD': 95, 'STOP': 58, 'OPEN_AT_END/VANISHED': 7}
+  RANDOM E2 med15<0.0                              n=100 pairs=36 hrs=13 mean50= -2.51 med= -4.36 win=31.0 pf=0.661 top=0.07 ci=[-10.85, 1.108] LOHO[min=-3.90 max=-0.82] exits={'STOP': 26, 'HOLD': 53, 'TP': 16, 'OPEN_AT_END/VANISHED': 5}
+  RANDOM E2 med15<-0.2                             n= 70 pairs=30 hrs=10 mean50= -0.89 med= -4.36 win=30.0 pf=0.868 top=0.09 ci=[-8.591, 5.291] LOHO[min=-2.03 max=0.60] exits={'HOLD': 37, 'TP': 14, 'STOP': 15, 'OPEN_AT_END/VANISHED': 4}
+  RANDOM E3 unfiltered                             n=232 pairs=43 hrs=14 mean50= -5.89 med= -3.92 win=19.4 pf=0.239 top=0.07 ci=[-15.812, -8.245] LOHO[min=-6.24 max=-5.16] exits={'HOLD': 223, 'OPEN_AT_END/VANISHED': 7, 'STOP': 2}
+  RANDOM E3 med15<0.0                              n=111 pairs=36 hrs=13 mean50= -2.69 med= -3.38 win=19.8 pf=0.524 top=0.08 ci=[-9.92, -0.361] LOHO[min=-3.69 max=-2.06] exits={'HOLD': 105, 'OPEN_AT_END/VANISHED': 6}
+  RANDOM E3 med15<-0.2                             n= 79 pairs=30 hrs=10 mean50= -1.90 med= -3.26 win=20.3 pf=0.627 top=0.09 ci=[-9.153, 2.266] LOHO[min=-2.83 max=-0.79] exits={'HOLD': 75, 'OPEN_AT_END/VANISHED': 4}
+== big/low-cost universes: pairs and random baselines (TRAIN), hold 60 no stop / E1
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] H60       n= 24 pairs= 5 hrs= 9 mean50= -2.81 med= -2.38 win=12.5 pf=0.09 top=0.25 ci=[-8.394, -2.921] LOHO[min=-3.38 max=-2.25] exits={'HOLD': 24}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] H60 br60>=0.60 n= 16 pairs= 5 hrs= 6 mean50=  0.48 med= -2.16 win=12.5 pf=1.191 top=0.25 ci=[-7.168, 13.514] LOHO[min=-3.04 max=2.01] exits={'HOLD': 16}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] H60 med60>=1.00 n= 18 pairs= 5 hrs= 7 mean50=  0.58 med= -2.10 win=11.1 pf=1.261 top=0.28 ci=[-5.39, 12.058] LOHO[min=-1.79 max=1.29] exits={'HOLD': 18}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] H60 pc1h>=1.60 n= 19 pairs= 5 hrs= 7 mean50= -2.47 med= -2.32 win=10.5 pf=0.158 top=0.26 ci=[-9.157, -1.172] LOHO[min=-3.10 max=-1.53] exits={'HOLD': 19}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] E1        n= 33 pairs= 5 hrs= 9 mean50= -4.92 med= -3.04 win=15.2 pf=0.39 top=0.33 ci=[-24.338, 5.526] LOHO[min=-7.19 max=-2.29] exits={'TP': 4, 'HOLD': 16, 'STOP': 13}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] E1 br60>=0.60 n= 19 pairs= 5 hrs= 6 mean50=  2.02 med= -2.21 win=15.8 pf=1.747 top=0.32 ci=[-6.063, 17.81] LOHO[min=-0.22 max=3.37] exits={'TP': 3, 'HOLD': 12, 'STOP': 4}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] E1 med60>=1.00 n= 20 pairs= 5 hrs= 7 mean50=  1.84 med= -2.10 win=15.0 pf=1.697 top=0.25 ci=[-5.552, 16.69] LOHO[min=-0.29 max=3.13] exits={'TP': 3, 'HOLD': 13, 'STOP': 4}
+  RND[lowcost fee<=50 liq>=250k rt<=1.2] E1 pc1h>=1.60 n= 23 pairs= 5 hrs= 7 mean50= -7.33 med= -2.94 win= 8.7 pf=0.055 top=0.35 ci=[-31.104, -4.518] LOHO[min=-9.30 max=-4.06] exits={'HOLD': 14, 'STOP': 8, 'TP': 1}
+  RND[fee<=95 liq>=250k rt<=2.5] H60               n= 65 pairs=16 hrs=10 mean50= -4.23 med= -3.20 win= 7.7 pf=0.047 top=0.11 ci=[-10.506, -6.509] LOHO[min=-4.53 max=-4.02] exits={'HOLD': 64, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=95 liq>=250k rt<=2.5] H60 br60>=0.60    n= 41 pairs=13 hrs= 7 mean50= -2.51 med= -2.34 win=14.6 pf=0.369 top=0.10 ci=[-9.779, 0.828] LOHO[min=-3.41 max=-2.12] exits={'HOLD': 41}
+  RND[fee<=95 liq>=250k rt<=2.5] H60 med60>=1.00   n= 43 pairs=13 hrs= 7 mean50= -2.48 med= -2.99 win=11.6 pf=0.375 top=0.12 ci=[-9.238, 0.834] LOHO[min=-3.43 max=-2.01] exits={'HOLD': 43}
+  RND[fee<=95 liq>=250k rt<=2.5] H60 pc1h>=1.60    n= 48 pairs=15 hrs= 9 mean50= -4.11 med= -3.27 win=10.4 pf=0.126 top=0.10 ci=[-11.126, -5.166] LOHO[min=-4.50 max=-3.84] exits={'HOLD': 47, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=95 liq>=250k rt<=2.5] E1                n= 84 pairs=16 hrs=10 mean50= -4.79 med= -4.11 win=11.9 pf=0.234 top=0.13 ci=[-16.389, -3.822] LOHO[min=-5.78 max=-3.58] exits={'STOP': 39, 'TP': 5, 'HOLD': 39, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=95 liq>=250k rt<=2.5] E1 br60>=0.60     n= 47 pairs=13 hrs= 7 mean50= -1.16 med= -2.90 win=14.9 pf=0.659 top=0.13 ci=[-6.935, 3.768] LOHO[min=-1.84 max=-0.75] exits={'STOP': 15, 'TP': 3, 'HOLD': 29}
+  RND[fee<=95 liq>=250k rt<=2.5] E1 med60>=1.00    n= 47 pairs=13 hrs= 7 mean50= -2.00 med= -3.27 win=10.6 pf=0.522 top=0.11 ci=[-9.065, 2.443] LOHO[min=-2.99 max=-1.43] exits={'STOP': 17, 'TP': 4, 'HOLD': 26}
+  RND[fee<=95 liq>=250k rt<=2.5] E1 pc1h>=1.60     n= 58 pairs=15 hrs= 9 mean50= -6.03 med= -4.65 win= 8.6 pf=0.077 top=0.14 ci=[-18.629, -7.471] LOHO[min=-6.93 max=-4.57] exits={'STOP': 28, 'HOLD': 26, 'OPEN_AT_END/VANISHED': 1, 'TP': 3}
+  RND[any fee liq>=250k rt<=3.5] H60               n= 65 pairs=16 hrs=10 mean50= -4.23 med= -3.20 win= 7.7 pf=0.047 top=0.11 ci=[-10.506, -6.509] LOHO[min=-4.53 max=-4.02] exits={'HOLD': 64, 'OPEN_AT_END/VANISHED': 1}
+  RND[any fee liq>=250k rt<=3.5] H60 br60>=0.60    n= 41 pairs=13 hrs= 7 mean50= -2.51 med= -2.34 win=14.6 pf=0.369 top=0.10 ci=[-9.779, 0.828] LOHO[min=-3.41 max=-2.12] exits={'HOLD': 41}
+  RND[any fee liq>=250k rt<=3.5] H60 med60>=1.00   n= 43 pairs=13 hrs= 7 mean50= -2.48 med= -2.99 win=11.6 pf=0.375 top=0.12 ci=[-9.238, 0.834] LOHO[min=-3.43 max=-2.01] exits={'HOLD': 43}
+  RND[any fee liq>=250k rt<=3.5] H60 pc1h>=1.60    n= 48 pairs=15 hrs= 9 mean50= -4.11 med= -3.27 win=10.4 pf=0.126 top=0.10 ci=[-11.126, -5.166] LOHO[min=-4.50 max=-3.84] exits={'HOLD': 47, 'OPEN_AT_END/VANISHED': 1}
+  RND[any fee liq>=250k rt<=3.5] E1                n= 84 pairs=16 hrs=10 mean50= -4.79 med= -4.11 win=11.9 pf=0.234 top=0.13 ci=[-16.389, -3.822] LOHO[min=-5.78 max=-3.58] exits={'STOP': 39, 'TP': 5, 'HOLD': 39, 'OPEN_AT_END/VANISHED': 1}
+  RND[any fee liq>=250k rt<=3.5] E1 br60>=0.60     n= 47 pairs=13 hrs= 7 mean50= -1.16 med= -2.90 win=14.9 pf=0.659 top=0.13 ci=[-6.935, 3.768] LOHO[min=-1.84 max=-0.75] exits={'STOP': 15, 'TP': 3, 'HOLD': 29}
+  RND[any fee liq>=250k rt<=3.5] E1 med60>=1.00    n= 47 pairs=13 hrs= 7 mean50= -2.00 med= -3.27 win=10.6 pf=0.522 top=0.11 ci=[-9.065, 2.443] LOHO[min=-2.99 max=-1.43] exits={'STOP': 17, 'TP': 4, 'HOLD': 26}
+  RND[any fee liq>=250k rt<=3.5] E1 pc1h>=1.60     n= 58 pairs=15 hrs= 9 mean50= -6.03 med= -4.65 win= 8.6 pf=0.077 top=0.14 ci=[-18.629, -7.471] LOHO[min=-6.93 max=-4.57] exits={'STOP': 28, 'HOLD': 26, 'OPEN_AT_END/VANISHED': 1, 'TP': 3}
+  RND[fee<=50 liq>=100k rt<=1.5] H60               n= 29 pairs= 7 hrs= 9 mean50= -3.08 med= -2.40 win=10.3 pf=0.07 top=0.21 ci=[-8.914, -3.703] LOHO[min=-3.70 max=-2.69] exits={'HOLD': 28, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=50 liq>=100k rt<=1.5] H60 br60>=0.60    n= 19 pairs= 6 hrs= 6 mean50=  0.21 med= -2.06 win=10.5 pf=1.089 top=0.21 ci=[-6.336, 10.953] LOHO[min=-2.68 max=1.56] exits={'HOLD': 19}
+  RND[fee<=50 liq>=100k rt<=1.5] H60 med60>=1.00   n= 20 pairs= 6 hrs= 7 mean50=  0.26 med= -2.10 win=10.0 pf=1.114 top=0.25 ci=[-5.548, 10.638] LOHO[min=-1.99 max=0.96] exits={'HOLD': 20}
+  RND[fee<=50 liq>=100k rt<=1.5] H60 pc1h>=1.60    n= 23 pairs= 7 hrs= 7 mean50= -2.69 med= -2.32 win=13.0 pf=0.131 top=0.22 ci=[-9.168, -1.87] LOHO[min=-3.23 max=-1.98] exits={'HOLD': 22, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=50 liq>=100k rt<=1.5] E1                n= 38 pairs= 7 hrs= 9 mean50= -4.89 med= -3.04 win=13.2 pf=0.359 top=0.29 ci=[-21.629, 3.616] LOHO[min=-7.00 max=-2.33] exits={'TP': 4, 'HOLD': 19, 'STOP': 14, 'OPEN_AT_END/VANISHED': 1}
+  RND[fee<=50 liq>=100k rt<=1.5] E1 br60>=0.60     n= 22 pairs= 6 hrs= 6 mean50=  1.57 med= -2.06 win=13.6 pf=1.627 top=0.27 ci=[-5.511, 15.427] LOHO[min=-0.40 max=2.84] exits={'TP': 3, 'HOLD': 15, 'STOP': 4}
+  RND[fee<=50 liq>=100k rt<=1.5] E1 med60>=1.00    n= 22 pairs= 6 hrs= 7 mean50=  1.36 med= -2.10 win=13.6 pf=1.503 top=0.23 ci=[-5.756, 14.733] LOHO[min=-0.67 max=2.44] exits={'TP': 3, 'HOLD': 14, 'STOP': 5}
+  RND[fee<=50 liq>=100k rt<=1.5] E1 pc1h>=1.60     n= 27 pairs= 7 hrs= 7 mean50= -6.80 med= -2.94 win=11.1 pf=0.054 top=0.30 ci=[-26.993, -4.683] LOHO[min=-8.67 max=-3.67] exits={'HOLD': 17, 'STOP': 8, 'OPEN_AT_END/VANISHED': 1, 'TP': 1}
+configs_tried step3: 68

@@ -1,0 +1,831 @@
+######## STRUCTURAL_RUG_GUARD_V1: a defensive filter, not a source of profit
+A pure pre-entry rule that fails closed.
+
+**Where it runs:** before quoting, before flow promotion and before the RugCheck call. It goes in backend/cost_first_established.rejections, the one place shared by the cost-first engine profile, both COST_FIRST Lab books and the scheduler's GROUP_COST_FIRST, and in every other entry path.
+
+**Inputs:** liquidityUsd, marketCap (fall back to fdv), and pair age from pairCreatedAt.
+
+**Reasons recorded in describe()**, checked in this order:
+1. rug_input_unknown: any input missing, non-finite or <= 0. Stop here.
+2. rug_lp_pullable: liq/mcap >= 1.0.
+3. rug_young_pool: age < 720 min.
+4. rug_fake_market_cap: mcap >= $20M AND liq/mcap < 1% AND age < 14 days.
+
+**Recommended conservative additions.** Blocking more costs nothing in expectation because no strategy has an edge.
+- Raise the fake-market-cap liq/mcap threshold to 2%. This catches DAWS-like pools; it was informed by the holdout and is not validated.
+- Use a corrected ticker-reuse rule. Block a token younger than 14 days whose normalized ticker was already seen on another pair with a DIFFERENT mint. The interim rule counts a token's own pump.fun curve pair as a reuse, which is wrong.
+
+**Naming:** call it something distinct from engine_rug_guard.py's RUG_GUARD_V2. That RugCheck-based check never ran on these families (checked_at 0) and passed SharkTank, which later collapsed.
+
+**Companion fix:** in market_monitor.score_pair, limit the +9 'good liquidity/MC' bonus to 0.15 <= liq/MC < 0.6 and treat liq/MC >= 1 as a risk. Today, pools whose creator can pull the liquidity score 86.7 on average and sit at SETUP on 96.9% of rows.
+
+**Reference code:** rug/rug_guard.py, frozen with sha256 20268e97..., and harness_final.rug_guard_v1.
+HOLDOUT: **Drain census (22.8 h):**
+- 157 terminal drains among 1,549 PumpSwap SOL pools.
+- All 19 drains in pools that ever had >= $250k liquidity came from two structural families: 9 LP-pullable (liq/mcap 1.2-1.9, liquidity goes to 0 at an unchanged price, tickers recycled) and 10 fake market cap ($23M-$1.3B market cap with liq/mcap 0.25-1.9%).
+- The other drains were young pools (median age 12.8 min).
+
+**Rule thresholds were frozen on train after 8,960 configurations. Holdout results:**
+- Drain-event recall 0.897 at a point false-positive rate of 0.148 (liquidity >= $20k).
+- Drain hazard per position-hour: 4.39% to 1.31% with the guard; cost-first universe 3.48% to 0.99%; fee 100-125 bps with liquidity >= $250k went from 54%/h to fully blocked.
+- Random entries on all PumpSwap pools, calibrated stressed net50: -8.72%/trade without the guard, -5.12% with it. Still a loss.
+
+**Pre-registered forward test (1.92 h):**
+- Flagged minute-samples lost >= 50% within 60 min in 10.8% of cases, against 1.7% for samples that passed.
+- By reason: LP-pullable 49%, young pool 15.4%, fake market cap 0% (no family pool drained in this short window).
+- 30-min stressed net: -9.25% flagged, -4.19% passed.
+
+**Forward cost-first universe:**
+- The guard flags 49% of minute-units; the interim screen flags 77%.
+- Half of the trades the guard lets through were still in DAWS-like family pools that pass the 1% threshold: USDF EpugLBw1, UDR ERFmQZQU, GOIF 8ZMkMgWM, DOTF 5GaCcKLd and WOTF HJ72PgqL. That is why the 2% and corrected-ticker additions are recommended.
+VERDICTS: - **Rug study:** works as a risk filter; 0 profit candidates.
+- **Leaderboard:** removes about 3.6 percentage points per trade of loss on random entries; no guarded row passes the gate.
+- **Forward check:** 'consistent' on both pre-registered outcomes. The direction matches the prediction, but the pair-bootstrap CIs touch 0: catastrophic-loss rate difference +9.1 pp, CI [-1.8, +22.4]; 30-min difference -5.1 pp, CI [-12.7, +0.7].
+- **Honest caveat:** in this 1.9 h window no fake-market-cap pool drained. The cost-first trades the guard removed actually did better (-1.1% vs -2.7%) because the scam pools drift up on wash buys until they are drained. The guard's value is in the drain tail, about -100% per event (10 of the 64 pools that entered the cost-first universe drained within 22.8 h), and a 2-hour window cannot show that.
+
+######## HEAT_VETO_STACK: a defensive entry filter
+Block a new entry in every book, and log the reason, when any of these holds at decision time. All inputs are fields the engine already has.
+
+- (a) 5-min price return >= +3%, measured against the price 300 s earlier.
+- (b) DexScreener 5-min buy share b5/(b5+s5) >= 0.70.
+- (c) Volume acceleration v5/(v1h/12) >= 1.3.
+- (d) pc6h >= +200% or pc24 >= +150%.
+- (e) Fee tier >= 100 bps and the pair carried the paid-profile 'latest' flag (token-profiles/latest) at any point in the last 60 min.
+- (f) Price <= 75% of its 15-min high, or 5-min return <= -20% (a crash in progress).
+- (g) Turnover v5/liquidity >= 0.095 (the 80th percentile on pre-cutoff data).
+
+Optional exit trigger, to run log-only first: sell a held token when it makes its first paid-profile appearance.
+
+Lab arms that test a surge hypothesis (LAB_A) log these flags but do not apply them.
+HOLDOUT: **Where the rules come from:**
+- **Momentum family (f1):** the top quintiles of 5-min return, buy share and volume acceleration had the worst forward returns in every universe (train). The 3 momentum configs lost to random entries by 3.5-15 points on holdout.
+- **Attention family (f4):** paid-profile samples in fee 100-125 bps pools under $50k liquidity lost -22.9% (train) and -24.7% (holdout) at 15 min. This was registered on train and confirmed on holdout.
+- **Mean-reversion family (f2):** crashes kept going, -14.6% over 15 min (train only).
+- **On-chain tape family (f8):** turnover had an IC of -0.13 to -0.19, with the same sign in both train halves.
+
+**Pre-registered forward test (1.92 h):** universe liquidity >= $20k, fee >= 55 bps, passing the structural guard.
+- Full stack: vetoed samples -8.73% vs kept -3.66% at 30 min. Difference -5.07 pp, pair-CI95 [-11.0, -0.95], 84 pairs. CONFIRMED.
+- Momentum part alone: -5.73 pp, CI [-12.1, -1.4]. CONFIRMED.
+- Attention -4.8 pp, crash -3.8 pp, turnover -6.1 pp: right sign, but the CIs span 0 and few pairs were flagged.
+- Inside the full rug-guard universe: -2.73 pp, CI [-8.5, +1.3].
+VERDICTS: - **Families f1, f2, f4, f8:** train evidence, partly confirmed on holdout.
+- **Forward check:** momentum part and full stack 'confirmed'; the other parts 'consistent'.
+- **Limit:** it removes losers but does not make the remaining entries profitable. Kept samples still lost -3.1% to -3.7% at 30 min on the stressed basis.
+
+######## Retire EXIT_IMPACT_EMERGENCY_V1 (a correctness fix)
+- For main (8878) and OFA (18801), use the sell-anchored, arm-then-confirm EXIT_IMPACT_EMERGENCY_V2 that the cost-first profile already ships, or run V1 log-only.
+- Never compare Jupiter priceImpactPct to a 0.75% floor: that figure already includes the pool fee.
+- Confirm stop exits with a second quote before selling.
+HOLDOUT: **Calibration (117 Jupiter-quoted PAPER trades from ledger copies):**
+- V1 closed 36% of all trades and 83% of fee <= 50 bps trades, after a median hold of 30-44 s.
+- 14.5% of trades already met the V1 threshold at entry.
+- Liquidity was unchanged at exit (ratio 1.003).
+- These trades booked -2.14% on average, but only -0.41% of that went beyond the entry round-trip cost.
+
+**Forensics:** 18 of the 23 live closes were V1 exits with less than 2% liquidity change.
+VERDICTS: - **Calibration:** V1 fires on quote noise.
+- **Forensics:** this fixes correctness, not P&L. V1 actually lost less (-1.73%) than a plain -5/+10/60 replay of the same bad entries (-2.75%); the entries were the real problem.
+
+######## Calibrated acceptance basis (methodology for engineers)
+**Judge every book on net50**, which is the sum of:
+- the engine cost model;
+- CALIB_V1 extra cost per leg: fee <= 50 bps +22 bps; fee 55-125 bps a +10 bps floor; +25 bps outside the measured range (liquidity < $50k or trade size > 0.3% of liquidity); plus engine rent and network costs, about 5.5 bps/leg at $200;
+- +50 bps/leg stress;
+- +200 bps on stop exits and +100 bps on trailing exits.
+
+leaderboard/harness_final.py implements this basis and the audited fills: next DexScreener refresh, feed-gap closes, survivorship-safe forward_net, drained pools valued at 0.
+
+PAPER fills must come from executable quotes, never from DexScreener prints.
+HOLDOUT: - Fee tiers and the 2N/L impact formula match Jupiter quotes to within about 0.1% (117 trades).
+- The old harness was optimistic by 0.56-0.76%/trade because DexScreener prints lag the pool by about 20 s.
+- Stop exits fill about 2% worse than the model.
+- The +50 bps stress covers the average gap but only 60% of individual trades.
+- The audit found two artifacts: zero-latency stale fills, and survivorship in forward_net (fee 100-125 bps with liquidity >= $250k showed +7.69% at 60 min; the real figure is -46%).
+VERDICTS: - **Calibration and audit:** adopted by the integrator.
+- **Effect on conclusions:** none. Every leaderboard row is negative on the model-cost, plain-stress and calibrated bases alike.
+
+######## LAB_A_SURGE_EST_GUARD (priority 1: cheapest, DexScreener data only)
+**Status:** hypothesis, not evidence-backed.
+
+**Universe**
+- PumpSwap pools quoted in SOL.
+- Passes STRUCTURAL_RUG_GUARD_V1, so pool age is at least 12 h.
+- Passes the interim and ticker screen.
+- Fee tier <= 95 bps; liquidity >= $50k.
+
+**Signal**
+- DexScreener txns.m5.buys >= 30.
+- txns.h1.buys > 0.
+- m5 buys >= 3 x (h1 buys / 12).
+- The same test was false at the pair's previous observation, i.e. a fresh crossing.
+- No heat veto in this arm; log the veto flags instead.
+
+**Size and exits**
+- $200 per trade.
+- Net stop -5%, take-profit +10%, max hold 60 min, 300 s cooldown per pool.
+- Use the engine's executable sell quotes.
+
+**Control book:** random entries in the same universe (hashed coin, 0.0005 per observation) with the same exits.
+
+**Expected volume:** about 2.6-4.2 signals per hour, i.e. 60-100 per day in a shadow log. A 3-slot book takes about 2 per hour, so reaching 150 trades takes about 2-4 days.
+
+**Stressed expectancy (calibrated net50)**
+
+| Period | Mean/trade | n | Pairs | Pair-CI95 | Random control |
+|---|---|---|---|---|---|
+| Train | -3.83% | 36 | 16 | | -5.14% |
+| Holdout | -3.21% | 32 | 16 | -5.1% to -0.7% | -6.14% |
+| Forward | -3.70% | 8 | 8 | | -6.97% |
+
+**Kill rule:** after 50 trades, stop if the mean net50 is below 0 and the CI upper bound is below 0.
+
+**Code:** synthesis/strategies.py, entries LAB_A_SURGE_EST_GUARD and RND_LAB_A.
+RATIONALE: This has the most consistent relative edge in the study, but its absolute result is about -3% per trade, so the chance of promotion is low.
+
+- It beat random entries in the same universe in train (+1.3 pp), in holdout (+2.9 pp) and in the forward window (+3.3 pp, tiny sample).
+- Each split covered about 16 pairs.
+- To pass the gate, costs or exits would have to improve.
+
+######## LAB_B_DIP_MKTDIP_GUARD (priority 2)
+**Universe**
+- PumpSwap pools quoted in SOL.
+- Liquidity >= $50k.
+- Passes STRUCTURAL_RUG_GUARD_V1 and the interim screen.
+
+**Market regime (computed every minute T)**
+1. Take every PumpSwap SOL pool with a print in the last 3 min and liquidity >= $20k.
+2. For each, compute its % price change against its price 15 min earlier. The comparison point may be at most 10 min stale.
+3. At least 8 pools are required.
+4. med15 is the median of those changes.
+
+**Signal (all must hold)**
+- med15 < -0.2% (the whole market is dipping).
+- Own price <= 90% of its price 15 min ago.
+- Liquidity >= 85% of its level 15 min ago.
+- pc24 > -50%.
+
+**Size and exits**
+- $200 per trade.
+- Net stop -15%, take-profit +20%, max hold 60 min, 300 s cooldown.
+
+**Control book:** random entries in the same universe without the dip or regime filter (0.0007 per observation) with the same exits.
+
+**Expected volume:** depends on the regime. The market-dip state covered 29% of train minutes and 9.6% of holdout minutes, giving 0.5-3.5 trades per hour, i.e. about 10-80 per day. Reaching 150 trades may take 3-7 days.
+
+**Stressed expectancy (calibrated net50)**
+
+| Period | Mean/trade | n | Pairs | Pair-CI95 | Random control |
+|---|---|---|---|---|---|
+| Train | -1.01% | 48 | 17 | | -5.51% |
+| Holdout | -1.27% | 12 | 6 | -11.8% to +9.0% | -4.48% |
+| Forward | +8.1% | 1 | 1 | | -4.65% |
+
+**Code:** LAB_B_DIP_MKTDIP_GUARD and RND_LAB_B.
+RATIONALE: A post-hoc split of the f9 regime study found the following:
+- Coin dips bought while the whole market was dipping lost little: +0.43% in train (n=54) and -0.37% in holdout (n=14).
+- Coin-specific dips lost -4.15% and -4.70%.
+- The selected config beat 20 of 20 random nulls on holdout.
+
+The evidence is weak: small samples, dependent on the market regime. The wide brackets reduce the drag from costs.
+
+######## LAB_C_TAPE_BREADTH_EST (priority 3: only after the tape-seat fix)
+**Prerequisite:** each candidate pool needs a tape seat.
+
+**Universe**
+- PumpSwap pools quoted in SOL.
+- Passes STRUCTURAL_RUG_GUARD_V1 and the interim screen.
+- Liquidity >= $150k; fee tier 52.5-90 bps.
+- The pool is tape-live: a confirmed swap was ingested within the last 10 min.
+
+**Signal** (over the last 300 s of confirmed swaps whose ingestion time <= decision time)
+- At least 10 distinct buyer wallets.
+- At least 5 first-time buyer wallets on this pool. Implement these as distinct wallets; the research code counted buy events.
+- Top buyer below 30% of buy SOL.
+- Net SOL inflow above 0.
+- 5-min price change within [-2%, +5%], so the entry does not chase.
+
+**Size and exits**
+- min($200, 0.2% of liquidity).
+- Net stop -10%, take-profit +6%, max hold 30 min.
+- Fills only from executable quotes taken at decision time plus latency.
+
+**Control book:** random entries (0.007 per observation) in the same tape-live universe with the no-chase filter.
+
+**Expected volume:** 0.4-1.2 trades per hour, limited by seats; about 10-30 per day, so 150 trades take 5-15 days.
+
+**Stressed expectancy (calibrated net50)**
+
+| Period | Mean/trade | n | Pairs | Pair-CI95 | Random control |
+|---|---|---|---|---|---|
+| Train | -13.7% | 6 | 1 | | -5.55% |
+| Holdout | +3.05% | 11 | 5 | -0.3% to +5.6% | -5.27% |
+
+In the holdout, CRAWL supplies about 79% of the profit. It could not be forward-tested here: the research tape snapshot ends at the cutoff.
+
+**Code:** LAB_C_TAPE_BREADTH_EST and RND_LAB_C. It reads f5_flowaccel/tapefeat.py read-only.
+RATIONALE: **For:**
+- It is the only real configuration with a positive holdout under the audited harness.
+- It is the only signal that adds information beyond DexScreener: the tape version beat its DexScreener twin by 5-7 points.
+
+**Against (four verifiers refuted it):**
+- Train loses, with a CI that excludes 0.
+- The liquidity >= $150k restriction was chosen after seeing the holdout.
+- With 5 s of tape latency the holdout turns negative.
+- Repricing at on-chain prices removes about 1.5% per trade.
+- The profit came from one 6-hour regime.
+
+Lowest priority: it uses scarce tape seats.
+
+######## PROMOTION GATE and run protocol (applies to every Lab test)
+**How to run each hypothesis**
+- As a PAPER Lab book.
+- As a zero-capital shadow log of every signal: no slot limit, with the engine's executable quote recorded at the decision.
+- Next to its random control book.
+- From the frozen config hash in synthesis/strategies.py, with no re-tuning.
+- Re-score it daily with leaderboard/run_all.py on the new scan log.
+
+**Promote to an engine account only when ALL of these hold** (on trades entered after the Lab start):
+- n >= 150 closed trades over >= 25 pairs and >= 3 days covering every UTC hour.
+- Mean net50 > 0, and the pair-bootstrap CI95 lower bound of mean $/trade > 0. Net50 here = booked executable-quote P&L minus 50 bps per leg, minus 200 bps on stop exits.
+- It beats the same-period random control by more than the control's CI half-width.
+- top_pair_share <= 0.20, it stays positive with the best pair removed, and no single day supplies more than 50% of the P&L.
+- A 3-slot $1000 book has a max drawdown of 20% or less.
+- It made zero entries on pools flagged by the rug guard.
+- Vanished or unpriced closes are under 10% of trades.
+
+**Kill rule:** after at least 50 trades, stop if the mean net50 is below 0 and the CI95 upper bound is below 0, or if drawdown exceeds 30%.
+RATIONALE: 22.8 hours of data can only detect effects of 2-3.5% per trade.
+- Confirming a +2%/trade edge needs about 240-800 out-of-sample trades; +1% needs about 1,000-3,200.
+- The old gate (20 trades with a positive mean) passes a strategy whose true mean is -1%/trade 34% of the time. With 3 configs per family, about 70% of families would show at least one false candidate.
+- The 15-minute view the owner is watching is pure noise: per-trade standard deviation is 9-13%.
+
+######## FOUNDATION audit
+I audited the shared backtest harness that every research family relies on. The cost model is correct, and the decision path has no look-ahead leak for signals that only look at their own pair. But I found realism and survivorship bugs that change some of the established facts. All confirmed bugs are fixed in audit/harness_v2.py, which has the same API, uses the same series.pkl cache and needs no rebuild.
+
+Writing REPORT.md was blocked by the harness (subagents must return findings as text), so the full report is in the findings and recommendations below.
+
+**Look-ahead tests (passed for per-pair signals):**
+- Brute-force checks of P(), ago and window: 0 mismatches.
+- The ticker index used by the rug screen: 0 mismatches.
+- A "poisoned future" test, where every value after a cut time T* is scrambled: decisions, exit_fn calls and trades closed before T* were identical.
+- Two leaks do exist, both fixed in v2:
+  - `P.static('price')` returns the whole column, future included.
+  - simulate runs pair by pair, so any state a signal keeps across pairs sees other pairs' future (118,272 of 130,986 calls came after a call at a later time).
+
+**Cost model:** identical to the engine's `paper_market_feasibility.modeled_roundtrip` on 135,512 raw rows (0 differences, 0 fee-tier mismatches).
+
+**Main realism bug: stale fills.** The `upd` column is the engine's batch time (37,771 distinct values over 3.1M rows), not DexScreener's per-pair update time. The engine polls every ~5 s, but DexScreener refreshes a pair only every ~30 s, so 90% of kept points repeat the previous price exactly. v1 therefore filled entries at the signal's own price 86-89% of the time and exits at the trigger price 94-96% of the time. That means zero effective latency, and one take-profit filled at +432% on a single-print spike.
+- Against the on-chain tape, DexScreener's price is the last trade from about 20 s earlier. It also bounces about ±50 bps between buy and sell prints.
+- v2 fills at the next DexScreener refresh (the first later point whose price differs, within 60 s). Fill error against the tape drops from 188 to 114 bps, and most of the context-dependent bias disappears.
+
+**Survivorship in forward_net.** It silently dropped samples whose pair left the feed (13.5% of 60-minute samples, mostly drained pools). Fact #1's 60-minute numbers change as follows:
+- fee100-125 & liq>=250k: **+7.69% becomes -46.1%** (sample count 333 becomes 706).
+- fee<=50 & liq>=250k: -0.49% becomes -4.04%.
+- fee100-125 & liq50-250k: +0.47% becomes -5.18%.
+
+**Fact #2 (random entries lose) stands under v2.** Holdout mean per trade at the stressed basis:
+
+| universe | v1 | v2 |
+|---|---|---|
+| all PumpSwap | -7.68% | -7.20% |
+| cost-first | -5.97% | -5.59% |
+| cost-first + interim rug guard | -3.30% | -2.98% |
+
+The rug guard's benefit is overstated. Its thresholds were chosen after seeing 7 rugs that drained in the holdout window. A guard built only from the 3 train-window rugs gives -4.61% instead of -2.98%.
+
+**smoke3.py run unchanged under each harness:**
+
+| run | v1 train / holdout | v2 train / holdout |
+|---|---|---|
+| no guard | -3.68 / -5.97 | -3.32 / -5.59 |
+| interim guard | -4.78 / -3.30 | -2.24 / -2.98 |
+
+None of the momentum or dip probes or the random baselines is near positive expectancy under either harness.
+
+**The candidate gate is far too weak for 22.8 hours of data.**
+- The smallest effect the holdout can reliably detect is 2-3.5% per trade.
+- With 20 holdout trades, a config whose true mean is -1% shows a positive holdout mean about 34% of the time.
+- When 3 configs are picked on train, roughly 70% of families would show at least one false candidate.
+
+Credible claims need about 240-800 holdout trades for a +2%/trade edge, which means 1-3 more days of data.
+- high Stale-quote fills: entries and exits filled at the decision price (zero effective latency)
+    Cause:
+- `upd` is the engine batch time (37,771 distinct values over 3.1M rows, ~82 rows each; t-upd median 1.2 s), not DexScreener's updatedAt.
+- So the de-dup rule keeps one row per ~5 s scan. 89.3% of kept PumpSwap points repeat the previous price and 86.8% repeat price+liq+v5+mcap. Only 20k of 715k same-price rows carry new verified-flow data.
+- DexScreener changes price every ~30 s (between changes: p10 26.5 s, p50 31.9 s, p90 68 s).
+
+Effect in v1:
+- Entry at i+1 had the same price as the signal 86-89% of the time.
+- Exit at k+1 had the trigger's price 94-96% of the time, so gap risk was barely modeled.
+- TP fills reached +432% on single prints. HOLD exits overshot by up to 87.5 min (p90 18.9 min).
+
+Tape (113 pools, mid = sqrt(last buy x last sell)):
+- Fill MAE vs truth at decision+2 s: v1 188 bps; v2 next-refresh rule 114 bps.
+- Conditional mean bias after a >2% DexScreener up-move: v1 -66 bps (fill too high), v2 -6. After a >2% down-move: v1 +15 (median +26), v2 -12.
+- Trade level, v1: STOP exits -0.6..-1.5% pessimistic; TP exits +0.3..+4.8% optimistic.
+
+Fixed in v2 (F1): fill at the first later point whose price differs, within 60 s, else i+1. Afterwards the trigger->fill gap is p50 25-30 s, HOLD overshoot p90 0.7-0.8 min, and max TP fill +27.9%. Impact on config holdout means: -0.9..+1.1%/trade.
+- high forward_net survivorship bias inflated base rates (established fact #1 is wrong in several buckets)
+    - v1 returned None when the pair had no point after the horizon although the dataset continued: 8,307 of 61,475 60-min samples (13.5%).
+- Of 1,549 PumpSwap pairs, 1,470 leave the feed more than 10 min before the end. Their last liquidity is p10 $20, median $20k, so many were drained.
+- v2 (F3) values them at last price -10% (VANISHED) or by the gap rule. It returns None only when right-censored at the dataset end.
+
+60-min forward net, v1 -> v2:
+- fee100-125 & liq>=250k: +7.69% (n 333, win 74.8%) -> -46.11% (n 706, median -13.4, p10 -100%)
+- fee<=50 & liq>=250k: -0.49 -> -4.04 (median 0.01 -> -0.46)
+- fee100-125 & liq50-250k: +0.47 -> -5.18
+- fee100-125 & liq<50k: -14.55 -> -21.00
+- fee55-95 & liq50-250k: -4.03 -> -5.58
+- fee55-95 & liq>=250k: -2.95 -> -3.08
+
+Survivorship plus the liq==0 fix alone (v1 fills) gives -46.15 for the first bucket, so the change is survivorship, not the fill rule.
+- high Candidate gate (holdout n>=20, mean>0) is statistically meaningless on 22.8 h
+    Inputs:
+- Per-trade stressed sd: 9.1% (mid-fee random) to 13.2% (all PumpSwap random).
+- Pair-cluster design effect: 0.7-2.4.
+- Minimum detectable effect at 80% power, holdout: 2.0-3.6% per trade.
+
+False-pass risk under a true mean of -1% (sd 9%, design effect 1.5):
+- P(holdout mean > 0) = 34% at n=20, 26% at n=50, 13% at n=150.
+- With 3 configs pre-selected on train, P(at least one false pass) = 72% / 60% / 35%.
+
+Holdout trades needed for 80% power: +3%/trade 106-353; +2% 238-795; +1% 950-3,200.
+
+The span is one 22.8 h regime; train and holdout cover different times of day. Random all-PumpSwap hourly means range from -15.6% to -2.9%. 3.2% of train trades exit after the cut (no embargo).
+
+This cannot be fixed in code; see recommendations.
+- medium Cross-pair look-ahead: pair-by-pair simulate lets global state in signal/exit_fn see other pairs' future
+    - v1: 118,272 of 130,986 signal calls happened after a call at a later time. Any cross-sectional or regime state kept inside a signal is leaky.
+- v2 (F5): a heap scheduler over per-pair generators invokes every callback (signal, size_fn, exit_fn) in global non-decreasing time order.
+- Result: 0 inversions. Trades are identical to pair order for stateless signals (3 configs verified). About 25% slower.
+- Custom `run(H)` simulators must enforce time order themselves.
+- medium Past.static() leaks the full future column
+    - v1 `P.static('price')` returned the whole array, so `P.static('price')[P.i+1]` was possible.
+- v2 (F4) raises LookAhead for any time-series column. Static keys (pair, mint, dex, quote_sol, sym, created) still work.
+- `P.s` remains reachable in Python. Integrators should grep strategy modules for `P.s[`, `.s['` and `P.i +`.
+- medium Feed gaps while holding: exit at reappearance price, hold limits overshot, tails selected
+    v1 behavior:
+- 66 of 1,057 random trades sat through a >5 min feed absence (gap median 53 min, p90 111 min). They exited at the reappearance price, and stops/targets could not act during the gap.
+- Those trades averaged +2.16% vs -9.68% for the others.
+
+Gap returns vs matched continuously observed controls over the same interval:
+- median +0.5% vs 0.0%
+- p90 +25% vs +7.6%
+- share below -50%: 4.8% vs 2.2%
+- liq>=250k gaps: +1.4% median, no drains
+
+v2 (F2):
+- Absence over 10 min closes the trade, valued at min(pre-gap, return price). This is conservative: drains during a gap are kept and re-listing pumps are not credited.
+- exit_t = return time (when the value is known). An earlier variant stamped the pre-gap time, and the poisoned-future test caught it.
+- No extra haircut (GAP_HAIRCUT_PCT=0). Switches: GAP_VALUATION 'pre'/'return', FEED_GAP_MS=None.
+
+Impact: -1.2..+0.7%/trade with no consistent sign; 6-17% of trades become FEED_GAP/GAP.
+- medium Interim rug screen thresholds were fit using holdout rugs
+    - All 10 drained cost-first pools are flagged at their first cost-first point, but 7 of the 10 drained in the holdout window.
+- DAWS ($22.9M market cap, liq/mcap 1.89%, no ticker reuse, holdout drain) sits just inside the $20M / 2% thresholds.
+- The 3 train-window rugs (IOF x2, SARP) had mcap $242-853M, liq/mcap 0.31-0.58%, and all reused a ticker.
+- v2 keeps interim_rug_risk unchanged (shared API) and adds rug_risk_train_only(P): mcap >= $200M & liq/mcap < 1% & young, or young + ticker reuse.
+- Random cost-first holdout: interim guard -2.98% vs train-only guard -4.61% (v2); v1 -3.30% vs -4.98%. About 1.6%/trade of the guard's holdout benefit is holdout-informed.
+- medium (pair, hour) cluster bootstrap CI is about as narrow as iid
+    - Trades on the same token are correlated across hours.
+- Pair-level design effect: 1.98 (train) and 2.37 (holdout) for random all-PumpSwap.
+- So (pair, hour) CIs are up to ~35% too narrow.
+- v2 (F7) adds ci95_mean_usd_pair (bootstrap over pairs) and keeps the original field.
+- medium DexScreener price is a ~20 s lagged last-trade print with bid/ask bounce
+    - Best-lag match to the raw tape last trade is at a 20 s lag: median abs error 38 bps, vs 94 bps at lag 0.
+- Same-second buy vs sell prints differ by a median of 106 bps, so the last-trade price bounces about ±50 bps.
+- Trade-level path noise vs tape (mean abs difference per trade): 1.7-3.2%.
+- Residual mean bias in v2: -0.6..+0.9%/trade. Dip-buying is still about +0.9% optimistic (n=42), comparable to the +50 bps/leg stress.
+- This cannot be removed with DexScreener data. Strategies targeting moves of 3% or less over short holds are at the noise floor.
+- low Drained pools (liquidity == 0) valued at 80% of price
+    - 570 PumpSwap points have liq == 0, and all are terminal (drained pools).
+- v1 exit_value applied the 20% impact cap there, crediting 80% of the price.
+- v2 (F6) values them at 0.
+- Affected 8 of 1,652 trades in the 3 regression configs (all differences explained).
+- low portfolio() allowed negative balance and drawdown above 100%
+    - v1 example: tight momentum probe final balance -437.46, max drawdown 143.75%.
+- v2 portfolio is cash-limited: a trade is taken only if realized cash minus committed capital covers its size. It reports skipped_no_cash.
+- Same results on the hand-checked examples (slot skip; drawdown 1.98%).
+- low summarize edge cases: upper median and trades_per_hour span
+    - median_pct used the upper median for even n (n=2 example: 2.5 instead of 1.0).
+- trades_per_hour used the first-to-last entry span instead of the evaluated window.
+- Both fixed in v2. Summaries also add censored_end, vanished and gap_closed counts.
+- low END censoring and VANISHED haircut are assumptions
+    END censoring:
+- Entries in the last hour are marked to market at the final price.
+- Excluding entries in the last 65 min changes holdout means by -0.05..-0.24%. Kept, with a count reported.
+
+VANISHED -10% haircut:
+- Kept. Tape evidence is thin: 20 vanished pools still traded afterwards, price at +10 min mean -14.2%, median +0.9%, p10 -70.7%.
+- 232 of 252 vanished tape pools have no later swaps.
+- low load() would silently rebuild the shared cache
+    - v1 load() calls build_cache() and overwrites series.pkl if it is missing.
+- v2 never auto-builds; build_cache(path) requires an explicit path. The cache was not rebuilt.
+- info Verified correct: cost model, Past view bounds, ticker index, net50 path, cooldown, de-dup ordering
+    Cost model:
+- Fee tier from mcap / (price/pnative), using the engine's PUMP_FEE_TIERS. The engine's marketCap-or-fdv fallback never triggered in the data.
+- Impact 2N/L is exact for constant-product buys and conservative for sells up to the 20% cap.
+- 20 bps buffer per leg; network fee on both legs as in the engine.
+- net50 re-prices qty50 at the same fill and exit.
+
+Mechanics:
+- No overlaps or cooldown violations (2,959 random trades).
+- Out-of-order rows via the 15 s rule: 71 (negligible).
+- A-B-A price flip-flops: 5% of changes, 0.3% within 15 s (bounce, not multi-writer echoes).
+
+Open question: same-second buy/sell spread ~106 bps on pools with a modeled 100 bps fee. The decoded quote amounts may exclude part of the fee. Not acted on.
+
+Housekeeping: tape_snapshot.sqlite3-shm/-wal in deep/ predate my first tape access (WAL file created 10:41:15, my first tape script 10:43). The main DB is unmodified (mtime 10:31).
+- info v1 vs v2 results (stressed net50 mean % per trade, train(n) / holdout(n), -5/+10/60 unless noted)
+    | config | v1 train (n) | v1 holdout (n) | v2 train (n) | v2 holdout (n) |
+|---|---|---|---|---|
+| smoke3 random cost-first, no guard | -3.68 (83) | -5.97 (129) | -3.32 (84) | -5.59 (126) |
+| smoke3 cost-first + interim guard | -4.78 (27) | -3.30 (43) | -2.24 (28) | -2.98 (40) |
+| cost-first + train-only guard | -4.65 | -4.98 | -2.24 | -4.61 |
+| random all PumpSwap | -9.94 (589) | -7.68 (468) | -11.10 (579) | -7.20 (468) |
+| random fee 52.5-125 & liq>=50k + guard | -4.48 | -4.32 | -5.57 | -4.69 |
+| momentum +3%/60 s probe | -6.15 | -4.17 | -5.38 | -5.28 |
+| dip -3%/60 s probe | -3.81 | -4.79 | -5.69 | -4.12 |
+| momentum -3/+3/15 | -4.74 | -3.68 | -4.30 | -3.45 |
+
+Per-fix decomposition and gap-valuation sensitivity: audit/t12_compare.out and t12_compare.json.
+
+Holdout portfolio (3 slots), cost-first + guard: v1 764.78 / 23.5% drawdown; v2 795.20 / 20.5%.
+
+Regression checks:
+- v2 in v1 mode reproduces v1 exactly except the 8 liq==0 trades.
+- Time-ordered equals pair-ordered for all 3 configs.
+- forward_net parity: 5 mismatches out of 14,837.
+DELIVERABLES ['C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/harness_v2.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/rerun_with_v2.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/strategies.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/tapelib.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t12_compare.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t12_compare.json', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/smoke3_v1_v2.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/baselines_v1_v2.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t11_v2_regression.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t04_lookahead_v1.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t04_lookahead_v2.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t01_dedup.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t03_tape_vs_dex.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t05_costs_v1.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t06_semantics_v1.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t06_semantics_v2.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t07_fillrule.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t08_stats_v1.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t09_vanish.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t10_liqbad.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t13_gaps.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t14_tape_reprice.out', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/audit/t15_flipflop.out']
+RECS
+  * Re-run every family's strategies.py under v2 before accepting anything: `python audit/rerun_with_v2.py <family>/strategies.py --v1-too` (it aliases `harness` to v2, so modules run unchanged). Report v2 stressed results as primary.
+  * Revise established fact #1. Under v2, 60-min base rates are fee100-125 & liq>=250k -46.1% (not +7.69%), fee<=50 & liq>=250k -4.04% (not -0.49%), fee100-125 & liq50-250k -5.18%. The old numbers came from survivorship. Flag fact #3's screen as holdout-informed: also report results with `rug_risk_train_only`, where random cost-first holdout is -4.61% vs -2.98% with the interim guard.
+  * Tighten the candidate gate. Replace holdout n >= 20 / mean > 0 with: holdout n >= 150 across >= 25 pairs; pair-level CI95 lower bound of mean net50 > 0 (`ci95_mean_usd_pair`); beating the same-period random baseline by more than its CI half-width; positive under `rug_risk_train_only`, `GAP_VALUATION='pre'` and `'return'`, and `FILL_RULE='next_point'`; top_pair_share <= 0.2. Treat anything weaker as a hypothesis for forward paper testing.
+  * Collect more data before claiming any edge. A +2%/trade edge needs about 240-800 holdout trades (1-3 more days of scan log); +1% needs about 1,000-3,200. Re-validate any survivor walk-forward on days after 2026-10-08 10:27, with no re-tuning.
+  * Strategy authors should use time-based `P.ago`/`P.window`, not `back=k` (k points are about k/6 distinct DexScreener updates). They should treat moves under ~1% within 30 s as bid/ask bounce, and avoid targets of 3% or less: the per-trade DexScreener-vs-chain noise is 1.7-3.2%.
+  * Integrator: grep strategy modules for `P.s[`, `.s['`, `P.i +` and module-level state mutated inside signals. Make sure custom `run(H)` simulators process events in global time order; v2's `simulate` already does.
+  * Live engine (outside this research): DexScreener data refreshes only every ~30 s and lags the chain by ~20 s. Any paper fill priced at the DexScreener quote at decision time is optimistic for take-profit exits and dip entries. Using the on-chain tape or a route quote for fills would make PAPER PnL more honest.
+
+######## FOUNDATION rug
+PAPER research only; nothing here is a profit claim. The rug guard works as a risk filter. No edge strategy came out of this study (0 candidates): random entries lose -3.8% to -5.0% per trade on holdout at net50 in every universe, with or without the guard. Thresholds were chosen on TRAIN only (configs_tried = 8,960 grid configurations), three configs were frozen before any holdout look (rug_guard.frozen.sha256), and holdout was evaluated once.
+
+The harness blocked writing REPORT.md ("subagents should return findings as text"), so the report content is in these findings. All other deliverables are in the rug folder.
+
+(a) DRAIN CENSUS
+- 1,549 PumpSwap SOL-quote pools had 157 terminal drains in 22.8 h: 97 in the train period, 60 in holdout, plus 3 recovered glitches. 115 were fast (>= 80% within 10 min); 42 were slow collapses.
+- Liquidity just before the drain: <$20k 90, $20-50k 30, $50-250k 18, >= $250k 19.
+- Median pair age at drain: 12.8 min.
+- All 19 drains in pools that ever had >= $250k liquidity belonged to two structural families:
+  1. LP-PULLABLE (9 of the 19; 25 drains in total). liq/mcap 1.2-1.9 on non-pump mints with 115-125 bps fees. Liquidity goes to 0.0 at an unchanged price and the pool leaves the feed. Tickers are recycled heavily (TWEETCRAFT x3, SharkTank x4, BORDR, Anthropic, ...). Of the 30 such pools whose fate was observable, 24 were pulled within the 22.8 h.
+  2. FAKE MARKET CAP (10). USDP/IOF/UDR/DOTF/GOIF/WSOS/VSOF/SARP/DAWS...: $23M-$1.3B 'market cap' on liq/mcap 0.25-1.9%, 0.3-4 days old.
+- Every other drain hit a young pool.
+- Tape: it decodes swaps only, so it cannot see LP removal. Family drains show NO sell burst (0 swaps in the 10 min before IOF/GOIF/DOTF drained). Their prior flow is almost only small buys (23:2, 63:1, 23:1). One seller wallet (4NA1SWzb) traded both GOIF and DOTF. Detection must therefore be structural, not flow-based.
+
+(b) THE RULE: rug_guard_v1(P) -> True means do not trade. It blocks if ANY of:
+- liq/mcap >= 1.0 (LP_PULLABLE)
+- pair age < 720 min (YOUNG_POOL)
+- mcap >= $20M AND liq/mcap < 1% AND age < 14 d (FAKE_MCAP)
+- liquidity, market cap or age is missing or non-positive (fail closed).
+
+HOLDOUT results (train in brackets):
+- liq >= $20k: 89.7% of drain events flagged [0.891]; 87.2% flagged at every pre-drain point. Point recall 0.709, FPR 0.148 [0.224], precision 0.309, pool-averaged FPR 0.277.
+- liq >= $50k: event recall 0.818 [0.810], FPR 0.139.
+- Cost-first slice: event recall 0.857 [1.0], FPR 0.298. Those 'false positives' are fake-family pools still alive at the end or draining more than 2 h later.
+- fee 100-125 & liq >= $50k: 0.857 [0.778], FPR 0.086.
+- References: the INTERIM screen gets 0.718 at FPR 0.485 (its thresholds were set on the full data, so its holdout is contaminated). Young-only gets 0.744 but catches 0 of 7 cost-first drains. Structural-only (no age gate) gets 0.436.
+- Holdout misses: DAWS (liq/mcap 1.86%, above the 1% threshold), OURA (3.65%, wash-traded), and two slow collapses of 1.3-day-old coins.
+- A 2% FAKE threshold would also have caught DAWS. Train could not tell 1% from 2%, so that variant is holdout-informed and NOT validated.
+
+(c) DRAIN HAZARD per position-hour (holdout, no guard -> rug_guard_v1, share of decision points kept)
+| slice | no guard | rug_guard_v1 (kept) | interim screen (kept) |
+|---|---|---|---|
+| liq >= $20k | 4.39%/h | 1.31%/h (81%) | |
+| cost-first: fee <= 50 & liq >= $250k | 3.48%/h | 0.99%/h (68%) | 0% (30%) |
+| fee 100-125 & liq $50-250k | 3.45%/h | 0.21%/h (85%) | |
+| fee 100-125 & liq >= $250k | 54%/h | blocked entirely | |
+A drain costs about 100% of the position, so the guard removes roughly 3 percentage points of expected loss per position-hour.
+
+(d) ENGINE FLAGS
+- Fake family: rows carry 'unnatural buy imbalance' 61% of the time and 'weak liquidity/MC' 93% (mean score 49, posture WAIT 91%). But these are only score penalties, they also fire on legitimate pools, and they have no lift on their own.
+- LP family: the engine gives the +9 'good liquidity/MC' bonus on 98.6% of rows (mean score 86.7, posture SETUP 96.9%). Only the winner_signal and flow-unavailable gates kept it out.
+- safety.allowed=false on family rows means the check never ran (checked_at 0), not that it blocked them.
+
+CORRECTIONS TO SHARED FACTS AND TOOLS
+1. Fact 1's +7.69%/60m (win 74.8%) for fee 100-125 & liq >= $250k is survivorship bias. H.forward_net dropped 375 of 708 samples whose pair ended before the horizon. Including them: mean -46.2%, median -13.9%, p10 -100%. The cost-first base rate also moves from -0.49% to -3.52%. Its 50% win rate was the fake family's wash-buy drift; with the guard the win rate is 24.6% and the median -0.89%.
+2. H.exit_value caps impact at 20% and books zero liquidity as 20% impact. An LP pull therefore costs about -22..-32% in the harness instead of ~-100%. In the fee >= 100 & liq >= $250k universe, harness -3.6..-6.7% per trade becomes -17.8..-23.3% with an uncapped exit (realistic_exit.py).
+
+FORWARD CHECK
+On 36.5 min of observations logged after the cutoff (read-only): 4 drains, all under $20k and all flagged at every pre-drain point. No family pool drained in that window, which is too short for precision.
+
+HOUSEKEEPING
+An early stray 'python3' call (Windows Store alias) hung as a background shell job. I did not kill any process; the harness terminates it at turn end.
+- critical Fact 1's only positive base rate is survivorship bias (forward_net drops drained pools)
+    fee100-125 & liq>=250k: forward_net-only n=333 mean +7.69% win 74.8% (reproduces fact 1). 375 of 708 one-per-minute samples were dropped because the pair series ended before +60 min. Keeping them, valued at the last point with an uncapped constant-product exit and the -10% vanish haircut: mean -46.15%, median -13.85%, p10 -100%. That slice is the LP-pull family; its measured drain hazard is 51.6%/position-hour (holdout 54%). The bias also inflates other slices: cost-first -0.49 -> -3.52 (768 ended samples), fee100-125 liq50-250k +0.47 -> -1.60, fee100-125 liq<50k -14.55 -> -20.56. Any study that ranks slices or signals by H.forward_net is affected. Script: rug/survivorship_all.py.
+- critical Harness under-prices LP pulls: impact cap 20% and liq=0 booked as 20%
+    H.exit_value uses min(20%, 2N/L), and 20% when L<=0. When liquidity goes to 0.0 at an unchanged price (LP pull), the harness books about -22..-32% (STOP fill plus VANISHED -10%) instead of ~-100%. Random entries in fee>=100 & liq>=250k: harness mean -6.65% (train) / -3.64% (holdout) vs -23.3% / -17.8% with an uncapped exit, impact = max(min(x,0.2), x/(1+x)), x=2N/L, which equals the harness for x<=0.2. The integrator should re-value trades with rug/realistic_exit.revalue() or fix the audited harness.
+- high All 19 drains in big pools (>= $250k liquidity) came from two structural families
+    157 terminal drains in 1,549 PumpSwap SOL pools in 22.8 h; 115 were fast (<= 10 min). The 19 drains in pools that ever had >= $250k liquidity: 9 LP_PULLABLE and 10 FAKE_MCAP. (1) LP_PULLABLE: liq/mcap 1.2-1.9 on non-pump mints, fee 115-125 bps, liquidity -> 0 at an unchanged price, recycled tickers (TWEETCRAFT x3, SharkTank x4, BORDR, Anthropic, SpaceX, XP, TITS, knightcat). 233 pools showed the signature at >= $20k; of the 30 with an observable fate, 24 were pulled and 4 were alive at the end; 203 were seen for about 1 min (fate unknown). (2) FAKE_MCAP: USDP/IOF/UDR/DOTF/GOIF/WSOS/VSOF/SARP/XRPN/ATFS/DAWS, $23M-$1.3B market cap on liq/mcap 0.25-1.9%, 0.3-4 days old. The other 138 drains were young pools: median age at drain 12.8 min, 104 under 60 min old.
+- high rug_guard_v1 holdout: 90% event recall at 15% point FPR (liq >= $20k)
+    Rule: block if liq/mcap>=1.0, OR age<720 min, OR (mcap>=$20M AND liq/mcap<1% AND age<14d); fail closed on missing inputs. Chosen on train (8,960 configs, two passes) and frozen. HOLDOUT, train in brackets:
+- liq>=$20k (39 events): event recall any 0.897 [0.891], all-points 0.872, point recall 0.709, FPR 0.148 [0.224], precision 0.309, pool-avg FPR 0.277.
+- liq>=$50k (22): 0.818 [0.810], FPR 0.139.
+- cost-first (7): 0.857 [1.0], FPR 0.298.
+- fee100-125 & liq>=$50k (14): 0.857 [0.778], FPR 0.086.
+- all PumpSwap (60): 0.933, FPR 0.147.
+Comparison: INTERIM 0.718 at FPR 0.485 (contaminated); young-only 0.744 at FPR 0.052 but 0 of 7 cost-first drains; structural-only 0.436.
+Misses: DAWS (liq/mcap 1.86%), OURA (3.65%, 12 wallets wash-trading), and slow collapses TON618 / AnyPS5.
+- high Drain hazard per position-hour falls ~3.4x with the guard
+    HOLDOUT (share of decision points kept in brackets):
+- all liq>=$20k: 4.39%/h -> 1.31%/h (81%); structural-only 2.36% (85%); interim 2.57% (49%).
+- cost-first: 3.48% -> 0.99% (68%); interim 0.00% (30%).
+- fee100-125 & liq$50-250k: 3.45% -> 0.21% (85%).
+- fee100-125 & liq$20-50k: 16.5% -> 10.1% (70%).
+- fee100-125 & liq>=$250k: 54% -> blocked entirely.
+- fee55-95 & liq>=$250k: 0% (nothing blocked).
+All data: liq>=$20k 4.28% -> 1.39% (78%); cost-first 3.22% -> 0.69% (59%). The remaining cost-first hazard is DAWS and 'D O T F' (liq/mcap 1.5-1.9%).
+- high Engine scoring rewards the LP-pull family; the safety check never ran on either family
+    Recomputed from 2.2M raw rows.
+- LP family: +9 'good liquidity/MC' on 98.6% of rows, mean score 86.7, posture SETUP on 96.9% of rows. Only winner_signal (31%) and promoted_verified_flow_unavailable (32%) rejections kept the engine out.
+- Fake family: 'unnatural buy imbalance' (b5/s5>5) on 61% of rows and 'weak liquidity/MC' on 93% (score 49, WAIT 91%). These are score penalties only; they also fire on 42 of 71 legitimate train pools with >= $50k liquidity, and they have no lift on their own (2h drain rate 5.8% vs 4.7%).
+- safety.allowed=false on 100% of family rows, but the raw rows show checked_at 0: the check was never run, so it did not block anything.
+- RUG_GUARD_V2 (rugcheck) passed SharkTank 65GHmCby (LP 100% locked), which later collapsed.
+- medium Tape shows no sell burst before family drains: detection must be structural
+    The tape snapshot decodes swaps only (no LP add/remove). IOF, GOIF and DOTF had 0 swaps in the 10 min before draining. Their prior 2h flow was almost only small buys of 0.1-0.2 SOL (buys:sells 23:2, 63:1, 23:1), the wash-buy pattern. One seller wallet (4NA1SWzb) traded both GOIF and DOTF. OURA had 292 swaps from 12 wallets. LP-pull pools show 0-2 swaps on the tape although DexScreener reported hundreds of transactions per 5 min (tape coverage may be incomplete). Young-pool dumps do show distributed selling (Bond: 71 sells / 11 buys in the final 10 min).
+- medium Guard removes the catastrophic tail but creates no edge: 0 candidates
+    Random entries, -5/+10/60, paired draws, HOLDOUT net50 (no guard -> guard):
+- cost-first: -5.01% (n131, 27 pairs) -> -4.95% (n78, 13 pairs, PF 0.09, CI95 $[-17.6,-4.3], portfolio $674, maxDD 33%).
+- liq>=$20k: -4.54% (n688) -> -4.18% (n515, 58 pairs, PF 0.21).
+- fee>=100 & liq>=$50k: -3.73% (realistic -4.62%) -> -3.76% (n184, 15 pairs).
+Trades worse than -50%, realistic exit, train+holdout: cost-first 8 -> 3, liq>=$20k 10 -> 1, fee>=100 & liq>=$50k 8 -> 0. No config meets holdout mean net50 > 0. The cost-first slice's 50% 60-min win rate was the fake family's wash-buy uptrend; with the guard it is 24.6% (median -0.89%).
+- medium FAKE_MCAP threshold 1% vs 2%: tied on train; 2% would have caught DAWS on holdout (unvalidated)
+    Train could not separate 1% from 2% (same recall); 1% was taken for fewer flags. On holdout, DAWS ($23.8M market cap, 1.86%, 4.1 days, fast drain) slipped through at 1%. The 2% variant (the interim's value) is holdout-informed and has no clean out-of-sample estimate. Three live pools fit DAWS's profile and pass at 1%: USDF EpugLBw1, UDR ERFmQZQU, GOIF 8ZMkMgWM (market cap $21-32M, liq/mcap 1.6-2.0%, 4-8 days old, cost-first universe).
+- info Forward check on 36.5 min of post-cutoff observations
+    The engine's append-only observations log was read read-only from the dataset cutoff byte: 113 PumpSwap SOL pairs. 4 fast drains (CODY, CERT, Wick, PLAGUE), all under $20k and all flagged (YOUNG_POOL) at every pre-drain point. No family pool drained in the window. Alive and flagged: FAKE_MCAP USDP, USDF, UDR Gs6hrh68, SARP x2, GOIF D2pVedgH, WOSE GhBPuDpt; LP_PULLABLE CAPYBARA x2, PQC FNU5SNrh. Of 49 never-drained pairs with >= $50k, the guard flagged 24.5% of points on average. The window is too short to measure precision.
+- info REPORT.md not written (tool policy); report content is in this output
+    The Write tool refused REPORT.md ('Subagents should return findings as text'), so the report content is in summary, findings and recommendations. Method, numbers and the engine spec are reproducible from the scripts and *.txt outputs in the rug folder.
+DELIVERABLES ['C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/rug_guard.py (rug_guard_v1(P), rug_guard_structural(P), young_only(P), rug_reasons(P); logic frozen, see rug_guard.frozen.sha256 — only the docstring was corrected afterwards)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/strategies.py (CONFIGS: 3 random-entry + rug_guard_v1 configs; BASELINES: the same paired draws without the guard)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/realistic_exit.py (uncapped constant-product exit re-valuation: revalue(trades) adds net50r/usd50r/net0r)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/labels.py + labels.pkl (drain labels for all pairs), census.txt, summary_a.txt, tape_check.txt', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/features.py + feat.pkl (per-minute past-only features and labels), rugcommon.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/search.py, search2.py, search_train.json, search2_train.json (train-only grid search, 8,960 configs)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/evaluate.py, evaluate.txt, evaluate_results.json, flags.pkl, misses.py (train/holdout precision-recall)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/hazard.py, hazard.txt (hazard per position-hour by slice, with and without guards)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/econ.py, econ_all.txt, econ_all.json (random entries with and without guards, harness vs realistic exit, portfolio)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/survivorship_all.py, survivorship_all.txt (fact-1 survivorship correction)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/engine_flags.py, engine_flags.txt, safety_peek.py (engine risk flags vs families)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/rug/forward_check.py, forward_check.txt (post-cutoff forward check)', 'REPORT.md was NOT written: the tool policy blocks report files for subagents; its content is in summary, findings and recommendations']
+RECS
+  * ENGINE RULE, plain language, in backend/cost_first_established.py style. Name: RUG_GUARD_V1, a pure pre-entry definition that fails closed and never admits an entry. Inputs: liquidityUsd, marketCap (fall back to fdv, as score_pair does), and pair age in minutes from pairCreatedAt. @dataclass(frozen=True) RugGuardParameters: lp_pullable_min_liq_to_mcap=1.0, young_pool_max_age_minutes=720.0, fake_mcap_min_usd=20_000_000.0, fake_mcap_max_liq_to_mcap=0.01, fake_mcap_max_age_minutes=20_160.0. REJECTION_REASONS, evaluated in order, recording every reason that applies:
+1. 'rug_input_unknown': liquidity, market cap or age missing, non-finite or <= 0 (return immediately).
+2. 'rug_lp_pullable': liquidity/market_cap >= 1.0 (the pool holds most of the supply, so the creator controls the LP).
+3. 'rug_young_pool': pair age < 720 min.
+4. 'rug_fake_market_cap': market_cap >= $20M AND liquidity/market_cap < 0.01 AND age < 14 days.
+The pool is a candidate only when the list is empty. Record the reasons in the describe() planning record.
+  * Run RUG_GUARD_V1 before quoting, flow promotion and the RugCheck call. It costs nothing, and those later checks never ran on these families (checked_at 0).
+  * In market_monitor.score_pair, bound the +9 'good liquidity/MC' bonus to 0.15 <= liq/MC < 0.6 and treat liq/MC >= 1.0 as a risk. Today LP-pullable pools score 86.7 on average and sit at SETUP on 96.9% of rows.
+  * Replace INTERIM interim_rug_risk with rug_guard_v1 in the cost-first universe. Interim keeps only 30% of cost-first decision points (its ticker-reuse rule flags most of them); rug_guard_v1 keeps 68% at a 0.99%/h holdout hazard. If the owner wants the most conservative fake-market-cap screen, the 2% variant also catches DAWS-like pools (currently USDF EpugLBw1, UDR ERFmQZQU, GOIF 8ZMkMgWM), but that variant is holdout-informed and unvalidated.
+  * Every research agent should stop using H.forward_net means (or any 'drop samples whose pair ended' statistic) for slice or signal ranking, and value ended pairs at their last point. The integrator should re-value all trades with realistic_exit.revalue() (uncapped constant-product exit; liquidity 0 means proceeds 0) or fix the audited harness's 20% impact cap. Without these, the LP-pull slice looks like +7.7%/h when it is about -46%.
+  * Do not deploy any 'momentum in young pools' idea without an explicit drain budget. 2h drain rates by pair age: <15 min 87%, 15-60 min 62%, 1-6 h 22%. If a strategy must trade young pools, use rug_guard_structural and size for a 10-16%/h hazard in the fee 100-125 & liq $20-50k slice.
+  * Keep a running forward log of rug_guard_v1 reason codes against later drains (liquidity -> 0 or price -80% within 10 min) in the live engine for at least several days before trusting the precision numbers. The 36.5-minute forward window here was too short.
+
+######## FOUNDATION calib
+The harness gets the swap costs right, but it fills at a DexScreener price that lags the pool. So on real trades it was too optimistic by about 0.56–0.76% per trade. The +50 bps/leg stress covers that on average, but not per trade, and not on stop-loss exits.
+
+REPORT.md was not written: the harness blocks subagents from writing .md report files, so the report is here and in the findings.
+
+**Data (copies only; live ledgers never opened)**
+- 31 account-ledger copies from the backup and archive folders, deduplicated by (account, trade id): 117 closed trades with entry, preflight buy/sell and exit quotes plus a market snapshot.
+  - 92 trades are from before the reset (Oct 6–7, before the dataset starts); 25 are after it, where dataset prices exist.
+  - Only 9 tokens, and 5 of them (CATCRAFT 39, swordinu 29, RARINU 19, A1 18, IRL 8) carry 113 trades. The 3 accounts mirror each other, so there are only 39 (pair, hour) clusters; every confidence interval is a cluster bootstrap.
+  - Range covered: $12–200 per trade, trade size 0.009–0.25% of pool liquidity, liquidity $33k–465k (only 2 trades under $50k), fee tiers 30/60/75/90–120 bps.
+- 162 strategy-lab $10 Jupiter price checks on 12 pools, compared with the lab's price, which matched the dataset price exactly.
+- The on-chain swap tape was inconclusive and is not used: its decoder reports about half the fee, and a mid-price rebuilt from recent swaps lags.
+
+**Method**
+- Each trade's own snapshot (price, SOL/USD, market cap, liquidity) is run through formulas identical to the harness entry/exit cost functions.
+- "Booked" means the raw Jupiter quote minus the engine's 10 bps/leg buffer, plus $0.03 network fee per leg and token-account rent counted as a loss.
+- For the 25 post-reset trades, the harness version buys at the dataset price at the entry quote and sells at the first dataset point after the exit quote.
+- Plus (+) means real cost is higher than the model.
+
+**T1: Buy then immediate sell (no price move in between) — booked round trip minus harness round trip, %**
+
+| Bucket | n | Mean | Median | p90 | CI95 |
+|---|---|---|---|---|---|
+| All | 117 | −0.27 | −0.15 | −0.01 | [−0.38, −0.18] |
+| fee ≤50, liq ≥250k | 23 | −0.10 | −0.09 | +0.01 | |
+| fee 55–95, liq 50–250k | 61 | −0.15 | | | |
+| fee 100–125, liq 50–250k | 29 | −0.51 | | | [−0.80, −0.27] |
+| liq <50k | 2 | −1.85 | | | |
+
+- The +50 bps stress covers 100% of trades here.
+- On the pool leg alone, half the buy/sell spread minus (fee + modeled price impact) is −0.03% mean (n=87). So the fee-tier table is right to about 0.1%.
+- Jupiter's USDC→SOL rate differs from DexScreener's SOL/USD by only −0.04%.
+
+**T2: Entry leg vs the price the harness would fill at — booked minus harness, % per leg**
+- Fresh dataset price (post-reset, about 0.35 s old): fill +0.35 (CI −0.00..+0.80, p90 +1.51), preflight buy +0.34.
+- The sell quoted at the same moment was 0.67% better than the model: the executable mid sat about 0.5% above the DexScreener price.
+- Snapshot price (about 8 s old), all trades: +0.25 mean, +0.18 median.
+- Lab $10 checks, in harness-equivalent terms: fee ≤50 +0.50, fee 55–95 +0.09, fee 100–125 −0.60.
+- This is a lag tied to the trigger, not a fixed bias of one pool. On the same pool, entries paid above the price, emergency exits sold about 0.5% below it, and stop exits were about 2% below the next price.
+
+**T3: Exit leg — booked minus harness, % per leg**
+
+| Comparison | n | Mean | CI95 |
+|---|---|---|---|
+| vs harness next-point fill, all post-reset | 25 | +0.76 | [+0.12, +1.70] |
+| … EXIT_IMPACT_EMERGENCY exits | 20 | +0.18 | |
+| … STOP_LOSS exits | 3 | +1.97 | [+1.19, +2.75] |
+| vs ledger price, older STOP exits | 30 | +3.78 | |
+| vs ledger price, emergency exits | 42 | −0.03 | |
+
+- The 43 STALE_MARKET_EXIT closes are excluded: their exit prices were stale by construction.
+
+**T4: Whole trade — booked P&L minus harness P&L, % per trade**
+
+| Comparison | n | Mean | Other |
+|---|---|---|---|
+| Post-reset, vs harness | 25 | −0.76 | CI [−1.25, −0.26], p10 −2.13 |
+| Post-reset, vs harness +50 stress | 25 | +0.23 | CI [−0.27, +0.72]; 60% of trades covered |
+| Non-stop exits, vs harness | 22 | −0.56 | about 28 bps per leg |
+| Stop exits, vs harness +50 | 3 | −1.25 | not covered |
+| Post-reset, vs calibrated harness | 25 | +0.04 | CI [−0.50, +0.52]; in-sample for fee ≤50 |
+
+**Exit-impact emergency (V1) and quote gaps**
+- It closed 36% of all trades and 83% of fee ≤50 trades, after a median hold of only 30–44 s.
+- 14.5% of trades already met the emergency threshold with the sell quote taken at entry.
+- Jupiter's reported price impact includes the pool fee: reported buy impact minus modeled pool impact averages +0.63%.
+- At these exits, liquidity was unchanged and the realised exit cost was 0.78% against a model of 0.41%.
+- These trades booked −2.14% on average, but only −0.41% beyond the entry-time round-trip cost. The rule mostly locked in the round-trip cost on quote noise.
+- Buy vs sell price at the same moment: mean gap 1.82%, median 2.17%, which is the real round-trip spread. Reported sell impact minus buy impact: median +0.18, p90 +0.56.
+
+**Calibration (calibration.py, version CALIB_V1)**
+- `extra_bps_per_leg(fee_bps, liq_usd, notional_usd, basis='engine', conservative=True)`, applied to both legs:
+  - fee ≤50: +22 bps (raw-quote basis +12).
+  - fee 55–95 and 100–125: +10 bps floor. The measured estimates are −5 and −55, meaning the harness already over-costs these tiers.
+  - Plus fixed engine costs: rent $0.185 per trade and +$0.018 network per leg, which is +5.5 bps/leg at $200 and +22 at $50.
+  - Plus +25 bps/leg outside the measured range (liquidity <$50k or trade above 0.3% of liquidity). This is a prior, not a measurement.
+- `exit_reason_extra_bps`: stop exits +200 bps (measured), trailing exits +100 bps (a prior).
+- `calibrated_net_pct(trade)` re-prices a finished harness trade.
+- On random-entry baselines (stop −5 / target +10 / 60 min), holdout mean per trade:
+
+| Baseline | net50 | Calibrated |
+|---|---|---|
+| All PumpSwap | −7.68 | −8.45 (stop-heavy) |
+| Cost-first universe + rug screen | −3.30 | −3.30 |
+
+**Caveats**
+- "Real" means Jupiter quotes plus the engine's simulated 250 ms delay, not on-chain fills. No MEV is included, and landing at the 1% slippage limit would add about 0.9% per round trip.
+- The fresh-price evidence is essentially one pool (swordinu, fee 30).
+- Nothing is measured for liquidity <$50k or trades above $200.
+- high The harness is optimistic per trade because it fills at a lagging DexScreener price
+    Post-reset trades (n=25, 12 clusters, mostly fee-30 pools around $450k liquidity) booked 0.76% per trade worse than a harness version using dataset prices (CI95 −1.25..−0.26, p10 −2.13). Non-stop exits alone: −0.56% (n=22, CI −1.14..−0.03), about 28 bps per leg. The cause is not the fee or impact model. The DexScreener price lags the pool in the direction of the recent move: signal entries paid +0.35% (fresh price, CI −0.00..+0.80, p90 +1.51) and +0.50% (lab $10 checks, fee ≤50) above the harness entry cost.
+- high Stop-loss exits are much worse than the harness's next-point fill; +50 bps stress does not cover them
+    With fresh prices, stop exits booked +1.97% per leg worse than the harness's next-point fill (n=3, CI +1.19..+2.75). On 30 older trades the gap was +3.78% against ledger prices, which were partly stale. Whole-trade stop gap after the +50 stress was still −1.25%. calibration.exit_reason_extra_bps('STOP') = 200 bps. The fresh-price sample is tiny (n=3).
+- high EXIT_IMPACT_EMERGENCY V1 mostly fired on quote noise
+    It closed 42/117 trades (35.9%), 19/23 (82.6%) of fee ≤50 trades, and 38.7% of fee 100–125 trades, after a median hold of 30 s (44 s for fee ≤50). 14.5% of trades already met the threshold, max(0.75, entry impact + 0.5), with the sell quote taken at entry. Jupiter's priceImpactPct includes the pool fee: reported buy impact minus 2N/L = +0.63% mean. Fee-30 pools showed a median sell impact of 0.59% against the 0.75% floor. At these exits liquidity was unchanged (exit/entry 1.003) and the realised exit cost was 0.78% against a model of 0.41%. The trades booked −2.14% on average, of which only −0.41% (CI −0.89..+0.05) went beyond the entry-time round trip. The rule mostly locked in the round-trip spread.
+- medium Fee tiers and the 2N/L impact formula are right or slightly conservative
+    Buy then immediate sell (no price move between), booked round trip minus harness round trip:
+- All 117 trades: −0.27% (median −0.15, p90 −0.01, CI −0.38..−0.18).
+- fee ≤50 / liq ≥250k: −0.10.
+- fee 55–95 / liq 50–250k: −0.15.
+- fee 100–125 / liq 50–250k: −0.51 (CI −0.80..−0.27).
+- liq <50k: −1.85 (n=2).
+
+On the pool leg alone, half the buy/sell spread minus (fee tier + 2N/L) averaged −0.03% (median +0.07, n=87). Jupiter's USDC/SOL rate differs from DexScreener's SOL/USD by only −0.04%. The +50 bps/leg stress covers 100% of these round trips.
+- medium +50 bps/leg stress covers the average gap but not individual trades
+    Post-reset whole trades minus the harness with +50 stress: +0.23% mean (CI −0.27..+0.72), median +0.41, p10 −1.16. Only 60% of individual trades were covered. Entry legs were covered in 52–62% of trades. Exit-impact-emergency exits were covered on average. Stop exits were not covered.
+- medium The engine books fixed costs the harness omits
+    Token-account rent of about $0.185 is booked as a loss per trade (it is refundable on-chain), and the engine charges $0.03 network per leg against the harness's 0.0001 SOL (about $0.012). Together that is 5.5 bps per leg at $200 and 22 bps per leg at $50. calibration.fixed_engine_bps_per_leg(notional) models it (engine basis only).
+- medium Booked costs assume quotes, not landed swaps
+    The engine books the expected quote minus 10 bps, after a simulated 250 ms delay. Its worst-case round trip at the 1% slippage floor averaged 3.07% versus 2.19% expected. Real swaps landing near the floor, or hit by MEV, would cost about 0.9% more per round trip; neither the engine nor this calibration includes that.
+- low Evidence is narrow; some data was excluded or inconclusive
+    - 113 of 117 trades are on 5 tokens, and the fresh-price evidence is essentially one pool (swordinu, fee 30).
+- The 43 STALE_MARKET_EXIT closes used stale pinned prices (the bug fixed in 566e941) and are excluded from the exit numbers.
+- Older snapshot prices were about 8 s old.
+- Nothing was measured for liquidity <$50k (n=2), trade size above 0.25% of liquidity, or trades above $200.
+- The tape cross-check (22k points, 178 pools) was inconclusive: its half-spread was about fee/2 because of the decoder's fee accounting, and the mid rebuilt from recent swaps lags. It is not used.
+- REPORT.md could not be written because the harness blocks subagents from writing report .md files; the content is in this output.
+DELIVERABLES ['C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/calibration.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/strategies.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/ledgers.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/costmodel.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/acct_calib.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/acct_rows.json', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/final_tables.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/acct_report2.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/acct_report3.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/lab_probe.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/lab_probe_rows.json', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/tape_mark.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/validate.py', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/calib/stats.py']
+RECS
+  * Keep net50 (+50 bps per leg) as the acceptance basis. Also re-price every candidate with calibration.calibrated_net_pct and reject any config whose holdout mean is negative on that basis. Exact form: add extra_bps_per_leg(H.fee_bps(s,j), liq, size) on both legs, plus exit_reason_extra_bps(reason) on the exit leg.
+  * Penalise stop-heavy configs: in the engine, stop-loss exits realise about 2% worse than the harness's next-point fill (+200 bps calibrated), and the +50 stress does not cover that. Prefer exits that do not fire right after an adverse move, or confirm stops with a second quote before selling.
+  * For signal entries in fee ≤50 pools, assume the real buy price is about 0.35–0.50% above the DexScreener price the harness uses. Momentum entries in the cost-first universe need more than 1.2% expected edge per round trip before they beat booked costs.
+  * Do not deploy any strategy with EXIT_IMPACT_EMERGENCY V1 on fee ≤50 pools. It closed 83% of those trades within about 44 s on quote noise. Use the sell-anchored, arm-then-confirm V2 (the cost-first profile already does). Do not compare Jupiter's priceImpactPct to a 0.75% floor: it includes the pool fee.
+  * Leave the fee-tier table and the 2N/L impact formula unchanged; real quotes confirm them to about 0.1%. Do not lower harness costs for fee 100–125 pools on this thin evidence, which is why the conservative floor is kept.
+  * To extend the calibration, collect more fresh-price evidence. For each quote, log the DexScreener price and its age next to the quote, especially for pools with fee 55–125, liquidity <$50k, and stop exits. Today almost all fresh-price evidence comes from one pool.
+
+######## FOUNDATION forensics
+Read-only forensics. Inputs: obs.sqlite3 (3.12M rows, 2,042 pairs, 22.76 h), the harness series, the tape snapshot (185k swaps), the /state snapshots taken at 10:23, and the Lab ledger copy in release-backup-20261008-101156. Code read at the deployed commit e964804. Nothing in the runtime or the repo was changed; a find after the runs showed no new files under backend. The harness refused to let me write REPORT.md (subagent policy), so the full report content is in these findings.
+
+Bottom line: none of the live rule sets shows positive expectancy after costs, with or without tape-verified flow. I tried 9 configs: 3 families (WE = main, OFA, CF = cost-first) x 3 flow variants (VF = tape-verified, PROXY = DexScreener txns proxy, NONE). From train only I picked 3: WE_PROXY, OFA_VF and CF_PROXY. All 3 have negative mean net50 on both train and holdout, so nothing qualifies as a candidate.
+
+Holdout results (net50):
+- **WE_PROXY:** -3.27% on n=9 (2 pairs). Random entries in the same universe: -4.33%.
+- **OFA_VF:** -1.29% on n=6 (4 pairs). Random: -9.59%.
+- **CF_PROXY (rug-screened):** -3.75% on n=47 (8 pairs, 5.3 trades/hour). Random: -2.82%, so it does worse than random.
+
+**Why main and OFA open nothing:**
+- **Too few candidates.** Main's market rules plus its 1.5% round-trip cap leave 0.14 pools per minute. Only COST_EFFICIENT_FLOW can ever pass the cap. Since 09:00 today the number is 0. OFA has 0.8 pools/min after its 2.75% cap.
+- **Tape seats go to the wrong pools.** There are 4 seats (NEO_TAPE_MAX_PAIRS=4). 87.5% of seat time watched pools that no running engine could trade.
+- **No free seats right now.** At 10:23 all 4 seats were pinned by held positions: the Lab's VSOF and the cost-first account's WOSE/GOIF/SARP. Entry capacity is therefore 0.
+- **Flow often missing even when seated.** 42% of the time a seated pool had no verified flow (DEGRADED).
+
+**Why every close was swordinu:** it was the only pool that met all of these at once:
+- matched by COST_EFFICIENT_FLOW;
+- in the 30 bps fee tier, with a quoted round trip of about 1.0-1.2%;
+- given seat priority by the scheduler as the most persistent pool in the "feasible" group;
+- steady buy flow.
+
+All three accounts ran the same rule on the same feed and tape. With a 20-minute cooldown and no memory of losses, they re-bought it every 30-40 minutes while it fell 76%.
+
+**Verified flow vs DexScreener proxy:** verified flow gives a small, short-lived timing signal: +1.51 pp at 5 minutes within the same pool (CI95 +0.62 to +2.54), and about 0 at 15-30 minutes. The DexScreener proxy gives nothing. Neither covers costs.
+
+**URGENT:** the cost-first account opened 3 positions within 80 seconds of going live, and all 3 belong to the serial rug family. The cost-first universe structurally favours this family, because the fee tier is computed from market cap.
+- critical Cost-first engine 18802 holds 3 rug-family positions now; the Lab also holds VSOF
+    18802 switched to COST_FIRST at 10:12. It opened WOSE (GhBPuDpt, 10:12:18), GOIF (D2pVedgH, 10:13:17) and SARP (HiPe6mDS, 10:13:38), $200 each, so $600 of PAPER exposure. The interim rug screen flags all three at entry:
+- WOSE: market cap $237.2M, liquidity/mcap 0.58%, 420 min old, ticker on 5 other pools.
+- GOIF: $193.7M, 0.65%, 375 min, 2 other pools.
+- SARP: $82.6M, 0.99%, 709 min, 4 other pools.
+The established drain hazard for this family is about 6% per hour per position. The Lab books MOMENTUM, COST_FIRST_CONTROL and COST_FIRST_SCALED hold VSOF (AGZjpu5v, since 09:52). VSOF is flagged only because its ticker is reused (liquidity/mcap 3.2%, 4.5 days old). These four pools also occupy all 4 tape seats.
+- critical The cost-first universe structurally selects the fake-market-cap rug family
+    cost_first_established.rejections works out the PumpSwap fee tier from market cap in SOL, and it has no liquidity/mcap or ticker-reuse check. An inflated fake market cap therefore earns the cheapest tier (30 bps) and passes the 'cheap' screen. Over 22.8 h, 50 of the 61 pools that ever passed the universe are flagged by the interim rug screen; that is 10,986 of 15,911 (69%) universe minute-units. COST_EFFICIENT_FLOW (liquidity/mcap >= 1.5%) and OFA (>= 3%) do have a liquidity/mcap floor; the cost-first universe removed it.
+- high Main engine: market rules x 1.5% cost cap leave about zero candidates
+    Funnel (forensics/funnel.py) applies the engine's own rule functions to each obs row. Each unit is a (minute, pool) pair; main scans about 20 times a minute.
+- Feed: 77.5 pools/min.
+- PumpSwap + SOL quote: 55.0.
+- Any WINNER_ENSEMBLE market rule: 6.49.
+- Cost <= 1.5% round trip: 0.144 (in 14.1% of minutes).
+- Verified flow present: 0.115.
+- Fresh: 0.113.
+- Promoted buy pressure: 0.078.
+- Rule flow match: 0.078 (7.8% of minutes).
+
+Only COST_EFFICIENT_FLOW ever produced a cost-feasible unit (187 of 187). EARLY, MOMENTUM, PRECISION, ULTRA_PRECISION and VERIFIED_FLOW_MOMENTUM target young pools in the 100-125 bps tiers, with round trips of 2.4% or more, so they can never pass. Only 5 distinct pools passed all non-flow rules in 22.8 h: swordinu 155 units (83%), Agency 18, neet 9, CATE 3, IOF 2. Since 09:00 today there are zero.
+
+Check against the engine's own rejection names: 1,782,324 winner_signal rows agree with the reconstruction, 11,153 (0.6%) disagree.
+
+Snapshot at 10:23: 82 winner_signal and 8 promoted_verified_flow_unavailable. Of those 8, 7 fail on fees alone; EVERYTHING (52 bps tier) is feasible but has no seat.
+- high Tape seats: 4 total, mostly spent on untradable pools, and 0 free right now
+    Live start script: NEO_TAPE_MAX_PAIRS=4. Live tape status at 10:23: pinned_exit_pools=4, entry_capacity=0.
+
+Over 22.8 h (forensics/seatuse.py), 7,387 (minute, pool) units were on the tape:
+- 61.7% were matched by main's rules but over main's cost budget;
+- 29.6% were exploration or pins;
+- 8.7% were feasible.
+- 87.5% of all seat-minutes were on pools that no running engine could trade under its non-flow rules (ECSTASY 565, VSOF 357, SNDWITCH 320, A1 312, ...).
+
+The scheduler ranks seats using only main's rules (winner_ensemble.market_candidates) plus the funded rules and the cost-first universe; it does not know OFA's rules. Share of units that passed every non-flow rule but were blocked only by missing verified flow:
+- WE: 20.3%
+- OFA: 72.7%
+- CF: 96.8% (92.1% after the rug screen)
+
+Verified flow exists in 4.75% of units, on 220 pools, about 3.68 pools at a time (median 4). Pins took on average only 0.84 seats (Lab 3,796 owner-minutes, main 135, 18802 42). They were heavy on 10-07 between 11:00 and 16:00, and are 4 of 4 now.
+- high Why every close was on swordinu
+    There are 23 closes in the three snapshots: 20 swordinu (69fyvgoT), 1 CRAWL, 1 MISTAKE (+10.15%). All were taken under WINNER_ENSEMBLE_PAPER_V1 and all matched COST_EFFICIENT_FLOW.
+1. Three accounts ran the same strategy on the same feed and tape, so entries landed within seconds of each other (for example 00:53:27, 00:53:40, 00:56:19). They were one experiment, not three.
+2. swordinu was the only pool that met both the rule and the cost cap: 30 bps tier (market cap $17-22M), liquidity about $450k, score 80-88, older than 1 day, liquidity/mcap 2.2%. Modeled round trip at $200 was 1.18-1.20%; quoted was 0.78-1.23%. The other feasible-group pools (MISTAKE, Agency, CRAWL, e/acc, JEANPHIL, EVERYTHING; 52-70 bps tiers) quote 1.3-1.9% at $200. CRAWL and MISTAKE only got in at $50 via the size backoff.
+3. The scheduler gives main-rule-matched, fee-feasible pools (GROUP_FEASIBLE) first claim on seats and lets them pre-empt exploration seats. swordinu held 155 of 684 feasible units, 140 of them on the tape.
+4. It had steady buy flow.
+5. There is a 20-minute same-token cooldown and no memory of losses: 8,774 cooldown rejections on swordinu, then a re-buy every 30-40 minutes as it fell 76%.
+- high No live rule set has positive cost-adjusted expectancy; no CANDIDATE
+    configs_tried=9: WE, OFA and CF, each with VF, PROXY and NONE flow variants, evaluated on train only. The selection rule was fixed before looking at holdout: best train mean net50 per family with train n >= 10.
+
+Train mean net50:
+- WE: VF -6.54 (n=5), PROXY = NONE -4.91 (n=11, identical trades)
+- OFA: VF -1.63 (n=12), PROXY -4.76 (n=40), NONE -4.30 (n=43)
+- CF (rug-screened): VF -5.95 (n=6), PROXY -4.63 (n=34), NONE -5.53 (n=38)
+
+Holdout net50:
+- **WE_PROXY:** n=9, 2 pairs, win 33.3%, mean -3.27%, median -5.97%, PF 0.41, -$58.83, CI95 of mean $ [-16.87, 4.18], top-pair share 0.89. Portfolio with 3 slots: $833.13, max drawdown 16.7%. Random baseline: -4.33%.
+- **OFA_VF:** n=6, 4 pairs, win 33.3%, mean -1.29%, PF 0.71, -$15.50, CI95 [-13.67, 8.57]. Portfolio: $945.47, max drawdown 10.5%. Random baseline: -9.59%.
+- **CF_PROXY:** n=47, 8 pairs, win 10.6%, mean -3.75%, median -2.58%, PF 0.15, -$352.84, CI95 [-11.26, -3.96], 5.3 trades/hour. Portfolio: $850.80, max drawdown 18.0%. Random baseline: -2.82%, so worse than random.
+
+Model costs (net0) holdout: -2.30%, -0.30% and -2.79% respectively.
+- medium Seated pools lose verified flow 42% of the time (DEGRADED)
+    forensics/degraded.py sampled 27,669 rows where the pool was on the tape: 57.9% COMPLETE, 42.1% DEGRADED.
+- **11.0 pp** of the degraded share is caused by SWAP_ACTOR_NOT_TRANSACTION_SIGNER swaps. These are 1.5-3% of decoded swaps, but market_monitor.live_flow marks the whole 30 s window DEGRADED if a single flagged event falls inside it.
+- **31.2 pp** has no flagged event in the snapshot. Likely causes are the 30 s complete_since warm-up after every new 60 s lease and pagination backlog on busy pools (Agency 99.8%, RARI 92%, A1 73%, SNDWITCH 69% degraded).
+
+QUOTE_USD_UNKNOWN made up nearly all events from 10-07 03:00 to 08:00 but is rare after 10-07 17:00.
+- medium EXIT_IMPACT_EMERGENCY V1 fires as a timer, but the entries were the real problem
+    18 of 23 closes were EXIT_IMPACT_EMERGENCY (V1). All 18 had less than 2% liquidity change, and in 12 the market move at exit was 0 or better. The impact of a $200 sell quote on these pools reads 0.75-1.0% (two-hop route token -> SOL -> USDC), which is at or above the 0.75% floor.
+
+Counterfactual: replaying a plain -5/+10/60 net exit from the same 23 entries in the harness gives -2.75% per trade (18 STOP, 5 TP), against -1.73% actually realized. V1 limited the losses; the bad entries (one declining pool) caused them.
+
+Total P&L of the 23 closes: -$94.23, of which EIE exits -$51.41.
+- medium Main spends the shared quote budget on pools its own model says are infeasible
+    Rejection rows after the flow gate on 100-125 bps pools (RARINU, CATCRAFT, ZKDARK, A1, ...): 3,858 quote_inconsistent, 4,950 quote_retry_cooldown, 845 roundtrip_cost. entry_quote_priority only moves these pools to the back of the queue; it never drops them. The fee model can overstate cost (CRAWL modeled 1.91% vs quoted 0.88%; MISTAKE 1.71% vs 1.49%), so these pools should be throttled, not dropped.
+- info Verified flow vs DexScreener txns proxy (Q3)
+    Proxy, fixed before looking at outcomes: b5 >= 3 and b5/max(s5,1) >= 1.2. Sample: one point per pool per minute, rug-screened: 35,636 samples, 1,191 of them on the tape.
+
+- **Selection:** pools on the tape are not better than pools off it in the same fee/liquidity bucket (15 min net): fee<=50 & liq>=250k -2.92 vs -1.38; fee55-95 & >=250k -3.02 vs -2.28; fee100-125 & 50-250k -5.43 vs -3.96.
+- **Inside the covered sample:** verified-flow pass vs fail at 15 min: -2.06% vs -3.09%. Within the same pool: +1.51 pp at 5 min (CI95 +0.62 to +2.54, 18 pools, 72% positive), -0.23 pp at 15 min (CI -4.5 to +3.2), -0.67 pp at 30 min.
+- **Proxy in the same covered sample:** -1.41 pp at 5 min, -0.09 pp at 15 min. The proxy is on for 88% of covered points, so it barely filters.
+- **Uncovered pools:** proxy on vs off within pool at 15 min: mean -9.3 pp, median -0.6 pp (pump-and-dump tails).
+- info OFA (18801) missed opportunities: partly unverified
+    OFA has been live since about 01:28. Since then, 44 (minute, pool) units passed every OFA gate I can reconstruct: MISTAKE 36, CRAWL 4, LMAO! 2, swordcat 2. OFA opened nothing. 96.8% of OFA-eligible rows were fresh enough for its 6 s signal-age limit.
+
+The remaining gates cannot be attributed without 18801's own observation log: the 60 s window, buyers >= 3, wallet ratio, large-sell check, rug guard, and quote limits (round trip <= 2.75%, worst case <= 4.5%, impact <= 2%). My OFA proxy uses the 30 s verified window and main's conviction values.
+DELIVERABLES ["C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/strategies.py (CONFIGS: FORENSICS_WE_PROXY, FORENSICS_OFA_VF, FORENSICS_CF_PROXY; BASELINES: random entries in each universe with p=0.12/0.002/0.06, salt 'forensics'; re-run verified to reproduce the holdout numbers)", 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/families.py (live WE/OFA/CF rules on the harness Past view; backend modules imported read-only with no bytecode written)', "C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/funnel.py + funnel.json (Q1 per-minute funnels for the 3 engines, blocked-by-flow breakdown, cross-check against the engine's rejection names)", 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/seats.py + seats.json (seats taken by pins over time, rebuilt from the Lab ledger copy and the snapshots)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/seatuse.py + seatuse.json (what the tape seats actually watched)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/degraded.py + degraded.json (causes of DEGRADED windows)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/hist_cf.py + hist_cf.json (the 23 closes, EIE forensics, -5/+10/60 counterfactual, rug checks on the open positions)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/flowq.py + flowq.json (Q3: verified flow vs DexScreener proxy forward returns, selection check, within-pool contrasts)', 'C:/Users/Chavd/AppData/Local/Temp/claude/C--Users-Chavd-Documents-ChatGPT-memcoin/94cc15b2-11ce-4fc6-b399-db5d9ab0bd20/scratchpad/deep/forensics/train_stage.py + train_stage.json (9 configs, train only), holdout_stage.py + holdout_stage.json (3 pre-selected configs + baselines), ofa_window.py, q_rej.py', 'REPORT.md was NOT written: the harness blocks subagents from writing report .md files. Its full content (method, tables, Q1-Q4, caveats) is in the summary, findings and recommendations of this output.']
+RECS
+  * URGENT (adds a safety rule): put the rug-family screen into cost_first_established.rejections. That one function is used by the cost-first engine profile, both COST_FIRST Lab books and the scheduler's GROUP_COST_FIRST. Reject a pool when: market cap >= $20M with liquidity/mcap < 2% on a token younger than 14 days, or a young token whose ticker already exists on another pool. Separately, the owner should decide what to do with the 3 open rug-family PAPER positions in 18802 (WOSE, GOIF, SARP) and the Lab's VSOF.
+  * Make tape entry seats engine-aware. Rank first the pools that pass the non-flow rules and cost cap of at least one running engine (main WE at 1.5%, OFA at 2.75%, the cost-first universe), after the rug screen; then exploration. Pools matched by main's rules but over every running engine's cost cap go below exploration. Evidence: 87.5% of seat-minutes were on untradable pools; OFA-eligible pools had verified flow only 27% of the time. WE + OFA demand (about 1 pool/min) fits in 4 seats.
+  * Pin a held pool to a tape seat only when the position's exit logic reads exact-pool flow: OFA adaptive exits and Lab MOMENTUM_RUSH_BRAIN. Main's 'fixed' exits, cost_first exits and the other Lab books use no flow, so their pools should drop to a lower observation tier that yields to entry candidates. At 10:23 such pins took all 4 seats, leaving entry capacity at 0. First check that nothing else (dashboards, training) depends on those pins.
+  * Stop discarding a whole 30 s window because of one SWAP_ACTOR_NOT_TRANSACTION_SIGNER swap. Count a confirmed, USD-valued swap conservatively: a SELL counts toward sells; a BUY is excluded from buys and from wallet counts. Keep DEGRADED for unknown USD, unconfirmed swaps, timing or duplicate problems. This recovers about 11 pp of verified-window time on seated pools, and buy-pressure checks can only get stricter. Ship it as a versioned change with a shadow comparison. Also renew a pool's lease while it stays engine-eligible, so it does not repeat the 30 s warm-up every 60 s.
+  * Add per-pool loss memory to each account: escalate the same-token cooldown after consecutive losses on a pool (for example 2 losses -> 6 h). 20 of 23 closes were repeated re-buys of one falling pool.
+  * Use EXIT_IMPACT_EMERGENCY V2 (or log-only) for main and OFA as a correctness fix, not as a P&L fix. V1 fired on 18 of 23 closes with no liquidity change, but plain -5/+10/60 exits from the same entries would have lost more (-2.75% vs -1.73% per trade).
+  * Throttle quote attempts on pools where fees alone exceed the cap: at most one probe per pool per N minutes, rather than dropping them (the model overstated CRAWL's cost by about 1 pp).
+  * Do NOT replace the tape gate with DexScreener proxies, and do NOT raise cost caps to force trades. CF_PROXY traded 5.3 times an hour at -3.75% per trade in holdout, worse than random entries in the same universe; the WE and OFA proxies were negative too.
+  * Tell the owner plainly: no tested configuration has shown positive expectancy, so the changes above remove waste and a toxic universe; they do not create profit. 'Huge incomes' are not supported by this data. Keep each account on a distinct hypothesis and judge them on the STRATEGY_VALIDATION acceptance basis (+50 bps per leg, CI lower bound > 0).
+  * To attribute OFA's missed opportunities (44 minute-units since 01:28, mostly MISTAKE), read 18801's own entry diagnostics or observation log (a backup copy, not the live files). That shows which of the 60 s flow, buyer-count, safety and quote gates rejected them.
+

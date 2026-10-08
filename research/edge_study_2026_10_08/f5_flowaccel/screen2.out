@@ -1,0 +1,238 @@
+=== universe TAPE_MIDHI_fee>50_liq>=20k samples 6389 pairs 68
+   ALL                                n= 6385 pr=  68 top=0.13 | f15  -4.92 | f30  -4.72 (pairavg -15.35, win 30.4) | f60  -6.05 (pairavg -18.00) | mfe30med   6.7
+  -- tp_ub120 cov 6389 edges [0, 0, 2, 15]
+   (-inf, 0]                          n= 3079 pr=  47 top=0.14 | f15  -6.06 | f30  -5.24 (pairavg -12.41, win 28.3) | f60  -6.79 (pairavg -16.01) | mfe30med   5.4
+   (0, 2]                             n=  784 pr=  34 top=0.29 | f15  -1.96 | f30  -0.58 (pairavg  -6.95, win 32.7) | f60   1.59 (pairavg  -4.62) | mfe30med   5.7
+   (2, 15]                            n= 1280 pr=  45 top=0.15 | f15  -2.67 | f30  -1.69 (pairavg -10.94, win 30.3) | f60  -3.33 (pairavg -14.38) | mfe30med   6.1
+   (15, inf]                          n= 1242 pr=  36 top=0.36 | f15  -6.29 | f30  -9.19 (pairavg -18.56, win 34.4) | f60 -11.81 (pairavg -18.10) | mfe30med  11.4
+  -- tp_ub300 cov 6389 edges [0, 3, 9, 39]
+   (-inf, 0]                          n= 1486 pr=  42 top=0.13 | f15  -6.88 | f30  -5.99 (pairavg  -5.10, win 24.8) | f60  -7.02 (pairavg  -8.74) | mfe30med   4.3
+   (0, 3]                             n= 1187 pr=  37 top=0.29 | f15  -2.90 | f30  -1.72 (pairavg -14.32, win 31.1) | f60  -0.16 (pairavg -11.70) | mfe30med   5.7
+   (3, 9]                             n= 1312 pr=  40 top=0.18 | f15  -2.50 | f30  -0.97 (pairavg  -7.85, win 28.7) | f60  -0.73 (pairavg -10.65) | mfe30med   3.8
+   (9, 39]                            n= 1133 pr=  36 top=0.27 | f15  -4.91 | f30  -3.61 (pairavg -16.06, win 36.1) | f60  -9.44 (pairavg -18.57) | mfe30med  11.1
+   (39, inf]                          n= 1267 pr=  25 top=0.44 | f15  -7.04 | f30 -10.94 (pairavg -20.26, win 33.1) | f60 -12.89 (pairavg -22.71) | mfe30med  11.7
+  -- tp_newb300 cov 6389 edges [0, 2, 5, 15]
+   (-inf, 0]                          n= 1882 pr=  42 top=0.12 | f15  -5.83 | f30  -4.99 (pairavg  -5.13, win 23.7) | f60  -6.58 (pairavg  -8.99) | mfe30med   3.7
+   (0, 2]                             n= 1134 pr=  34 top=0.27 | f15  -2.16 | f30  -0.01 (pairavg  -9.20, win 34.6) | f60   1.56 (pairavg  -6.72) | mfe30med   6.4
+   (2, 5]                             n= 1018 pr=  38 top=0.21 | f15  -3.42 | f30  -2.74 (pairavg   0.66, win 33.6) | f60  -2.29 (pairavg  -2.56) | mfe30med   6.0
+   (5, 15]                            n= 1081 pr=  36 top=0.21 | f15  -4.60 | f30  -3.63 (pairavg -10.74, win 32.8) | f60  -8.88 (pairavg -15.77) | mfe30med   8.7
+   (15, inf]                          n= 1270 pr=  41 top=0.38 | f15  -7.52 | f30 -11.06 (pairavg -16.76, win 32.0) | f60 -12.65 (pairavg -17.85) | mfe30med  11.3
+  -- tp_net300 cov 6389 edges [-2.091, 0.0, 0.055, 2.728]
+   (-inf, -2.09]                      n= 1277 pr=  36 top=0.21 | f15  -3.25 | f30  -6.07 (pairavg -13.01, win 36.7) | f60  -7.73 (pairavg -11.82) | mfe30med   8.7
+   (-2.09, 0]                         n= 2454 pr=  50 top=0.16 | f15  -6.25 | f30  -5.27 (pairavg -11.82, win 26.0) | f60  -6.04 (pairavg -15.53) | mfe30med   4.9
+   (0, 0.0549]                        n=  100 pr=  19 top=0.43 | f15  -6.98 | f30  -5.38 (pairavg -14.04, win 22.0) | f60  -0.11 (pairavg  -7.90) | mfe30med   3.1
+   (0.0549, 2.73]                     n= 1279 pr=  41 top=0.15 | f15  -3.35 | f30   0.15 (pairavg  -4.19, win 31.0) | f60  -0.86 (pairavg  -9.00) | mfe30med   6.0
+   (2.73, inf]                        n= 1275 pr=  36 top=0.22 | f15  -5.45 | f30  -7.15 (pairavg  -6.50, win 32.7) | f60 -10.04 (pairavg -13.09) | mfe30med   9.9
+  -- tp_net120 cov 6389 edges [-0.352, 0.0, 0.0, 0.786]
+   (-inf, -0.352]                     n= 1276 pr=  44 top=0.15 | f15  -4.13 | f30  -5.64 (pairavg -16.38, win 31.6) | f60  -6.66 (pairavg -13.24) | mfe30med   7.6
+   (-0.352, 0]                        n= 3223 pr=  50 top=0.14 | f15  -6.02 | f30  -5.15 (pairavg -12.29, win 28.4) | f60  -6.82 (pairavg -15.73) | mfe30med   5.5
+   (0, 0.786]                         n=  610 pr=  39 top=0.23 | f15  -2.49 | f30  -1.14 (pairavg  -6.62, win 29.8) | f60  -0.80 (pairavg  -6.73) | mfe30med   4.7
+   (0.786, inf]                       n= 1276 pr=  45 top=0.23 | f15  -4.11 | f30  -4.43 (pairavg  -7.52, win 34.7) | f60  -5.98 (pairavg -12.83) | mfe30med  10.2
+  -- tp_bshare300 cov 5121 edges [0.241, 0.457, 0.547, 0.717]
+   (-inf, 0.241]                      n= 1025 pr=  37 top=0.24 | f15  -3.71 | f30  -2.81 (pairavg -13.66, win 31.2) | f60  -4.92 (pairavg -16.48) | mfe30med   5.2
+   (0.241, 0.457]                     n= 1024 pr=  41 top=0.23 | f15  -3.92 | f30  -6.76 (pairavg -12.30, win 31.7) | f60  -7.09 (pairavg -11.29) | mfe30med   7.7
+   (0.457, 0.547]                     n= 1020 pr=  36 top=0.37 | f15  -5.63 | f30  -5.74 (pairavg  -4.27, win 28.6) | f60  -7.29 (pairavg  -9.12) | mfe30med   8.9
+   (0.547, 0.717]                     n= 1027 pr=  35 top=0.21 | f15  -5.59 | f30  -5.36 (pairavg -13.41, win 31.7) | f60  -7.02 (pairavg -15.84) | mfe30med   6.8
+   (0.717, inf]                       n= 1021 pr=  42 top=0.24 | f15  -3.30 | f30  -2.07 (pairavg -11.76, win 33.3) | f60  -2.87 (pairavg -15.97) | mfe30med   7.0
+  -- tp_ubshare300 cov 5121 edges [0.39, 0.5, 0.585, 0.667]
+   (-inf, 0.39]                       n= 1024 pr=  33 top=0.20 | f15  -4.26 | f30  -6.84 (pairavg -16.00, win 24.0) | f60  -8.35 (pairavg -18.62) | mfe30med   4.4
+   (0.39, 0.5]                        n= 1025 pr=  38 top=0.18 | f15  -4.60 | f30  -4.12 (pairavg -16.34, win 28.6) | f60  -5.22 (pairavg -19.58) | mfe30med   6.7
+   (0.5, 0.585]                       n= 1023 pr=  35 top=0.26 | f15  -3.99 | f30  -4.58 (pairavg  -1.68, win 30.5) | f60  -5.96 (pairavg  -7.49) | mfe30med   8.3
+   (0.585, 0.667]                     n= 1032 pr=  32 top=0.16 | f15  -2.49 | f30   0.69 (pairavg   0.08, win 38.8) | f60  -2.83 (pairavg  -2.94) | mfe30med   9.3
+   (0.667, inf]                       n= 1013 pr=  43 top=0.17 | f15  -6.85 | f30  -7.99 (pairavg -12.92, win 34.7) | f60  -6.86 (pairavg -10.46) | mfe30med   7.7
+  -- tp_top300 cov 4903 edges [0.177, 0.331, 0.534, 0.831]
+   (-inf, 0.177]                      n=  980 pr=  26 top=0.43 | f15  -8.24 | f30 -11.66 (pairavg -19.50, win 30.7) | f60 -13.53 (pairavg -21.07) | mfe30med  11.9
+   (0.177, 0.331]                     n=  980 pr=  34 top=0.24 | f15  -1.76 | f30  -2.80 (pairavg  -0.93, win 35.0) | f60  -6.60 (pairavg  -5.99) | mfe30med   9.6
+   (0.331, 0.534]                     n=  979 pr=  38 top=0.17 | f15  -5.05 | f30  -2.87 (pairavg  -8.64, win 30.3) | f60  -5.37 (pairavg -15.30) | mfe30med   6.7
+   (0.534, 0.831]                     n=  981 pr=  34 top=0.22 | f15  -4.18 | f30  -2.81 (pairavg -10.07, win 33.0) | f60  -1.11 (pairavg  -8.27) | mfe30med   5.6
+   (0.831, inf]                       n=  979 pr=  38 top=0.30 | f15  -2.40 | f30  -1.55 (pairavg  -8.21, win 31.5) | f60  -2.13 (pairavg  -7.96) | mfe30med   5.5
+  -- tp_breadth300 cov 4903 edges [0.565, 0.766, 0.957, 1.0]
+   (-inf, 0.565]                      n=  979 pr=  19 top=0.42 | f15  -3.52 | f30  -2.54 (pairavg  -1.26, win 42.3) | f60  -5.58 (pairavg  -2.43) | mfe30med   9.5
+   (0.565, 0.766]                     n=  981 pr=  32 top=0.39 | f15  -5.64 | f30 -10.11 (pairavg -13.14, win 23.9) | f60 -11.54 (pairavg -15.13) | mfe30med   7.4
+   (0.766, 0.957]                     n=  985 pr=  38 top=0.12 | f15  -5.63 | f30  -5.39 (pairavg -10.67, win 29.8) | f60  -8.34 (pairavg -12.83) | mfe30med   9.9
+   (0.957, 1]                         n= 1954 pr=  51 top=0.24 | f15  -3.42 | f30  -1.82 (pairavg -14.77, win 32.3) | f60  -1.62 (pairavg -17.74) | mfe30med   6.2
+   (1, inf]                           n=0
+  -- tp_uacc cov 6219 edges [0.0, 0.0, 0.629, 1.68]
+   (-inf, 0]                          n= 2909 pr=  44 top=0.15 | f15  -5.97 | f30  -4.94 (pairavg -10.06, win 29.6) | f60  -6.79 (pairavg -13.83) | mfe30med   6.0
+   (0, 0.629]                         n=  823 pr=  26 top=0.32 | f15  -1.87 | f30  -0.68 (pairavg   5.79, win 39.1) | f60  -2.74 (pairavg   1.52) | mfe30med  11.3
+   (0.629, 1.68]                      n= 1242 pr=  40 top=0.18 | f15  -3.80 | f30  -4.06 (pairavg  -8.07, win 32.9) | f60  -4.83 (pairavg -10.36) | mfe30med   8.7
+   (1.68, inf]                        n= 1241 pr=  60 top=0.13 | f15  -5.25 | f30  -6.79 (pairavg -13.45, win 27.5) | f60  -7.60 (pairavg -15.73) | mfe30med   6.0
+  -- tp_bsacc cov 6219 edges [0.0, 0.0, 0.0, 1.581]
+   (-inf, 0]                          n= 3841 pr=  47 top=0.15 | f15  -5.56 | f30  -4.99 (pairavg -12.51, win 29.8) | f60  -6.57 (pairavg -15.87) | mfe30med   6.4
+   (0, 1.58]                          n= 1134 pr=  32 top=0.22 | f15  -3.34 | f30  -2.31 (pairavg  -9.30, win 36.7) | f60  -4.45 (pairavg -11.99) | mfe30med   8.9
+   (1.58, inf]                        n= 1240 pr=  62 top=0.17 | f15  -4.02 | f30  -5.33 (pairavg -12.75, win 30.0) | f60  -5.78 (pairavg -14.91) | mfe30med   7.3
+  -- tp_netsol900 cov 6389 edges [-5.655, -0.74, 1.278, 7.146]
+   (-inf, -5.65]                      n= 1279 pr=  26 top=0.27 | f15  -5.04 | f30  -7.23 (pairavg -20.05, win 38.6) | f60 -13.09 (pairavg -25.20) | mfe30med   9.2
+   (-5.65, -0.74]                     n= 1275 pr=  38 top=0.24 | f15  -4.22 | f30  -1.86 (pairavg -13.97, win 32.3) | f60   0.58 (pairavg -13.44) | mfe30med   7.1
+   (-0.74, 1.28]                      n= 1279 pr=  48 top=0.16 | f15  -2.77 | f30  -2.47 (pairavg  -7.42, win 22.1) | f60  -1.18 (pairavg  -8.12) | mfe30med   3.4
+   (1.28, 7.15]                       n= 1277 pr=  36 top=0.14 | f15  -5.35 | f30  -2.92 (pairavg  -3.01, win 30.5) | f60  -5.39 (pairavg  -6.80) | mfe30med   6.4
+   (7.15, inf]                        n= 1275 pr=  25 top=0.23 | f15  -7.22 | f30  -9.14 (pairavg -18.41, win 28.5) | f60 -11.14 (pairavg -23.43) | mfe30med   7.5
+  -- ba1h cov 6389 edges [0.47, 0.772, 0.929, 1.215]
+   (-inf, 0.47]                       n= 1277 pr=  35 top=0.14 | f15  -3.30 | f30  -2.98 (pairavg   3.83, win 33.9) | f60  -6.63 (pairavg  -0.73) | mfe30med   6.3
+   (0.47, 0.772]                      n= 1275 pr=  38 top=0.15 | f15  -3.66 | f30  -5.45 (pairavg  -2.27, win 30.0) | f60  -5.88 (pairavg  -5.49) | mfe30med   6.6
+   (0.772, 0.929]                     n= 1278 pr=  35 top=0.30 | f15  -5.97 | f30  -6.51 (pairavg  -2.13, win 27.2) | f60  -8.94 (pairavg  -3.74) | mfe30med   6.9
+   (0.929, 1.22]                      n= 1279 pr=  34 top=0.22 | f15  -5.23 | f30  -3.42 (pairavg  -3.09, win 28.9) | f60  -3.82 (pairavg  -6.37) | mfe30med   7.2
+   (1.22, inf]                        n= 1276 pr=  60 top=0.13 | f15  -6.44 | f30  -5.26 (pairavg -17.81, win 32.2) | f60  -4.97 (pairavg -19.54) | mfe30med   6.3
+  -- bshare5 cov 6389 edges [0.471, 0.553, 0.607, 0.673]
+   (-inf, 0.471]                      n= 1282 pr=  27 top=0.19 | f15  -3.82 | f30  -5.70 (pairavg  -9.41, win 22.4) | f60  -5.85 (pairavg -12.00) | mfe30med   3.7
+   (0.471, 0.553]                     n= 1274 pr=  39 top=0.18 | f15  -5.37 | f30  -3.26 (pairavg -12.20, win 28.6) | f60  -2.64 (pairavg -15.47) | mfe30med   6.7
+   (0.553, 0.607]                     n= 1276 pr=  40 top=0.21 | f15  -6.28 | f30  -4.32 (pairavg  -7.78, win 32.4) | f60  -6.42 (pairavg -11.97) | mfe30med   8.1
+   (0.607, 0.673]                     n= 1276 pr=  35 top=0.24 | f15  -2.55 | f30  -1.88 (pairavg  -7.22, win 37.3) | f60  -7.22 (pairavg -13.13) | mfe30med  10.7
+   (0.673, inf]                       n= 1277 pr=  39 top=0.27 | f15  -6.59 | f30  -8.44 (pairavg -10.04, win 31.5) | f60  -8.09 (pairavg -11.03) | mfe30med   6.0
+  -- va1h cov 6389 edges [0.358, 0.622, 0.871, 1.268]
+   (-inf, 0.358]                      n= 1276 pr=  31 top=0.21 | f15  -5.56 | f30  -4.45 (pairavg   8.42, win 33.5) | f60  -7.49 (pairavg   5.57) | mfe30med   6.2
+   (0.358, 0.622]                     n= 1277 pr=  38 top=0.17 | f15  -4.76 | f30  -4.61 (pairavg  -0.49, win 28.7) | f60  -5.70 (pairavg  -6.34) | mfe30med   6.8
+   (0.622, 0.871]                     n= 1278 pr=  36 top=0.17 | f15  -3.47 | f30  -0.69 (pairavg  -1.70, win 32.8) | f60   0.19 (pairavg  -2.95) | mfe30med   6.1
+   (0.871, 1.27]                      n= 1278 pr=  36 top=0.20 | f15  -4.56 | f30  -5.18 (pairavg -10.42, win 28.5) | f60  -7.39 (pairavg  -6.71) | mfe30med   6.7
+   (1.27, inf]                        n= 1276 pr=  57 top=0.16 | f15  -6.27 | f30  -8.70 (pairavg -20.64, win 28.7) | f60  -9.85 (pairavg -20.31) | mfe30med   7.7
+  -- uw5 cov 5832 edges [1.0, 6.0, 15.0, 57.0]
+   (-inf, 1]                          n= 1299 pr=  41 top=0.11 | f15  -6.54 | f30  -5.99 (pairavg  -2.07, win 26.2) | f60  -7.41 (pairavg  -6.02) | mfe30med   4.7
+   (1, 6]                             n= 1092 pr=  37 top=0.31 | f15  -2.81 | f30  -0.79 (pairavg  -9.30, win 32.1) | f60   1.58 (pairavg  -4.57) | mfe30med   4.8
+   (6, 15]                            n= 1171 pr=  38 top=0.20 | f15  -3.22 | f30  -0.72 (pairavg  -7.16, win 28.4) | f60  -1.37 (pairavg -11.51) | mfe30med   4.0
+   (15, 57]                           n= 1110 pr=  35 top=0.31 | f15  -4.36 | f30  -4.34 (pairavg -16.99, win 34.9) | f60  -9.42 (pairavg -19.12) | mfe30med  11.5
+   (57, inf]                          n= 1156 pr=  19 top=0.47 | f15  -7.35 | f30 -11.87 (pairavg -22.36, win 32.4) | f60 -14.57 (pairavg -25.65) | mfe30med  11.4
+=== universe TAPE_LOWFEE_big samples 311 pairs 3
+   ALL                                n=  311 pr=   3 top=0.70 | f15  -3.19 | f30  -2.92 (pairavg  -2.94, win 22.8) | f60  -3.21 (pairavg  -2.83) | mfe30med   0.8
+  -- tp_ub120 cov 311 edges [0, 0, 17, 47]
+   (-inf, 0]                          n=  150 pr=   3 top=0.56 | f15  -1.49 | f30  -1.23 (pairavg  -1.88, win 30.7) | f60  -0.69 (pairavg  -1.36) | mfe30med   0.5
+   (0, 17]                            n=   37 pr=   3 top=0.59 | f15  -2.39 | f30  -2.60 (pairavg  -2.55, win 10.8) | f60  -2.08 (pairavg  -1.76) | mfe30med   1.0
+   (17, 47]                           n=   67 pr=   2 top=0.99 | f15  -5.25 | f30  -4.34 (pairavg  -3.82, win 19.4) | f60  -4.66 (pairavg  -3.79) | mfe30med   1.0
+   (47, inf]                          n=   57 pr=   1 top=1.00 | f15  -5.76 | f30  -5.94 (pairavg  -5.94, win 14.0) | f60  -8.85 (pairavg  -8.85) | mfe30med   1.5
+  -- tp_ub300 cov 311 edges [0, 8, 48, 105]
+   (-inf, 0]                          n=   85 pr=   3 top=0.55 | f15  -1.22 | f30  -0.90 (pairavg  -1.68, win 35.3) | f60  -0.52 (pairavg  -1.24) | mfe30med   0.5
+   (0, 8]                             n=   41 pr=   3 top=0.90 | f15  -2.45 | f30  -2.88 (pairavg  -2.63, win  2.4) | f60  -2.64 (pairavg  -2.43) | mfe30med   0.6
+   (8, 48]                            n=   61 pr=   3 top=0.72 | f15  -1.22 | f30  -1.14 (pairavg  -2.17, win 31.1) | f60  -0.35 (pairavg  -1.87) | mfe30med   1.0
+   (48, 105]                          n=   62 pr=   1 top=1.00 | f15  -4.23 | f30  -3.20 (pairavg  -3.20, win 24.2) | f60  -3.65 (pairavg  -3.65) | mfe30med   1.6
+   (105, inf]                         n=   62 pr=   1 top=1.00 | f15  -7.27 | f30  -7.21 (pairavg  -7.21, win  9.7) | f60  -9.63 (pairavg  -9.63) | mfe30med   1.0
+  -- tp_newb300 cov 311 edges [0, 5, 42, 83]
+   (-inf, 0]                          n=   85 pr=   3 top=0.55 | f15  -1.22 | f30  -0.90 (pairavg  -1.68, win 35.3) | f60  -0.52 (pairavg  -1.24) | mfe30med   0.5
+   (0, 5]                             n=   40 pr=   3 top=0.88 | f15  -2.10 | f30  -2.52 (pairavg  -1.67, win  5.0) | f60  -2.22 (pairavg  -1.39) | mfe30med   0.6
+   (5, 42]                            n=   64 pr=   3 top=0.70 | f15  -1.55 | f30  -1.28 (pairavg  -2.26, win 31.2) | f60  -0.63 (pairavg  -2.00) | mfe30med   0.9
+   (42, 83]                           n=   60 pr=   1 top=1.00 | f15  -4.92 | f30  -4.05 (pairavg  -4.05, win 20.0) | f60  -4.74 (pairavg  -4.74) | mfe30med   1.0
+   (83, inf]                          n=   62 pr=   1 top=1.00 | f15  -6.60 | f30  -6.56 (pairavg  -6.56, win 11.3) | f60  -8.70 (pairavg  -8.70) | mfe30med   1.4
+  -- tp_net300 cov 311 edges [-11.896, -0.852, 0.0, 4.112]
+   (-inf, -11.9]                      n=   63 pr=   2 top=0.97 | f15  -4.31 | f30  -4.54 (pairavg  -3.79, win 12.7) | f60  -6.22 (pairavg  -5.10) | mfe30med   1.5
+   (-11.9, -0.852]                    n=   62 pr=   3 top=0.73 | f15  -1.61 | f30  -1.16 (pairavg  -2.27, win 35.5) | f60  -1.01 (pairavg  -1.97) | mfe30med   0.9
+   (-0.852, 0]                        n=   88 pr=   3 top=0.57 | f15  -1.38 | f30  -0.86 (pairavg  -1.69, win 36.4) | f60  -0.53 (pairavg  -1.29) | mfe30med   0.5
+   (0, 4.11]                          n=   36 pr=   3 top=0.47 | f15  -4.39 | f30  -5.00 (pairavg  -4.49, win  2.8) | f60  -3.56 (pairavg  -3.14) | mfe30med   0.6
+   (4.11, inf]                        n=   62 pr=   2 top=0.73 | f15  -5.49 | f30  -4.79 (pairavg  -4.04, win 12.9) | f60  -5.92 (pairavg  -4.90) | mfe30med   1.0
+  -- tp_net120 cov 311 edges [-4.281, 0.0, 0.0, 3.151]
+   (-inf, -4.28]                      n=   63 pr=   2 top=0.95 | f15  -3.99 | f30  -3.64 (pairavg  -3.42, win 22.2) | f60  -5.26 (pairavg  -4.71) | mfe30med   1.1
+   (-4.28, 0]                         n=  171 pr=   3 top=0.58 | f15  -1.91 | f30  -1.67 (pairavg  -2.19, win 28.1) | f60  -1.09 (pairavg  -1.64) | mfe30med   0.5
+   (0, 3.15]                          n=   15 pr=   3 top=0.47 | f15  -3.74 | f30  -4.12 (pairavg  -3.85, win  0.0) | f60  -3.98 (pairavg  -3.47) | mfe30med   1.2
+   (3.15, inf]                        n=   62 pr=   2 top=0.84 | f15  -5.76 | f30  -5.37 (pairavg  -4.22, win 14.5) | f60  -6.76 (pairavg  -5.25) | mfe30med   1.3
+  -- tp_bshare300 cov 227 edges [0.366, 0.451, 0.51, 0.632]
+   (-inf, 0.366]                      n=   46 pr=   2 top=0.91 | f15  -1.34 | f30  -1.73 (pairavg  -2.52, win 34.8) | f60  -2.10 (pairavg  -3.23) | mfe30med   0.9
+   (0.366, 0.451]                     n=   45 pr=   3 top=0.78 | f15  -3.10 | f30  -3.02 (pairavg  -3.10, win 13.3) | f60  -4.17 (pairavg  -3.28) | mfe30med   1.0
+   (0.451, 0.51]                      n=   46 pr=   2 top=0.87 | f15  -5.29 | f30  -4.18 (pairavg  -3.80, win 23.9) | f60  -5.36 (pairavg  -4.86) | mfe30med   1.2
+   (0.51, 0.632]                      n=   45 pr=   2 top=0.82 | f15  -6.79 | f30  -5.69 (pairavg  -4.59, win 11.1) | f60  -6.21 (pairavg  -4.65) | mfe30med   0.6
+   (0.632, inf]                       n=   45 pr=   3 top=0.60 | f15  -3.15 | f30  -3.86 (pairavg  -3.77, win  6.7) | f60  -3.30 (pairavg  -3.07) | mfe30med   1.0
+  -- tp_ubshare300 cov 227 edges [0.724, 0.76, 0.8, 0.84]
+   (-inf, 0.724]                      n=   46 pr=   3 top=0.41 | f15  -1.88 | f30  -2.67 (pairavg  -2.73, win 10.9) | f60  -5.67 (pairavg  -5.05) | mfe30med   1.0
+   (0.724, 0.76]                      n=   45 pr=   2 top=0.98 | f15  -5.02 | f30  -4.46 (pairavg  -3.87, win 26.7) | f60  -7.49 (pairavg  -5.42) | mfe30med   1.1
+   (0.76, 0.8]                        n=   53 pr=   3 top=0.83 | f15  -3.76 | f30  -4.19 (pairavg  -3.49, win 20.8) | f60  -5.15 (pairavg  -3.57) | mfe30med   0.4
+   (0.8, 0.84]                        n=   38 pr=   1 top=1.00 | f15  -5.77 | f30  -4.02 (pairavg  -4.02, win 21.1) | f60  -2.86 (pairavg  -2.86) | mfe30med   0.9
+   (0.84, inf]                        n=   45 pr=   2 top=0.58 | f15  -3.58 | f30  -3.10 (pairavg  -2.99, win 11.1) | f60   0.46 (pairavg   0.21) | mfe30med   1.5
+  -- tp_top300 cov 226 edges [0.087, 0.147, 0.277, 0.639]
+   (-inf, 0.0872]                     n=   46 pr=   1 top=1.00 | f15  -5.84 | f30  -8.28 (pairavg  -8.28, win  0.0) | f60 -12.34 (pairavg -12.34) | mfe30med   1.0
+   (0.0872, 0.147]                    n=   45 pr=   1 top=1.00 | f15  -6.24 | f30  -4.22 (pairavg  -4.22, win 22.2) | f60  -3.97 (pairavg  -3.97) | mfe30med   1.0
+   (0.147, 0.277]                     n=   45 pr=   3 top=0.73 | f15  -3.92 | f30  -3.29 (pairavg  -3.16, win 17.8) | f60  -1.43 (pairavg  -2.43) | mfe30med   0.9
+   (0.277, 0.639]                     n=   45 pr=   2 top=0.87 | f15  -0.75 | f30   0.53 (pairavg  -1.08, win 48.9) | f60  -0.48 (pairavg  -2.04) | mfe30med   1.0
+   (0.639, inf]                       n=   45 pr=   3 top=0.80 | f15  -2.85 | f30  -3.08 (pairavg  -3.22, win  2.2) | f60  -2.68 (pairavg  -2.58) | mfe30med   0.6
+  -- tp_breadth300 cov 226 edges [0.546, 0.596, 0.628, 0.8]
+   (-inf, 0.546]                      n=   46 pr=   1 top=1.00 | f15  -5.68 | f30  -2.61 (pairavg  -2.61, win 32.6) | f60  -1.31 (pairavg  -1.31) | mfe30med   1.0
+   (0.546, 0.596]                     n=   45 pr=   2 top=0.91 | f15  -5.04 | f30  -4.26 (pairavg  -3.78, win 20.0) | f60  -5.28 (pairavg  -4.77) | mfe30med   1.4
+   (0.596, 0.628]                     n=   46 pr=   2 top=0.89 | f15  -2.41 | f30  -3.87 (pairavg  -3.61, win 19.6) | f60  -5.93 (pairavg  -5.14) | mfe30med   1.0
+   (0.628, 0.8]                       n=   46 pr=   2 top=0.83 | f15  -4.26 | f30  -5.00 (pairavg  -4.18, win 13.0) | f60  -5.93 (pairavg  -4.48) | mfe30med   0.9
+   (0.8, inf]                         n=   43 pr=   3 top=0.84 | f15  -2.16 | f30  -2.63 (pairavg  -2.05, win  4.7) | f60  -2.55 (pairavg  -2.33) | mfe30med   0.6
+  -- tp_uacc cov 311 edges [0.0, 0.0, 0.679, 1.568]
+   (-inf, 0]                          n=  150 pr=   3 top=0.56 | f15  -1.49 | f30  -1.23 (pairavg  -1.88, win 30.7) | f60  -0.69 (pairavg  -1.36) | mfe30med   0.5
+   (0, 0.679]                         n=   37 pr=   2 top=0.97 | f15  -6.10 | f30  -5.23 (pairavg  -4.05, win 18.9) | f60  -7.13 (pairavg  -4.61) | mfe30med   0.6
+   (0.679, 1.57]                      n=   62 pr=   2 top=0.77 | f15  -4.76 | f30  -4.54 (pairavg  -3.94, win 17.7) | f60  -6.29 (pairavg  -5.00) | mfe30med   1.3
+   (1.57, inf]                        n=   62 pr=   3 top=0.81 | f15  -4.00 | f30  -4.05 (pairavg  -3.47, win 11.3) | f60  -3.87 (pairavg  -3.29) | mfe30med   1.6
+  -- tp_bsacc cov 311 edges [0.0, 0.0, 0.238, 1.965]
+   (-inf, 0]                          n=  173 pr=   3 top=0.55 | f15  -1.59 | f30  -1.33 (pairavg  -1.92, win 29.5) | f60  -0.77 (pairavg  -1.39) | mfe30med   0.6
+   (0, 0.238]                         n=   14 pr=   2 top=0.93 | f15  -3.42 | f30  -2.79 (pairavg  -2.72, win 21.4) | f60  -5.94 (pairavg  -4.41) | mfe30med   1.1
+   (0.238, 1.96]                      n=   62 pr=   1 top=1.00 | f15  -6.39 | f30  -6.13 (pairavg  -6.13, win 16.1) | f60  -8.50 (pairavg  -8.50) | mfe30med   1.0
+   (1.96, inf]                        n=   62 pr=   3 top=0.77 | f15  -4.39 | f30  -4.20 (pairavg  -3.48, win 11.3) | f60  -4.09 (pairavg  -3.15) | mfe30med   1.5
+  -- tp_netsol900 cov 311 edges [-27.941, -5.355, 0.207, 7.909]
+   (-inf, -27.9]                      n=   63 pr=   1 top=1.00 | f15  -2.30 | f30  -4.49 (pairavg  -4.49, win 23.8) | f60  -6.82 (pairavg  -6.82) | mfe30med   4.3
+   (-27.9, -5.35]                     n=   74 pr=   2 top=0.96 | f15  -1.34 | f30  -0.38 (pairavg  -1.71, win 41.9) | f60   0.98 (pairavg  -1.45) | mfe30med   1.5
+   (-5.35, 0.207]                     n=   50 pr=   3 top=0.50 | f15  -3.72 | f30  -1.59 (pairavg  -2.09, win 30.0) | f60  -2.10 (pairavg  -2.13) | mfe30med   0.4
+   (0.207, 7.91]                      n=   70 pr=   3 top=0.40 | f15  -3.34 | f30  -2.91 (pairavg  -2.86, win 12.9) | f60  -1.52 (pairavg  -1.55) | mfe30med   0.5
+   (7.91, inf]                        n=   54 pr=   2 top=0.67 | f15  -6.07 | f30  -5.85 (pairavg  -5.41, win  1.9) | f60  -7.93 (pairavg  -7.21) | mfe30med   1.0
+  -- ba1h cov 311 edges [0.602, 0.813, 0.884, 0.96]
+   (-inf, 0.602]                      n=   63 pr=   3 top=0.84 | f15  -2.67 | f30  -3.30 (pairavg  -3.90, win  0.0) | f60  -3.24 (pairavg  -4.96) | mfe30med   0.3
+   (0.602, 0.813]                     n=   64 pr=   1 top=1.00 | f15  -4.59 | f30  -4.73 (pairavg  -4.73, win 25.0) | f60  -6.68 (pairavg  -6.68) | mfe30med   2.0
+   (0.813, 0.884]                     n=   60 pr=   1 top=1.00 | f15  -2.39 | f30  -2.57 (pairavg  -2.57, win 31.7) | f60  -2.49 (pairavg  -2.49) | mfe30med   1.1
+   (0.884, 0.96]                      n=   62 pr=   1 top=1.00 | f15  -2.61 | f30  -1.90 (pairavg  -1.90, win 35.5) | f60  -1.47 (pairavg  -1.47) | mfe30med   1.1
+   (0.96, inf]                        n=   62 pr=   3 top=0.48 | f15  -3.61 | f30  -2.05 (pairavg  -2.39, win 22.6) | f60  -2.02 (pairavg  -2.16) | mfe30med   1.0
+  -- bshare5 cov 311 edges [0.598, 0.714, 0.765, 0.791]
+   (-inf, 0.598]                      n=   63 pr=   3 top=0.51 | f15  -2.85 | f30  -3.75 (pairavg  -4.20, win  0.0) | f60  -4.93 (pairavg  -5.92) | mfe30med   0.5
+   (0.598, 0.714]                     n=   64 pr=   2 top=0.92 | f15  -4.94 | f30  -4.45 (pairavg  -2.65, win 20.3) | f60  -7.33 (pairavg  -4.21) | mfe30med   1.0
+   (0.714, 0.765]                     n=   60 pr=   2 top=0.98 | f15  -2.66 | f30  -2.54 (pairavg  -2.81, win 35.0) | f60  -2.86 (pairavg  -2.97) | mfe30med   1.6
+   (0.765, 0.791]                     n=   63 pr=   2 top=0.89 | f15  -2.27 | f30  -0.73 (pairavg  -1.80, win 42.9) | f60   0.76 (pairavg  -0.97) | mfe30med   0.4
+   (0.791, inf]                       n=   61 pr=   2 top=0.52 | f15  -3.17 | f30  -3.11 (pairavg  -3.16, win 16.4) | f60  -1.53 (pairavg  -1.57) | mfe30med   0.6
+  -- va1h cov 311 edges [0.638, 0.769, 0.861, 1.114]
+   (-inf, 0.638]                      n=   63 pr=   3 top=0.44 | f15  -2.11 | f30  -2.47 (pairavg  -2.42, win 19.0) | f60  -3.02 (pairavg  -2.72) | mfe30med   0.4
+   (0.638, 0.769]                     n=   62 pr=   2 top=0.95 | f15  -3.90 | f30  -2.42 (pairavg  -3.14, win 35.5) | f60  -2.15 (pairavg  -3.69) | mfe30med   1.6
+   (0.769, 0.861]                     n=   63 pr=   2 top=0.94 | f15  -4.68 | f30  -4.00 (pairavg  -4.96, win 23.8) | f60  -3.41 (pairavg  -2.97) | mfe30med   0.6
+   (0.861, 1.11]                      n=   61 pr=   3 top=0.80 | f15  -2.94 | f30  -3.45 (pairavg  -3.40, win 21.3) | f60  -4.43 (pairavg  -3.43) | mfe30med   1.0
+   (1.11, inf]                        n=   62 pr=   3 top=0.48 | f15  -2.30 | f30  -2.28 (pairavg  -2.35, win 14.5) | f60  -3.04 (pairavg  -2.92) | mfe30med   1.1
+  -- uw5 cov 273 edges [0.0, 12.0, 57.0, 131.0]
+   (-inf, 0]                          n=   74 pr=   3 top=0.55 | f15  -1.16 | f30  -0.81 (pairavg  -1.64, win 35.1) | f60  -0.34 (pairavg  -1.14) | mfe30med   0.5
+   (0, 12]                            n=   36 pr=   3 top=0.86 | f15  -2.00 | f30  -2.68 (pairavg  -2.24, win  5.6) | f60  -2.08 (pairavg  -0.92) | mfe30med   0.6
+   (12, 57]                           n=   54 pr=   3 top=0.67 | f15  -1.44 | f30  -0.87 (pairavg  -2.04, win 33.3) | f60  -0.03 (pairavg  -1.65) | mfe30med   0.8
+   (57, 131]                          n=   56 pr=   1 top=1.00 | f15  -5.81 | f30  -4.00 (pairavg  -4.00, win 21.4) | f60  -4.38 (pairavg  -4.38) | mfe30med   1.0
+   (131, inf]                         n=   53 pr=   1 top=1.00 | f15  -6.26 | f30  -7.33 (pairavg  -7.33, win  7.5) | f60 -10.60 (pairavg -10.60) | mfe30med   1.0
+
+##### EVENT SCREENS (train, non-rug, PumpSwap) #####
+== E1 wake-up: age>=1d liq>=50k va6h>=3
+   fee<=50                            n=  195 pr=   5 top=0.32 | f15  -2.01 | f30  -2.03 (pairavg  -2.15, win  8.2) | f60  -1.85 (pairavg  -2.12) | mfe30med   0.7
+   fee55-95                           n=  337 pr=  12 top=0.18 | f15  -3.66 | f30  -3.11 (pairavg  -5.02, win 30.0) | f60  -3.73 (pairavg  -5.52) | mfe30med   2.1
+   fee100+                            n=  254 pr=   8 top=0.24 | f15  -9.33 | f30  -9.68 (pairavg  -5.99, win 18.9) | f60  -4.52 (pairavg  -2.98) | mfe30med   6.2
+== E1b wake-up: age>=1d liq>=50k va6h>=3 r300<2
+   fee<=50                            n=  144 pr=   5 top=0.26 | f15  -1.89 | f30  -1.87 (pairavg  -1.75, win 11.1) | f60  -1.51 (pairavg  -1.62) | mfe30med   1.0
+   fee55-95                           n=  245 pr=  10 top=0.24 | f15  -3.09 | f30  -1.81 (pairavg  -2.73, win 31.8) | f60  -2.17 (pairavg  -3.12) | mfe30med   1.6
+   fee100+                            n=  102 pr=   7 top=0.27 | f15  -7.95 | f30  -7.41 (pairavg  -6.39, win 15.7) | f60  -1.82 (pairavg   0.24) | mfe30med   4.3
+== E2 vol leads px: va1h>=2 |r300|<1 bshare5>=.6 liq>=50k
+   fee<=50                            n=   39 pr=   5 top=0.36 | f15  -2.56 | f30  -1.71 (pairavg  -1.69, win  0.0) | f60  -1.88 (pairavg  -2.16) | mfe30med   0.6
+   fee55-95                           n=   61 pr=   8 top=0.25 | f15  -4.10 | f30  -4.34 (pairavg  -5.35, win 11.5) | f60  -4.38 (pairavg  -3.55) | mfe30med   1.0
+   fee100+                            n=   67 pr=   7 top=0.81 | f15  -2.20 | f30  -2.67 (pairavg  -7.28, win 22.4) | f60  -3.60 (pairavg  -6.91) | mfe30med   2.1
+== E2b same, age>=1d
+   fee<=50                            n=   39 pr=   5 top=0.36 | f15  -2.56 | f30  -1.71 (pairavg  -1.69, win  0.0) | f60  -1.88 (pairavg  -2.16) | mfe30med   0.6
+   fee55-95                           n=   58 pr=   7 top=0.26 | f15  -3.26 | f30  -2.83 (pairavg  -1.34, win 12.1) | f60  -3.92 (pairavg  -2.17) | mfe30med   1.0
+   fee100+                            n=   65 pr=   5 top=0.83 | f15  -2.40 | f30  -2.39 (pairavg  -5.59, win 21.5) | f60  -3.38 (pairavg  -5.35) | mfe30med   2.1
+== E3 broad buyers DS: uw5>=20 rb5/uw5<.3 bshare5>=.55
+   fee<=50                            n=  131 pr=   1 top=1.00 | f15  -4.84 | f30  -4.03 (pairavg  -4.03, win 24.4) | f60  -5.75 (pairavg  -5.75) | mfe30med   0.9
+   fee55-95                           n=  143 pr=   5 top=0.75 | f15  -4.59 | f30  -2.35 (pairavg  -2.24, win 36.4) | f60  -4.78 (pairavg   1.79) | mfe30med   6.7
+   fee100+                            n=  662 pr=  28 top=0.27 | f15  -8.22 | f30 -13.08 (pairavg -16.99, win 31.1) | f60 -20.29 (pairavg -19.38) | mfe30med  15.6
+== E4 tape breadth: ub300>=10 top<.3 net300>0
+   fee<=50                            n=   62 pr=   2 top=0.87 | f15  -6.34 | f30  -5.76 (pairavg  -4.53, win 12.9) | f60  -6.78 (pairavg  -4.84) | mfe30med   0.7
+   fee55-95                           n=  328 pr=   5 top=0.67 | f15  -0.99 | f30  -0.20 (pairavg  -1.00, win 46.6) | f60  -0.34 (pairavg   3.05) | mfe30med  10.2
+   fee100+                            n=  614 pr=  25 top=0.60 | f15  -8.19 | f30 -11.51 (pairavg   0.50, win 28.0) | f60 -18.08 (pairavg  -3.10) | mfe30med  14.3
+== E4b tape breadth + new buyers: ub300>=10 newb>=5 top<.3 net>0
+   fee<=50                            n=   62 pr=   2 top=0.87 | f15  -6.34 | f30  -5.76 (pairavg  -4.53, win 12.9) | f60  -6.78 (pairavg  -4.84) | mfe30med   0.7
+   fee55-95                           n=  300 pr=   4 top=0.67 | f15  -0.43 | f30   1.12 (pairavg  -0.39, win 50.7) | f60   2.50 (pairavg   5.02) | mfe30med  11.9
+   fee100+                            n=  555 pr=  24 top=0.66 | f15  -9.00 | f30 -14.15 (pairavg   0.50, win 25.6) | f60 -20.42 (pairavg  -2.62) | mfe30med  12.3
+== E4c tape whale: top>=.6 net300>0 bsol300>=5
+   fee<=50                            n=   18 pr=   2 top=0.94 | f15  -2.39 | f30  -2.53 (pairavg  -3.77, win  0.0) | f60  -2.90 (pairavg  -4.81) | mfe30med   1.5
+   fee55-95                           n=   96 pr=   8 top=0.27 | f15  -5.16 | f30  -6.37 (pairavg  -6.45, win  8.3) | f60  -7.40 (pairavg  -5.31) | mfe30med   1.4
+   fee100+                            n=  116 pr=  12 top=0.27 | f15  -0.91 | f30  -2.60 (pairavg  -9.48, win 33.6) | f60  -4.14 (pairavg  -7.97) | mfe30med  11.1
+== E5 capitulation: age>=1d liq>=50k bshare5<=.3 r300<=-5
+   fee<=50                            n=0
+   fee55-95                           n=   25 pr=   7 top=0.36 | f15  -2.21 | f30  -3.91 (pairavg  -3.29, win 12.0) | f60  -1.40 (pairavg  -2.54) | mfe30med   3.3
+   fee100+                            n=   21 pr=   5 top=0.38 | f15   1.51 | f30  -4.67 (pairavg  -6.56, win 28.6) | f60   5.83 (pairavg  -1.83) | mfe30med   8.7
+== E5b capitulation tape: net300<0 us300>=10 r300<=-5 liq>=20k
+   fee<=50                            n=    6 pr=   1 top=1.00 | f15  -3.78 | f30  -1.61 (pairavg  -1.61, win 50.0) | f60  -4.28 (pairavg  -4.28) | mfe30med   5.0
+   fee55-95                           n=   94 pr=   2 top=0.87 | f15   1.06 | f30   1.44 (pairavg   8.04, win 48.9) | f60  -3.70 (pairavg   3.67) | mfe30med  11.5
+   fee100+                            n=  213 pr=  14 top=0.40 | f15  -3.58 | f30 -10.82 (pairavg  -3.39, win 36.2) | f60 -16.30 (pairavg   0.56) | mfe30med  13.8
+== E6 quiet established: age>=1d liq>=50k va6h<0.2
+   fee<=50                            n=  854 pr=   4 top=0.35 | f15  -0.88 | f30  -0.42 (pairavg  -0.56, win  8.1) | f60   0.89 (pairavg   0.50) | mfe30med   0.4
+   fee55-95                           n= 1557 pr=  12 top=0.18 | f15  -3.96 | f30  -4.79 (pairavg  -5.51, win 11.0) | f60  -5.14 (pairavg  -5.11) | mfe30med   1.1
+   fee100+                            n=  989 pr=   8 top=0.52 | f15  -4.00 | f30  -4.79 (pairavg  -1.15, win 13.2) | f60  -5.99 (pairavg  -0.34) | mfe30med   0.0
+== E7 ba1h>=3 and va1h>=3, age>=1d liq>=50k
+   fee<=50                            n=   76 pr=   4 top=0.32 | f15  -2.01 | f30  -2.03 (pairavg  -2.03, win  6.6) | f60  -1.22 (pairavg  -1.27) | mfe30med   1.1
+   fee55-95                           n=  178 pr=   9 top=0.19 | f15  -3.52 | f30  -3.37 (pairavg  -2.02, win 20.8) | f60  -3.24 (pairavg  -2.02) | mfe30med   1.5
+   fee100+                            n=   90 pr=   7 top=0.42 | f15  -5.34 | f30  -6.83 (pairavg -10.63, win 13.3) | f60  -6.63 (pairavg  -7.06) | mfe30med   7.5
+screens (bins/events) evaluated 189

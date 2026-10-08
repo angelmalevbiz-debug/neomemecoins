@@ -1,0 +1,5 @@
+tb nochase + sell-pressure exit      {"n": 100, "pairs": 14, "mean": 2.23, "median": -2.98, "trim5": -1.91, "mean_wo_top3": -2.27, "pairavg": 26.45, "win": 29.0, "top_share": 0.33} exits {'TP': 22, 'STOP': 14, 'FLOW_SELL': 64} 2s
+tb nochase + frenzy exit             {"n": 75, "pairs": 14, "mean": 4.83, "median": 2.69, "trim5": -0.46, "mean_wo_top3": -1.13, "pairavg": 29.67, "win": 62.7, "top_share": 0.333} exits {'TP': 21, 'STOP': 24, 'FRENZY': 26, 'HOLD': 4} 2s
+DS analog nochase                    {"n": 185, "pairs": 39, "mean": -2.14, "median": -5.8, "trim5": -4.46, "mean_wo_top3": -4.84, "pairavg": -0.74, "win": 36.2, "top_share": 0.141} exits {'TP': 59, 'STOP': 81, 'HOLD': 43, 'OPEN_AT_END': 2} 1s
+RANDOM tape-live nochase {"n": 98, "pairs": 29, "mean": -5.7, "median": -9.19, "trim5": -6.36, "mean_wo_top3": -7.31, "pairavg": -7.34, "win": 22.4, "top_share": 0.133}
+new configs counted: 3

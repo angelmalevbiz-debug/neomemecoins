@@ -1,0 +1,22 @@
+rows 3116792 distinct upd 37771 rows per distinct upd 82.5
+upd null rows 0
+t - upd ms (sample n=32131): p1 71 p10 296 p50 1207 p90 4985 p99 14664 max 37262
+largest upd groups (upd, rows, pairs): [(1791418902010, 332, 84), (1791395080526, 323, 83), (1791424762928, 319, 80)]
+dropped 1988143
+kept 1128649
+kept_15s 4817
+kept_15s_upd_OLDER_than_last 71
+kept_15s_upd_equal 4746
+kept_first 2042
+kept_newer 1121790
+ps_pts_after_first 801123
+ps_same_all_as_prev 695486
+ps_same_price_as_prev_kept 715400
+pts_after_first 1126607
+raw_rows_lt_1s_after_prev_raw 1403404
+same_price_as_prev_kept 1017020
+same_price_liq_v5_mcap_as_prev 990666
+share kept points whose price equals previous kept point: all 0.903, pumpswap-SOL 0.893
+share identical price+liq+v5+mcap: all 0.879, pumpswap-SOL 0.868
+gap histogram between kept points: {'<5s': 597520, '<15s': 520582, '<60s': 7892, '<1h': 178, '<10m': 318, '>=1h': 117}
+time between price changes (kept pts) ms: p10 26542 p50 31933 p90 68002 p99 387489

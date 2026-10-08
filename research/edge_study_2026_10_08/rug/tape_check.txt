@@ -1,0 +1,379 @@
+tape pairs 938
+drained pumpswap pairs 184 in tape 117
+== BP GkFoq4nn kinds ['PRICE_SLOW'] liq_peak 15020
+   pre(-2h..-10m): n=35 buys=14 (4.2 SOL) sells=21 (2.4 SOL) wallets=24 biggest_sell=0.6 SOL by AKQZ5j8F at -39.8 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+FullMargin 8LXqhybM kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+Si27 X7aEa787 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== PPAV 2or8ATkU kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 56931
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=64 buys=2 (0.0 SOL) sells=62 (0.0 SOL) wallets=64 biggest_sell=0.0 SOL by ANQ9yWqE at +0.1 min
+   post(+1m..+30m): n=342 buys=0 (0.0 SOL) sells=342 (0.5 SOL) wallets=342 biggest_sell=0.2 SOL by HkY1MHBP at +1.8 min
+   near sellers top3: [('ANQ9yWqE', 0.0, 62), ('4F8qKkmu', 0.0, 11), ('DVzXFmeH', 0.0, 1)]
+== EIN AA9bkEEG kinds ['PRICE_SLOW'] liq_peak 19507
+   pre(-2h..-10m): n=229 buys=140 (32.8 SOL) sells=89 (29.3 SOL) wallets=174 biggest_sell=2.3 SOL by HfohKLvQ at -36.0 min
+   near(-10m..+1m): n=100 buys=52 (17.4 SOL) sells=48 (17.6 SOL) wallets=68 biggest_sell=2.3 SOL by AP91XYno at -2.7 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('AP91XYno', 4.4, 25), ('GCtgAfju', 1.9, 11), ('fdVZakRN', 1.9, 11)]
+FELIX FgxyjUCW kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== IRLCraft GbLV9rYb kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 26159
+   pre(-2h..-10m): n=15 buys=8 (1.5 SOL) sells=7 (2.8 SOL) wallets=15 biggest_sell=0.7 SOL by HDUApJgL at -11.5 min
+   near(-10m..+1m): n=14 buys=9 (2.3 SOL) sells=5 (3.0 SOL) wallets=13 biggest_sell=1.0 SOL by DefYnFe5 at -9.1 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('DefYnFe5', 1.9, 62), ('6JK2PL9V', 0.8, 27), ('2tgUbS9U', 0.2, 8)]
+== CORNYBOB EVcJU4r4 kinds ['PRICE_SLOW'] liq_peak 22066
+   pre(-2h..-10m): n=114 buys=49 (11.8 SOL) sells=65 (22.3 SOL) wallets=99 biggest_sell=3.7 SOL by 9St6ETbe at -12.7 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=17 buys=7 (1.2 SOL) sells=10 (8.6 SOL) wallets=16 biggest_sell=2.7 SOL by EP4iprpg at +16.5 min
+== Karl 8dfPAs3d kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 17483
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=4 buys=2 (0.4 SOL) sells=2 (0.1 SOL) wallets=4 biggest_sell=0.1 SOL by DMGV6MxE at +13.7 min
+== XEC 3khFt2Si kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 21453
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=99 buys=48 (12.3 SOL) sells=51 (30.7 SOL) wallets=90 biggest_sell=2.9 SOL by 3AMqrVBU at -7.8 min
+   post(+1m..+30m): n=4 buys=2 (0.5 SOL) sells=2 (1.0 SOL) wallets=4 biggest_sell=0.9 SOL by 9C2YUaKF at +8.5 min
+   near sellers top3: [('3AMqrVBU', 2.9, 10), ('HjDZJpcv', 2.3, 8), ('GxifJqkZ', 2.1, 7)]
+Playground 2pdpLymB kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== BACK EwJZyBsQ kinds ['PRICE_SLOW'] liq_peak 17364
+   pre(-2h..-10m): n=129 buys=79 (22.7 SOL) sells=50 (22.7 SOL) wallets=90 biggest_sell=4.0 SOL by AwsmHo4C at -17.8 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== QUAKE 7mAwgbki kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 19820
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=30 buys=14 (3.7 SOL) sells=16 (6.6 SOL) wallets=29 biggest_sell=1.9 SOL by 93kk52Hk at -9.7 min
+   post(+1m..+30m): n=8 buys=3 (0.1 SOL) sells=5 (0.2 SOL) wallets=8 biggest_sell=0.1 SOL by 3XfpUuc1 at +12.1 min
+   near sellers top3: [('93kk52Hk', 3.8, 58), ('DWsWx2EA', 1.2, 18), ('9SbKQ7Ai', 0.4, 6)]
+== REFLECT 7BzskuDb kinds ['PRICE_SLOW'] liq_peak 49283
+   pre(-2h..-10m): n=56 buys=36 (8.6 SOL) sells=20 (11.0 SOL) wallets=44 biggest_sell=3.3 SOL by EXpDc1N1 at -66.5 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=9 buys=3 (0.1 SOL) sells=6 (1.0 SOL) wallets=9 biggest_sell=0.3 SOL by Ek4xJ3Rp at +17.8 min
+GR 4xcFAQcP kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== Hama GKJqoq1w kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 23418
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=45 buys=21 (8.3 SOL) sells=24 (12.2 SOL) wallets=41 biggest_sell=2.5 SOL by A8143T27 at -8.7 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('A8143T27', 2.5, 20), ('6L9x1WDu', 2.3, 19), ('5aLY85py', 1.9, 15)]
+== SK 7vXSFb9t kinds ['PRICE_SLOW'] liq_peak 33499
+   pre(-2h..-10m): n=52 buys=21 (11.0 SOL) sells=31 (12.0 SOL) wallets=44 biggest_sell=2.5 SOL by 3WHmbKbu at -62.3 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+CATCHA 7rTnGNW3 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== PHASEONE 2cRT2N5A kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 20997
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=59 buys=31 (12.5 SOL) sells=28 (10.9 SOL) wallets=53 biggest_sell=2.3 SOL by CziTnnYR at -4.0 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('CziTnnYR', 2.3, 21), ('FxTnb6Kd', 1.6, 15), ('C3W8BXu5', 1.1, 10)]
+== Bond CQiAHFkY kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 18543
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=82 buys=11 (11.3 SOL) sells=71 (11.9 SOL) wallets=81 biggest_sell=1.0 SOL by 3W27Tvae at -0.7 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('3W27Tvae', 1.0, 9), ('67JLbkDD', 1.0, 8), ('5oHSfZRj', 0.8, 7)]
+ACTII AbcUWi2y kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== ACTII CRvE2Thp kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 23534
+   pre(-2h..-10m): n=22 buys=8 (1.5 SOL) sells=14 (5.5 SOL) wallets=22 biggest_sell=1.5 SOL by 9Co41DEs at -17.8 min
+   near(-10m..+1m): n=18 buys=7 (2.8 SOL) sells=11 (6.4 SOL) wallets=18 biggest_sell=2.2 SOL by BM9CcyEr at -6.9 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('BM9CcyEr', 2.2, 35), ('EguxFSGu', 1.1, 17), ('AGgNiaMW', 0.7, 11)]
+SI FsAEJ7ud kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+Bunker 8fdwTv51 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+WUMPUS 2reuXQEd kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+VC EqMK5mLb kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== HASH 6rYoJFeJ kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 17519
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=114 buys=65 (17.0 SOL) sells=49 (24.6 SOL) wallets=97 biggest_sell=2.0 SOL by D3LE8oR5 at -1.1 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('wdKSBWNQ', 2.5, 10), ('D3LE8oR5', 2.0, 8), ('2Hen4bZU', 1.9, 8)]
+QI EhQBLu8g kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== slingoor FUFmDAvc kinds ['PRICE_SLOW'] liq_peak 17716
+   pre(-2h..-10m): n=276 buys=138 (24.3 SOL) sells=138 (44.6 SOL) wallets=230 biggest_sell=3.3 SOL by 6PSUHkiE at -38.1 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+Tokenero F2MK22RL kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== SNDWITCH HU22UBaT kinds ['PRICE_SLOW'] liq_peak 109430
+   pre(-2h..-10m): n=3672 buys=2209 (691.1 SOL) sells=1463 (657.4 SOL) wallets=1911 biggest_sell=5.5 SOL by GUWqhhMg at -77.3 min
+   near(-10m..+1m): n=156 buys=110 (19.0 SOL) sells=46 (19.1 SOL) wallets=82 biggest_sell=4.3 SOL by BPGJyoNF at -5.2 min
+   post(+1m..+30m): n=6 buys=3 (1.4 SOL) sells=3 (0.1 SOL) wallets=6 biggest_sell=0.0 SOL by 59x3cAtr at +17.0 min
+   near sellers top3: [('BPGJyoNF', 4.3, 22), ('7gcYvG3s', 2.8, 15), ('9AcGBt9r', 2.2, 12)]
+== PIXEL 4M8CKsEv kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 18173
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=133 buys=65 (18.5 SOL) sells=68 (21.6 SOL) wallets=92 biggest_sell=2.6 SOL by 3va5oKd8 at -4.6 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('3va5oKd8', 2.6, 12), ('ui382uEg', 1.9, 9), ('HYmNYbRH', 1.9, 9)]
+== VIBE 9Bq3P2yY kinds ['PRICE_SLOW'] liq_peak 26964
+   pre(-2h..-10m): n=406 buys=201 (81.8 SOL) sells=205 (107.7 SOL) wallets=269 biggest_sell=7.3 SOL by B6WfJBRh at -29.4 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+PONS DUgnFoAD kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+分身 6msBHvSi kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== OGTRUMP 9rSmRH9w kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 65630
+   pre(-2h..-10m): n=43 buys=24 (16.2 SOL) sells=19 (28.1 SOL) wallets=38 biggest_sell=6.2 SOL by 7oXwcmWy at -16.0 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== A1 F2P22Sfc kinds ['PRICE_SLOW'] liq_peak 163598
+   pre(-2h..-10m): n=2165 buys=1340 (335.5 SOL) sells=825 (426.1 SOL) wallets=761 biggest_sell=14.0 SOL by CPGJ9smV at -41.7 min
+   near(-10m..+1m): n=119 buys=73 (48.0 SOL) sells=46 (113.6 SOL) wallets=69 biggest_sell=14.6 SOL by cFkN7Vc1 at -3.5 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('cFkN7Vc1', 14.6, 13), ('DZ4JCPzy', 14.4, 13), ('FxGupSuW', 11.5, 10)]
+TWEETCRAFT DKufAd78 kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== BOOT 5CihwRiq kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 21837
+   pre(-2h..-10m): n=1065 buys=711 (70.9 SOL) sells=354 (77.9 SOL) wallets=342 biggest_sell=3.4 SOL by 4unNVstm at -24.6 min
+   near(-10m..+1m): n=548 buys=365 (44.6 SOL) sells=183 (36.0 SOL) wallets=228 biggest_sell=3.4 SOL by AC3tCQUp at -8.3 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('AC3tCQUp', 3.4, 10), ('AZSTPRxD', 0.8, 2), ('4ZDjQwfB', 0.7, 2)]
+== EMBEDPAD 9etnNzzZ kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 22203
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=69 buys=52 (13.8 SOL) sells=17 (7.3 SOL) wallets=60 biggest_sell=1.9 SOL by 2cXtFeLx at -3.9 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('2cXtFeLx', 1.9, 25), ('HyZYJbHR', 1.2, 16), ('evoKymzk', 1.1, 15)]
+CATE HMzvsEEm kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== SLEDGE 1XmrCvzt kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 19264
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=46 buys=8 (3.3 SOL) sells=38 (10.0 SOL) wallets=41 biggest_sell=2.3 SOL by 8UjAHJXZ at +0.4 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('8UjAHJXZ', 2.3, 23), ('5Kk12mwU', 1.9, 19), ('3HZBLYPZ', 1.1, 11)]
+== JIPPI 6US3uMtB kinds ['PRICE_SLOW'] liq_peak 20872
+   pre(-2h..-10m): n=37 buys=9 (7.0 SOL) sells=28 (10.9 SOL) wallets=34 biggest_sell=3.3 SOL by LT2viWLD at -22.5 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+xFloor02 HQQtibmz kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+Playground DXn4nTV4 kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+TWEETCRAFT 5W7nDoeT kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== RARINU A2ASUorC kinds ['PRICE_SLOW'] liq_peak 182235
+   pre(-2h..-10m): n=888 buys=742 (178.0 SOL) sells=146 (223.5 SOL) wallets=490 biggest_sell=8.9 SOL by 4h3qvJqh at -102.6 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=403 buys=340 (106.9 SOL) sells=63 (73.0 SOL) wallets=247 biggest_sell=3.8 SOL by 5Q1553mf at +23.0 min
+== Leoncio 7yoL9U1E kinds ['PRICE_SLOW'] liq_peak 23581
+   pre(-2h..-10m): n=18 buys=10 (1.8 SOL) sells=8 (2.8 SOL) wallets=15 biggest_sell=0.6 SOL by FGdZwJbk at -10.3 min
+   near(-10m..+1m): n=97 buys=60 (13.0 SOL) sells=37 (18.2 SOL) wallets=82 biggest_sell=3.8 SOL by 9jLfXDZH at -4.8 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('9jLfXDZH', 3.8, 21), ('9NwAyZnE', 2.4, 13), ('9S4wWgJ9', 1.5, 8)]
+BTCFUN Hk6o4RU5 kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== JONATHAN 55JuD9oS kinds ['PRICE_SLOW'] liq_peak 23799
+   pre(-2h..-10m): n=251 buys=78 (23.8 SOL) sells=173 (32.6 SOL) wallets=132 biggest_sell=3.4 SOL by 3oak1peT at -11.1 min
+   near(-10m..+1m): n=61 buys=25 (9.1 SOL) sells=36 (13.8 SOL) wallets=48 biggest_sell=2.1 SOL by 8J1BCq8F at -5.6 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('8J1BCq8F', 2.1, 15), ('CBxQjnef', 2.0, 14), ('2cXtFeLx', 1.2, 9)]
+== SPLAZU 3YPcMDkZ kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 18540
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=110 buys=51 (31.6 SOL) sells=59 (40.5 SOL) wallets=87 biggest_sell=7.9 SOL by Gf2wYM2k at -6.0 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('Gf2wYM2k', 7.9, 19), ('EJYCJzxe', 6.1, 15), ('GyZnu8jx', 3.4, 8)]
+== CRINE 876WGa4Y kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 24377
+   pre(-2h..-10m): n=47 buys=27 (6.4 SOL) sells=20 (12.0 SOL) wallets=43 biggest_sell=2.3 SOL by BVbU1k7d at -10.2 min
+   near(-10m..+1m): n=14 buys=3 (0.2 SOL) sells=11 (3.3 SOL) wallets=14 biggest_sell=1.1 SOL by Cmu2CEAS at -9.8 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('Cmu2CEAS', 1.1, 33), ('HPkXW8NR', 0.8, 25), ('3enz5ySN', 0.4, 12)]
+== FPRO DK98xZqj kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 36358
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=40 buys=16 (16.9 SOL) sells=24 (13.8 SOL) wallets=39 biggest_sell=4.3 SOL by GY6LEjwe at -1.7 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('GY6LEjwe', 4.3, 31), ('3m58vnZ2', 4.1, 29), ('C6AJTJ6W', 0.7, 5)]
+== BLOX Eji6Lww6 kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 44454
+   pre(-2h..-10m): n=473 buys=246 (191.7 SOL) sells=227 (161.0 SOL) wallets=335 biggest_sell=21.8 SOL by HWhWFkfr at -53.6 min
+   near(-10m..+1m): n=7 buys=5 (1.0 SOL) sells=2 (0.9 SOL) wallets=7 biggest_sell=0.5 SOL by 4SAAxbw6 at -9.6 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('4SAAxbw6', 0.5, 57), ('ADaTvNh7', 0.4, 43)]
+SpaceX 7TTkuwhn kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== NOVUM Hx51fBYy kinds ['PRICE_SLOW'] liq_peak 20230
+   pre(-2h..-10m): n=40 buys=17 (9.1 SOL) sells=23 (8.3 SOL) wallets=40 biggest_sell=1.3 SOL by DefYnFe5 at -20.0 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== META 7TJFv3Fg kinds ['PRICE_SLOW'] liq_peak 19196
+   pre(-2h..-10m): n=64 buys=32 (14.8 SOL) sells=32 (17.3 SOL) wallets=52 biggest_sell=5.8 SOL by 65yYL1r8 at -22.5 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== SHIFT 8PwEy33D kinds ['PRICE_SLOW'] liq_peak 19752
+   pre(-2h..-10m): n=50 buys=30 (9.5 SOL) sells=20 (11.7 SOL) wallets=46 biggest_sell=3.1 SOL by VASf7Ag7 at -16.1 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== LOBBY FkfDrvbz kinds ['PRICE_SLOW'] liq_peak 116483
+   pre(-2h..-10m): n=104 buys=52 (31.2 SOL) sells=52 (34.2 SOL) wallets=65 biggest_sell=10.2 SOL by 9Dun6vME at -92.1 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=150 buys=84 (30.6 SOL) sells=66 (29.8 SOL) wallets=105 biggest_sell=6.6 SOL by ARu4n5mF at +27.7 min
+== CATCRAFT 7mQDGtei kinds ['PRICE_SLOW'] liq_peak 184688
+   pre(-2h..-10m): n=358 buys=253 (28.5 SOL) sells=105 (40.8 SOL) wallets=158 biggest_sell=9.3 SOL by CZMtkQqH at -104.3 min
+   near(-10m..+1m): n=118 buys=38 (8.0 SOL) sells=80 (6.5 SOL) wallets=69 biggest_sell=1.9 SOL by EBLYRiap at -8.1 min
+   post(+1m..+30m): n=258 buys=180 (84.2 SOL) sells=78 (102.9 SOL) wallets=136 biggest_sell=9.3 SOL by GgzgiuVM at +10.3 min
+   near sellers top3: [('EBLYRiap', 1.9, 29), ('4vmw9chY', 0.3, 5), ('F5Xjnj9n', 0.3, 5)]
+== FLYPAD DYMBQ4FT kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 15639
+   pre(-2h..-10m): n=181 buys=110 (27.5 SOL) sells=71 (32.9 SOL) wallets=152 biggest_sell=2.4 SOL by pXGQ6J2z at -16.2 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+TWEETCRAFT 54TyDv21 kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== cage ETJJk6uP kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 1785
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=1 buys=0 (0.0 SOL) sells=1 (0.1 SOL) wallets=1 biggest_sell=0.1 SOL by 2xFktwd4 at +13.1 min
+GOMOCAT 2ddkUY8T kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== NEXUM 8AF4QPsx kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 16958
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=6 buys=5 (0.1 SOL) sells=1 (0.1 SOL) wallets=4 biggest_sell=0.1 SOL by 5nwYFhxh at +4.8 min
+BOND GPZFDYdd kinds ['PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+Wrap 5bf82Jz8 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== gem 3jA1KKnK kinds ['PRICE_SLOW'] liq_peak 33217
+   pre(-2h..-10m): n=332 buys=175 (74.0 SOL) sells=157 (74.3 SOL) wallets=235 biggest_sell=4.0 SOL by FhRn6CyC at -30.5 min
+   near(-10m..+1m): n=15 buys=6 (1.6 SOL) sells=9 (4.9 SOL) wallets=14 biggest_sell=2.2 SOL by 8zkgFGVZ at -9.7 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('8zkgFGVZ', 2.2, 44), ('BEvw9mQb', 1.8, 36), ('HJJ9T6rQ', 0.4, 9)]
+== XP 7rrriLXA kinds ['LIQ_FAST'] liq_peak 244972
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=2 buys=1 (0.0 SOL) sells=1 (0.0 SOL) wallets=2 biggest_sell=0.0 SOL by FUCKsEYx at +0.4 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('FUCKsEYx', 0.0, 100)]
+== IOF 3oKvxwy5 kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 1415496
+   pre(-2h..-10m): n=25 buys=23 (4.9 SOL) sells=2 (1.8 SOL) wallets=10 biggest_sell=1.2 SOL by FhWXWpRe at -26.5 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== TREEPAD EM5Rfnvv kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 19195
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=200 buys=133 (32.4 SOL) sells=67 (19.0 SOL) wallets=145 biggest_sell=1.8 SOL by Am1SFvdN at -5.9 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('Am1SFvdN', 1.8, 9), ('5g8mLoaE', 1.7, 9), ('HCtopau4', 1.5, 8)]
+== Higher 7g7VM9Hw kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 18000
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=111 buys=40 (4.1 SOL) sells=71 (7.9 SOL) wallets=59 biggest_sell=1.4 SOL by 8SYtTJfX at -6.0 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('8SYtTJfX', 1.4, 18), ('XdxgCivp', 1.0, 12), ('9oN7VoZg', 0.8, 10)]
+== ANTMIWOJ 2iaQyL9E kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 29740
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=6 buys=1 (0.0 SOL) sells=5 (0.0 SOL) wallets=5 biggest_sell=0.0 SOL by UMupqone at -0.2 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('UMupqone', 0.0, 40), ('ARu4n5mF', 0.0, 31), ('CGo2RfqQ', 0.0, 12)]
+== SGI 3SYRfaoe kinds ['PRICE_SLOW'] liq_peak 13071
+   pre(-2h..-10m): n=230 buys=134 (67.6 SOL) sells=96 (62.2 SOL) wallets=129 biggest_sell=11.9 SOL by 5YRgrP3m at -11.5 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+FLY J4AzHntu kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== NOBO 8DanH6yA kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 29736
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=5 buys=1 (1.0 SOL) sells=4 (4.3 SOL) wallets=5 biggest_sell=1.7 SOL by Df6mpH9q at -6.5 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('Df6mpH9q', 1.7, 41), ('Ajx4fm7n', 1.6, 38), ('zu4VaL8E', 0.7, 15)]
+== GOIF AzfHgMbz kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 1836390
+   pre(-2h..-10m): n=64 buys=63 (5.6 SOL) sells=1 (1.1 SOL) wallets=64 biggest_sell=1.1 SOL by 4NA1SWzb at -42.7 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== DOTF HYZCigd7 kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 1929657
+   pre(-2h..-10m): n=24 buys=23 (2.0 SOL) sells=1 (1.6 SOL) wallets=24 biggest_sell=1.6 SOL by 4NA1SWzb at -100.6 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== Gitretriever 8LaCaQb7 kinds ['PRICE_SLOW'] liq_peak 20890
+   pre(-2h..-10m): n=617 buys=352 (94.1 SOL) sells=265 (96.2 SOL) wallets=380 biggest_sell=5.5 SOL by CaaEoz18 at -20.0 min
+   near(-10m..+1m): n=52 buys=21 (6.1 SOL) sells=31 (13.2 SOL) wallets=52 biggest_sell=2.9 SOL by BPWG71U7 at -9.8 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('BPWG71U7', 2.9, 22), ('DG74sgy5', 1.5, 11), ('378CuxVQ', 1.3, 10)]
+BULLCRAFT EGHZxFBb kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+UDR 8TSAcyiP kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== SharkTank 65GHmCby kinds ['PRICE_SLOW'] liq_peak 94520
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=34 buys=16 (5.3 SOL) sells=18 (8.4 SOL) wallets=29 biggest_sell=1.7 SOL by 9YrZvcC6 at -0.5 min
+   post(+1m..+30m): n=4 buys=2 (0.1 SOL) sells=2 (0.2 SOL) wallets=4 biggest_sell=0.1 SOL by E84bqTUd at +5.9 min
+   near sellers top3: [('9YrZvcC6', 1.7, 21), ('BqNFKfMr', 1.3, 16), ('E84bqTUd', 0.9, 11)]
+== PumpOG CatiRucx kinds ['PRICE_SLOW'] liq_peak 23394
+   pre(-2h..-10m): n=106 buys=65 (24.4 SOL) sells=41 (26.4 SOL) wallets=86 biggest_sell=5.5 SOL by 7aCYTnqt at -17.0 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== Heist 3PqGrGpR kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 21235
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=44 buys=9 (2.4 SOL) sells=35 (3.0 SOL) wallets=42 biggest_sell=0.4 SOL by 2NDYEAwu at +0.1 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('2NDYEAwu', 0.4, 14), ('zodiac2v', 0.4, 13), ('5uA5SaRf', 0.4, 12)]
+VSOF VFy2QcKA kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== Anthropic DaQs1pBC kinds ['LIQ_FAST'] liq_peak 370848
+   pre(-2h..-10m): n=1 buys=1 (0.0 SOL) sells=0 (0.0 SOL) wallets=1 biggest_sell=-
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== Topless FHN1mENc kinds ['PRICE_SLOW'] liq_peak 21087
+   pre(-2h..-10m): n=312 buys=194 (55.8 SOL) sells=118 (40.1 SOL) wallets=223 biggest_sell=3.8 SOL by 8BZMQ2EK at -28.7 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== Clubhouse 41ndvvkX kinds ['PRICE_SLOW'] liq_peak 20552
+   pre(-2h..-10m): n=89 buys=47 (23.0 SOL) sells=42 (19.6 SOL) wallets=69 biggest_sell=5.8 SOL by P7Lchfcg at -15.9 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== BOZ 63Pver9B kinds ['PRICE_SLOW'] liq_peak 17669
+   pre(-2h..-10m): n=34 buys=19 (1.5 SOL) sells=15 (2.9 SOL) wallets=32 biggest_sell=0.8 SOL by 5aEGb8CS at -14.0 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+TON618 34w9ReB7 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+SpaceXSI 282Ka3TZ kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+BABYBATON 7EFyp2o6 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== HUMAN FKcNmNnn kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 39455
+   pre(-2h..-10m): n=278 buys=189 (86.9 SOL) sells=89 (75.2 SOL) wallets=161 biggest_sell=5.0 SOL by 9nc7bfun at -16.3 min
+   near(-10m..+1m): n=259 buys=180 (38.6 SOL) sells=79 (20.0 SOL) wallets=125 biggest_sell=4.9 SOL by C9Fqp6Z1 at -6.1 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('C9Fqp6Z1', 4.9, 25), ('DAEbfQna', 4.7, 23), ('3jRy9hXP', 4.1, 20)]
+Colony HZMDy5MU kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+knightcat 7puXhhDF kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== findr 6NDDPXBU kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 18831
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=194 buys=125 (31.9 SOL) sells=69 (42.7 SOL) wallets=156 biggest_sell=5.1 SOL by FM1YCKED at -4.6 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('FM1YCKED', 5.1, 12), ('8ftXJiJK', 3.4, 8), ('8TZousGX', 2.7, 6)]
+== SIC HTHpTANu kinds ['LIQ_FAST'] liq_peak 46641
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=2 buys=1 (0.1 SOL) sells=1 (0.0 SOL) wallets=2 biggest_sell=0.0 SOL by EKh5yQvG at -0.5 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('EKh5yQvG', 0.0, 100)]
+== DARK 3SxiPS9W kinds ['LIQ_FAST'] liq_peak 25097
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=2 buys=2 (0.1 SOL) sells=0 (0.0 SOL) wallets=2 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+D O T F Bmc7xtro kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== DIAMONDANT 6B4sAoGv kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 62527
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=36 buys=34 (3.6 SOL) sells=2 (0.0 SOL) wallets=36 biggest_sell=0.0 SOL by BkPvrE8u at -9.5 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('BkPvrE8u', 0.0, 63), ('2hjrBmyi', 0.0, 37)]
+BORDR Cu1k3vfU kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== 七仔 BuuCADrj kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 22607
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=170 buys=92 (29.2 SOL) sells=78 (27.0 SOL) wallets=140 biggest_sell=1.5 SOL by 5qp6MjGJ at -6.1 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('5qp6MjGJ', 1.5, 6), ('B1QesfSx', 1.5, 6), ('B4VNbMjF', 1.5, 5)]
+== AnyPS5 GV5G2ZGz kinds ['PRICE_SLOW'] liq_peak 91494
+   pre(-2h..-10m): n=5 buys=4 (1.1 SOL) sells=1 (0.0 SOL) wallets=3 biggest_sell=0.0 SOL by 26ZWyf56 at -85.4 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== SharkTank 6zPBL2oc kinds ['LIQ_FAST'] liq_peak 236873
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=1 buys=1 (0.0 SOL) sells=0 (0.0 SOL) wallets=1 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+== sam CqS2pBK3 kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 21077
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=18 buys=5 (26.9 SOL) sells=13 (266.9 SOL) wallets=13 biggest_sell=137.2 SOL by F2ad5jZj at +6.7 min
+== sam CmenZu6t kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 28545
+   pre(-2h..-10m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near(-10m..+1m): n=11 buys=4 (0.1 SOL) sells=7 (2.1 SOL) wallets=10 biggest_sell=0.6 SOL by AyNWXhor at -3.5 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('AyNWXhor', 0.6, 27), ('12g4eKXz', 0.5, 26), ('CKcWAvvD', 0.5, 24)]
+PAYBACK BZJYVTWg kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+Gpgbot 2LTT14Wa kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+== OURA Fm6tVXcH kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] liq_peak 224135
+   pre(-2h..-10m): n=292 buys=177 (39.1 SOL) sells=115 (34.8 SOL) wallets=12 biggest_sell=0.4 SOL by F2XXRDHt at -68.6 min
+   near(-10m..+1m): n=38 buys=23 (5.6 SOL) sells=15 (4.3 SOL) wallets=10 biggest_sell=0.4 SOL by 3JCMYr3L at -2.8 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('HBgV3vvR', 0.6, 15), ('3JCMYr3L', 0.6, 15), ('F2XXRDHt', 0.6, 14)]
+TITS 3aogJsYU kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason None
+CORES 8fkn2K7n kinds ['LIQ_FAST', 'PRICE_FAST', 'PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+SharkTank CRGN2uGj kinds ['LIQ_FAST'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+GOMO 5a7QurJL kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason PAGINATION_PENDING
+== Tincan 4sVitrei kinds ['PRICE_SLOW'] liq_peak 44934
+   pre(-2h..-10m): n=286 buys=171 (61.2 SOL) sells=115 (63.4 SOL) wallets=236 biggest_sell=5.4 SOL by AMjSpr8r at -28.2 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=30 buys=13 (0.8 SOL) sells=17 (10.0 SOL) wallets=25 biggest_sell=4.0 SOL by EBjPNCDY at +20.4 min
+== MOGCAT 2WFm4D9u kinds ['PRICE_FAST', 'PRICE_SLOW'] liq_peak 22536
+   pre(-2h..-10m): n=386 buys=238 (61.2 SOL) sells=148 (46.0 SOL) wallets=261 biggest_sell=3.4 SOL by 3Yg4yzZf at -23.5 min
+   near(-10m..+1m): n=340 buys=179 (32.8 SOL) sells=161 (48.3 SOL) wallets=203 biggest_sell=4.1 SOL by EY8yPRNU at -9.2 min
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   near sellers top3: [('GS9DFEYa', 5.3, 11), ('CvHSYvRb', 4.6, 9), ('ARu4n5mF', 4.2, 9)]
+C3PO Gb79ZGP9 kinds ['PRICE_SLOW'] no tape events in [-2h,+30m] tape reason None
+== iCoin 7oHDsL98 kinds ['PRICE_SLOW'] liq_peak 46668
+   pre(-2h..-10m): n=318 buys=180 (44.0 SOL) sells=138 (54.5 SOL) wallets=244 biggest_sell=5.3 SOL by He4THuAW at -31.9 min
+   near(-10m..+1m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+   post(+1m..+30m): n=0 buys=0 (0.0 SOL) sells=0 (0.0 SOL) wallets=0 biggest_sell=-
+drained pairs with tape events around the drain 73

@@ -1,0 +1,439 @@
+[
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 08:29:40",
+  "hold_s": 68,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": 1.33,
+  "pnl_usd": 2.66,
+  "market_move_pct": 3.2,
+  "entry_rt_pct": -1.1992,
+  "entry_impact": 0.132,
+  "exit_impact": 0.752,
+  "liq_change_pct": 1.58,
+  "cf_5_10_60": [
+   -12.42,
+   "STOP",
+   14.7
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 07:58:20",
+  "hold_s": 286,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": 0.18,
+  "pnl_usd": 0.37,
+  "market_move_pct": 1.62,
+  "entry_rt_pct": -1.0067,
+  "entry_impact": 0.191,
+  "exit_impact": 0.78,
+  "liq_change_pct": 0.77,
+  "cf_5_10_60": [
+   10.07,
+   "TP",
+   13.5
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 05:42:37",
+  "hold_s": 966,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -2.07,
+  "pnl_usd": -4.14,
+  "market_move_pct": 1.03,
+  "entry_rt_pct": -1.011,
+  "entry_impact": 0.131,
+  "exit_impact": 0.91,
+  "liq_change_pct": 0.5,
+  "cf_5_10_60": [
+   -8.27,
+   "STOP",
+   43.2
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "CRAWL",
+  "opened": "10-08 05:43:14",
+  "hold_s": 275,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -0.3,
+  "pnl_usd": -0.15,
+  "market_move_pct": 0.29,
+  "entry_rt_pct": -0.8795,
+  "entry_impact": 0.521,
+  "exit_impact": 1.158,
+  "liq_change_pct": 0.15,
+  "cf_5_10_60": [
+   11.58,
+   "TP",
+   11.0
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 04:53:15",
+  "hold_s": 44,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -2.96,
+  "pnl_usd": -5.92,
+  "market_move_pct": -0.1,
+  "entry_rt_pct": -1.1477,
+  "entry_impact": 0.154,
+  "exit_impact": 0.759,
+  "liq_change_pct": -0.03,
+  "cf_5_10_60": [
+   -5.22,
+   "STOP",
+   3.7
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 03:43:46",
+  "hold_s": 986,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -4.67,
+  "pnl_usd": -9.34,
+  "market_move_pct": -0.11,
+  "entry_rt_pct": -1.0899,
+  "entry_impact": 0.182,
+  "exit_impact": 0.926,
+  "liq_change_pct": 0.06,
+  "cf_5_10_60": [
+   10.28,
+   "TP",
+   37.5
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 01:38:44",
+  "hold_s": 3501,
+  "exit": "STALE_MARKET_EXIT",
+  "pnl_pct": -8.84,
+  "pnl_usd": -17.68,
+  "market_move_pct": 0.29,
+  "entry_rt_pct": -1.0636,
+  "entry_impact": 0.648,
+  "exit_impact": 0.606,
+  "liq_change_pct": 0.14,
+  "cf_5_10_60": [
+   -8.53,
+   "STOP",
+   58.4
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 00:56:19",
+  "hold_s": 443,
+  "exit": "STOP_LOSS_NET_TARGET",
+  "pnl_pct": -5.09,
+  "pnl_usd": -10.18,
+  "market_move_pct": -1.7,
+  "entry_rt_pct": -0.7755,
+  "entry_impact": 0.545,
+  "exit_impact": 0.488,
+  "liq_change_pct": -0.78,
+  "cf_5_10_60": [
+   -5.62,
+   "STOP",
+   8.0
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-08 00:14:06",
+  "hold_s": 1271,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -0.82,
+  "pnl_usd": -1.64,
+  "market_move_pct": 0.95,
+  "entry_rt_pct": -1.0973,
+  "entry_impact": 0.618,
+  "exit_impact": 1.171,
+  "liq_change_pct": 0.41,
+  "cf_5_10_60": [
+   -5.03,
+   "STOP",
+   28.9
+  ]
+ },
+ {
+  "acct": "main",
+  "sym": "swordinu",
+  "opened": "10-07 21:41:38",
+  "hold_s": 272,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -3.48,
+  "pnl_usd": -6.96,
+  "market_move_pct": -2.47,
+  "entry_rt_pct": -1.2278,
+  "entry_impact": 0.099,
+  "exit_impact": 0.87,
+  "liq_change_pct": -1.22,
+  "cf_5_10_60": [
+   -5.69,
+   "STOP",
+   8.1
+  ]
+ },
+ {
+  "acct": "ofa_18801",
+  "sym": "swordinu",
+  "opened": "10-08 00:53:40",
+  "hold_s": 2,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.0,
+  "pnl_usd": -2.01,
+  "market_move_pct": 0,
+  "entry_rt_pct": -0.9093,
+  "entry_impact": 0,
+  "exit_impact": 0.76,
+  "liq_change_pct": 0.0,
+  "cf_5_10_60": [
+   -5.3,
+   "STOP",
+   10.6
+  ]
+ },
+ {
+  "acct": "ofa_18801",
+  "sym": "swordinu",
+  "opened": "10-07 21:40:03",
+  "hold_s": 37,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -0.48,
+  "pnl_usd": -0.96,
+  "market_move_pct": 0.1,
+  "entry_rt_pct": -1.2,
+  "entry_impact": 0.124,
+  "exit_impact": 0.992,
+  "liq_change_pct": -0.01,
+  "cf_5_10_60": [
+   -5.2,
+   "STOP",
+   9.7
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 08:11:40",
+  "hold_s": 337,
+  "exit": "STOP_LOSS_NET_TARGET",
+  "pnl_pct": -5.01,
+  "pnl_usd": -10.01,
+  "market_move_pct": -1.07,
+  "entry_rt_pct": -1.0901,
+  "entry_impact": 0.19,
+  "exit_impact": 0.465,
+  "liq_change_pct": -0.45,
+  "cf_5_10_60": [
+   -6.92,
+   "STOP",
+   11.8
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "MISTAKE",
+  "opened": "10-08 06:58:48",
+  "hold_s": 718,
+  "exit": "TAKE_PROFIT_10_NET",
+  "pnl_pct": 10.15,
+  "pnl_usd": 5.08,
+  "market_move_pct": 12.75,
+  "entry_rt_pct": -1.494,
+  "entry_impact": 1.047,
+  "exit_impact": 0.893,
+  "liq_change_pct": 6.23,
+  "cf_5_10_60": [
+   10.78,
+   "TP",
+   11.7
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 07:04:15",
+  "hold_s": 4,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.01,
+  "pnl_usd": -2.03,
+  "market_move_pct": -0.5,
+  "entry_rt_pct": -1.21,
+  "entry_impact": 0,
+  "exit_impact": 0.793,
+  "liq_change_pct": -0.27,
+  "cf_5_10_60": [
+   -5.04,
+   "STOP",
+   11.1
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 06:33:54",
+  "hold_s": 302,
+  "exit": "STOP_LOSS_NET_TARGET",
+  "pnl_pct": -5.01,
+  "pnl_usd": -10.03,
+  "market_move_pct": -2.2,
+  "entry_rt_pct": -1.118,
+  "entry_impact": 0.559,
+  "exit_impact": 0.632,
+  "liq_change_pct": -1.09,
+  "cf_5_10_60": [
+   -6.61,
+   "STOP",
+   5.6
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 06:04:47",
+  "hold_s": 26,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -0.5,
+  "pnl_usd": -1.0,
+  "market_move_pct": 1.28,
+  "entry_rt_pct": -1.007,
+  "entry_impact": 0.066,
+  "exit_impact": 0.763,
+  "liq_change_pct": 0.59,
+  "cf_5_10_60": [
+   -5.73,
+   "STOP",
+   19.4
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 04:55:31",
+  "hold_s": 106,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.79,
+  "pnl_usd": -3.57,
+  "market_move_pct": -0.37,
+  "entry_rt_pct": -1.0409,
+  "entry_impact": 0.136,
+  "exit_impact": 0.834,
+  "liq_change_pct": -0.19,
+  "cf_5_10_60": [
+   -5.22,
+   "STOP",
+   25.5
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 04:18:33",
+  "hold_s": 42,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -0.73,
+  "pnl_usd": -1.46,
+  "market_move_pct": 1.07,
+  "entry_rt_pct": -1.1002,
+  "entry_impact": 0.197,
+  "exit_impact": 0.758,
+  "liq_change_pct": 0.54,
+  "cf_5_10_60": [
+   -5.25,
+   "STOP",
+   20.8
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 03:43:17",
+  "hold_s": 2,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.49,
+  "pnl_usd": -2.97,
+  "market_move_pct": 0,
+  "entry_rt_pct": -1.0156,
+  "entry_impact": 0.2,
+  "exit_impact": 0.801,
+  "liq_change_pct": 0.0,
+  "cf_5_10_60": [
+   10.28,
+   "TP",
+   38.0
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 01:37:36",
+  "hold_s": 44,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.88,
+  "pnl_usd": -3.77,
+  "market_move_pct": 0.33,
+  "entry_rt_pct": -1.0962,
+  "entry_impact": 0.163,
+  "exit_impact": 0.901,
+  "liq_change_pct": 0.16,
+  "cf_5_10_60": [
+   -8.75,
+   "STOP",
+   59.5
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-08 00:53:27",
+  "hold_s": 7,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -1.05,
+  "pnl_usd": -2.09,
+  "market_move_pct": 0,
+  "entry_rt_pct": -1.1077,
+  "entry_impact": 0.023,
+  "exit_impact": 0.756,
+  "liq_change_pct": 0.0,
+  "cf_5_10_60": [
+   -5.3,
+   "STOP",
+   10.9
+  ]
+ },
+ {
+  "acct": "cf_18802",
+  "sym": "swordinu",
+  "opened": "10-07 22:22:59",
+  "hold_s": 1166,
+  "exit": "EXIT_IMPACT_EMERGENCY",
+  "pnl_pct": -3.21,
+  "pnl_usd": -6.43,
+  "market_move_pct": -0.05,
+  "entry_rt_pct": -1.1399,
+  "entry_impact": 0.443,
+  "exit_impact": 1.001,
+  "liq_change_pct": -0.15,
+  "cf_5_10_60": [
+   -6.05,
+   "STOP",
+   33.6
+  ]
+ }
+]

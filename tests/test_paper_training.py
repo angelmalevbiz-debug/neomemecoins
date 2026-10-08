@@ -1,9 +1,11 @@
 """Synthetic correctness fixtures ONLY; they do not establish trading edge."""
 import copy
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -99,6 +101,101 @@ class PaperTrainingTests(unittest.TestCase):
             paper_training.atomic_json(self.path, {"checkpoint": "complete"})
         self.assertEqual(len(attempts), 4)
         self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), {"checkpoint": "complete"})
+
+    def abandoned_temporary(self, age_seconds, directory=None):
+        # Named by tempfile itself, exactly as atomic_json names its copy, so
+        # the sweep's name pattern is checked against the real generator.
+        fd, name = tempfile.mkstemp(prefix=".training.json", dir=directory or self.path.parent)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write('{"partial": ')
+        stamp = time.time() - age_seconds
+        os.utime(name, (stamp, stamp))
+        return Path(name)
+
+    def temporaries(self):
+        return sorted(p.name for p in self.path.parent.iterdir()
+                      if p.name.startswith(".training.json") and p.is_file())
+
+    def test_interrupted_checkpoint_write_removes_its_temporary(self):
+        paper_training.atomic_json(self.path, {"checkpoint": "previous"})
+        with patch.object(paper_training.os, "fsync", side_effect=KeyboardInterrupt):
+            with self.assertRaises(KeyboardInterrupt):
+                paper_training.atomic_json(self.path, {"checkpoint": "partial"})
+        self.assertEqual(self.temporaries(), [])
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), {"checkpoint": "previous"})
+
+    def test_exhausted_replace_retries_remove_the_temporary(self):
+        with patch.object(paper_training.os, "replace", side_effect=PermissionError("held")), \
+                patch.object(paper_training.time, "sleep"):
+            with self.assertRaises(PermissionError):
+                paper_training.atomic_json(self.path, {"checkpoint": "complete"})
+        self.assertEqual(self.temporaries(), [])
+        self.assertFalse(self.path.exists())
+
+    def test_temporary_cleanup_failure_never_masks_the_write_error(self):
+        with patch.object(paper_training.os, "replace", side_effect=OSError(28, "No space left on device")), \
+                patch.object(paper_training.os, "unlink", side_effect=PermissionError("scanner holds it")) as unlink, \
+                patch.object(paper_training.time, "sleep"):
+            with self.assertRaises(OSError) as raised:
+                paper_training.atomic_json(self.path, {"checkpoint": "complete"})
+        self.assertNotIsInstance(raised.exception, PermissionError)
+        self.assertEqual(raised.exception.errno, 28)
+        self.assertEqual(unlink.call_count, 5)
+        # The copy cleanup could not remove is reclaimed once it is stale.
+        [leftover] = self.temporaries()
+        self.assertEqual(paper_training.remove_stale_temp_files(self.path), [])
+        stamp = time.time() - paper_training.STALE_TEMP_SECONDS - 1
+        os.utime(self.path.parent / leftover, (stamp, stamp))
+        self.assertEqual(paper_training.remove_stale_temp_files(self.path), [leftover])
+        self.assertEqual(self.temporaries(), [])
+
+    def test_engine_start_reclaims_only_stale_temporaries_of_its_own_checkpoint(self):
+        self.engine()
+        directory = self.path.parent
+        stale = [self.abandoned_temporary(paper_training.STALE_TEMP_SECONDS + 60) for _ in range(3)]
+        in_flight = self.abandoned_temporary(30)
+        (directory / "archive").mkdir()
+        other_directory = self.abandoned_temporary(paper_training.STALE_TEMP_SECONDS + 60,
+                                                   directory=directory / "archive")
+        kept = ["observations.jsonl", ".training_snapshot.json.abcdefgh.tmp",
+                ".training.json.abcdefgh.tmp", ".training.jsonabcdefg", ".training.jsonabcdefghi",
+                ".training.json.bak", ".reset-training-0123.json"]
+        old = time.time() - 10 * paper_training.STALE_TEMP_SECONDS
+        for name in kept:
+            (directory / name).write_text("{}\n", encoding="utf-8")
+            os.utime(directory / name, (old, old))
+        (directory / ".training.jsonzzzzzzzz").mkdir()
+        os.utime(directory / ".training.jsonzzzzzzzz", (old, old))
+        os.utime(self.path, (old, old))
+        checkpoint = json.loads(self.path.read_text(encoding="utf-8"))
+
+        e = self.engine()
+
+        self.assertFalse(any(path.exists() for path in stale))
+        self.assertTrue(in_flight.exists())
+        self.assertTrue(other_directory.exists())
+        for name in kept:
+            self.assertTrue((directory / name).exists(), name)
+        self.assertTrue((directory / ".training.jsonzzzzzzzz").is_dir())
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), checkpoint)
+        self.assertEqual(e.state, checkpoint)
+        self.assertEqual(paper_training.remove_stale_temp_files(directory / "missing" / "training.json"), [])
+
+    def test_saves_reclaim_a_temporary_abandoned_just_before_start(self):
+        # The restart's own kill leaves a copy too young for the start sweep.
+        e = self.engine()
+        abandoned = self.abandoned_temporary(30)
+        e.save()
+        stamp = time.time() - paper_training.STALE_TEMP_SECONDS - 1
+        os.utime(abandoned, (stamp, stamp))
+        e.save()
+        self.assertTrue(abandoned.exists())  # at most one sweep per interval
+        due = e._next_temp_sweep
+        with patch.object(paper_training.time, "monotonic", return_value=due):
+            e.save()
+        self.assertFalse(abandoned.exists())
+        self.assertEqual(e._next_temp_sweep, due + paper_training.STALE_TEMP_SECONDS)
+        self.assertEqual(json.loads(self.path.read_text(encoding="utf-8")), e.state)
 
     def test_next_observation_and_latency_no_favourable_stale_fill(self):
         e = self.engine()

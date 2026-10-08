@@ -97,3 +97,21 @@ export function percentageOrUnavailable(value: number | undefined): string {
 export function tokenDetailForAddress<T extends { coin: { address: string } }>(detail: T | null, address: string): T | null {
   return detail?.coin.address === address ? detail : null;
 }
+
+export type QuotePreparationDiagnostics = {
+  quote_attempts?: number; quote_defers?: number;
+  quote_preparation_codes?: Record<string, number>; quote_preparation_codes_rolling?: Record<string, number>;
+  quote_preparation_rolling_scans?: number; quote_preparation_rolling_window_minutes?: number;
+  quote_preparation_codes_lifetime?: Record<string, number>; quote_preparation_lifetime_scope?: string;
+};
+
+/** Failed quote preparations: counts since engine start (not persisted) with this scan and the rolling time window. */
+export function quotePreparationSummary(diagnostics?: QuotePreparationDiagnostics | null, limit = 6): string {
+  const lifetime = Object.entries(diagnostics?.quote_preparation_codes_lifetime || {}).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  if (!lifetime.length) return '';
+  const minutes = diagnostics?.quote_preparation_rolling_window_minutes;
+  const window = typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0 ? `последните ${minutes} мин` : 'последния прозорец';
+  const codes = lifetime.map(([code, count]) => `${code} ${count} (${diagnostics?.quote_preparation_codes?.[code] ?? 0} / ${diagnostics?.quote_preparation_codes_rolling?.[code] ?? 0})`).join(' · ');
+  return `Неуспешни подготовки на котировки от старта на engine-а, без запазване при рестарт (това сканиране / ${window}, ${diagnostics?.quote_preparation_rolling_scans ?? 0} сканирания с откази): ${codes}. `
+    + `Отложени заради чужд entry lease или чакащ изход: ${diagnostics?.quote_defers ?? 0} (не се броят към бюджета от ${diagnostics?.quote_attempts ?? 0} проверки).`;
+}

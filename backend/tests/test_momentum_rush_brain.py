@@ -30,6 +30,13 @@ def coin(stamp=NOW, price=1.02, **changes):
 
 FLOW = {'trades': 8, 'buys': 6, 'sells': 2, 'ratio': 4, 'buy_usd': 800,
         'sell_usd': 100, 'unique_wallets': 6, 'max_sell': 50}
+# LAB_ACTIVE_V6 admits at most a 1.5% modeled round trip. A $60 low-cap entry
+# on $12k liquidity costs ~3%, so runner fixtures that must open use $60k.
+RUNNER_LIQUIDITY_USD = 60_000
+
+
+def runner_coin(stamp=NOW, price=1.02, **changes):
+    return coin(stamp, price, liquidityUsd=RUNNER_LIQUIDITY_USD, **changes)
 
 
 def features(c=None):
@@ -211,12 +218,12 @@ class RushRunnerTests(unittest.TestCase):
     def warmup(self):
         for stamp, price in ((NOW - 16_000, 1), (NOW - 8_000, 1.005)):
             with patch.object(lab, 'now_ms', return_value=stamp):
-                lab.maybe_open([coin(stamp, price)], {(MINT, PAIR): copy.deepcopy(FLOW)})
+                lab.maybe_open([runner_coin(stamp, price)], {(MINT, PAIR): copy.deepcopy(FLOW)})
         self.assertIsNone(self.book['position'])
 
     def open(self, c=None):
         with patch.object(lab, 'now_ms', return_value=NOW):
-            lab.maybe_open([c or coin()], {(MINT, PAIR): copy.deepcopy(FLOW)})
+            lab.maybe_open([c or runner_coin()], {(MINT, PAIR): copy.deepcopy(FLOW)})
 
     def test_registered_runnable_test_book_opens_and_keeps_promoted_books_independent(self):
         self.assertEqual(set(activity.RULES), {s['id'] for s in lab.STRATEGIES})
@@ -231,7 +238,8 @@ class RushRunnerTests(unittest.TestCase):
         self.assertFalse(position['promotion_eligible'])
         self.assertTrue(position['momentum_rush_brain']['allow'])
         self.assertLessEqual(position['notional_usd'], 60)
-        self.assertGreaterEqual(position['entry_roundtrip_pnl_pct'], -activity.MAX_ENTRY_COST_PCT)
+        self.assertGreaterEqual(position['entry_roundtrip_pnl_pct'], -activity.admission_cost_cap_pct(lab.STOP_LOSS))
+        self.assertEqual(position['entry_cost_cap_pct'], 1.5)
         self.assertLess(position['open_pnl_usd'], 0)
         self.assertEqual(self.book['balance'], self.book['starting_balance'])
         self.assertEqual(before, {key: self.books[key] for key in lab.PROMOTED_STRATEGIES})
@@ -245,10 +253,10 @@ class RushRunnerTests(unittest.TestCase):
     def warmup_without_position_assertion(self):
         for stamp, price in ((NOW - 16_000, 1), (NOW - 8_000, 1.005)):
             with patch.object(lab, 'now_ms', return_value=stamp):
-                lab.maybe_open([coin(stamp, price)], {(MINT, PAIR): copy.deepcopy(FLOW)})
+                lab.maybe_open([runner_coin(stamp, price)], {(MINT, PAIR): copy.deepcopy(FLOW)})
 
     def test_future_feed_snapshot_cannot_open_a_rush_trade(self):
-        self.warmup(); self.open(coin(NOW + 1))
+        self.warmup(); self.open(runner_coin(NOW + 1))
         self.assertIsNone(self.book['position'])
         self.assertEqual(self.book['entry_diagnostics']['blocked_reason'], 'temporal_warmup')
 

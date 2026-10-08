@@ -122,12 +122,27 @@ def entry_enabled(book):
     return not (isinstance(marker, dict) and marker.get('status') == 'retired')
 
 
+def accepted_activity_version(key, activity_version, activity_versions=None):
+    """Entry-policy version whose closes count as evidence for one book.
+
+    Books that stamp their own entry policy (for example the COST_FIRST pair)
+    are compared against that version; every other book uses the shared one.
+    """
+    if isinstance(activity_versions, dict):
+        version = activity_versions.get(key)
+        if isinstance(version, str) and version:
+            return version
+    return activity_version
+
+
 def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
-                    execution_version, now):
+                    execution_version, now, activity_versions=None):
     """Annotate entries; never alter money, trades, positions or registration.
 
     A retirement remains in place after restart and does not expire on a timer.
-    Re-enabling it requires an explicit reviewed policy change.
+    Re-enabling it requires an explicit reviewed policy change. activity_versions
+    maps a book id to the entry-policy version its own closes carry, so a book
+    with its own policy is judged by exactly the same rules on its own rows.
     """
     retired = []
     active = []
@@ -144,8 +159,9 @@ def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
             active.append(key)
             continue
         else:
-            evidence = observed_evidence(book, activity_version=activity_version,
-                                         execution_version=execution_version, now=now)
+            evidence = observed_evidence(
+                book, activity_version=accepted_activity_version(key, activity_version, activity_versions),
+                execution_version=execution_version, now=now)
             rejected = evidence['repeated_losses']
             marker = {'version': VERSION, 'status': 'retired' if rejected else 'active',
                       'entry_enabled': not rejected, 'position_management_enabled': True,
@@ -168,6 +184,10 @@ def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
                    'minimum_unique_closed_trades_if_all_losses': MIN_ALL_LOSS_TRADES,
                    'maximum_win_rate_upper_bound_95': MAX_WIN_RATE_UPPER_BOUND,
                    'negative_total_and_both_chronological_halves_required': True,
-                   'activity_version': activity_version, 'execution_version': execution_version,
+                   'activity_version': activity_version,
+                   'activity_versions_by_strategy': {
+                       key: version for key, version in sorted((activity_versions or {}).items())
+                       if key in registered_ids and isinstance(version, str) and version},
+                   'execution_version': execution_version,
                    'promoted_cohort_exempt': True, 'automatic_reactivation': False},
     }

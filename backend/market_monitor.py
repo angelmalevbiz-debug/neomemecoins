@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import copy, hashlib, json, math, os, re, shutil, threading, time, uuid
+from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from datetime import datetime
@@ -49,6 +50,26 @@ STOP_LOSS_PCT = 5.0
 STOP_EXECUTION_BUFFER_PCT = 0.5  # Planned risk allowance, never a fill clamp.
 STOP_EXECUTION_ARM_NET_PCT = 5.0
 EXIT_IMPACT_EMERGENCY_PCT = 0.75
+# Forensics only (the exit rule itself is unchanged): the sell quote that fired
+# EXIT_IMPACT_EMERGENCY, the confirming re-quote, the entry preflight impacts and
+# liquidity at entry versus exit are recorded on every such close.
+EXIT_IMPACT_EMERGENCY_ENTRY_MARGIN_PCT = 0.50
+EXIT_IMPACT_EMERGENCY_FORENSICS_VERSION = 'EXIT_IMPACT_EMERGENCY_FORENSICS_V1'
+# A cross-process entry-lease or exit-priority defer is not a quote: it neither
+# consumes the per-scan quote budget nor arms the per-token retry cooldown.
+QUOTE_PREPARATION_DEFER_CODES = frozenset({'ENTRY_SEQUENCE_BUSY', 'EXIT_PRIORITY_PENDING'})
+QUOTE_PREPARATION_ROLLING_WINDOW_MS = 60 * 60_000  # rolling histogram covers the last 60 minutes
+QUOTE_PREPARATION_ROLLING_MAX_SCANS = 4096          # memory bound on scans kept inside that window
+QUOTE_PREPARATION_MAX_CODES = 32        # distinct codes per histogram; extras fold into OTHER
+# Per-failure rows are diagnostics, not ledger evidence: they go to a size-capped
+# sidecar next to AUDIT_PATH (plain append, no fsync, never under STATE.lock), at
+# most one row per (pair, code) per QUOTE_RETRY_COOLDOWN_MS and a few per scan.
+# audit.jsonl receives no per-failure rows; the in-memory histograms stay complete.
+QUOTE_PREPARATION_LOG_NAME = 'quote_preparation.jsonl'
+QUOTE_PREPARATION_LOG_MAX_BYTES = 5 * 1024 * 1024
+QUOTE_PREPARATION_LOG_PER_SCAN = 12
+QUOTE_PREPARATION_LOG_RATE_KEYS = 4096
+QUOTE_PREPARATION_LOG_LOCK = threading.Lock()
 TAKE_PROFIT_PCT = 10.0
 TRAILING_PCT = 4.0
 MAX_HOLD_MINUTES = 60
@@ -351,8 +372,74 @@ def compact_public_trade(trade: dict[str, Any]) -> dict[str, Any]:
         'exit_policy_version', 'signal_pnl_pct', 'entry_roundtrip_pnl_pct',
         'observed_exit_pnl_pct', 'observed_exit_pnl_usd', 'paper_stop_capped',
         'stop_execution_source',
+        # Exit forensics (numbers only; raw provider quotes stay private).
+        'entry_price_impact_pct', 'exit_price_impact_pct', 'entry_liquidity_usd',
+        'exit_liquidity_usd', 'exit_route_matches_entry_pool', 'exit_impact_emergency',
     )
     return {field: trade.get(field) for field in fields if field in trade}
+
+
+def abbreviate_address(value: Any) -> str:
+    """Short pool/mint label for logs and audit rows; full addresses stay in fields."""
+    text = str(value or '')
+    return text if len(text) <= 12 else f'{text[:4]}…{text[-4:]}'
+
+
+def _raw_quote_impact_pct(raw_quote: Any) -> float | None:
+    """Percent impact from a stored raw provider quote (fraction string), else None."""
+    try:
+        value = float((raw_quote or {}).get('priceImpactPct')) * 100
+    except (TypeError, ValueError, AttributeError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def compact_exit_quote_evidence(quote: dict[str, Any]) -> dict[str, Any]:
+    """Numbers and route pools of one sell quote; never the raw provider payload."""
+    pools: list[str] = []
+    route = quote.get('route')
+    for leg in route if isinstance(route, list) else []:
+        key = leg.get('ammKey') if isinstance(leg, dict) else None
+        if key and key not in pools:
+            pools.append(str(key))
+    return {'impact_pct': num(quote.get('impact_pct')), 'quoted_at': quote.get('quoted_at'),
+            'route_pools': pools, 'route_matches_entry_pool': quote.get('route_matches_entry_pool'),
+            'from_cache': bool(quote.get('from_cache')), 'execution_source': quote.get('execution_source'),
+            'net_proceeds_usd': quote.get('net_proceeds_usd'), 'context_slot': quote.get('context_slot'),
+            'quote_age_ms': quote.get('quote_age_ms'), 'queue_ms': quote.get('queue_ms'),
+            'http_ms': quote.get('http_ms')}
+
+
+def exit_impact_emergency_record(position: dict[str, Any], quote: dict[str, Any], coin: dict[str, Any],
+                                 threshold_pct: float, now: int, *, trigger_is_requote: bool = False) -> dict[str, Any]:
+    """Evidence for one EXIT_IMPACT_EMERGENCY close. Fields only; the rule is unchanged."""
+    entry_liquidity = position.get('entry_liquidity_usd')
+    exit_liquidity = coin.get('liquidityUsd')
+    ratio = (round(num(exit_liquidity) / num(entry_liquidity), 4)
+             if num(entry_liquidity) > 0 and exit_liquidity is not None else None)
+    return {
+        'version': EXIT_IMPACT_EMERGENCY_FORENSICS_VERSION,
+        'rule': 'exit_quote_impact_pct >= max(exit_impact_emergency_pct, entry_price_impact_pct + entry_margin_pct)',
+        'rule_changed': False,
+        'threshold_pct': round(float(threshold_pct), 6),
+        'exit_impact_emergency_pct': EXIT_IMPACT_EMERGENCY_PCT,
+        'entry_margin_pct': EXIT_IMPACT_EMERGENCY_ENTRY_MARGIN_PCT,
+        'entry_preflight': {
+            'buy_impact_pct': position.get('entry_price_impact_pct'),
+            'preflight_buy_impact_pct': _raw_quote_impact_pct(position.get('preflight_buy_quote')),
+            'preflight_sell_impact_pct': _raw_quote_impact_pct(position.get('preflight_sell_quote')),
+            'buy_quoted_at': position.get('jupiter_entry_quote_at'),
+            'entry_roundtrip_pnl_pct': position.get('entry_roundtrip_pnl_pct'),
+        },
+        'trigger_quote': compact_exit_quote_evidence(quote),
+        'trigger_is_requote': trigger_is_requote,
+        'confirming_quote': None,
+        'confirming_quote_meets_threshold': None,
+        'booked_quote': 'trigger',
+        'liquidity': {'entry_usd': entry_liquidity, 'exit_usd': exit_liquidity,
+                      'exit_to_entry_ratio': ratio, 'exit_observed_at': coin.get('updatedAt')},
+        'triggered_at': now,
+    }
 
 
 def api(path: str) -> Any:
@@ -872,6 +959,51 @@ def append_audit(event: str, payload: dict[str, Any]) -> None:
         handle.flush(); os.fsync(handle.fileno())
 
 
+def quote_preparation_log_path() -> Path:
+    return AUDIT_PATH.with_name(QUOTE_PREPARATION_LOG_NAME)
+
+
+def _compact_quote_preparation_log(path: Path, keep_bytes: int) -> None:
+    """Keep only the newest whole rows within keep_bytes (atomic replace)."""
+    with path.open('rb') as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        start = max(0, size - max(0, keep_bytes))
+        handle.seek(start)
+        tail = handle.read()
+    if start > 0:
+        newline = tail.find(b'\n')
+        tail = tail[newline + 1:] if newline >= 0 else b''
+    temp = path.with_name(path.name + '.tmp')
+    temp.write_bytes(tail)
+    os.replace(temp, path)
+
+
+def append_quote_preparation_log(payload: dict[str, Any]) -> bool:
+    """Append one diagnostics row to the capped sidecar; returns False when dropped.
+
+    Deliberately not durable: no fsync, no event_id dedupe and no STATE.lock, so a
+    burst of failed quote preparations never slows ledger commits."""
+    record = {'schema_version': 1, 'ts': now_ms(), 'event': 'QUOTE_PREPARATION_FAILED',
+              'session_id': STATE.demo_session_id, **payload}
+    line = (json.dumps(record, ensure_ascii=False, allow_nan=False) + '\n').encode('utf-8')
+    cap = int(QUOTE_PREPARATION_LOG_MAX_BYTES)
+    if len(line) > cap // 2:
+        return False
+    path = quote_preparation_log_path()
+    with QUOTE_PREPARATION_LOG_LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            size = path.stat().st_size
+        except FileNotFoundError:
+            size = 0
+        if size + len(line) > cap:
+            _compact_quote_preparation_log(path, cap // 2)
+        with path.open('ab') as handle:
+            handle.write(line)
+    return True
+
+
 def trade_metrics(trades):
     known = [t for t in trades if isinstance(t.get('pnl_usd'), (int, float)) and math.isfinite(t['pnl_usd'])]
     wins = sum(t['pnl_usd'] > 0 for t in known)
@@ -1369,11 +1501,89 @@ class Monitor:
         self.position_poll_lock = threading.Lock()
         self.entry_lock = threading.Lock()
         self.entry_quote_retry_after: dict[str, int] = {}
+        # Quote-preparation failure codes: since this engine started (not
+        # persisted; the ledger schema is unchanged) and a rolling time window.
+        self.quote_preparation_codes_lifetime: dict[str, int] = {}
+        self.quote_preparation_lifetime_since = now_ms()
+        self.quote_preparation_recent: deque = deque(maxlen=QUOTE_PREPARATION_ROLLING_MAX_SCANS)
+        self.quote_preparation_log_after: dict[tuple[str, str], int] = {}
         self.training_probe_lock = threading.Lock()
         self.training_probe_inflight = False
         self.training_probe_last_attempt_at = 0
         self.training_probe_retry_after: dict[tuple[str, str], int] = {}
         self.discovery = runtime.DiscoveryCache(discover, refresh_seconds=8, max_age_seconds=90)
+
+    @staticmethod
+    def _bounded_code_add(histogram: dict[str, int], code: str, count: int = 1) -> None:
+        if code not in histogram and len(histogram) >= QUOTE_PREPARATION_MAX_CODES:
+            code = 'OTHER'
+        histogram[code] = histogram.get(code, 0) + count
+
+    def _record_quote_preparation_failure(self, report: dict[str, Any], coin: dict[str, Any], notional: float,
+                                          attempt_index: int, failure: dict[str, Any], code: str,
+                                          deferred: bool, latency_ms: int, dex_id: str) -> None:
+        """Complete histogram, bounded examples and a rate-limited sidecar row."""
+        self._bounded_code_add(report.setdefault('quote_preparation_codes', {}), code)
+        examples = report.setdefault('quote_preparation_failures', [])
+        if len(examples) < 3:
+            examples.append({'symbol': str(coin.get('symbol') or '')[:40], 'notional_usd': notional,
+                             'counted_as_quote_attempt': not deferred, 'latency_ms': latency_ms, **failure})
+        pair, mint = str(coin.get('pairAddress') or ''), str(coin.get('address') or '')
+        now = now_ms()
+        key = (pair, code)
+        if self.quote_preparation_log_after.get(key, 0) > now:
+            report['quote_preparation_log_rate_limited'] = int(report.get('quote_preparation_log_rate_limited') or 0) + 1
+            return
+        logged = int(report.get('quote_preparation_log_events') or 0)
+        if logged >= QUOTE_PREPARATION_LOG_PER_SCAN:
+            report['quote_preparation_log_skipped'] = int(report.get('quote_preparation_log_skipped') or 0) + 1
+            return
+        if len(self.quote_preparation_log_after) >= QUOTE_PREPARATION_LOG_RATE_KEYS:
+            self.quote_preparation_log_after = {k: v for k, v in self.quote_preparation_log_after.items() if v > now}
+            while len(self.quote_preparation_log_after) >= QUOTE_PREPARATION_LOG_RATE_KEYS:
+                self.quote_preparation_log_after.pop(next(iter(self.quote_preparation_log_after)))
+        self.quote_preparation_log_after[key] = now + entry_size_backoff.QUOTE_RETRY_COOLDOWN_MS
+        payload = {'code': code, 'stage': failure.get('stage'), 'pool': abbreviate_address(pair),
+                   'pair_address': pair, 'mint': mint, 'symbol': str(coin.get('symbol') or '')[:40],
+                   'dex_id': dex_id, 'notional_usd': round(float(notional), 8), 'attempt': attempt_index + 1,
+                   'latency_ms': int(latency_ms), 'queue_ms': failure.get('queue_ms'),
+                   'http_ms': failure.get('http_ms'), 'http_status': failure.get('http_status'),
+                   'retry_at': failure.get('retry_at'), 'deferred': deferred,
+                   'counted_as_quote_attempt': not deferred, 'scan_count': STATE.scan_count,
+                   'checked_at': report.get('checked_at')}
+        try:
+            if append_quote_preparation_log(payload):
+                report['quote_preparation_log_events'] = logged + 1
+        except Exception as exc:
+            report['quote_preparation_log_error'] = type(exc).__name__
+
+    def _finish_quote_preparation_histograms(self, report: dict[str, Any]) -> dict[str, Any]:
+        """Attach the rolling (time window) and since-engine-start code histograms."""
+        scan_codes = dict(report.get('quote_preparation_codes') or {})
+        checked_at = report.get('checked_at')
+        checked_at = int(checked_at) if isinstance(checked_at, (int, float)) else now_ms()
+        if scan_codes:
+            self.quote_preparation_recent.append((checked_at, scan_codes))
+            for code, count in scan_codes.items():
+                self._bounded_code_add(self.quote_preparation_codes_lifetime, code, count)
+        horizon = max(checked_at, now_ms()) - QUOTE_PREPARATION_ROLLING_WINDOW_MS
+        while self.quote_preparation_recent and self.quote_preparation_recent[0][0] < horizon:
+            self.quote_preparation_recent.popleft()
+        rolling: dict[str, int] = {}
+        for _at, codes in self.quote_preparation_recent:
+            for code, count in codes.items():
+                self._bounded_code_add(rolling, code, count)
+        report['quote_preparation_codes'] = scan_codes
+        report['quote_preparation_codes_rolling'] = rolling
+        report['quote_preparation_rolling_scans'] = len(self.quote_preparation_recent)
+        report['quote_preparation_rolling_window_minutes'] = QUOTE_PREPARATION_ROLLING_WINDOW_MS // 60_000
+        report['quote_preparation_rolling_since'] = (self.quote_preparation_recent[0][0]
+                                                     if self.quote_preparation_recent else None)
+        report['quote_preparation_codes_lifetime'] = dict(self.quote_preparation_codes_lifetime)
+        report['quote_preparation_lifetime_since'] = self.quote_preparation_lifetime_since
+        report['quote_preparation_lifetime_scope'] = 'SINCE_ENGINE_START'
+        report['quote_preparation_defer_codes'] = sorted(QUOTE_PREPARATION_DEFER_CODES)
+        return report
 
     def prewarm_entry_checks(self, feed: list[dict[str, Any]]) -> None:
         """Warm only the most time-sensitive candidates; avoid provider queues."""
@@ -1450,10 +1660,14 @@ class Monitor:
             },
         }
 
-    def _quote_unavailable(self, position, session, reason, error='no_sell_route'):
+    def _quote_unavailable(self, position, session, reason, error='no_sell_route', forensics=None):
         with STATE.lock:
             live = next((p for p in STATE.positions if p.get('id') == position.get('id')), None)
             if live is None or STATE.demo_session_id != session: return
+            if forensics is not None:
+                # Keep the quote that fired EXIT_IMPACT_EMERGENCY with the pending
+                # exit so the eventual close can still record it as the trigger.
+                live['exit_impact_emergency'] = forensics
             attempts = int(live.get('exit_retry_count') or 0) + 1
             delay = min(60_000, 1000 * 2 ** min(attempts-1, 6))
             quote_at = num(live.get('execution_quote_at'), num(live.get('updated_at')))
@@ -1588,18 +1802,27 @@ class Monitor:
                 context = adaptive_exit_context(position, context)
             reason = reason or exit_policy.exit_reason(position, context, net_pct=pct,peak_net_pct=peak_pct,
                 hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=policy)
-            if num(quote.get('impact_pct')) >= max(EXIT_IMPACT_EMERGENCY_PCT,num(position.get('entry_price_impact_pct'))+.50):
-                reason = reason or 'EXIT_IMPACT_EMERGENCY'
+            emergency_threshold = max(EXIT_IMPACT_EMERGENCY_PCT,num(position.get('entry_price_impact_pct'))+.50)
+            emergency_forensics = position.get('exit_impact_emergency') if reason == 'EXIT_IMPACT_EMERGENCY' else None
+            if num(quote.get('impact_pct')) >= emergency_threshold:
+                if not reason:
+                    reason = 'EXIT_IMPACT_EMERGENCY'
+                    # Forensics only: keep the sell quote that fired the unchanged rule.
+                    emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms())
+            if reason == 'EXIT_IMPACT_EMERGENCY' and emergency_forensics is None:
+                # A pending emergency from an older position record: the re-quote is all we have.
+                emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms(),
+                                                                   trigger_is_requote=True)
             if reason and is_quote and quote.get('from_cache'):
                 quote = paper_quotes.position_mark(position,coin,network,force=True)
                 if quote is None:
-                    self._quote_unavailable(position,session,reason)
+                    self._quote_unavailable(position,session,reason,forensics=emergency_forensics)
                     continue
                 if not math.isfinite(num(quote.get('net_proceeds_usd'),math.nan)):
-                    self._quote_unavailable(position,session,reason,'invalid_sell_quote')
+                    self._quote_unavailable(position,session,reason,'invalid_sell_quote',forensics=emergency_forensics)
                     continue
                 if not 0 <= now_ms()-num(quote.get('quoted_at')) <= entry_policy.MAX_ENTRY_QUOTE_AGE_MS:
-                    self._quote_unavailable(position,session,reason,'stale_sell_quote')
+                    self._quote_unavailable(position,session,reason,'stale_sell_quote',forensics=emergency_forensics)
                     continue
                 pnl = num(quote.get('net_proceeds_usd'))-notional-entry_cost
                 pct = pnl/max(notional,1e-18)*100
@@ -1608,6 +1831,17 @@ class Monitor:
                 if reason.startswith(('TAKE_PROFIT', 'ADAPTIVE_TP', 'ADAPTIVE_TRAILING', 'CONVICTION_PROFIT')):
                     reason = exit_policy.exit_reason(position,context,net_pct=pct,peak_net_pct=peak_pct,
                         hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=policy)
+            if emergency_forensics is not None:
+                booked = compact_exit_quote_evidence(quote)
+                trigger = emergency_forensics.get('trigger_quote') or {}
+                if (booked.get('quoted_at'), booked.get('from_cache')) != (trigger.get('quoted_at'), trigger.get('from_cache')):
+                    emergency_forensics = dict(emergency_forensics, confirming_quote=booked, booked_quote='confirming',
+                        confirming_quote_meets_threshold=num(quote.get('impact_pct')) >= emergency_threshold)
+                emergency_forensics = dict(emergency_forensics, booked_impact_pct=num(quote.get('impact_pct')),
+                    liquidity=dict(emergency_forensics.get('liquidity') or {}, exit_usd=coin.get('liquidityUsd'),
+                        exit_observed_at=coin.get('updatedAt'),
+                        exit_to_entry_ratio=(round(num(coin.get('liquidityUsd'))/num(position.get('entry_liquidity_usd')),4)
+                            if num(position.get('entry_liquidity_usd')) > 0 and coin.get('liquidityUsd') is not None else None)))
             market = num(coin.get('priceUsd'), num(position.get('current_price')))
             entry = num(position.get('entry_price'))
             updated = dict(position, current_price=market,peak_price=max(market,num(position.get('peak_price'))),
@@ -1627,6 +1861,8 @@ class Monitor:
                 estimated_exit_network_fee_usd=num(quote.get('network_fee_usd')),
                 estimated_exit_price_impact_pct=num(quote.get('impact_pct')),
                 estimated_exit_slippage_pct=num(quote.get('slippage_pct'))+num(quote.get('latency_pct')))
+            if emergency_forensics is not None:
+                updated['exit_impact_emergency'] = emergency_forensics
             with STATE.lock:
                 live = next((p for p in STATE.positions if p.get('id') == position.get('id')),None)
                 if live is None or STATE.demo_session_id != session: continue
@@ -1663,9 +1899,10 @@ class Monitor:
         if not STATE.running or not self.entry_lock.acquire(blocking=False): return
         report = {'policy_version': ENTRY_POLICY_VERSION, 'signal_strategy': SIGNAL_STRATEGY, 'checked_at': now_ms(),
                   'candidates': len(feed), 'evaluated': 0, 'signal_passed': 0,
-                  'quoted': 0, 'quote_attempts': 0, 'size_retries': 0, 'opened': 0,
+                  'quoted': 0, 'quote_attempts': 0, 'quote_defers': 0, 'size_retries': 0, 'opened': 0,
                   'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS,
-                  'max_quote_attempts_per_scan': MAX_QUOTED_CANDIDATES}
+                  'max_quote_attempts_per_scan': MAX_QUOTED_CANDIDATES,
+                  'quote_preparation_codes': {}}
         estimates = [market_feasibility.execution_feasibility(
                          coin, STRICT_MAX_ROUNDTRIP_COST_PCT,
                          base_slippage_bps=0, latency_buffer_bps=0)
@@ -1690,7 +1927,7 @@ class Monitor:
             entry_policy.record(report,['entry_error'],metrics={'type':type(exc).__name__})
         finally:
             with STATE.lock:
-                STATE.entry_diagnostics = entry_policy.finish(report)
+                STATE.entry_diagnostics = entry_policy.finish(self._finish_quote_preparation_histograms(report))
             self.entry_lock.release()
         # Learner route checks run in a separate daemon and only consume the
         # shared, low-priority quote path after main-account entry evaluation.
@@ -2039,9 +2276,9 @@ class Monitor:
                 if report['quote_attempts'] >= MAX_QUOTED_CANDIDATES:
                     reject(report, ['quote_budget'], coin)
                     return None, ['quote_budget']
-                report['quote_attempts'] += 1
                 if attempt_index:
                     report['size_retries'] += 1
+                preparation_started_at = now_ms()
                 if dex_id == 'pumpswap':
                     prepared = pumpswap_stop.prepare_entry(
                         coin, attempt_notional, sol_usd,
@@ -2054,22 +2291,27 @@ class Monitor:
                     )
                 if not prepared:
                     preparation_failure = paper_quotes.last_preparation_error()
-                    preparation_examples = report.setdefault('quote_preparation_failures', [])
-                    if len(preparation_examples) < 3:
-                        preparation_examples.append({
-                            'symbol': str(coin.get('symbol') or '')[:40],
-                            'notional_usd': attempt_notional,
-                            **preparation_failure,
-                        })
-                    # Another account's short entry bundle or a pending exit
-                    # is a shared-budget defer, not bad token evidence.
-                    retry_cause['quote'] = preparation_failure.get('code') not in {
-                        'ENTRY_SEQUENCE_BUSY', 'EXIT_PRIORITY_PENDING',
-                    }
+                    failure_code = str(preparation_failure.get('code') or 'QUOTE_UNAVAILABLE')
+                    # Another account's short entry bundle or a pending exit is a
+                    # shared-budget defer, not bad token evidence and not a quote:
+                    # it consumes no per-scan budget and arms no retry cooldown.
+                    # Provider failures (TIMEOUT, RATE_LIMITED, route consistency)
+                    # keep counting as attempts and arm the per-token cooldown.
+                    deferred = failure_code in QUOTE_PREPARATION_DEFER_CODES
+                    if deferred:
+                        report['quote_defers'] += 1
+                    else:
+                        report['quote_attempts'] += 1
+                    self._record_quote_preparation_failure(
+                        report, coin, attempt_notional, attempt_index, preparation_failure,
+                        failure_code, deferred, now_ms() - preparation_started_at, dex_id)
+                    retry_cause['quote'] = not deferred
                     reject(report, ['quote_inconsistent'], coin,
                            {'notional_usd': attempt_notional, 'attempt': attempt_index + 1,
-                            'quote_preparation': preparation_failure})
+                            'quote_preparation': preparation_failure,
+                            'counted_as_quote_attempt': not deferred})
                     return None, ['quote_inconsistent']
+                report['quote_attempts'] += 1
                 live_quote, initial_exit = prepared
                 expected_token_raw = int(live_quote['token_raw_amount'])
                 immediate_exit_net = max(0.0, num(initial_exit.get('expected_usdc')) - entry_network_fee)

@@ -16,7 +16,7 @@ import { isArchivedStrategy, partitionLabStrategies, planningCostStatus, quoteFa
 import LabEntryStatus from './components/LabEntryStatus';
 import {
   backendErrorMessage, dashboardConnectionStatus, initialDashboardConnection,
-  moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
+  moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, quotePreparationSummary, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
 } from './lib/paperDashboardState';
 
 const apiConfiguration = paperApiConfiguration((import.meta as any).env.VITE_NEO_API_URL, (import.meta as any).env.DEV);
@@ -75,7 +75,7 @@ type StrategyLab = { paired?: LabPairedSnapshot; astra?: AstraSnapshot; executio
 type LiveTrade = { ts: number; direction: 'BUY' | 'SELL'; token_amount: number; usd_amount: number; wallet: string; note: string; address: string; pairAddress: string; symbol: string; signature: string; slot: number };
 type FlowStats = { seconds: number; trades: number; buys: number; sells: number; buy_usd: number; sell_usd: number; buy_sell_usd_ratio: number; unique_wallets: number; max_buy_usd: number; max_sell_usd: number };
 type TapeStatus = { status?: string; tracked_pairs?: number; updated_at?: number; source?: string; error?: string | null };
-type EntryDiagnostics = { status?: string; message?: string; evaluated?: number; signal_passed?: number; quoted?: number; opened?: number; rejections?: Record<string, number>; reason_labels?: Record<string, string>; market_cost_feasibility?: CostFeasibility; quote_preparation_failures?: { symbol?: string; stage?: string; code?: string }[] };
+type EntryDiagnostics = { status?: string; message?: string; evaluated?: number; signal_passed?: number; quoted?: number; quote_attempts?: number; quote_defers?: number; opened?: number; rejections?: Record<string, number>; reason_labels?: Record<string, string>; market_cost_feasibility?: CostFeasibility; quote_preparation_failures?: { symbol?: string; stage?: string; code?: string }[]; quote_preparation_codes?: Record<string, number>; quote_preparation_codes_rolling?: Record<string, number>; quote_preparation_rolling_scans?: number; quote_preparation_rolling_window_minutes?: number; quote_preparation_codes_lifetime?: Record<string, number>; quote_preparation_lifetime_scope?: string };
 type RuleLearning = { closed_trades: number; wins: number; win_rate_pct: number; net_pnl_usd: number; loss_reasons: Record<string, number>; throttled: boolean };
 type StrategyLearning = { policy_version: string; closed_trades: number; wins: number; win_rate_pct: number; net_pnl_usd: number; profit_factor: number | null; min_trades_before_throttle: number; window_max_closed_trades?: number; ignored_data?: Record<string, number>; throttled_strategies: string[]; strategies: Record<string, RuleLearning>; attribution_note: string };
 type MonitorState = {
@@ -329,6 +329,7 @@ export default function App() {
   const portfolioRunning = promotedPortfolio ? state?.strategy_lab?.status === 'online' : state?.running;
   const portfolioHistory = promotedPortfolio?.history ?? (state?.history || []).map(trade => ({ ...trade, strategy_name: '' }));
   const entryRejections = Object.entries(state?.entry_diagnostics?.rejections || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  const quotePreparationText = quotePreparationSummary(state?.entry_diagnostics);
   const strategyLearningRows = Object.entries(state?.strategy_learning?.strategies || {});
 
 
@@ -373,6 +374,7 @@ export default function App() {
           {entryRejections.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{entryRejections.map(([reason, count]) => <span key={reason} className="rounded-lg border border-amber-300/10 bg-amber-300/[0.03] px-2 py-1 text-[9px] text-amber-100/80">{state?.entry_diagnostics?.reason_labels?.[reason] ?? reason}: {count}</span>)}</div>}
           {planningCostStatus(state?.entry_diagnostics?.market_cost_feasibility) && <p className="mt-3 text-[10px] leading-5 text-amber-200" data-testid="main-cost-feasibility">{planningCostStatus(state?.entry_diagnostics?.market_cost_feasibility)}</p>}
           {state?.entry_diagnostics?.quote_preparation_failures?.map((failure, index) => <p key={`${failure.symbol}-${index}`} className="mt-2 text-[10px] text-amber-200">{failure.symbol}: {quoteFailureStatus(failure.code)}</p>)}
+          {quotePreparationText && <p className="mt-2 text-[10px] leading-5 text-slate-400" data-testid="quote-preparation-codes">{quotePreparationText}</p>}
         </div>
         <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
           <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">Главна PAPER сметка · обратна връзка</div><h2 className="mt-1 text-sm font-black text-white">Резултат по правила и изходи на загуба</h2></div><span className="text-[9px] text-slate-500">{state?.strategy_learning?.policy_version ?? '—'}</span></div>

@@ -20,7 +20,12 @@ from typing import Any
 
 STRATEGY_ID = 'ORDER_FLOW_ADAPTIVE'
 LEARNING_MODE = 'ADAPTIVE_CONTEXT_HOLD'
-ENTRY_POLICY_VERSION = 'ORDER_FLOW_BALANCED_V4'
+# The restored October 4 decision checks keep their historical label; the entry
+# policy V5 is those unchanged checks behind DEFENSIVE_ENTRY_LAYER_V1, a modern
+# overlay that only removes entries (2026-10-08).
+DECISION_FILTER_VERSION = 'ORDER_FLOW_BALANCED_V4'
+ENTRY_POLICY_VERSION = 'ORDER_FLOW_BALANCED_V5'
+PREVIOUS_ENTRY_POLICY_VERSION = 'ORDER_FLOW_BALANCED_V4'
 RESTORE_VERSION = 'ORDER_FLOW_ADAPTIVE_OCT4_RESTORE_V1'
 SOURCE_COMMIT = 'neo-meme-trade@5b78efd (2026-10-04)'
 SIGNAL_EVIDENCE = 'ORDER_FLOW_BALANCED_V4_ON_CONFIRMED_EXACT_POOL_FLOW_WITH_VERIFIED_EXECUTION_CHECKS'
@@ -108,6 +113,8 @@ EXIT_LADDER = (
     'CONVICTION_PROFIT_LOCK', 'ADAPTIVE_TRAILING', 'ADAPTIVE_MAX_HOLD', 'ABSOLUTE_MAX_HOLD',
 )
 MODERN_OVERLAYS_RETAINED = (
+    'entry_defense DEFENSIVE_ENTRY_LAYER_V1 (STRUCTURAL_RUG_GUARD_V1, POOL_LOSS_MEMORY_V1, '
+    'HEAT_VETO_STACK_V1) before flow, safety and quotes',
     'promoted_entry_guard.flow_admission (confirmed 30s exact-pool PumpSwap window)',
     'engine_rug_guard fail-closed safety', 'pair_price_integrity exact-pool price confirmation',
     'Jupiter/PumpSwap executable entry and immediate-exit quotes', 'LIQUIDITY_EMERGENCY',
@@ -326,6 +333,7 @@ def config_snapshot(profile: Profile = PROFILE) -> dict[str, Any]:
     return {
         'strategy_id': STRATEGY_ID, 'learning_mode': LEARNING_MODE,
         'entry_policy_version': ENTRY_POLICY_VERSION, 'restore_version': RESTORE_VERSION,
+        'decision_filter_version': DECISION_FILTER_VERSION,
         'source_commit': SOURCE_COMMIT, 'profile': profile.as_dict(),
         'entry_flow_window_seconds': ENTRY_FLOW_WINDOW_SECONDS,
         'conviction_flow_windows_seconds': [FAST_FLOW_WINDOW_SECONDS, SLOW_FLOW_WINDOW_SECONDS],

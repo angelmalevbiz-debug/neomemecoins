@@ -10,6 +10,30 @@ import funded_market_candidates as candidates
 import promoted_entry_guard as guard
 import strategy_lab as lab
 from tape_pool_scheduler import TapePoolScheduler
+import entry_defense as _isolation_entry_defense
+import strategy_lab as _isolation_lab
+import tape_pool_scheduler as _isolation_tape
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_lab, 'defensive_entry_decision'), (_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 NOW = 1_800_000_000_000

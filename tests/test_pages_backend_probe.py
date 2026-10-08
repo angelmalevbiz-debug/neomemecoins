@@ -36,6 +36,11 @@ class ProbeTests(unittest.TestCase):
         # ORDER_FLOW_ADAPTIVE profile publishes ORDER_FLOW_BALANCED_V4.
         self.assertIn('WINNER_ENSEMBLE_VERIFIED_ENTRY_V4', probe.SUPPORTED_ENTRY_POLICIES)
         self.assertIn('ORDER_FLOW_BALANCED_V4', probe.SUPPORTED_ENTRY_POLICIES)
+        # DEFENSIVE_ENTRY_LAYER_V1 labels (2026-10-08) published by updated backends.
+        import winner_ensemble
+        import order_flow_adaptive_oct4 as oct4
+        self.assertIn(winner_ensemble.ENTRY_POLICY_VERSION, probe.SUPPORTED_ENTRY_POLICIES)
+        self.assertIn(oct4.ENTRY_POLICY_VERSION, probe.SUPPORTED_ENTRY_POLICIES)
 
     def test_current_ensemble_and_original_validated_policy_are_supported(self):
         for version in probe.SUPPORTED_ENTRY_POLICIES:

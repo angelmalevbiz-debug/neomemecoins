@@ -8,6 +8,29 @@ from unittest.mock import patch
 
 import lab_strategy_lifecycle as lifecycle
 import strategy_lab as lab
+import entry_defense as _isolation_entry_defense
+import strategy_lab as _isolation_lab
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_lab, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 NOW = 1_800_000_000_000
@@ -151,16 +174,16 @@ class CostFirstLifecycleParityTests(unittest.TestCase):
 
     def test_production_review_counts_each_book_on_its_accepted_policy_version(self):
         versions = lab.lifecycle_activity_versions()
-        self.assertEqual(versions, {key: 'COST_FIRST_ESTABLISHED_V1' for key in lab.cost_first.BOOK_IDS})
+        self.assertEqual(versions, {key: 'COST_FIRST_ESTABLISHED_V2' for key in lab.cost_first.BOOK_IDS})
         for strategy_id in lab.cost_first.BOOK_IDS:
             with self.subTest(strategy_id=strategy_id):
                 books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
-                books[strategy_id] = book([-4] * 12, strategy_id, 'COST_FIRST_ESTABLISHED_V1')
+                books[strategy_id] = book([-4] * 12, strategy_id, 'COST_FIRST_ESTABLISHED_V2')
                 books[RESEARCH] = book([-4] * 12)
                 with patch.object(lab, 'now_ms', return_value=NOW):
                     report = lab.review_strategy_lifecycle(books)
                 self.assertEqual(sorted(report['retired_strategy_ids']), sorted([strategy_id, RESEARCH]))
-                for key, version in ((strategy_id, 'COST_FIRST_ESTABLISHED_V1'),
+                for key, version in ((strategy_id, 'COST_FIRST_ESTABLISHED_V2'),
                                      (RESEARCH, lab.activity.POLICY_VERSION)):
                     evidence = books[key]['strategy_lifecycle']['evidence']
                     self.assertEqual(evidence['closed_trades'], 12)
@@ -192,7 +215,7 @@ class CostFirstLifecycleParityTests(unittest.TestCase):
         versions = lab.lifecycle_activity_versions()
         pair_id = lab.cost_first.SCALED_BOOK_ID
         pair = book([-4] * 12, pair_id)  # LAB_ACTIVE rows in a COST_FIRST book.
-        research = book([-4] * 12, RESEARCH, 'COST_FIRST_ESTABLISHED_V1')
+        research = book([-4] * 12, RESEARCH, 'COST_FIRST_ESTABLISHED_V2')
         report = lifecycle.apply_lifecycle(
             {pair_id: pair, RESEARCH: research}, registered_ids={pair_id, RESEARCH},
             promoted_ids=set(), activity_version=lab.activity.POLICY_VERSION,

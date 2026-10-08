@@ -69,6 +69,15 @@ Passing the gates on book B (or A) is the precondition for a Stage 2 per-account
 
 The Stage 2 profile `COST_FIRST_ESTABLISHED_PAPER_V1` (entry `COST_FIRST_ESTABLISHED_ENTRY_V1`, exit `COST_FIRST_NET_EXIT_V1` with `EXIT_IMPACT_EMERGENCY_V2`) is implemented as an opt-in, per-account choice that nothing enables by default; see [COST_FIRST_ENGINE_PROFILE.md](COST_FIRST_ENGINE_PROFILE.md). Enabling it before the Lab pair passes is an owner decision for one PAPER test account; that account is evaluated as its own sample under the same gates plus feasibility and a −$25-before-20-closes halt, never as evidence for the Lab gates.
 
+## Defensive entry layer (DEFENSIVE_ENTRY_LAYER_V1, 2026-10-08)
+
+Every entry path now runs `STRUCTURAL_RUG_GUARD_V1`, `HEAT_VETO_STACK_V1` and `POOL_LOSS_MEMORY_V1` before any quote, flow promotion or RugCheck call; see [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md). The research behind it (22.8 h scan log, PAPER) found no strategy with positive expectancy after costs; the layer removes measured loss tails (holdout drain hazard 4.39% → 1.31% per position-hour; forward heat-veto difference −5.07 pp, CI [−11.0, −0.95]) and creates no edge. Consequences for validation:
+
+- Closes after this change carry new entry-policy versions (`WINNER_ENSEMBLE_VERIFIED_ENTRY_V5`, `ORDER_FLOW_BALANCED_V5`, `COST_FIRST_ESTABLISHED_ENTRY_V2`, `COST_FIRST_ESTABLISHED_V2`, `LAB_ACTIVE_V7_DEFENSIVE_ENTRY`, `PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5`) and are a new sample; earlier closes are never relabelled or pooled into it as acceptance evidence.
+- The cost-first pair's acceptance criteria above apply unchanged to its V2 sample (structural guard inside the universe). Its V1 sample is a different universe that included rug-family pools.
+- A book or account that the layer leaves with too few entries to reach the gates is reported as such; filters are never loosened to force trades.
+- The layer's own precision is judged forward: structural reason codes are recorded on every blocked candidate, so later drains (liquidity → 0 or price −80% within 10 min) can be matched against them before the precision figures are trusted.
+
 ## Dataset provenance and measurements
 
 | Dataset | Scope | Valid conclusion |

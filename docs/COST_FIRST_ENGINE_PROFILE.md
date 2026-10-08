@@ -6,6 +6,13 @@ entry `COST_FIRST_ESTABLISHED_ENTRY_V1`, exit policy `cost_first` /
 this change submits swaps, resets or rewrites a ledger, switches an account, or
 claims that the profile is profitable. It is an unvalidated, versioned hypothesis.
 
+Update 2026-10-08 (`DEFENSIVE_ENTRY_LAYER_V1`, [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md)):
+profile `COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY`, entry `COST_FIRST_ESTABLISHED_ENTRY_V2`,
+universe `COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD` (the structural rug guard is part of
+`cost_first_established.rejections`), and the heat veto and pool loss memory run before quotes.
+The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default and
+`ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
+
 ## What it is
 
 Stage 2 of the cost-first research line (`docs/STRATEGY_VALIDATION.md`,

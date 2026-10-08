@@ -10,6 +10,29 @@ import live_tape as tape
 import engine_execution as execution
 import honest_quote_transport as transport
 import pumpswap_stop_quote as pump
+import entry_defense as _isolation_entry_defense
+import tape_pool_scheduler as _isolation_tape
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 def pubkey(number):

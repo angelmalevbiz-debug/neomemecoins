@@ -49,6 +49,9 @@ def main():
                              'stop_pct, take_profit_pct, disable_exit_impact_emergency, max_hold_minutes. '
                              'Exit decisions only; the report is labelled EXIT_VARIANT.')
     parser.add_argument('--variant-label',help='Label stored in the variant report (default derived from the rules)')
+    parser.add_argument('--entry-defense',choices=('recorded_policy','apply'),
+                        help='DEFENSIVE_ENTRY_LAYER_V1 in the replay: recorded_policy (default; journals recorded '
+                             'before the layer) or apply (labelled counterfactual on the replayed rows only)')
     parser.add_argument('--overwrite',action='store_true',
                         help='Replace an existing --output, only when it is a report of the same report_kind')
     args=parser.parse_args()
@@ -77,7 +80,8 @@ def main():
     refusal=output_refusal(args.output,'EXIT_VARIANT' if exit_variant else 'BASELINE',args.overwrite)
     if refusal:
         raise SystemExit(refusal)
-    with MainReplay(root,adaptive=args.adaptive,exit_variant=exit_variant,label=args.variant_label) as replay:
+    options={'entry_defense':args.entry_defense} if args.entry_defense else {}
+    with MainReplay(root,adaptive=args.adaptive,exit_variant=exit_variant,label=args.variant_label,**options) as replay:
         result=replay.replay(rows)
     # Re-check after the run: the path may have been written in the meantime.
     refusal=output_refusal(args.output,result['report_kind'],args.overwrite)

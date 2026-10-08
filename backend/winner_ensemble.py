@@ -12,7 +12,13 @@ from typing import Any
 import lab_activity
 
 VERSION = 'WINNER_ENSEMBLE_PAPER_V1'
-ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V4'
+# V5 (2026-10-08): the V4 rules and gates behind DEFENSIVE_ENTRY_LAYER_V1
+# (structural rug guard, pool loss memory, heat veto), which only removes
+# entries. Same-policy loss feedback keeps counting V4 closes, so a rule held
+# on V4 evidence stays held: a version bump never releases a throttle.
+ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V5'
+PREVIOUS_ENTRY_POLICY_VERSION = 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V4'
+LEARNING_POLICY_VERSIONS = (ENTRY_POLICY_VERSION, PREVIOUS_ENTRY_POLICY_VERSION)
 VERIFIED_FLOW_MOMENTUM = 'VERIFIED_FLOW_MOMENTUM'
 COST_EFFICIENT_FLOW = 'COST_EFFICIENT_FLOW'
 STRATEGIES = (VERIFIED_FLOW_MOMENTUM, COST_EFFICIENT_FLOW, 'EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
@@ -107,7 +113,7 @@ def learning_snapshot(history: list[dict[str, Any]]) -> dict[str, Any]:
         if not isinstance(trade, dict):
             ignore('invalid_record')
             continue
-        if trade.get('entry_policy_version') != ENTRY_POLICY_VERSION:
+        if trade.get('entry_policy_version') not in LEARNING_POLICY_VERSIONS:
             ignore('other_policy')
             continue
         trade_id = trade.get('id')
@@ -214,6 +220,7 @@ def learning_snapshot(history: list[dict[str, Any]]) -> dict[str, Any]:
     gross_loss = -sum(pnl for pnl in all_pnls if pnl < 0)
     return {
         'policy_version': ENTRY_POLICY_VERSION,
+        'learning_policy_versions': list(LEARNING_POLICY_VERSIONS),
         'closed_trades': len(closed),
         'wins': wins,
         'losses': sum(pnl < 0 for pnl in all_pnls),

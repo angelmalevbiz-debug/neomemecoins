@@ -23,6 +23,29 @@ import tape_pool_scheduler as scheduler_module
 from tape_pool_scheduler import TapePoolScheduler
 from test_tape_execution_repair import META, NOW, non_swap, pubkey, transaction
 from test_tape_decoder_shadow_v2 import BODIES, real
+import entry_defense as _isolation_entry_defense
+import tape_pool_scheduler as _isolation_tape
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 NOW_MS = 1_800_000_000_000
 

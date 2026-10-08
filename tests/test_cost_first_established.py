@@ -1,4 +1,4 @@
-"""COST_FIRST_ESTABLISHED_V1: isolated Lab book pair on a cost-defined universe.
+"""COST_FIRST_ESTABLISHED (V2): isolated Lab book pair on a cost-defined universe.
 
 Synthetic fixtures verify the universe rule, the size rule, the shared evidence
 gates and the two exit geometries. No outcome, win rate or return is claimed.
@@ -15,10 +15,12 @@ os.environ['NEO_STRATEGY_LAB_PATH'] = str(Path(TMP.name) / 'state.json')
 os.environ['NEO_STRATEGY_LAB_COMPACT_PATH'] = str(Path(TMP.name) / 'compact.json')
 os.environ['NEO_STRATEGY_LAB_RESET_FLAG'] = str(Path(TMP.name) / 'reset')
 import cost_first_established as cf
+import entry_defense
 import lab_activity as activity
 import paper_market_feasibility as feasibility
 import promoted_entry_guard as guard
 import strategy_lab as lab
+import structural_rug_guard
 
 NOW = 1_800_000_000_000
 MINT = 'BrUimx7KncgRNTggAdZdaX2s5XUqQyR6XMRmEg4mpump'
@@ -32,9 +34,45 @@ def coin(**changes):
             'priceUsd': .1, 'priceNative': .1 / SOL_USD,
             'quoteTokenAddress': lab.SOL_QUOTE_MINT, 'dexId': 'pumpswap',
             'liquidityUsd': 2_000_000, 'marketCap': 100_000 * SOL_USD,
-            'updatedAt': NOW, 'score': 40, 'ageMinutes': 5000,
+            'updatedAt': NOW, 'score': 40, 'ageMinutes': 5000, 'pairCreatedAt': NOW - 5000 * 60_000,
             'priceChange': {'m5': .1, 'h1': -2}, 'volume': {'h1': 50_000},
             'txns': {'m5': {'buys': 10, 'sells': 12}}, **changes}
+
+
+# The universe includes STRUCTURAL_RUG_GUARD_V1 (V2); the pure checks below use an
+# empty ticker registry at NOW, as a fresh engine would.
+REGISTRY = structural_rug_guard.TickerRegistry()
+
+
+def candidate(market, **kwargs):
+    return cf.candidate(market, now=NOW, ticker_registry=REGISTRY, **kwargs)
+
+
+def rejections(market, **kwargs):
+    return cf.rejections(market, now=NOW, ticker_registry=REGISTRY, **kwargs)
+
+
+def describe(market, **kwargs):
+    return cf.describe(market, now=NOW, ticker_registry=REGISTRY, **kwargs)
+
+
+def setUpModule():
+    # These Lab tests isolate the cost-first universe, flow, safety, price and
+    # exit gates; DEFENSIVE_ENTRY_LAYER_V1 (heat warming, loss memory) has its
+    # own suite (test_defensive_entry_layer.py). The universe's structural
+    # guard is NOT patched: it runs with the Lab's own ticker registry.
+    isolation = patch.object(lab, 'defensive_entry_decision',
+                             lambda *_args, **_kwargs: entry_defense.pass_decision('TEST_GATE_ISOLATION'))
+    isolation.start()
+    MODULE_PATCHES.append(isolation)
+
+
+def tearDownModule():
+    while MODULE_PATCHES:
+        MODULE_PATCHES.pop().stop()
+
+
+MODULE_PATCHES = []
 
 
 def verified_flows():
@@ -48,8 +86,8 @@ def verified_flows():
 
 class UniverseRuleTests(unittest.TestCase):
     def test_versions_books_and_exit_geometries(self):
-        self.assertEqual(cf.VERSION, 'COST_FIRST_ESTABLISHED_V1')
-        self.assertEqual(cf.ENTRY_POLICY_VERSION, 'COST_FIRST_ESTABLISHED_V1')
+        self.assertEqual(cf.VERSION, 'COST_FIRST_ESTABLISHED_V2')
+        self.assertEqual(cf.ENTRY_POLICY_VERSION, 'COST_FIRST_ESTABLISHED_V2')
         self.assertEqual(cf.BOOK_IDS, ('COST_FIRST_CONTROL', 'COST_FIRST_SCALED'))
         self.assertEqual((cf.CONTROL_EXITS.stop_loss_net_pct, cf.CONTROL_EXITS.take_profit_net_pct,
                           cf.CONTROL_EXITS.max_hold_minutes), (3.0, 10.0, 60.0))
@@ -100,10 +138,10 @@ class UniverseRuleTests(unittest.TestCase):
         self.assertIsNone(cf.fee_impact_roundtrip_pct(coin(priceNative=0), 150))
 
     def test_candidate_matrix(self):
-        self.assertTrue(cf.candidate(coin(), cap_usd=150))
-        self.assertTrue(cf.candidate(coin(marketCap=60_000 * SOL_USD), cap_usd=150))
-        self.assertTrue(cf.candidate(coin(score=0), cap_usd=150))
-        self.assertTrue(cf.candidate(coin(ageMinutes=30), cap_usd=150))
+        self.assertTrue(candidate(coin(), cap_usd=150))
+        self.assertTrue(candidate(coin(marketCap=60_000 * SOL_USD), cap_usd=150))
+        self.assertTrue(candidate(coin(score=0), cap_usd=150))
+        self.assertTrue(candidate(coin(ageMinutes=30), cap_usd=150))
         cases = {
             'fee_tier_above_maximum': coin(marketCap=56_000 * SOL_USD),
             'liquidity_below_minimum': coin(liquidityUsd=249_999),
@@ -115,15 +153,15 @@ class UniverseRuleTests(unittest.TestCase):
             'fee_impact_roundtrip_above_maximum': coin(marketCap=60_000 * SOL_USD, liquidityUsd=250_000),
         }
         for reason, market in cases.items():
-            self.assertIn(reason, cf.rejections(market, cap_usd=150), reason)
-            self.assertFalse(cf.candidate(market, cap_usd=150), reason)
-        self.assertEqual(cf.rejections(coin(), cap_usd=0), ['size_below_minimum'])
-        self.assertEqual(cf.rejections(coin(), cap_usd=5, minimum_notional_usd=10), ['size_below_minimum'])
-        for reason in cf.rejections(coin(dexId='raydium', liquidityUsd=1000), cap_usd=150):
+            self.assertIn(reason, rejections(market, cap_usd=150), reason)
+            self.assertFalse(candidate(market, cap_usd=150), reason)
+        self.assertEqual(rejections(coin(), cap_usd=0), ['size_below_minimum'])
+        self.assertEqual(rejections(coin(), cap_usd=5, minimum_notional_usd=10), ['size_below_minimum'])
+        for reason in rejections(coin(dexId='raydium', liquidityUsd=1000), cap_usd=150):
             self.assertIn(reason, cf.REJECTION_REASONS)
 
     def test_describe_is_a_planning_record_not_a_quote(self):
-        record = cf.describe(coin(), cap_usd=150)
+        record = describe(coin(), cap_usd=150)
         self.assertEqual(record['fee_tier_bps'], 30.0)
         self.assertEqual(record['planned_notional_usd'], 150.0)
         self.assertEqual(record['rejections'], [])
@@ -142,7 +180,10 @@ class LabBookPairTests(unittest.TestCase):
         self.scaled = self.books[cf.SCALED_BOOK_ID]
         self.risk = {'status': 'pass', 'mint': MINT, 'pair': PAIR, 'checked_at': NOW}
         self.price = {'status': 'pass', 'mint': MINT, 'pair': PAIR}
+        # A fresh, non-persistent Lab defensive layer per test: the ticker memory of
+        # one test (for example a second mint with this ticker) never leaks into the next.
         for mock in (patch.object(lab, 'STATE', {'books': self.books}),
+                     patch.object(lab, 'DEFENSE', entry_defense.DefensiveEntryLayer()),
                      patch.object(lab, 'now_ms', side_effect=lambda: self.clock),
                      patch.object(lab.rug_guard, 'check', return_value=self.risk),
                      patch.object(lab.price_integrity, 'check', return_value=self.price)):
@@ -164,7 +205,7 @@ class LabBookPairTests(unittest.TestCase):
         for book, exits in ((self.control, cf.CONTROL_EXITS), (self.scaled, cf.SCALED_EXITS)):
             position = book['position']
             self.assertIsNotNone(position, book['id'])
-            self.assertEqual(position['entry_policy_version'], 'COST_FIRST_ESTABLISHED_V1')
+            self.assertEqual(position['entry_policy_version'], cf.ENTRY_POLICY_VERSION)
             self.assertEqual(position['entry_universe_version'], cf.UNIVERSE_VERSION)
             self.assertEqual(position['notional_usd'], 150.0)
             self.assertFalse(position['promotion_eligible'])
@@ -181,7 +222,7 @@ class LabBookPairTests(unittest.TestCase):
             self.assertEqual(book['balance'], 500.0)
             diagnostics = book['entry_diagnostics']
             self.assertEqual(diagnostics['cost_first']['universe_candidates'], 1)
-            self.assertEqual(diagnostics['entry_policy_version'], 'COST_FIRST_ESTABLISHED_V1')
+            self.assertEqual(diagnostics['entry_policy_version'], cf.ENTRY_POLICY_VERSION)
             self.assertFalse(diagnostics['cost_first']['automatic_promotion'])
         self.assertEqual(self.control['position']['address'], self.scaled['position']['address'])
         for key, book in before.items():
@@ -278,7 +319,7 @@ class LabBookPairTests(unittest.TestCase):
         self.assertIsNotNone(self.control['position'])
         self.assertEqual(self.scaled['history'][0]['exit_reason'], 'TAKE_PROFIT_4_NET')
         self.assertAlmostEqual(self.scaled['history'][0]['pnl_usd'], 150 * .045, places=4)
-        self.assertEqual(self.scaled['history'][0]['entry_policy_version'], 'COST_FIRST_ESTABLISHED_V1')
+        self.assertEqual(self.scaled['history'][0]['entry_policy_version'], cf.ENTRY_POLICY_VERSION)
         self.assertEqual(self.scaled['history'][0]['exit_policy_label'], 'COST_SCALED_3_4_60')
         self.assertEqual(lab.stats(self.scaled)['active_policy_trades'], 1)
 
@@ -364,7 +405,7 @@ class LabBookPairTests(unittest.TestCase):
             self.assertEqual(marker['status'], 'retired', book['id'])
             self.assertEqual(marker['reason'], 'repeated_observed_paper_losses')
             self.assertEqual(marker['evidence']['closed_trades'], 12)
-            self.assertEqual(marker['evidence']['activity_version'], 'COST_FIRST_ESTABLISHED_V1')
+            self.assertEqual(marker['evidence']['activity_version'], cf.ENTRY_POLICY_VERSION)
             self.assertEqual(marker['evidence']['net_pnl_usd'], -54.0)
             self.assertIn(book['id'], report['retired_strategy_ids'])
             self.assertIn(book['id'], report['retired_open_position_ids'])
@@ -372,7 +413,7 @@ class LabBookPairTests(unittest.TestCase):
                 if field != 'strategy_lifecycle':
                     self.assertEqual(book[field], value, field)
         self.assertEqual(report['policy']['activity_versions_by_strategy'],
-                         {key: 'COST_FIRST_ESTABLISHED_V1' for key in cf.BOOK_IDS})
+                         {key: cf.ENTRY_POLICY_VERSION for key in cf.BOOK_IDS})
         # Retirement stops new entries only; the open positions still exit normally.
         quotes = {book['id']: book['position']['remaining_cost_basis_usd'] * .925
                   for book in (self.control, self.scaled)}

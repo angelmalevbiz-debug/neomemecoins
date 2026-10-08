@@ -23,6 +23,14 @@ from unittest.mock import patch
 
 FRESHNESS_WINDOWS_VERSION = 'REPLAY_LIVE_DERIVED_WINDOWS_V1'
 EXIT_VARIANT_VERSION = 'REPLAY_EXIT_VARIANT_V1'
+# DEFENSIVE_ENTRY_LAYER_V1 decides from a per-process pair history (every scan
+# of the whole feed) and ticker registry that a recorded journal slice cannot
+# reconstruct, and the journals replayed today were recorded before the layer
+# existed. 'recorded_policy' (default) therefore replays the recorded decision
+# path without the layer, labelled in the report; 'apply' runs the layer on the
+# replayed rows only, as a labelled counterfactual (not an identity replay).
+ENTRY_DEFENSE_MODES = ('recorded_policy', 'apply')
+ENTRY_DEFENSE_RECORDED_POLICY_LABEL = 'REPLAY_RECORDED_POLICY_PREDATES_DEFENSIVE_ENTRY_LAYER_V1'
 EXIT_VARIANT_FIELDS = ('stop_pct', 'take_profit_pct', 'disable_exit_impact_emergency', 'max_hold_minutes')
 # Archived engines (compare_main.py frozen arm) can predate the named preflight
 # and guard constants. Only then are these documented legacy values used, and
@@ -168,8 +176,11 @@ def variant_label(rules):
 
 
 class MainReplay:
-    def __init__(self, root, *, adaptive=False, exit_variant=None, label=None):
+    def __init__(self, root, *, adaptive=False, exit_variant=None, label=None, entry_defense='recorded_policy'):
         import market_monitor as market
+        if entry_defense not in ENTRY_DEFENSE_MODES:
+            raise ValueError(f'entry_defense must be one of {ENTRY_DEFENSE_MODES}')
+        self.entry_defense_mode = entry_defense
         self.market = market
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -185,6 +196,15 @@ class MainReplay:
         self._patch(market, 'sol_usd_market_price', lambda:0.)
         self._patch(market, 'STATE', market.State())
         self.monitor = market.Monitor()
+        # Archived engines (compare_main.py frozen arm) predate the layer.
+        self.entry_defense_applied = False
+        if hasattr(self.monitor, 'defensive_entry_decision'):
+            if entry_defense == 'recorded_policy':
+                import entry_defense as defense
+                self._patch(self.monitor, 'defensive_entry_decision',
+                            lambda *_args, **_kwargs: defense.pass_decision(ENTRY_DEFENSE_RECORDED_POLICY_LABEL))
+            else:
+                self.entry_defense_applied = True
         self._patch(market.STATE, 'live_flow', self.flow)
         self._patch(market.price_integrity, 'check', self.price)
         self._patch(market.price_integrity, 'jupiter_tiebreak', self.tiebreak)
@@ -824,6 +844,12 @@ class MainReplay:
                 'freshness_windows':{'version':FRESHNESS_WINDOWS_VERSION,'windows':dict(self.windows),
                                      'basis':dict(self.window_basis),'clock_basis':dict(CLOCK_BASIS)},
                 'records':self.replayed,'invalid_records':self.unusable,
+                'entry_defense':{'mode':self.entry_defense_mode,'applied':self.entry_defense_applied,
+                                 'label':(ENTRY_DEFENSE_RECORDED_POLICY_LABEL if not self.entry_defense_applied
+                                          else 'COUNTERFACTUAL_LAYER_ON_REPLAYED_ROWS_ONLY'),
+                                 'note':'The layer needs whole-feed pair history and a ticker registry that a '
+                                        'journal slice cannot reconstruct; recorded_policy reproduces the '
+                                        'recorded decisions, apply is a counterfactual, never an identity replay'},
                 'decision_summary':self.decision_summary(),
                 'coverage_note':'Only recorded exact-quantity raw quotes are executable; sparse snapshots cannot reconstruct missing history',
                 # Export the actual ledger, not the public UI's compact recent

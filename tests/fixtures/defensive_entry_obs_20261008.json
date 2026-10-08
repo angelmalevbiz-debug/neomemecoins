@@ -1,0 +1,1824 @@
+{
+ "addresses": "mint and pair abbreviated to 8 characters; the guard and the history key on them as opaque identifiers",
+ "fixtures": {
+  "ANSEM_FnzKY6x7": {
+   "coin": {
+    "address": "9cRCn9rG",
+    "ageMinutes": 162934.2,
+    "dexId": "pumpswap",
+    "fdv": 146487876.0,
+    "liquidityUsd": 2465118.97,
+    "marketCap": 146487876.0,
+    "pairAddress": "FnzKY6x7",
+    "pairCreatedAt": 1781643948000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 2.99,
+     "h24": -1.24,
+     "h6": 5.35,
+     "m5": 1.08
+    },
+    "priceNative": 0.001263,
+    "priceUsd": 0.1468,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 50.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "ANSEM",
+    "txns": {
+     "h1": {
+      "buys": 64,
+      "sells": 126
+     },
+     "m5": {
+      "buys": 7,
+      "sells": 37
+     }
+    },
+    "updatedAt": 1791420000377,
+    "volume": {
+     "h1": 54809.77,
+     "h24": 1276123.02,
+     "h6": 171889.36,
+     "m5": 8593.05
+    }
+   },
+   "family": "established",
+   "observed_at": 1791420000377
+  },
+  "CATE_HMzvsEEm": {
+   "coin": {
+    "address": "Ai66LHZG",
+    "ageMinutes": 105607.3,
+    "dexId": "pumpswap",
+    "fdv": 56733074.0,
+    "liquidityUsd": 2886468.4,
+    "marketCap": 56734331.0,
+    "pairAddress": "HMzvsEEm",
+    "pairCreatedAt": 1785083563000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": -30.39,
+     "h24": -3.37,
+     "h6": 2.02,
+     "m5": -30.41
+    },
+    "priceNative": 0.0005061,
+    "priceUsd": 0.05884,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 49.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "CATE",
+    "txns": {
+     "h1": {
+      "buys": 49240,
+      "sells": 103
+     },
+     "m5": {
+      "buys": 540,
+      "sells": 2
+     }
+    },
+    "updatedAt": 1791420000385,
+    "volume": {
+     "h1": 36270.79,
+     "h24": 1380463.09,
+     "h6": 299479.82,
+     "m5": 1170.83
+    }
+   },
+   "family": "established",
+   "observed_at": 1791420000385
+  },
+  "DAWS_BTSpnpim": {
+   "coin": {
+    "address": "keS4m2DA",
+    "ageMinutes": 5861.1,
+    "dexId": "pumpswap",
+    "fdv": 23709959.0,
+    "liquidityUsd": 441603.63,
+    "marketCap": 23709959.0,
+    "pairAddress": "BTSpnpim",
+    "pairCreatedAt": 1791070406000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 1.31,
+     "h24": 12.86,
+     "h6": 3.93,
+     "m5": 0.6
+    },
+    "priceNative": 0.0002031,
+    "priceUsd": 0.02371,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 48.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "DAWS",
+    "txns": {
+     "h1": {
+      "buys": 166,
+      "sells": 106
+     },
+     "m5": {
+      "buys": 13,
+      "sells": 6
+     }
+    },
+    "updatedAt": 1791422073917,
+    "volume": {
+     "h1": 8248.31,
+     "h24": 207202.34,
+     "h6": 49145.67,
+     "m5": 532.58
+    }
+   },
+   "family": "fake_market_cap_2pct",
+   "observed_at": 1791422073917
+  },
+  "GOIF_8ZMkMgWM": {
+   "coin": {
+    "address": "ViKiUNWG",
+    "ageMinutes": 11237.3,
+    "dexId": "pumpswap",
+    "fdv": 31005279.0,
+    "liquidityUsd": 506047.37,
+    "marketCap": 31005279.0,
+    "pairAddress": "8ZMkMgWM",
+    "pairCreatedAt": 1790745765000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 0.61,
+     "h24": 8.48,
+     "h6": 1.14,
+     "m5": 0.01
+    },
+    "priceNative": 0.0002667,
+    "priceUsd": 0.03101,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 48.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "GOIF",
+    "txns": {
+     "h1": {
+      "buys": 175,
+      "sells": 115
+     },
+     "m5": {
+      "buys": 13,
+      "sells": 9
+     }
+    },
+    "updatedAt": 1791420000397,
+    "volume": {
+     "h1": 8621.97,
+     "h24": 214078.2,
+     "h6": 52300.94,
+     "m5": 630.97
+    }
+   },
+   "family": "fake_market_cap_2pct",
+   "observed_at": 1791420000397
+  },
+  "GOIF_D2pVedgH": {
+   "coin": {
+    "address": "Goh59QCf",
+    "ageMinutes": 2.9,
+    "dexId": "pumpswap",
+    "fdv": 168073558.0,
+    "liquidityUsd": 1172223.28,
+    "marketCap": 168073558.0,
+    "pairAddress": "D2pVedgH",
+    "pairCreatedAt": 1791421067000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 347362.0,
+     "h24": 347362.0,
+     "h6": 347362.0,
+     "m5": 347362.0
+    },
+    "priceNative": 0.001443,
+    "priceUsd": 0.168,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 54.0,
+    "sources": [
+     "gecko-new-pools"
+    ],
+    "symbol": "GOIF",
+    "txns": {
+     "h1": {
+      "buys": 198,
+      "sells": 6
+     },
+     "m5": {
+      "buys": 198,
+      "sells": 6
+     }
+    },
+    "updatedAt": 1791421239315,
+    "volume": {
+     "h1": 576476.16,
+     "h24": 576476.16,
+     "h6": 576476.16,
+     "m5": 576476.16
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791421239315
+  },
+  "IOF_FeCGDeqW": {
+   "coin": {
+    "address": "Vm4SsKRS",
+    "ageMinutes": 452.4,
+    "dexId": "pumpswap",
+    "fdv": 293308452.0,
+    "liquidityUsd": 1545163.3,
+    "marketCap": 293308452.0,
+    "pairAddress": "FeCGDeqW",
+    "pairCreatedAt": 1791384046000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 3.44,
+     "h24": 609202.0,
+     "h6": 49.7,
+     "m5": 0.36
+    },
+    "priceNative": 0.002535,
+    "priceUsd": 0.2933,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 55.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "IOF",
+    "txns": {
+     "h1": {
+      "buys": 2745,
+      "sells": 69
+     },
+     "m5": {
+      "buys": 193,
+      "sells": 5
+     }
+    },
+    "updatedAt": 1791411190613,
+    "volume": {
+     "h1": 33837.31,
+     "h24": 904721.76,
+     "h6": 259214.18,
+     "m5": 2311.73
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791411190613
+  },
+  "OGTRUMP_9rSmRH9w": {
+   "coin": {
+    "address": "FeHhc37a",
+    "ageMinutes": 6.1,
+    "dexId": "pumpswap",
+    "fdv": 194406.0,
+    "liquidityUsd": 38585.74,
+    "marketCap": 194406.0,
+    "pairAddress": "9rSmRH9w",
+    "pairCreatedAt": 1791391450000,
+    "posture": "SETUP",
+    "priceChange": {
+     "h1": 303.0,
+     "h24": 303.0,
+     "h6": 303.0,
+     "m5": 124.0
+    },
+    "priceNative": 1.664e-06,
+    "priceUsd": 0.0001944,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 64.0,
+    "sources": [
+     "latest"
+    ],
+    "symbol": "OGTRUMP",
+    "txns": {
+     "h1": {
+      "buys": 1480,
+      "sells": 860
+     },
+     "m5": {
+      "buys": 1322,
+      "sells": 803
+     }
+    },
+    "updatedAt": 1791391816915,
+    "volume": {
+     "h1": 279414.42,
+     "h24": 279414.42,
+     "h6": 279414.42,
+     "m5": 264750.14
+    }
+   },
+   "family": "young_pool",
+   "observed_at": 1791391816915
+  },
+  "SARP_AdvA19rg": {
+   "coin": {
+    "address": "W7LjdSHi",
+    "ageMinutes": 850.5,
+    "dexId": "pumpswap",
+    "fdv": 271853054.0,
+    "liquidityUsd": 1487002.42,
+    "marketCap": 271853054.0,
+    "pairAddress": "AdvA19rg",
+    "pairCreatedAt": 1791393371000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 3.11,
+     "h24": 558984.0,
+     "h6": 13.89,
+     "m5": 0.36
+    },
+    "priceNative": 0.002351,
+    "priceUsd": 0.2718,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 55.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "SARP",
+    "txns": {
+     "h1": {
+      "buys": 3528,
+      "sells": 58
+     },
+     "m5": {
+      "buys": 240,
+      "sells": 4
+     }
+    },
+    "updatedAt": 1791444401697,
+    "volume": {
+     "h1": 11539.82,
+     "h24": 877239.74,
+     "h6": 65362.58,
+     "m5": 704.53
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791444401697
+  },
+  "SARP_HiPe6mDS": {
+   "coin": {
+    "address": "5z1QmPwL",
+    "ageMinutes": 577.1,
+    "dexId": "pumpswap",
+    "fdv": 77756063.0,
+    "liquidityUsd": 791990.68,
+    "marketCap": 77756063.0,
+    "pairAddress": "HiPe6mDS",
+    "pairCreatedAt": 1791401073000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 1.81,
+     "h24": 160860.0,
+     "h6": 15.22,
+     "m5": 0.11
+    },
+    "priceNative": 0.0006766,
+    "priceUsd": 0.07775,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 55.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "SARP",
+    "txns": {
+     "h1": {
+      "buys": 2376,
+      "sells": 121
+     },
+     "m5": {
+      "buys": 179,
+      "sells": 9
+     }
+    },
+    "updatedAt": 1791435701039,
+    "volume": {
+     "h1": 21366.91,
+     "h24": 546229.64,
+     "h6": 127731.89,
+     "m5": 1630.41
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791435701039
+  },
+  "SharkTank_CRGN2uGj": {
+   "coin": {
+    "address": "MnmvsGrK",
+    "ageMinutes": 32.7,
+    "dexId": "pumpswap",
+    "fdv": 175762.0,
+    "liquidityUsd": 261673.13,
+    "marketCap": 175762.0,
+    "pairAddress": "CRGN2uGj",
+    "pairCreatedAt": 1791433420000,
+    "posture": "SETUP",
+    "priceChange": {
+     "h1": 94.75,
+     "h24": 94.75,
+     "h6": 94.75,
+     "m5": 0.29
+    },
+    "priceNative": 1.528e-06,
+    "priceUsd": 0.0001757,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 89.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "SharkTank",
+    "txns": {
+     "h1": {
+      "buys": 5073,
+      "sells": 3289
+     },
+     "m5": {
+      "buys": 479,
+      "sells": 241
+     }
+    },
+    "updatedAt": 1791435382918,
+    "volume": {
+     "h1": 5165278.0,
+     "h24": 5165278.0,
+     "h6": 5165278.0,
+     "m5": 410873.84
+    }
+   },
+   "family": "lp_pullable",
+   "observed_at": 1791435382918
+  },
+  "TROLL_4w2cysot": {
+   "coin": {
+    "address": "5UUH9RTD",
+    "ageMinutes": 770769.6,
+    "dexId": "pumpswap",
+    "fdv": 39848741.0,
+    "liquidityUsd": 3135336.33,
+    "marketCap": 39859244.0,
+    "pairAddress": "4w2cysot",
+    "pairCreatedAt": 1745173826000,
+    "posture": "SKIP",
+    "priceChange": {
+     "h1": 0.27,
+     "h24": -6.05,
+     "h6": -0.45,
+     "m5": -0.06
+    },
+    "priceNative": 0.0003431,
+    "priceUsd": 0.03989,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 36.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "TROLL",
+    "txns": {
+     "h1": {
+      "buys": 16,
+      "sells": 13
+     },
+     "m5": {
+      "buys": 0,
+      "sells": 3
+     }
+    },
+    "updatedAt": 1791420000411,
+    "volume": {
+     "h1": 7066.28,
+     "h24": 540090.2,
+     "h6": 84847.32,
+     "m5": 30.24
+    }
+   },
+   "family": "established",
+   "observed_at": 1791420000411
+  },
+  "USDP_8RCJrW94": {
+   "coin": {
+    "address": "AeePdtTT",
+    "ageMinutes": 2712.1,
+    "dexId": "pumpswap",
+    "fdv": 609809592.0,
+    "liquidityUsd": 2238233.22,
+    "marketCap": 609809592.0,
+    "pairAddress": "8RCJrW94",
+    "pairCreatedAt": 1791257272000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 2.03,
+     "h24": 77.15,
+     "h6": 15.11,
+     "m5": 0.17
+    },
+    "priceNative": 0.005245,
+    "priceUsd": 0.6098,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 51.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "USDP",
+    "txns": {
+     "h1": {
+      "buys": 1347,
+      "sells": 109
+     },
+     "m5": {
+      "buys": 96,
+      "sells": 7
+     }
+    },
+    "updatedAt": 1791420000361,
+    "volume": {
+     "h1": 37745.09,
+     "h24": 987084.53,
+     "h6": 248972.82,
+     "m5": 2693.72
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791420000361
+  },
+  "WOSE_GhBPuDpt": {
+   "coin": {
+    "address": "HSg85Naq",
+    "ageMinutes": 409.6,
+    "dexId": "pumpswap",
+    "fdv": 234574973.0,
+    "liquidityUsd": 1379241.0,
+    "marketCap": 234574973.0,
+    "pairAddress": "GhBPuDpt",
+    "pairCreatedAt": 1791418313000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 4.35,
+     "h24": 485599.0,
+     "h6": 32.98,
+     "m5": -0.16
+    },
+    "priceNative": 0.002033,
+    "priceUsd": 0.2345,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 51.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "WOSE",
+    "txns": {
+     "h1": {
+      "buys": 742,
+      "sells": 63
+     },
+     "m5": {
+      "buys": 52,
+      "sells": 5
+     }
+    },
+    "updatedAt": 1791442890551,
+    "volume": {
+     "h1": 30157.61,
+     "h24": 781748.04,
+     "h6": 181862.81,
+     "m5": 2082.68
+    }
+   },
+   "family": "fake_market_cap",
+   "observed_at": 1791442890551
+  },
+  "knightcat_7puXhhDF": {
+   "coin": {
+    "address": "JBhaALoY",
+    "ageMinutes": 423.0,
+    "dexId": "pumpswap",
+    "fdv": 218138.0,
+    "liquidityUsd": 301223.41,
+    "marketCap": 218138.0,
+    "pairAddress": "7puXhhDF",
+    "pairCreatedAt": 1791401441000,
+    "posture": "SETUP",
+    "priceChange": {
+     "h1": 17.74,
+     "h24": 254.0,
+     "h6": 135.0,
+     "m5": 4.11
+    },
+    "priceNative": 1.874e-06,
+    "priceUsd": 0.0002181,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 81.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "knightcat",
+    "txns": {
+     "h1": {
+      "buys": 1303,
+      "sells": 1299
+     },
+     "m5": {
+      "buys": 108,
+      "sells": 107
+     }
+    },
+    "updatedAt": 1791426824573,
+    "volume": {
+     "h1": 3112734.47,
+     "h24": 22432027.6,
+     "h6": 19367359.09,
+     "m5": 258987.32
+    }
+   },
+   "family": "lp_pullable",
+   "observed_at": 1791426824573
+  },
+  "neet_5wNu5Qhd": {
+   "coin": {
+    "address": "Ce2gx9KG",
+    "ageMinutes": 761741.8,
+    "dexId": "pumpswap",
+    "fdv": 34069681.0,
+    "liquidityUsd": 1994133.24,
+    "marketCap": 34069698.0,
+    "pairAddress": "5wNu5Qhd",
+    "pairCreatedAt": 1745715491000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": -0.51,
+     "h24": -11.37,
+     "h6": -1.44,
+     "m5": 0.44
+    },
+    "priceNative": 0.0002931,
+    "priceUsd": 0.03407,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 51.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "neet",
+    "txns": {
+     "h1": {
+      "buys": 58,
+      "sells": 88
+     },
+     "m5": {
+      "buys": 1,
+      "sells": 1
+     }
+    },
+    "updatedAt": 1791420000372,
+    "volume": {
+     "h1": 13245.94,
+     "h24": 737994.65,
+     "h6": 326076.14,
+     "m5": 193.16
+    }
+   },
+   "family": "established",
+   "observed_at": 1791420000372
+  }
+ },
+ "paid_profile_example": {
+  "coin": {
+   "address": "85WdpEBN",
+   "ageMinutes": 97.1,
+   "dexId": "pumpswap",
+   "fdv": 138348.0,
+   "liquidityUsd": 34420.42,
+   "marketCap": 138348.0,
+   "pairAddress": "28CJf2tS",
+   "pairCreatedAt": 1791356636000,
+   "posture": "SETUP",
+   "priceChange": {
+    "h1": -3.14,
+    "h24": 206.0,
+    "h6": 206.0,
+    "m5": 14.4
+   },
+   "priceNative": 1.241e-06,
+   "priceUsd": 0.000147,
+   "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+   "score": 92.0,
+   "sources": [
+    "latest"
+   ],
+   "symbol": "HASHERS",
+   "txns": {
+    "h1": {
+     "buys": 3759,
+     "sells": 2768
+    },
+    "m5": {
+     "buys": 122,
+     "sells": 104
+    }
+   },
+   "updatedAt": 1791362460759,
+   "volume": {
+    "h1": 370442.28,
+    "h24": 796694.78,
+    "h6": 796694.78,
+    "m5": 15613.2
+   }
+  },
+  "observed_at": 1791362460759
+ },
+ "reference_now_ms": 1791420000000,
+ "source": "research scan log obs.sqlite3 table o (engine DexScreener observations, 2026-10-07/08, 22.8 h, PAPER research); read-only extraction",
+ "ticker_universe": [
+  {
+   "first_seen": 1791382160095,
+   "mint": "9cRCn9rG",
+   "pair": "FnzKY6x7",
+   "symbol": "ANSEM",
+   "ticker": "ansem"
+  },
+  {
+   "first_seen": 1791382159772,
+   "mint": "Ai66LHZG",
+   "pair": "HMzvsEEm",
+   "symbol": "CATE",
+   "ticker": "cate"
+  },
+  {
+   "first_seen": 1791411564323,
+   "mint": "BSBxZN2a",
+   "pair": "E6wuSkGL",
+   "symbol": "CATE",
+   "ticker": "cate"
+  },
+  {
+   "first_seen": 1791412326219,
+   "mint": "7zAJRt2m",
+   "pair": "FsWZXF9g",
+   "symbol": "CATE!",
+   "ticker": "cate"
+  },
+  {
+   "first_seen": 1791403122087,
+   "mint": "keS4m2DA",
+   "pair": "BTSpnpim",
+   "symbol": "DAWS",
+   "ticker": "daws"
+  },
+  {
+   "first_seen": 1791392470340,
+   "mint": "aR2sB3Pt",
+   "pair": "AzfHgMbz",
+   "symbol": "GOIF",
+   "ticker": "goif"
+  },
+  {
+   "first_seen": 1791399385250,
+   "mint": "ViKiUNWG",
+   "pair": "8ZMkMgWM",
+   "symbol": "GOIF",
+   "ticker": "goif"
+  },
+  {
+   "first_seen": 1791421239315,
+   "mint": "Goh59QCf",
+   "pair": "D2pVedgH",
+   "symbol": "GOIF",
+   "ticker": "goif"
+  },
+  {
+   "first_seen": 1791377328704,
+   "mint": "6pkFn5mJ",
+   "pair": "A6gqKgHr",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791400139574,
+   "mint": "Vm4SsKRS",
+   "pair": "FeCGDeqW",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791407694994,
+   "mint": "HxCRQnqe",
+   "pair": "GguTnStb",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791408685605,
+   "mint": "2pN4A6PF",
+   "pair": "3oKvxwy5",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791411666321,
+   "mint": "2sY7rkMC",
+   "pair": "7wCarEYc",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791417744948,
+   "mint": "GxX6Eauq",
+   "pair": "3h94MKHu",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791427750778,
+   "mint": "kjmkD4Nf",
+   "pair": "4RJjYb7Z",
+   "symbol": "IOF",
+   "ticker": "iof"
+  },
+  {
+   "first_seen": 1791412239846,
+   "mint": "JBhaALoY",
+   "pair": "7puXhhDF",
+   "symbol": "knightcat",
+   "ticker": "knightcat"
+  },
+  {
+   "first_seen": 1791397035371,
+   "mint": "Ce2gx9KG",
+   "pair": "5wNu5Qhd",
+   "symbol": "neet",
+   "ticker": "neet"
+  },
+  {
+   "first_seen": 1791427275808,
+   "mint": "GvfLGX3K",
+   "pair": "HCZfU5Er",
+   "symbol": "Neet",
+   "ticker": "neet"
+  },
+  {
+   "first_seen": 1791427992924,
+   "mint": "5bXMbmL5",
+   "pair": "HQZkVkyK",
+   "symbol": "Neet",
+   "ticker": "neet"
+  },
+  {
+   "first_seen": 1791391816915,
+   "mint": "FeHhc37a",
+   "pair": "9rSmRH9w",
+   "symbol": "OGTRUMP",
+   "ticker": "ogtrump"
+  },
+  {
+   "first_seen": 1791373231759,
+   "mint": "9nVFoPMX",
+   "pair": "EumDiwwg",
+   "symbol": "SARP",
+   "ticker": "sarp"
+  },
+  {
+   "first_seen": 1791392470306,
+   "mint": "Ph1ie3e4",
+   "pair": "EpakUVUm",
+   "symbol": "SARP",
+   "ticker": "sarp"
+  },
+  {
+   "first_seen": 1791403122116,
+   "mint": "WBeE75pk",
+   "pair": "HcawRxRH",
+   "symbol": "SARP",
+   "ticker": "sarp"
+  },
+  {
+   "first_seen": 1791417296762,
+   "mint": "W7LjdSHi",
+   "pair": "AdvA19rg",
+   "symbol": "SARP",
+   "ticker": "sarp"
+  },
+  {
+   "first_seen": 1791435701039,
+   "mint": "5z1QmPwL",
+   "pair": "HiPe6mDS",
+   "symbol": "SARP",
+   "ticker": "sarp"
+  },
+  {
+   "first_seen": 1791418363027,
+   "mint": "FwdDni9d",
+   "pair": "AHN65ini",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791418537482,
+   "mint": "7XqZYJdP",
+   "pair": "HpY1DScH",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791418829246,
+   "mint": "HaQdrXRU",
+   "pair": "65GHmCby",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791418890797,
+   "mint": "BDnciiSE",
+   "pair": "A478nHsN",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791419444237,
+   "mint": "39bKLjhD",
+   "pair": "C5LWhvF1",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791419735355,
+   "mint": "3nUtippZ",
+   "pair": "BYBAMhXJ",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791419735366,
+   "mint": "AGaJPNG1",
+   "pair": "8ao6s5kg",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791419799543,
+   "mint": "Es8mip43",
+   "pair": "CaEWd2an",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791420221531,
+   "mint": "AUwhdJ4d",
+   "pair": "H5h8sz5j",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791420642258,
+   "mint": "7mSeqYds",
+   "pair": "BDzdpr6H",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791420818407,
+   "mint": "9r3bLHbQ",
+   "pair": "8QxadkMB",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791421130304,
+   "mint": "CL8LizE4",
+   "pair": "3NBAZRXV",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791421481760,
+   "mint": "C6LU94td",
+   "pair": "AkcHq77T",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791421723245,
+   "mint": "BgoP3PmD",
+   "pair": "2LDjB6tq",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791422095372,
+   "mint": "4xSgkiqg",
+   "pair": "GzrGBgC5",
+   "symbol": "Shark Tank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791422211645,
+   "mint": "9NLAZr29",
+   "pair": "BtigAEEf",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791422445538,
+   "mint": "QRDbqQse",
+   "pair": "7pQaFYRA",
+   "symbol": "Shark Tank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791423176551,
+   "mint": "4AKpdEGB",
+   "pair": "F917tiyY",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791423414517,
+   "mint": "7RLGVPbR",
+   "pair": "5s5fWaDw",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791423775703,
+   "mint": "2ZSX6nh6",
+   "pair": "Cxnnakhb",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791423830731,
+   "mint": "BGRbuoY2",
+   "pair": "H9vhZ4c5",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791424255858,
+   "mint": "ADdsWNFY",
+   "pair": "9bEj5wL5",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791424508671,
+   "mint": "EC1QMyrk",
+   "pair": "3FqcAEi4",
+   "symbol": "Shark Tank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791425277821,
+   "mint": "3rD47chk",
+   "pair": "Eb57scWK",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791425395618,
+   "mint": "HeFwcS8c",
+   "pair": "9wko9iCX",
+   "symbol": "Shark Tank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791425467333,
+   "mint": "CFBt9hJt",
+   "pair": "7273MKGi",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791427091844,
+   "mint": "25J4nhSp",
+   "pair": "DpgxSxJZ",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791428355676,
+   "mint": "3WZEdy8N",
+   "pair": "4N8vJNfn",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791428593536,
+   "mint": "5Xq3Qer8",
+   "pair": "Aevs8mvZ",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791428660428,
+   "mint": "5GxsrCH9",
+   "pair": "3nj42eii",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791429801114,
+   "mint": "6tPz7XyK",
+   "pair": "9j63UKN3",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791431858215,
+   "mint": "6szfwLKg",
+   "pair": "F8zUagqb",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791432324547,
+   "mint": "8SSJHZCv",
+   "pair": "B27dzudX",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791432685117,
+   "mint": "6qnrcTva",
+   "pair": "6zPBL2oc",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791433760671,
+   "mint": "MnmvsGrK",
+   "pair": "CRGN2uGj",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791435396173,
+   "mint": "5P2kBjBT",
+   "pair": "7QjGkRoK",
+   "symbol": "SharkTank",
+   "ticker": "sharktank"
+  },
+  {
+   "first_seen": 1791377873249,
+   "mint": "BN5Fh9Nu",
+   "pair": "4tmQKCP3",
+   "symbol": "Troll",
+   "ticker": "troll"
+  },
+  {
+   "first_seen": 1791392470560,
+   "mint": "5UUH9RTD",
+   "pair": "4w2cysot",
+   "symbol": "TROLL",
+   "ticker": "troll"
+  },
+  {
+   "first_seen": 1791365347186,
+   "mint": "ED5cdsNf",
+   "pair": "2vZhCuCR",
+   "symbol": "USDP",
+   "ticker": "usdp"
+  },
+  {
+   "first_seen": 1791365826275,
+   "mint": "BqXPsYUK",
+   "pair": "7VDog5qa",
+   "symbol": "USDP",
+   "ticker": "usdp"
+  },
+  {
+   "first_seen": 1791392470264,
+   "mint": "AeePdtTT",
+   "pair": "8RCJrW94",
+   "symbol": "USDP",
+   "ticker": "usdp"
+  },
+  {
+   "first_seen": 1791412209907,
+   "mint": "442kHX8v",
+   "pair": "4RaxuEry",
+   "symbol": "USDP",
+   "ticker": "usdp"
+  },
+  {
+   "first_seen": 1791432937403,
+   "mint": "FHjh2ps1",
+   "pair": "EqAAhWGE",
+   "symbol": "USDP",
+   "ticker": "usdp"
+  },
+  {
+   "first_seen": 1791374069052,
+   "mint": "EgSbbWBK",
+   "pair": "DNGD1SwQ",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  },
+  {
+   "first_seen": 1791390351062,
+   "mint": "GnTaEA9J",
+   "pair": "9WC8faVn",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  },
+  {
+   "first_seen": 1791391605118,
+   "mint": "tX76eTYS",
+   "pair": "GaVFbagN",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  },
+  {
+   "first_seen": 1791416229674,
+   "mint": "HVrMeoah",
+   "pair": "4H4ZXivP",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  },
+  {
+   "first_seen": 1791437222835,
+   "mint": "WqxrZALC",
+   "pair": "BAPyQHY6",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  },
+  {
+   "first_seen": 1791442890551,
+   "mint": "HSg85Naq",
+   "pair": "GhBPuDpt",
+   "symbol": "WOSE",
+   "ticker": "wose"
+  }
+ ],
+ "troll_series": [
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419040892
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419051856
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419065045
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419077256
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419089448
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419101378
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419113900
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419125972
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419138249
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419150477
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419162733
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419175103
+  },
+  {
+   "priceUsd": 0.04011,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419187288
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419200427
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419212993
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419224418
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419237805
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419250230
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419262698
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419275168
+  },
+  {
+   "priceUsd": 0.04007,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419287360
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419299849
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419312623
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419324568
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419337354
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419349867
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419361807
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419373942
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419385641
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419398664
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419409701
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419420741
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419430853
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419444108
+  },
+  {
+   "priceUsd": 0.0401,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419456218
+  },
+  {
+   "priceUsd": 0.04012,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419468757
+  },
+  {
+   "priceUsd": 0.04012,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419481503
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419493848
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419506159
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419519037
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419532254
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419545323
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419557963
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419570980
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419583553
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419593676
+  },
+  {
+   "priceUsd": 0.03995,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419604723
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419615538
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419628290
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419641372
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419654766
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419667404
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419679969
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419691791
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419703787
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419716361
+  },
+  {
+   "priceUsd": 0.04015,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419728590
+  },
+  {
+   "priceUsd": 0.03992,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419738830
+  },
+  {
+   "priceUsd": 0.03992,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419750344
+  },
+  {
+   "priceUsd": 0.03992,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419762968
+  },
+  {
+   "priceUsd": 0.03992,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419775436
+  },
+  {
+   "priceUsd": 0.03992,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419787318
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419799890
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419811872
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419824179
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419835128
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419846994
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419859410
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419871304
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419882950
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419895514
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419905812
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419916220
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419927276
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419938972
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419949798
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419961193
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419971842
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419982696
+  },
+  {
+   "priceUsd": 0.03989,
+   "sources": [
+    "pumpswap-address-catalog"
+   ],
+   "t": 1791419993151
+  }
+ ]
+}

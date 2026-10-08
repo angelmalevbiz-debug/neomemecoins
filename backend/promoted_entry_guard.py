@@ -6,7 +6,9 @@ execution signal. It never changes completed outcomes or manages existing exits.
 import math
 
 VERSION = 'PROMOTED_EVIDENCE_COST_V1'
-FUNDED_POLICY_VERSION = 'PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V4'
+# V5 (2026-10-08): the V4 funded screen and evidence gates behind
+# DEFENSIVE_ENTRY_LAYER_V1 in strategy_lab.py; the gates below are unchanged.
+FUNDED_POLICY_VERSION = 'PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5'
 FLOW_SOURCE = 'CONFIRMED_PUMPSWAP_WINDOW'
 FLOW_MAX_AGE_MS = 12_000
 FLOW_WINDOW_MS = 30_000

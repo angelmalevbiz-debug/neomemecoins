@@ -25,6 +25,29 @@ import engine_exit_policy as exit_policy
 import order_flow_adaptive_oct4 as oct4
 import promoted_entry_guard as promoted_guard
 import winner_ensemble
+import entry_defense as _isolation_entry_defense
+import market_monitor as _isolation_engine
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_engine.Monitor, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 A, B, C = 'A' * 44, 'B' * 44, 'C' * 44
 
@@ -103,16 +126,16 @@ class Oct4EntryTests(unittest.TestCase):
     def test_01_valid_historical_entry_passes(self):
         report = self.open_once()
         self.assertEqual(report['status'], 'opened')
-        self.assertEqual(report['policy_version'], 'ORDER_FLOW_BALANCED_V4')
+        self.assertEqual(report['policy_version'], 'ORDER_FLOW_BALANCED_V5')
         self.assertEqual(report['signal_strategy'], 'ORDER_FLOW_ADAPTIVE')
         self.assertEqual(len(m.STATE.positions), 1)
         pos = m.STATE.positions[0]
         self.assertEqual(pos['strategy_id'], 'ORDER_FLOW_ADAPTIVE')
-        self.assertEqual(pos['entry_policy_version'], 'ORDER_FLOW_BALANCED_V4')
+        self.assertEqual(pos['entry_policy_version'], 'ORDER_FLOW_BALANCED_V5')
         self.assertEqual(pos['exit_policy'], 'adaptive')
         self.assertEqual(pos['exit_policy_version'], exit_policy.ADAPTIVE_VERSION)
         self.assertEqual(pos['learning_mode'], 'ADAPTIVE_CONTEXT_HOLD')
-        self.assertEqual(pos['entry_mode'], 'ORDER_FLOW_BALANCED_V4')
+        self.assertEqual(pos['entry_mode'], 'ORDER_FLOW_BALANCED_V5')
         self.assertEqual(pos['signal_evidence'], oct4.SIGNAL_EVIDENCE)
         self.assertEqual(pos['notional_usd'], 200)
         self.assertEqual(pos['entry_hold_mode'], 'STRONG')
@@ -497,7 +520,7 @@ class Oct4ConfigTests(unittest.TestCase):
     def test_50_state_exposes_strategy_identity_and_ownership(self):
         config = m.STATE.snapshot()['config']
         expected = {
-            'signal_strategy': 'ORDER_FLOW_ADAPTIVE', 'entry_policy_version': 'ORDER_FLOW_BALANCED_V4',
+            'signal_strategy': 'ORDER_FLOW_ADAPTIVE', 'entry_policy_version': 'ORDER_FLOW_BALANCED_V5',
             'exit_policy': 'adaptive', 'exit_policy_version': exit_policy.ADAPTIVE_VERSION,
             'learning_mode': 'ADAPTIVE_CONTEXT_HOLD', 'scan_seconds': 15, 'position_scan_seconds': 2.0,
             'max_positions': 1, 'trade_notional_usd': 200.0, 'max_daily_loss_usd': 100.0,
@@ -519,7 +542,7 @@ class Oct4ConfigTests(unittest.TestCase):
         self.assertIn('ORDER_FLOW_ADAPTIVE', config['effective_entry_thresholds'])
         self.assertEqual(config['config_ownership']['scan_seconds'], 'strategy_profile:ORDER_FLOW_ADAPTIVE')
         self.assertEqual(config['config_ownership']['environment_overrides_honored'], 'none for strategy values')
-        self.assertEqual(m.STATE.entry_diagnostics['policy_version'], 'ORDER_FLOW_BALANCED_V4')
+        self.assertEqual(m.STATE.entry_diagnostics['policy_version'], 'ORDER_FLOW_BALANCED_V5')
 
     def test_51_effective_config_hash_distinguishes_strategies(self):
         adaptive = m.effective_config_hash()

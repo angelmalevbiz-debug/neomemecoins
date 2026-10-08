@@ -38,16 +38,42 @@ import market_monitor as m
 import cost_first_engine_profile as cfp
 import cost_first_established as cost_first
 import engine_exit_policy as exit_policy
+import entry_defense
+import structural_rug_guard
 import order_flow_adaptive_oct4 as oct4
 import promoted_entry_guard as promoted_guard
 import winner_ensemble
+import entry_defense as _isolation_entry_defense
+import market_monitor as _isolation_engine
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_engine.Monitor, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 A, B, C = 'A' * 44, 'B' * 44, 'C' * 44
 SOL = cost_first.SOL_QUOTE_MINT
 TOKENS_PER_USD = 1_000_000  # fixture route: 1 token (6 decimals) per quoted USD
 
 # effective_config_hash of the two existing strategies, computed on origin/main 69be225
-# before this profile existed (code defaults, no NEO_* overrides). They must not move.
+# before this profile existed (code defaults, no NEO_* overrides). The cost-first profile
+# left them unchanged; DEFENSIVE_ENTRY_LAYER_V1 changes both visibly.
 DEFAULT_HASH_AT_69BE225 = 'fe08e29c142e0675cfbde9c6d4728a0a4429a64797fdec4ef7532ca6a183e62c'
 ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c200156fdefaeae4f3666ecdc4'
 
@@ -59,9 +85,23 @@ def universe_coin(now, **overrides):
             'score': 40, 'liquidityUsd': 400_000, 'marketCap': 10_000_000, 'priceUsd': .001,
             'priceNative': .00001, 'ageMinutes': 9000, 'priceChange': {'m5': 0.2, 'h1': -1.0},
             'txns': {'m5': {'buys': 20, 'sells': 18}}, 'volume': {'h1': 50000}, 'signals': [],
-            'updatedAt': now}
+            'updatedAt': now, 'pairCreatedAt': now - 9000 * 60_000}
     coin.update(overrides)
     return coin
+
+
+# The universe includes STRUCTURAL_RUG_GUARD_V1 (cost_first_established V2); the
+# pure checks run at a fixed clock with an empty ticker registry, as a fresh engine.
+FIXED_NOW = 1_800_000_000_000
+REGISTRY = structural_rug_guard.TickerRegistry()
+
+
+def universe_rejections(coin, cap_usd):
+    return cfp.universe_rejections(coin, cap_usd, now=FIXED_NOW, ticker_registry=REGISTRY)
+
+
+def universe_metrics(coin, cap_usd):
+    return cfp.universe_metrics(coin, cap_usd, now=FIXED_NOW, ticker_registry=REGISTRY)
 
 
 def confirmed_flow(now, **overrides):
@@ -78,39 +118,39 @@ class UniverseAndSizeRuleTests(unittest.TestCase):
     """The profile imports the merged cost-first definitions; it never restates them."""
 
     def test_universe_candidate_passes(self):
-        coin = universe_coin(1)
-        self.assertEqual(cfp.universe_rejections(coin, 200.0), [])
-        metrics = cfp.universe_metrics(coin, 200.0)
+        coin = universe_coin(FIXED_NOW)
+        self.assertEqual(universe_rejections(coin, 200.0), [])
+        metrics = universe_metrics(coin, 200.0)
         self.assertEqual(metrics['fee_tier_bps'], 30.0)
         self.assertEqual(metrics['planned_notional_usd'], 200.0)
         self.assertLessEqual(metrics['fee_impact_roundtrip_pct'], 1.2)
         self.assertFalse(metrics['is_execution_quote'])
 
     def test_fee_tier_above_50_bps_rejects(self):
-        coin = universe_coin(1, marketCap=500_000)   # 5,000 SOL -> 100 bps
-        self.assertEqual(cfp.universe_rejections(coin, 200.0), ['fee_tier_above_maximum'])
-        self.assertEqual(cfp.universe_metrics(coin, 200.0)['fee_tier_bps'], 100.0)
+        coin = universe_coin(FIXED_NOW, marketCap=500_000)   # 5,000 SOL -> 100 bps
+        self.assertEqual(universe_rejections(coin, 200.0), ['fee_tier_above_maximum'])
+        self.assertEqual(universe_metrics(coin, 200.0)['fee_tier_bps'], 100.0)
 
     def test_liquidity_below_250k_rejects(self):
-        self.assertEqual(cfp.universe_rejections(universe_coin(1, liquidityUsd=249_999), 200.0),
+        self.assertEqual(universe_rejections(universe_coin(FIXED_NOW, liquidityUsd=249_999), 200.0),
                          ['liquidity_below_minimum'])
 
     def test_fee_plus_impact_above_1_2_pct_rejects(self):
-        coin = universe_coin(1, marketCap=6_000_000, liquidityUsd=250_000)   # 50 bps tier, thin for its size
-        self.assertEqual(cfp.universe_rejections(coin, 250.0), ['fee_impact_roundtrip_above_maximum'])
-        self.assertGreater(cfp.universe_metrics(coin, 250.0)['fee_impact_roundtrip_pct'], 1.2)
+        coin = universe_coin(FIXED_NOW, marketCap=6_000_000, liquidityUsd=250_000)   # 50 bps tier, thin for its size
+        self.assertEqual(universe_rejections(coin, 250.0), ['fee_impact_roundtrip_above_maximum'])
+        self.assertGreater(universe_metrics(coin, 250.0)['fee_impact_roundtrip_pct'], 1.2)
 
     def test_non_pumpswap_or_non_sol_or_unknown_cap_rejects(self):
-        self.assertIn('dex_not_pumpswap', cfp.universe_rejections(universe_coin(1, dexId='raydium'), 200.0))
-        self.assertIn('quote_token_not_sol', cfp.universe_rejections(
-            universe_coin(1, quoteTokenAddress='USDC', quoteToken={'address': 'USDC'}), 200.0))
-        self.assertEqual(cfp.universe_rejections(universe_coin(1, marketCap=None, fdv=None), 200.0),
+        self.assertIn('dex_not_pumpswap', universe_rejections(universe_coin(FIXED_NOW, dexId='raydium'), 200.0))
+        self.assertIn('quote_token_not_sol', universe_rejections(
+            universe_coin(FIXED_NOW, quoteTokenAddress='USDC', quoteToken={'address': 'USDC'}), 200.0))
+        self.assertEqual(universe_rejections(universe_coin(FIXED_NOW, marketCap=None, fdv=None), 200.0),
                          ['market_cap_unknown'])
 
     def test_size_rule_only_shrinks_the_engine_notional(self):
-        self.assertEqual(cfp.requested_notional(universe_coin(1), 200.0), 200.0)
-        self.assertEqual(cfp.requested_notional(universe_coin(1, liquidityUsd=300_000), 500.0), 300.0)
-        self.assertEqual(cfp.requested_notional(universe_coin(1, liquidityUsd=0), 500.0), 0.0)
+        self.assertEqual(cfp.requested_notional(universe_coin(FIXED_NOW), 200.0), 200.0)
+        self.assertEqual(cfp.requested_notional(universe_coin(FIXED_NOW, liquidityUsd=300_000), 500.0), 300.0)
+        self.assertEqual(cfp.requested_notional(universe_coin(FIXED_NOW, liquidityUsd=0), 500.0), 0.0)
         self.assertEqual(cfp.SIZE_POLICY, 'COST_FIRST_LIQUIDITY_SCALED_V1')
 
 
@@ -121,6 +161,9 @@ class CostFirstEntryTests(unittest.TestCase):
         m.STATE_PATH.unlink(missing_ok=True)
         m.STATE = m.State()
         self.monitor = m.Monitor()
+        # A fresh, non-persistent defensive layer per test: no ticker memory
+        # leaks between tests through the sidecar next to the shared state path.
+        self.monitor._entry_defense = entry_defense.DefensiveEntryLayer()
         self.addCleanup(self.monitor.stop)
         now = m.now_ms()
         self.coin = universe_coin(now)
@@ -172,12 +215,12 @@ class CostFirstEntryTests(unittest.TestCase):
     def test_valid_universe_entry_opens_with_profile_identity(self):
         report = self.open_once()
         self.assertEqual(report['status'], 'opened', report)
-        self.assertEqual(report['policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V1')
+        self.assertEqual(report['policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V2')
         self.assertEqual(report['signal_strategy'], 'COST_FIRST_ESTABLISHED_PAPER_V1')
         pos = m.STATE.positions[0]
         self.assertEqual(pos['strategy_id'], cfp.STRATEGY_ID)
-        self.assertEqual(pos['entry_policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V1')
-        self.assertEqual(pos['entry_mode'], 'COST_FIRST_ESTABLISHED_ENTRY_V1')
+        self.assertEqual(pos['entry_policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V2')
+        self.assertEqual(pos['entry_mode'], 'COST_FIRST_ESTABLISHED_ENTRY_V2')
         self.assertEqual(pos['exit_policy'], 'cost_first')
         self.assertEqual(pos['exit_policy_version'], 'COST_FIRST_NET_EXIT_V1')
         self.assertEqual(pos['signal_evidence'], cfp.SIGNAL_EVIDENCE)
@@ -219,7 +262,9 @@ class CostFirstEntryTests(unittest.TestCase):
     def test_ensemble_market_rule_is_not_the_screen(self):
         # Score 40 fails every ensemble rule; the cost-first universe does not gate on score.
         self.assertFalse(winner_ensemble.market_candidates(self.coin))
-        self.assertTrue(m.market_candidate(self.coin))
+        self.assertTrue(m.market_candidate(self.coin, m.now_ms(), self.monitor.defense.registry))
+        # The universe's structural rug guard fails closed without a ticker registry.
+        self.assertFalse(m.market_candidate(self.coin, m.now_ms()))
         self.assertEqual(self.open_once()['status'], 'opened')
 
     def test_confirmed_exact_pool_flow_is_still_required(self):
@@ -668,7 +713,7 @@ class CostFirstConfigTests(unittest.TestCase):
 
     def test_state_config_publishes_profile_and_engine_owned_limits(self):
         config = m.STATE.snapshot()['config']
-        expected = {'signal_strategy': cfp.STRATEGY_ID, 'entry_policy_version': 'COST_FIRST_ESTABLISHED_ENTRY_V1',
+        expected = {'signal_strategy': cfp.STRATEGY_ID, 'entry_policy_version': 'COST_FIRST_ESTABLISHED_ENTRY_V2',
                     'exit_policy': 'cost_first', 'exit_policy_version': 'COST_FIRST_NET_EXIT_V1',
                     'exit_impact_emergency_version': 'EXIT_IMPACT_EMERGENCY_V2',
                     'learning_mode': cfp.LEARNING_MODE, 'ensemble_strategies': [cfp.STRATEGY_ID],
@@ -704,7 +749,7 @@ class CostFirstConfigTests(unittest.TestCase):
         self.assertFalse(profile['profitability_proven'])
         self.assertIn(cfp.STRATEGY_ID, config['effective_entry_thresholds'])
         self.assertEqual(config['effective_config_hash'], m.effective_config_hash())
-        self.assertEqual(m.STATE.entry_diagnostics['policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V1')
+        self.assertEqual(m.STATE.entry_diagnostics['policy_version'], 'COST_FIRST_ESTABLISHED_ENTRY_V2')
 
     def test_effective_config_hash_differs_and_includes_the_profile(self):
         cost_first_hash = m.effective_config_hash()
@@ -718,13 +763,21 @@ class CostFirstConfigTests(unittest.TestCase):
         with patch.object(cfp, 'EIE_VERSION', 'EXIT_IMPACT_EMERGENCY_V3_PROBE'):
             self.assertNotEqual(m.effective_config_hash(), cost_first_hash, 'the profile is part of the hash')
 
-    def test_default_and_order_flow_adaptive_hashes_are_unchanged(self):
+    def test_default_and_order_flow_adaptive_hashes_change_visibly_with_the_defensive_layer(self):
+        # DEFENSIVE_ENTRY_LAYER_V1, the V5 entry policies and the V2 score model are
+        # behaviour changes, so neither pre-layer hash may survive (2026-10-08).
         if _ENV_OVERRIDES_AT_IMPORT:
             self.skipTest(f'environment overrides change the engine hash: {_ENV_OVERRIDES_AT_IMPORT}')
-        m.activate_strategy(m.DEFAULT_SIGNAL_STRATEGY)
-        self.assertEqual(m.effective_config_hash(), DEFAULT_HASH_AT_69BE225)
-        m.activate_strategy(oct4.STRATEGY_ID)
-        self.assertEqual(m.effective_config_hash(), ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225)
+        for strategy, old in ((m.DEFAULT_SIGNAL_STRATEGY, DEFAULT_HASH_AT_69BE225),
+                              (oct4.STRATEGY_ID, ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225)):
+            with self.subTest(strategy=strategy):
+                m.activate_strategy(strategy)
+                current = m.effective_config_hash()
+                self.assertNotEqual(current, old)
+                with patch.object(entry_defense, 'VERSION', 'DEFENSIVE_ENTRY_LAYER_PROBE'):
+                    self.assertNotEqual(m.effective_config_hash(), current, 'the layer is part of the hash')
+                with patch.object(m, 'SCORE_VERSION', 'NEO_MARKET_SCORE_PROBE'):
+                    self.assertNotEqual(m.effective_config_hash(), current, 'the score model is part of the hash')
 
     def test_engine_defaults_restored_and_unknown_fails_closed(self):
         self.assertEqual((m.MAX_POSITIONS, m.SCAN_SECONDS, m.TRADE_NOTIONAL_USD, m.MAX_DAILY_LOSS_USD,
@@ -753,7 +806,7 @@ class CostFirstConfigTests(unittest.TestCase):
         env = dict(os.environ, PYTHONPATH=backend, NEO_SIGNAL_STRATEGY=cfp.STRATEGY_ID, PYTHONUTF8='1')
         out = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True, timeout=120)
         self.assertEqual(out.returncode, 0, out.stderr)
-        self.assertEqual(out.stdout.split(), [cfp.STRATEGY_ID, 'COST_FIRST_ESTABLISHED_ENTRY_V1', 'cost_first',
+        self.assertEqual(out.stdout.split(), [cfp.STRATEGY_ID, 'COST_FIRST_ESTABLISHED_ENTRY_V2', 'cost_first',
                                               'COST_FIRST_NET_EXIT_V1'])
         env['NEO_SIGNAL_STRATEGY'] = 'COST_FIRST_UNKNOWN'
         out = subprocess.run([sys.executable, '-c', script], env=env, capture_output=True, text=True, timeout=120)

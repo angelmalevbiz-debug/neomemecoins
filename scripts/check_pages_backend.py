@@ -18,12 +18,16 @@ BACKEND = "https://neo-meme-api.169-58-211-177.sslip.io"
 ORIGIN = "https://angelmalevbiz-debug.github.io"
 # Entry policy labels a repaired shared backend may publish in ``config.entry_policy_version``.
 # The current shared PAPER account publishes winner_ensemble.ENTRY_POLICY_VERSION
-# (strategy-lock.json ``entry_policy_version``). ORDER_FLOW_BALANCED_V4 is the label of
-# the opt-in ORDER_FLOW_ADAPTIVE per-account profile (PR #10) and of the legacy 2026-10-04
-# records. The two older labels are the 2026-10-05
-# validated-threshold repair and the first ensemble release; both remain accepted so a
-# backend that has not yet been updated still passes the schema part of this probe.
+# (strategy-lock.json ``entry_policy_version``): V5 since DEFENSIVE_ENTRY_LAYER_V1.
+# ORDER_FLOW_BALANCED_V5 is the label of the opt-in ORDER_FLOW_ADAPTIVE per-account
+# profile behind the same layer; ORDER_FLOW_BALANCED_V4 is its earlier label (PR #10)
+# and that of the legacy 2026-10-04 records. The V4 ensemble label and the two older
+# labels (the 2026-10-05 validated-threshold repair and the first ensemble release)
+# remain accepted so a backend that has not yet been updated still passes the schema
+# part of this probe.
 SUPPORTED_ENTRY_POLICIES = {
+    "WINNER_ENSEMBLE_VERIFIED_ENTRY_V5",
+    "ORDER_FLOW_BALANCED_V5",
     "WINNER_ENSEMBLE_VERIFIED_ENTRY_V4",
     "ORDER_FLOW_BALANCED_V4",
     "WINNER_ENSEMBLE_ENTRY_V1",

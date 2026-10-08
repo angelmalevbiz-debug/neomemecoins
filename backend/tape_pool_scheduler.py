@@ -25,6 +25,14 @@ flow coverage. Each engine's /state is read on 127.0.0.1 by a background
 refresher, never on the tape poll; the poll only reads the latest snapshot.
 Pools held only by personal engines are capped (NEO_TAPE_PERSONAL_PIN_LIMIT)
 after main's and Lab's pins, which are never capped.
+
+Defensive entry seats (V5): a pool that DEFENSIVE_ENTRY_LAYER_V1 blocks
+(STRUCTURAL_RUG_GUARD_V1, HEAT_VETO_STACK_V1 with the scheduler's own pair
+history, or POOL_LOSS_MEMORY_V1 in any ledger visible here: main's history
+and every Lab book's) cannot be entered, so it gets no entry or exploration
+seat. Pins of held positions are never affected. Every candidate group,
+including the cost-first universe (cost_first_established V2 includes the
+structural guard), shares this screen; nothing here admits a pool.
 """
 import json
 import math
@@ -35,15 +43,19 @@ from pathlib import Path
 
 import lab_activity
 import cost_first_established as cost_first
+import entry_defense
 import funded_market_candidates
 import paper_market_feasibility as feasibility
+import pool_loss_memory
 from shared_snapshot_io import read_shared_text
 import winner_ensemble
 
 
 FUNDED_RULES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 LEASE_MS = 60_000
-POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS'
+POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY'
+PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS'
+DEFENSIVE_EXAMPLE_LIMIT = 6
 SHED_MIN_BODIES = max(1, int(os.getenv('NEO_TAPE_SHED_MIN_BODIES', '40')))
 SHED_COOLDOWN_MS = max(60_000, int(os.getenv('NEO_TAPE_SHED_COOLDOWN_MS', '1800000')))
 SHED_REASON = 'ZERO_DECODED_SWAPS_AFTER_BODIES'
@@ -394,10 +406,25 @@ class PersonalEnginePositions:
             thread.join(timeout)
 
 
+def visible_pool_loss_index(state, now):
+    """POOL_LOSS_MEMORY_V1 blocked pools of every ledger in the main /state document.
+
+    A seat serves every engine, so a pool in a loss cooldown in main's history
+    or in any Lab book's history gets no entry seat (conservative union);
+    each account's own entry path still applies its own memory.
+    """
+    indexes = [pool_loss_memory.index(state.get('history') or [], now)]
+    books = (state.get('strategy_lab') or {}).get('books') or {}
+    for book in (books.values() if isinstance(books, dict) else books):
+        if isinstance(book, dict):
+            indexes.append(pool_loss_memory.index(book.get('history') or [], now))
+    return pool_loss_memory.merge(*indexes)
+
+
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
                  shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS,
-                 personal_pin_limit=PERSONAL_PIN_LIMIT):
+                 personal_pin_limit=PERSONAL_PIN_LIMIT, registry_path=None):
         self.lease_ms = max(30_000, int(lease_ms))
         self.personal_pin_limit = max(0, int(personal_pin_limit))
         self.leases = {}
@@ -407,6 +434,12 @@ class TapePoolScheduler:
         self.yield_window_ms = max(60_000, int(yield_window_ms))
         self.shed = {}
         self.yield_since = {}
+        # DEFENSIVE_ENTRY_LAYER_V1 of the tape process (own registry and history).
+        self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path)
+
+    def defensive_entry_decision(self, coin, now, *, blocked_pools):
+        """Whether an entry into this pool could pass the defensive layer now."""
+        return self.defense.evaluate(coin, now, blocked_pools=blocked_pools)
 
     def _shed_record(self, identity, coin, now, decode_yield):
         """Return the active shed record for a supported entry candidate, if any."""
@@ -464,6 +497,12 @@ class TapePoolScheduler:
         unsupported_pins = [coin for coin in held if not _supported(coin)]
         candidates, examples, cost_first_examples = [], [], []
         cost_first_rejections = {}
+        # Every poll feeds the scheduler's ticker registry and pair history.
+        self.defense.observe(list(market.values()), now)
+        blocked_pools = visible_pool_loss_index(state, now)
+        defensive_summary = entry_defense.new_summary()
+        defensive_summary['pool_loss_cooldown_pools'] = len(blocked_pools)
+        defensive_blocked = []
         model_possible = model_excluded = model_unknown = 0
         main_cost_cap = feasibility.number((state.get('config') or {}).get(
             'strict_max_roundtrip_cost_pct'), 1.5)
@@ -489,6 +528,12 @@ class TapePoolScheduler:
             shed = self._shed_record(identity, coin, now, decode_yield)
             if shed is not None:
                 shed_now.append(shed)
+                continue
+            # A pool no entry path may enter spends no seat (pins are exempt above).
+            defensive = self.defensive_entry_decision(coin, now, blocked_pools=blocked_pools)
+            entry_defense.record(defensive_summary, defensive, coin)
+            if not defensive['allowed']:
+                defensive_blocked.append(identity)
                 continue
             features = lab_activity.market_features(coin)
             main_rules = winner_ensemble.market_candidates(coin)
@@ -521,7 +566,8 @@ class TapePoolScheduler:
             # never an admission, and full flow/safety/quote gates still apply.
             universe_rejections = cost_first.rejections(
                 coin, cap_usd=COST_FIRST_PLANNING_NOTIONAL_USD,
-                minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD)
+                minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD,
+                now=now, ticker_registry=self.defense.registry)
             in_cost_first = not universe_rejections
             for reason in universe_rejections:
                 cost_first_rejections[reason] = cost_first_rejections.get(reason, 0) + 1
@@ -583,7 +629,8 @@ class TapePoolScheduler:
         for row in sorted(cost_first_rows, key=lambda row: (row['identity'] not in selected_ids,
                                                              row['identity']))[:COST_FIRST_EXAMPLE_LIMIT]:
             described = cost_first.describe(row['coin'], cap_usd=COST_FIRST_PLANNING_NOTIONAL_USD,
-                                            minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD)
+                                            minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD,
+                                            now=now, ticker_registry=self.defense.registry)
             cost_first_examples.append({
                 'symbol': row['coin'].get('symbol'), 'address': row['identity'][0],
                 'pairAddress': row['identity'][1], 'selected': row['identity'] in selected_ids,
@@ -595,6 +642,14 @@ class TapePoolScheduler:
         personal_pins = [coin for coin in pins if _identity(coin) in personal_held]
         shed_records = sorted(self.shed.values(), key=lambda row: (-int(row['shed_at']), row['pairAddress']))
         diagnostics = {'policy_version': POLICY_VERSION,
+                       'previous_policy_version': PREVIOUS_POLICY_VERSION,
+                       'defensive_entry': {
+                           **defensive_summary, 'examples': defensive_summary['examples'][:DEFENSIVE_EXAMPLE_LIMIT],
+                           'blocked_pools_in_feed': len(defensive_blocked),
+                           'seat_rule': 'NO_ENTRY_OR_EXPLORATION_SEAT_FOR_A_BLOCKED_POOL',
+                           'pinned_exit_pools_exempt': True,
+                           'pool_loss_memory_scope': 'MAIN_HISTORY_AND_LAB_BOOK_HISTORIES_UNION',
+                           'layer': self.defense.status(), 'is_entry_authorization': False},
                        'funded_candidate_policy_version':funded_market_candidates.VERSION,
                        'checked_at': now, 'model_is_execution_quote': False,
                        'cost_estimates_are_planning_hints': True,

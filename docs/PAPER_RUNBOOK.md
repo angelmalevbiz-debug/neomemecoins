@@ -124,6 +124,8 @@ Primary repository defaults (`backend/market_monitor.py`, mirrored in `strategy-
 
 Opt-in per-account engine profiles are selected per account in the gateway registry while services are stopped, never by default: `ORDER_FLOW_ADAPTIVE` ([ORDER_FLOW_ADAPTIVE_OCT4_RESTORE.md](ORDER_FLOW_ADAPTIVE_OCT4_RESTORE.md)) and `COST_FIRST_ESTABLISHED_PAPER_V1` (cost-first universe with `EXIT_IMPACT_EMERGENCY_V2`; enable, verify and acceptance criteria in [COST_FIRST_ENGINE_PROFILE.md](COST_FIRST_ENGINE_PROFILE.md)).
 
+Every engine account, every Lab book, the training probe and the tape scheduler apply `DEFENSIVE_ENTRY_LAYER_V1` before quotes ([DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md)): pools younger than 12 h, LP-pullable pools, fake-market-cap pools, reused tickers, hot or crashing pools and pools with two consecutive losses in the last 6 h are not entered; exits are unchanged. Expect a 5-minute heat warm-up after each service restart (`heat_history_warming` in `entry_diagnostics`). Each service keeps a ticker sidecar next to its state file (`state.ticker_registry.json`, `strategy_lab.ticker_registry.json`, `live_tape.ticker_registry.json`); deleting one only resets ticker memory, and a corrupt one is replaced on the next save. Check `entry_diagnostics.defensive_entry` (main), each book's `entry_diagnostics.defensive_entry` (Lab) and `live_tape_status.entry_scheduling.defensive_entry` (seats) for counts, reasons and examples.
+
 `GET /state` includes `paper_training`: portfolio capitals/returns, open/completed trades, raw simulation versus unique observations/episodes, refusals, failure fees, queue drops/lag, last training, active version, history and control comparison. The live Pages build displays those fields.
 
 ## Recording and causal replay

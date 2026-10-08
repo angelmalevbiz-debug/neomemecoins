@@ -18,6 +18,7 @@ import engine_exit_policy as exit_policy
 import training_bridge
 import winner_ensemble
 import order_flow_adaptive_oct4 as oct4
+import cost_first_engine_profile as cost_first_profile
 import promoted_entry_guard as promoted_guard
 import entry_size_backoff
 import market_discovery
@@ -116,8 +117,10 @@ if MAX_POSITION_RISK_USD <= 0 or not 0 < MAX_TOTAL_EXPOSURE_PCT <= 100 or not 0 
 # ORDER_FLOW_ADAPTIVE is an opt-in per-engine profile (NEO_SIGNAL_STRATEGY, set per
 # account by the user gateway) whose effective values are strategy-owned and never
 # environment-tuned, so code, strategy lock and runtime cannot drift apart silently.
+# COST_FIRST_ESTABLISHED_PAPER_V1 is a second opt-in profile: the cost-first universe
+# and EXIT_IMPACT_EMERGENCY_V2 on the engine's own gates, sizes and risk limits.
 DEFAULT_SIGNAL_STRATEGY = winner_ensemble.VERSION
-SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID)
+SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID, cost_first_profile.STRATEGY_ID)
 SAME_TOKEN_COOLDOWN_SECONDS = 1200
 _ENGINE_DEFAULTS = {
     'SCAN_SECONDS': SCAN_SECONDS, 'POSITION_SCAN_SECONDS': POSITION_SCAN_SECONDS,
@@ -132,6 +135,7 @@ _ENGINE_DEFAULTS = {
 }
 SIGNAL_STRATEGY = DEFAULT_SIGNAL_STRATEGY
 ADAPTIVE_PROFILE = None
+COST_FIRST_ACTIVE = False
 ENTRY_POLICY_VERSION = winner_ensemble.ENTRY_POLICY_VERSION
 POSITION_EXIT_POLICY = 'fixed'
 MAX_QUOTED_CANDIDATES = entry_policy.MAX_QUOTED_CANDIDATES
@@ -139,7 +143,7 @@ MAX_QUOTED_CANDIDATES = entry_policy.MAX_QUOTED_CANDIDATES
 
 def activate_strategy(strategy_id: str) -> str:
     """Select the engine's signal strategy; unknown identifiers fail closed at startup."""
-    global SIGNAL_STRATEGY, ADAPTIVE_PROFILE, ENTRY_POLICY_VERSION, POSITION_EXIT_POLICY
+    global SIGNAL_STRATEGY, ADAPTIVE_PROFILE, ENTRY_POLICY_VERSION, POSITION_EXIT_POLICY, COST_FIRST_ACTIVE
     global SCAN_SECONDS, POSITION_SCAN_SECONDS, MAX_POSITIONS, TRADE_NOTIONAL_USD, MAX_DAILY_LOSS_USD
     global STRICT_ENTRY_SCORE, STRICT_MIN_CONVICTION, STRICT_MIN_LIQUIDITY_USD, STRICT_MAX_ENTRY_IMPACT_PCT
     global STRICT_MAX_ROUNDTRIP_COST_PCT, STRICT_MAX_WORST_CASE_COST_PCT, EFFECTIVE_ENTRY_THRESHOLDS
@@ -151,6 +155,7 @@ def activate_strategy(strategy_id: str) -> str:
         profile = oct4.PROFILE
         if profile.stop_loss_pct != STOP_LOSS_PCT:
             raise ValueError('ORDER_FLOW_ADAPTIVE stop must equal the engine net stop')
+        COST_FIRST_ACTIVE = False
         ADAPTIVE_PROFILE = profile
         ENTRY_POLICY_VERSION = oct4.ENTRY_POLICY_VERSION
         POSITION_EXIT_POLICY = 'adaptive'
@@ -168,8 +173,21 @@ def activate_strategy(strategy_id: str) -> str:
         EFFECTIVE_ENTRY_THRESHOLDS = order_flow.EntryThresholds(
             STRICT_ENTRY_SCORE, STRICT_MIN_LIQUIDITY_USD, STRICT_MIN_CONVICTION)
         MAX_QUOTED_CANDIDATES = int(profile.max_quoted_candidates)
+    elif strategy_id == cost_first_profile.STRATEGY_ID:
+        # Universe, size rule and exit policy are profile-owned; every risk limit,
+        # cost cap, cadence and the net stop stay at the engine defaults.
+        if (cost_first_profile.EIE_V2.floor_pct != EXIT_IMPACT_EMERGENCY_PCT
+                or cost_first_profile.EIE_V2.entry_margin_pct != EXIT_IMPACT_EMERGENCY_ENTRY_MARGIN_PCT):
+            raise ValueError('EXIT_IMPACT_EMERGENCY_V2 must keep the engine floor and margin')
+        ADAPTIVE_PROFILE = None
+        COST_FIRST_ACTIVE = True
+        ENTRY_POLICY_VERSION = cost_first_profile.ENTRY_POLICY_VERSION
+        POSITION_EXIT_POLICY = cost_first_profile.EXIT_POLICY
+        for name, value in _ENGINE_DEFAULTS.items():
+            globals()[name] = value
     else:
         ADAPTIVE_PROFILE = None
+        COST_FIRST_ACTIVE = False
         ENTRY_POLICY_VERSION = winner_ensemble.ENTRY_POLICY_VERSION
         POSITION_EXIT_POLICY = 'fixed'
         for name, value in _ENGINE_DEFAULTS.items():
@@ -182,12 +200,16 @@ def market_candidate(coin: dict[str, Any], now: int | None = None) -> bool:
     """Market-only candidate screen of the active strategy; flow and conviction follow."""
     if ADAPTIVE_PROFILE is not None:
         return oct4.is_market_candidate(coin, now=now_ms() if now is None else now, profile=ADAPTIVE_PROFILE)
+    if COST_FIRST_ACTIVE:
+        return cost_first_profile.is_market_candidate(coin, TRADE_NOTIONAL_USD)
     return bool(winner_ensemble.market_candidates(coin))
 
 
 def strategy_rule_config() -> dict[str, Any]:
     if ADAPTIVE_PROFILE is not None:
         return oct4.effective_entry_thresholds(ADAPTIVE_PROFILE)
+    if COST_FIRST_ACTIVE:
+        return {cost_first_profile.STRATEGY_ID: cost_first_profile.universe_parameters()}
     return winner_ensemble.rule_config()
 
 
@@ -848,7 +870,7 @@ class State:
                     'demo_started_at': self.demo_started_at,
                     'demo_session_id': self.demo_session_id,
                 },
-                'config': {
+                'config': strategy_config_overlay({
                     'scan_seconds': SCAN_SECONDS,
                     'position_scan_seconds': POSITION_SCAN_SECONDS,
                     'entry_score': STRICT_ENTRY_SCORE if ADAPTIVE_PROFILE is not None else winner_ensemble.MIN_SCORE,
@@ -915,7 +937,7 @@ class State:
                     'latency_buffer_bps': LATENCY_BUFFER_BPS,
                     'network_fee_sol_per_leg': NETWORK_FEE_SOL,
                     'max_price_impact_pct': MAX_PRICE_IMPACT_PCT,
-                },
+                }),
             }
     def token_snapshot(self, address: str) -> dict[str, Any] | None:
         with self.lock:
@@ -1044,7 +1066,39 @@ def effective_config_hash():
                        'same_token_cooldown_seconds': SAME_TOKEN_COOLDOWN_SECONDS,
                        'max_quoted_candidates': MAX_QUOTED_CANDIDATES,
                        'size_policy': 'FLAT_NOTIONAL_NO_BACKOFF'})
+    if COST_FIRST_ACTIVE:
+        config.update({'signal_strategy': SIGNAL_STRATEGY, 'exit_policy': POSITION_EXIT_POLICY,
+                       'exit_version': exit_policy_version(),
+                       'strategy_profile': cost_first_profile.hash_basis(
+                           cap_usd=TRADE_NOTIONAL_USD, stop_loss_pct=STOP_LOSS_PCT, take_profit_pct=TAKE_PROFIT_PCT),
+                       'same_token_cooldown_seconds': SAME_TOKEN_COOLDOWN_SECONDS,
+                       'max_quoted_candidates': MAX_QUOTED_CANDIDATES,
+                       'size_policy': cost_first_profile.SIZE_POLICY})
     return hashlib.sha256(json.dumps(config, sort_keys=True).encode()).hexdigest()
+
+
+def strategy_config_overlay(config: dict[str, Any]) -> dict[str, Any]:
+    """/state config of the active profile; the default and adaptive configs pass through unchanged."""
+    if not COST_FIRST_ACTIVE:
+        return config
+    engine_ownership = _engine_config_ownership()
+    config.update({
+        'entry_score': None,
+        'ensemble_strategies': [cost_first_profile.STRATEGY_ID],
+        'signal_source_commit': cost_first_profile.SIGNAL_SOURCE,
+        'learning_mode': cost_first_profile.LEARNING_MODE,
+        'strategy_profile': cost_first_profile.config_snapshot(
+            cap_usd=TRADE_NOTIONAL_USD, stop_loss_pct=STOP_LOSS_PCT, take_profit_pct=TAKE_PROFIT_PCT,
+            engine_ownership=engine_ownership),
+        'min_liquidity_usd': cost_first_profile.cost_first.UNIVERSE.min_liquidity_usd,
+        'execution_note': cost_first_profile.EXECUTION_NOTE,
+        'universe_parameters': cost_first_profile.universe_parameters(),
+        'size_rule': cost_first_profile.size_rule(TRADE_NOTIONAL_USD),
+        'exit_parameters': cost_first_profile.exit_parameters(STOP_LOSS_PCT, TAKE_PROFIT_PCT),
+        'exit_impact_emergency_version': cost_first_profile.EIE_VERSION,
+        'max_hold_minutes': exit_policy.FIXED_MAX_HOLD_MINUTES,
+    })
+    return config
 
 
 # Below the conviction (72) that lets a mode outlive its max hold: without live
@@ -1075,13 +1129,28 @@ def adaptive_exit_context(position: dict[str, Any], context: dict[str, Any]) -> 
 
 
 def exit_policy_version() -> str:
-    return exit_policy.ADAPTIVE_VERSION if POSITION_EXIT_POLICY == 'adaptive' else exit_policy.VERSION
+    return position_exit_policy_version(POSITION_EXIT_POLICY)
+
+
+def position_exit_policy_version(policy: str) -> str:
+    """Version stamped for one position's own exit policy (never the engine's current one)."""
+    if policy == 'adaptive':
+        return exit_policy.ADAPTIVE_VERSION
+    if policy == cost_first_profile.EXIT_POLICY:
+        return cost_first_profile.EXIT_POLICY_VERSION
+    return exit_policy.VERSION
 
 
 def config_ownership() -> dict[str, str]:
     """Where every effective runtime value comes from, so drift is visible in /state."""
     if ADAPTIVE_PROFILE is not None:
         return oct4.config_ownership(ADAPTIVE_PROFILE)
+    if COST_FIRST_ACTIVE:
+        return cost_first_profile.config_ownership(_engine_config_ownership())
+    return _engine_config_ownership()
+
+
+def _engine_config_ownership() -> dict[str, str]:
     return {
         'signal_strategy': 'winner_ensemble.VERSION constant',
         'entry_policy_version': 'winner_ensemble.ENTRY_POLICY_VERSION constant',
@@ -1797,22 +1866,33 @@ class Monitor:
             peak_pct = max(pct,num(position.get('peak_net_pnl_pct'), pct))
             hold = (now_ms()-int(position.get('opened_at',now_ms())))/60000
             policy = str(position.get('exit_policy') or 'fixed')
+            # A position keeps the exit policy it was opened with. cost_first reuses the
+            # fixed net geometry; only its impact emergency (V2) differs.
+            decision_policy = cost_first_profile.EXIT_GEOMETRY_POLICY if policy == cost_first_profile.EXIT_POLICY else policy
             context = self.market_context(coin,position) if policy == 'adaptive' else {}
             if policy == 'adaptive':
                 context = adaptive_exit_context(position, context)
             reason = reason or exit_policy.exit_reason(position, context, net_pct=pct,peak_net_pct=peak_pct,
-                hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=policy)
-            emergency_threshold = max(EXIT_IMPACT_EMERGENCY_PCT,num(position.get('entry_price_impact_pct'))+.50)
-            emergency_forensics = position.get('exit_impact_emergency') if reason == 'EXIT_IMPACT_EMERGENCY' else None
-            if num(quote.get('impact_pct')) >= emergency_threshold:
-                if not reason:
-                    reason = 'EXIT_IMPACT_EMERGENCY'
-                    # Forensics only: keep the sell quote that fired the unchanged rule.
-                    emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms())
-            if reason == 'EXIT_IMPACT_EMERGENCY' and emergency_forensics is None:
-                # A pending emergency from an older position record: the re-quote is all we have.
-                emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms(),
-                                                                   trigger_is_requote=True)
+                hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=decision_policy)
+            emergency_v2_state = None
+            if policy == cost_first_profile.EXIT_POLICY:
+                v2 = self.exit_impact_emergency_v2(position, quote, coin, network, reason, is_quote, context,
+                                                   notional=notional, entry_cost=entry_cost, peak_pct=peak_pct, hold=hold)
+                reason, quote, pnl, pct, peak_pct = v2['reason'], v2['quote'], v2['pnl'], v2['pct'], v2['peak_pct']
+                emergency_threshold, emergency_forensics = v2['threshold_pct'], v2['forensics']
+                emergency_v2_state = v2['state']
+            else:
+                emergency_threshold = max(EXIT_IMPACT_EMERGENCY_PCT,num(position.get('entry_price_impact_pct'))+.50)
+                emergency_forensics = position.get('exit_impact_emergency') if reason == 'EXIT_IMPACT_EMERGENCY' else None
+                if num(quote.get('impact_pct')) >= emergency_threshold:
+                    if not reason:
+                        reason = 'EXIT_IMPACT_EMERGENCY'
+                        # Forensics only: keep the sell quote that fired the unchanged rule.
+                        emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms())
+                if reason == 'EXIT_IMPACT_EMERGENCY' and emergency_forensics is None:
+                    # A pending emergency from an older position record: the re-quote is all we have.
+                    emergency_forensics = exit_impact_emergency_record(position,quote,coin,emergency_threshold,now_ms(),
+                                                                       trigger_is_requote=True)
             if reason and is_quote and quote.get('from_cache'):
                 quote = paper_quotes.position_mark(position,coin,network,force=True)
                 if quote is None:
@@ -1830,7 +1910,7 @@ class Monitor:
                 # A profit signal must still hold at the actual simulated sale.
                 if reason.startswith(('TAKE_PROFIT', 'ADAPTIVE_TP', 'ADAPTIVE_TRAILING', 'CONVICTION_PROFIT')):
                     reason = exit_policy.exit_reason(position,context,net_pct=pct,peak_net_pct=peak_pct,
-                        hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=policy)
+                        hold_minutes=hold,stop_pct=STOP_LOSS_PCT,take_profit_pct=TAKE_PROFIT_PCT,policy=decision_policy)
             if emergency_forensics is not None:
                 booked = compact_exit_quote_evidence(quote)
                 trigger = emergency_forensics.get('trigger_quote') or {}
@@ -1856,13 +1936,15 @@ class Monitor:
                 conservative_risk_usd=notional+entry_cost, execution_quote_at=quote.get('quoted_at',now_ms()),
                 execution_quote_source=quote.get('execution_source','MODEL_V1'), updated_at=now_ms(),
                 pending_exit_reason=reason,exit_state='PENDING_EXIT' if reason else 'OPEN',exit_retry_count=0,next_exit_retry_at=0,
-                exit_policy_version=exit_policy.ADAPTIVE_VERSION if policy == 'adaptive' else exit_policy.VERSION,
+                exit_policy_version=position_exit_policy_version(policy),
                 market_context=context, estimated_exit_dex_fee_usd=num(quote.get('dex_fee_usd')),
                 estimated_exit_network_fee_usd=num(quote.get('network_fee_usd')),
                 estimated_exit_price_impact_pct=num(quote.get('impact_pct')),
                 estimated_exit_slippage_pct=num(quote.get('slippage_pct'))+num(quote.get('latency_pct')))
             if emergency_forensics is not None:
                 updated['exit_impact_emergency'] = emergency_forensics
+            if emergency_v2_state is not None:
+                updated['exit_impact_emergency_v2'] = emergency_v2_state
             with STATE.lock:
                 live = next((p for p in STATE.positions if p.get('id') == position.get('id')),None)
                 if live is None or STATE.demo_session_id != session: continue
@@ -1870,6 +1952,82 @@ class Monitor:
                     live.update(updated)
                     continue
             self.book_paper_exit(updated,quote,reason,coin)
+
+    def exit_impact_emergency_v2(self, position, quote, coin, network, reason, is_quote, context, *,
+                                 notional, entry_cost, peak_pct, hold):
+        """EXIT_IMPACT_EMERGENCY_V2 for cost_first positions: sell-anchored, arm then confirm.
+
+        The first mark at/above the threshold only arms. After confirm_delay_ms a fresh
+        forced exact-pool sell quote decides: still at/above the threshold exits with that
+        quote, anything else disarms (and is recorded). Stop, target, max hold and the
+        liquidity/stale safety exits always take priority; V2 never overrides them.
+        """
+        params = cost_first_profile.EIE_V2
+        rule = cost_first_profile.emergency_threshold(position, params)
+        threshold = rule['threshold_pct']
+        state = dict(position.get('exit_impact_emergency_v2')
+                     or {'version': cost_first_profile.EIE_VERSION, 'armed': False, 'armed_at': None,
+                         'arm_count': 0, 'disarm_count': 0, 'disarms': []})
+        pnl = num(quote.get('net_proceeds_usd'))-notional-entry_cost
+        out = {'reason': reason, 'quote': quote, 'pnl': pnl, 'pct': pnl/max(notional,1e-18)*100,
+               'peak_pct': peak_pct, 'threshold_pct': threshold, 'forensics': None, 'state': state}
+        if reason == cost_first_profile.EIE_REASON:
+            # A confirmed V2 emergency whose sale is being retried keeps its evidence.
+            forensics = position.get('exit_impact_emergency')
+            if forensics is None:
+                forensics = dict(exit_impact_emergency_record(position, quote, coin, threshold, now_ms(),
+                                                              trigger_is_requote=True),
+                                 rule_version=cost_first_profile.EIE_VERSION, rule=cost_first_profile.EIE_V2_RULE,
+                                 rule_changed=True, threshold_anchor=rule['anchor'])
+            out['forensics'] = forensics
+            return out
+        if reason:
+            if state.get('armed'):
+                out['state'] = {**state, 'armed': False, 'superseded_by': reason, 'superseded_at': now_ms()}
+            return out
+        if not state.get('armed'):
+            if num(quote.get('impact_pct')) >= threshold:
+                out['state'] = {**state, **rule, 'armed': True, 'armed_at': now_ms(),
+                                'arm_count': int(state.get('arm_count') or 0) + 1,
+                                'trigger_quote': compact_exit_quote_evidence(quote)}
+            return out
+        armed_at = num(state.get('armed_at'))
+        if now_ms()-armed_at < params.confirm_delay_ms:
+            return out
+        confirm = paper_quotes.position_mark(position, coin, network, force=True) if is_quote else None
+        problem = cost_first_profile.confirm_quote_problem(
+            confirm, armed_at=armed_at, now=now_ms(), max_age_ms=entry_policy.MAX_ENTRY_QUOTE_AGE_MS,
+            threshold_pct=threshold, params=params)
+        compact_confirm = compact_exit_quote_evidence(confirm) if isinstance(confirm, dict) else None
+        if problem in (None, 'confirm_below_threshold'):
+            # The fresh exact-pool quote is the newest valid mark; the stop keeps priority on it.
+            pnl = num(confirm.get('net_proceeds_usd'))-notional-entry_cost
+            pct = pnl/max(notional,1e-18)*100
+            out.update(quote=confirm, pnl=pnl, pct=pct, peak_pct=max(peak_pct, pct))
+            decided = exit_policy.exit_reason(position, context, net_pct=pct, peak_net_pct=out['peak_pct'],
+                hold_minutes=hold, stop_pct=STOP_LOSS_PCT, take_profit_pct=TAKE_PROFIT_PCT,
+                policy=cost_first_profile.EXIT_GEOMETRY_POLICY)
+            if decided:
+                out['reason'] = decided
+                out['state'] = {**state, 'armed': False, 'superseded_by': decided, 'superseded_at': now_ms(),
+                                'confirm_quote': compact_confirm}
+                return out
+        if problem is None:
+            confirmed_at = now_ms()
+            record = exit_impact_emergency_record(position, confirm, coin, threshold, int(armed_at))
+            record.update(
+                rule_version=cost_first_profile.EIE_VERSION, rule=cost_first_profile.EIE_V2_RULE, rule_changed=True,
+                threshold_anchor=state.get('anchor'), anchor_source=state.get('anchor_source'),
+                anchor_impact_pct=state.get('anchor_impact_pct'), entry_margin_pct=params.entry_margin_pct,
+                trigger_quote=state.get('trigger_quote'), trigger_is_requote=False, armed_at=int(armed_at),
+                confirmed_at=confirmed_at, confirm_delay_ms=num(confirm.get('quoted_at'))-armed_at,
+                confirming_quote=compact_confirm, confirming_quote_meets_threshold=True, booked_quote='confirming')
+            out.update(reason=cost_first_profile.EIE_REASON, forensics=record,
+                       state={**state, 'armed': False, 'confirmed_at': confirmed_at, 'confirm_quote': compact_confirm})
+            return out
+        out['state'] = cost_first_profile.disarmed(state, code=problem, now=now_ms(), confirm=compact_confirm,
+                                                   params=params)
+        return out
 
     def fast_position_check(self) -> None:
         if not self.position_lock.acquire(blocking=False): return
@@ -2140,6 +2298,15 @@ class Monitor:
                     reject(report, market_rejected, coin, oct4.signal_metrics(coin, {}, {}))
                     continue
                 market_candidates = [oct4.STRATEGY_ID]
+            elif COST_FIRST_ACTIVE:
+                # The cost-first universe replaces the ensemble market screen; its
+                # rejection names and observed values are kept as examples.
+                universe_rejected = cost_first_profile.universe_rejections(coin, TRADE_NOTIONAL_USD)
+                if universe_rejected:
+                    reject(report, universe_rejected, coin,
+                           cost_first_profile.universe_metrics(coin, TRADE_NOTIONAL_USD))
+                    continue
+                market_candidates = [cost_first_profile.STRATEGY_ID]
             else:
                 market_candidates = winner_ensemble.market_candidates(coin)
                 if not market_candidates:
@@ -2151,7 +2318,9 @@ class Monitor:
                 continue
             if retry_after:
                 self.entry_quote_retry_after.pop(address, None)
-            entry_mode = oct4.ENTRY_POLICY_VERSION if ADAPTIVE_PROFILE is not None else 'WINNER_ENSEMBLE_VERIFIED_FLOW'
+            entry_mode = (oct4.ENTRY_POLICY_VERSION if ADAPTIVE_PROFILE is not None
+                          else cost_first_profile.ENTRY_POLICY_VERSION if COST_FIRST_ACTIVE
+                          else 'WINNER_ENSEMBLE_VERIFIED_FLOW')
             # The confirmed 30-second exact-pool window is the modern fail-closed
             # evidence gate for every strategy.
             flow = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
@@ -2177,6 +2346,13 @@ class Monitor:
                     continue
                 raw_strategy_matches = strategy_matches = [oct4.STRATEGY_ID]
                 policy_learning = dict(oct4.NO_LEARNING)
+            elif COST_FIRST_ACTIVE:
+                # No extra signal rule: the confirmed exact-pool flow gate above is the
+                # evidence requirement; no outcome-based throttle (fixed hypothesis).
+                decision_flow = flow
+                raw_strategy_matches = strategy_matches = [cost_first_profile.STRATEGY_ID]
+                policy_learning = dict(cost_first_profile.NO_LEARNING)
+                context = self.market_context(coin)
             else:
                 decision_flow = flow
                 raw_strategy_matches = winner_ensemble.matches(coin, flow)
@@ -2252,7 +2428,11 @@ class Monitor:
             open_planned_risk=sum(num(p.get('planned_risk_usd')) for p in STATE.positions)
             # October 4 sized every entry at the flat strategy notional; the ensemble
             # scales scouts by liquidity and age. Daily budget and exposure caps apply to both.
-            requested_base = TRADE_NOTIONAL_USD if ADAPTIVE_PROFILE is not None else early_requested_notional(coin, learning)
+            # The cost-first profile applies the universe's liquidity size rule to the
+            # engine notional; the daily-budget sizing below still applies to it.
+            requested_base = (TRADE_NOTIONAL_USD if ADAPTIVE_PROFILE is not None
+                              else cost_first_profile.requested_notional(coin, TRADE_NOTIONAL_USD) if COST_FIRST_ACTIVE
+                              else early_requested_notional(coin, learning))
             requested_notional = min(requested_base,MAX_POSITION_RISK_USD-fixed_cost_budget)
             notional = runtime.plan_notional(
                 requested_notional,available_before,MAX_DAILY_LOSS_USD,
@@ -2434,6 +2614,17 @@ class Monitor:
                         continue
                     final_market_candidates = final_raw_strategy_matches = final_strategy_matches = [oct4.STRATEGY_ID]
                     final_policy_learning = dict(oct4.NO_LEARNING)
+                elif COST_FIRST_ACTIVE:
+                    final_universe_rejected = cost_first_profile.universe_rejections(current_coin, TRADE_NOTIONAL_USD)
+                    if final_universe_rejected:
+                        reject(report, final_universe_rejected, coin,
+                               cost_first_profile.universe_metrics(current_coin, TRADE_NOTIONAL_USD))
+                        continue
+                    final_decision_flow = final_flow
+                    final_market_candidates = final_raw_strategy_matches = final_strategy_matches = [
+                        cost_first_profile.STRATEGY_ID]
+                    final_policy_learning = dict(cost_first_profile.NO_LEARNING)
+                    final_context = self.market_context(current_coin)
                 else:
                     final_decision_flow = final_flow
                     final_market_candidates = winner_ensemble.market_candidates(current_coin)
@@ -2570,6 +2761,19 @@ class Monitor:
                     'entry_scan_count': STATE.scan_count, 'dex_url': coin.get('dexUrl'),
                     'coin_snapshot': coin,
                 }
+                if COST_FIRST_ACTIVE:
+                    position.update({
+                        'signal_evidence': cost_first_profile.SIGNAL_EVIDENCE,
+                        'learning_mode': cost_first_profile.LEARNING_MODE,
+                        'signal_source_commit': cost_first_profile.SIGNAL_SOURCE,
+                        'strategy_profile_version': cost_first_profile.PROFILE_VERSION,
+                        'cost_first_universe': cost_first_profile.universe_metrics(current_coin, TRADE_NOTIONAL_USD),
+                        'size_policy': cost_first_profile.SIZE_POLICY,
+                        'size_rule_notional_usd': round(requested_base, 8),
+                        # Anchor of EXIT_IMPACT_EMERGENCY_V2: the entry preflight sell quote.
+                        'entry_sell_impact_pct': cost_first_profile.entry_sell_impact_pct(initial_exit),
+                        'exit_impact_emergency_version': cost_first_profile.EIE_VERSION,
+                    })
                 # Pin the exact-pool observation that passed the final freshness
                 # check together with the entry. Until scan_once refreshes the
                 # held pool, the position guard otherwise sees only a record left

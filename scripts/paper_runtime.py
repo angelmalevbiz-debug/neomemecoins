@@ -10,9 +10,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 from engine_runtime import atomic_json
 from paper_state_reset import reset_offline, restore_archive, reset_all_offline
 import order_flow_adaptive_oct4 as oct4
+import cost_first_engine_profile as cost_first_profile
 import winner_ensemble
 
-SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID)
+SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID, cost_first_profile.STRATEGY_ID)
 
 
 def set_account_strategy(registry, user, strategy):

@@ -122,6 +122,8 @@ The main monitor and the 36-strategy Lab consume the same live tape and recent m
 
 Primary repository defaults (`backend/market_monitor.py`, mirrored in `strategy-lock.json` with `primary_daily_and_drawdown_caps_enabled: true`) are a $100 daily loss cap, a 20% drawdown cap, maximum full-loss capital $250, exposure 100%, $200 notional and eight positions; these are explicitly visible and are **not** the conservative runbook settings above. Earlier revisions of this runbook recorded both caps as disabled (`0`); that was the 2026-10-05 default and is historical. New training default risk limits remain active. Do not silently change an existing account's limits.
 
+Opt-in per-account engine profiles are selected per account in the gateway registry while services are stopped, never by default: `ORDER_FLOW_ADAPTIVE` ([ORDER_FLOW_ADAPTIVE_OCT4_RESTORE.md](ORDER_FLOW_ADAPTIVE_OCT4_RESTORE.md)) and `COST_FIRST_ESTABLISHED_PAPER_V1` (cost-first universe with `EXIT_IMPACT_EMERGENCY_V2`; enable, verify and acceptance criteria in [COST_FIRST_ENGINE_PROFILE.md](COST_FIRST_ENGINE_PROFILE.md)).
+
 `GET /state` includes `paper_training`: portfolio capitals/returns, open/completed trades, raw simulation versus unique observations/episodes, refusals, failure fees, queue drops/lag, last training, active version, history and control comparison. The live Pages build displays those fields.
 
 ## Recording and causal replay

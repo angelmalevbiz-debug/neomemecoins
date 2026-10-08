@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
 import winner_ensemble
-from tape_pool_scheduler import TapePoolScheduler
+from tape_pool_scheduler import PersonalEnginePositions, TapePoolScheduler
 from pool_reference_proof import proves_no_pool_swap
 from shared_snapshot_io import read_shared_text, replace_shared_snapshot
 from tape_pool_owner_proof import collect_pool_owner_proofs, foreign_reference_candidate
@@ -104,6 +104,25 @@ _NEXT_REFERENCE_AT = 0
 _POOL_SCHEDULER = TapePoolScheduler()
 
 
+# Personal-engine reads run on the refresher thread, so they use their own
+# session rather than sharing the poll's connection pool across threads.
+PERSONAL_SESSION = requests.Session()
+PERSONAL_SESSION.headers.update({'user-agent':'NEO-LiveTape/3.0'})
+
+
+def personal_engine_state(port,timeout_seconds):
+    """GET one personal PAPER engine's /state on the loopback interface only."""
+    response = PERSONAL_SESSION.get(f'http://127.0.0.1:{int(port)}/state',timeout=timeout_seconds,
+                                    allow_redirects=False)
+    response.raise_for_status()
+    return response.json()
+
+
+# Refreshed by its own daemon thread (started in main()); the tape poll only
+# reads the latest snapshot and never waits on a personal engine.
+_PERSONAL_ENGINES = PersonalEnginePositions(lambda port,timeout: personal_engine_state(port,timeout))
+
+
 def shared_quote_reference():
     """One shared background FX observation, never one API request per token."""
     global _NEXT_REFERENCE_AT
@@ -156,8 +175,16 @@ def feed_snapshot():
     # Seat shedding reads the recorder's in-memory decode yield only; the
     # scheduler still never decides whether to trade.
     decode_yield = _RECORDER.decode_yield if _RECORDER is not None else None
+    # Open positions of every personal PAPER engine in the account registry
+    # are pinned like main's. This reads the refresher's latest in-memory
+    # snapshot only (no HTTP), so a slow or dead engine never delays the poll.
+    personal_positions, personal = _PERSONAL_ENGINES.latest(observed)
     coins, scheduling = _POOL_SCHEDULER.select(state, now=observed, max_tracked=MAX_TRACKED,
-                                               decode_yield=decode_yield)
+                                               decode_yield=decode_yield,
+                                               personal_positions=personal_positions)
+    # entry_scheduling reaches every user's /state; personal-engine aggregates
+    # stay in the tape file's operator-only status.
+    STATUS['personal_engines'] = {**personal,**scheduling.pop('personal_pins_operator',{})}
     STATUS['entry_scheduling'] = scheduling
     shared_reference=shared_quote_reference()
     for coin in coins:
@@ -871,6 +898,7 @@ def failure_summary(exc):
 
 def main():
     failures=0
+    _PERSONAL_ENGINES.start()
     while True:
         started = time.monotonic()
         try:

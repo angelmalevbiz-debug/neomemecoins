@@ -110,6 +110,17 @@ Get-Content canonical-observations.jsonl | .venv/Scripts/python.exe scripts/pape
 
 Synthetic correctness reproduction uses `tests/fixtures/paper_gap_v9.jsonl`, not the real dataset paths. Financial evaluation needs recorded subsequent market data across enough independent days/episodes.
 
+## Honest edge report from ledger copies (read-only)
+
+`scripts/paper_edge_report.py` measures closed PAPER trades from **copies** of engine ledgers (`state.json` for the main and per-user accounts) and Strategy Lab ledgers (`strategy_lab.json`). It never writes to its inputs and refuses an `--output` inside an input directory. Point it at the checksum archives or a backup copy; never at the files an engine is still writing, because a partially written ledger is not evidence and the live runtime directory is off limits while engines run.
+
+```powershell
+.venv/Scripts/python.exe scripts/paper_edge_report.py --archive-dir .runtime/accounts/archive --since 2026-10-06 --output .runtime/reports/edge
+.venv/Scripts/python.exe scripts/paper_edge_report.py --state main=BACKUP/state.json --state main=BACKUP/archive/reset-X/state.json --state BACKUP/users/USER_ID/state.json --lab BACKUP/strategy_lab.json --output .runtime/reports/edge
+```
+
+The report prints Markdown and, with `--output`, writes `<output>.json` and `<output>.md`. For each engine account, strategy/policy version and exit reason, and for each Lab book, entry policy version and exit reason, it reports: unique closed trades (deduplicated by trade id across every copy; conflicting copies of one id are excluded and counted), wins/losses/breakeven on a net basis, average net win and loss, expectancy per trade in dollars and percent, a cluster-bootstrap 95% interval of expectancy over `(mint, pool, UTC hour)` clusters, the same expectancy after a +50 bps per leg cost stress, profit factor (`null` below ten losses), maximum drawdown of the closed-trade equity path, total modeled cost versus gross mark move with its components and the cost-only loss share, median hold, trades per hour and per day for the supplied window, the period, distinct mints and clusters. Per-user account labels are shortened to eight characters. Rows below 20 closed trades, 30 clusters or five calendar days say `insufficient data`; nothing in the report is a profitability claim, and a sufficient sample is only ever labelled a descriptive sample.
+
 ## Reset every PAPER account and restore
 
 Explicit latest user authorization covers all PAPER accounts. Stop **all** main/per-user/training/Lab/Astra/paired writers before offline reset. The all-account operation enumerates the known registry/user state formats, preserves each starting balance (Fast Scalper $100, the four `PROMOTED_PAPER` cohort books $250, other Lab books normally $500), resets main/per-user $1,000 and nine training books $500 each, creates SHA256 archives and new sessions, and keeps raw market data. Unknown schemas abort before known-account changes. A multi-account reset is not one filesystem transaction; disk failure can leave a partial reset, so retain the output/archive manifests and recover from them.

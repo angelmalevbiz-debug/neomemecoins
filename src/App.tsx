@@ -543,6 +543,8 @@ export default function App() {
           <div data-testid="execution-integrity" className="rounded-xl border border-white/[0.07] bg-black/20 p-3 text-[10px] leading-5 text-slate-500">
             {state ? (state.config.exit_policy === 'adaptive'
               ? <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · адаптивен изход по убеденост ({state.config.learning_mode ?? 'ADAPTIVE_CONTEXT_HOLD'}): RUNNER/STRONG без фиксирана цел, NORMAL +20%, CAUTIOUS +14%, WEAK +8% нето; trailing 3–7%; max hold 4–60 min, абсолютно 120 min · {state.config.max_positions} позиция.</>
+              : state.config.exit_policy === 'cost_first'
+              ? <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · cost-first universe (PumpSwap tier ≤ 50 bps, ликвидност ≥ ${state.config.min_liquidity_usd}, fee+impact ≤ 1.2%) · стоп −{state.config.stop_loss_pct}% нето · цел +{state.config.take_profit_pct}% нето · max hold {state.config.max_hold_minutes}m · EXIT_IMPACT_EMERGENCY_V2: праг спрямо входната sell котировка, изход само след нова потвърждаваща котировка ≥ 2 s · непроверена хипотеза.</>
               : <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · цел +{state.config.take_profit_pct}% нето · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m.</>) : 'Настройките още не са заредени.'}
           </div>
         </div>}

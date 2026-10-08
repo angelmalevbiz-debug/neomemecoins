@@ -67,6 +67,8 @@ Acceptance criteria for the pair (fixed before the run; evaluated on future obse
 
 Passing the gates on book B (or A) is the precondition for a Stage 2 per-account engine profile that imports the same module; it is not a profitability claim, and the 80% win-rate target is not an acceptance criterion.
 
+The Stage 2 profile `COST_FIRST_ESTABLISHED_PAPER_V1` (entry `COST_FIRST_ESTABLISHED_ENTRY_V1`, exit `COST_FIRST_NET_EXIT_V1` with `EXIT_IMPACT_EMERGENCY_V2`) is implemented as an opt-in, per-account choice that nothing enables by default; see [COST_FIRST_ENGINE_PROFILE.md](COST_FIRST_ENGINE_PROFILE.md). Enabling it before the Lab pair passes is an owner decision for one PAPER test account; that account is evaluated as its own sample under the same gates plus feasibility and a −$25-before-20-closes halt, never as evidence for the Lab gates.
+
 ## Dataset provenance and measurements
 
 | Dataset | Scope | Valid conclusion |

@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import requests
 from engine_runtime import atomic_json
 import order_flow_adaptive_oct4 as oct4
+import cost_first_engine_profile as cost_first_profile
 import winner_ensemble
 
 HOST = os.getenv("NEO_USER_GATEWAY_HOST", "127.0.0.1")
@@ -40,7 +41,7 @@ ENGINE_HEALTH_RETRIES = 4
 # supported engine strategy; absent means the default ensemble.
 ACCOUNT_STRATEGY_FIELD = "signal_strategy"
 DEFAULT_SIGNAL_STRATEGY = winner_ensemble.VERSION
-SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID)
+SUPPORTED_SIGNAL_STRATEGIES = (winner_ensemble.VERSION, oct4.STRATEGY_ID, cost_first_profile.STRATEGY_ID)
 
 LOCK = threading.RLock()
 ENGINE_PROCESSES = {}

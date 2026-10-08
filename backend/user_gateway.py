@@ -352,6 +352,16 @@ def start_engine(user, account):
         "NEO_ENGINE_MODE": "PAPER",
         "NEO_TRAINING_ROOT": str(engine_dir(user_id) / 'training'),
     })
+    # TICKER_REGISTRY_SEED_V4: the engine's own NEO_MARKET_STATE_PATH is its
+    # account, so main's state file (the gateway's own) is passed separately;
+    # the engine reads main's ticker registry sidecar read-only as a seed (at
+    # start, while running when its coverage does not vouch, and main's
+    # sightings every 5 min while it vouches).
+    main_state = os.environ.get("NEO_MAIN_MARKET_STATE_PATH") or os.environ.get("NEO_MARKET_STATE_PATH")
+    if main_state and Path(main_state) != engine_state_path(user_id):
+        env["NEO_MAIN_MARKET_STATE_PATH"] = main_state
+    else:
+        env.pop("NEO_MAIN_MARKET_STATE_PATH", None)
     # A gateway-wide strategy variable never leaks into personal engines.
     env.pop("NEO_SIGNAL_STRATEGY", None)
     if requested_strategy:

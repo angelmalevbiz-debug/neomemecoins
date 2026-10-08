@@ -2,11 +2,20 @@
 
 This is a conservative operational filter on observed modeled results. Repeated
 trades can share market episodes; the score is not a profitability prediction.
+
+V2 (2026-10-08): the accepted entry-policy version may be a sequence, the
+current version first, then predecessors whose closes still count. A version
+bump that only removes entries (LAB_ACTIVE_V7 = V6 behind the defensive entry
+layer; COST_FIRST_ESTABLISHED_V2 = V1 behind the structural rug guard) keeps
+the predecessor's losses as evidence, as the main ensemble's loss throttle
+does: such a bump never delays a retirement. Retirement still only stops new
+entries; money, history and exits are never touched.
 """
 import math
 
 
-VERSION = 'LAB_STRATEGY_LIFECYCLE_V1'
+VERSION = 'LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE'
+PREVIOUS_VERSION = 'LAB_STRATEGY_LIFECYCLE_V1'
 MIN_CLOSED_TRADES = 12
 MIN_ALL_LOSS_TRADES = 9
 MAX_WIN_RATE_UPPER_BOUND = 0.5
@@ -41,9 +50,21 @@ def _sum_finite(values):
         return None
 
 
+def accepted_versions(activity_version) -> tuple:
+    """Entry-policy versions whose closes count: one string, or a sequence (current first)."""
+    if isinstance(activity_version, str):
+        return (activity_version,) if activity_version else ()
+    if isinstance(activity_version, (list, tuple)):
+        return tuple(dict.fromkeys(version for version in activity_version
+                                   if isinstance(version, str) and version))
+    return ()
+
+
 def observed_evidence(book, *, activity_version, execution_version, now):
-    """Count unique, valid closes in one known price/execution/entry regime."""
+    """Count unique, valid closes in one known price/execution regime and accepted entry versions."""
+    accepted = accepted_versions(activity_version)
     unique = {}
+    version_of = {}
     conflicts = set()
     excluded = 0
     rows = book.get('history') or []
@@ -66,7 +87,7 @@ def observed_evidence(book, *, activity_version, execution_version, now):
                 or pnl is None or row.get('strategy_id') != book.get('id')
                 or not isinstance(mint, str) or not mint.strip()
                 or not isinstance(pair, str) or not pair.strip()
-                or row.get('entry_policy_version') != activity_version
+                or row.get('entry_policy_version') not in accepted
                 or row.get('execution_mode') != execution_version
                 or not isinstance(price, dict) or price.get('status') != 'pass'
                 or price.get('mint') != mint or price.get('pair') != pair
@@ -88,6 +109,10 @@ def observed_evidence(book, *, activity_version, execution_version, now):
                 excluded += 1
         else:
             unique[identity] = value
+            version_of[identity] = row.get('entry_policy_version')
+    by_version = {}
+    for identity in unique:
+        by_version[version_of[identity]] = by_version.get(version_of[identity], 0) + 1
     trades = sorted(unique.values())
     pnls = [trade[2] for trade in trades]
     count = len(pnls)
@@ -108,7 +133,11 @@ def observed_evidence(book, *, activity_version, execution_version, now):
         'first_half_net_pnl_usd': round(first, 4) if first is not None else None,
         'second_half_net_pnl_usd': round(second, 4) if second is not None else None,
         'win_rate_upper_bound_95': round(upper, 6) if upper is not None else None,
-        'activity_version': activity_version, 'execution_version': execution_version,
+        'activity_version': accepted[0] if accepted else None,
+        'accepted_activity_versions': list(accepted),
+        'closed_trades_by_activity_version': {version: by_version[version] for version in accepted
+                                              if version in by_version},
+        'execution_version': execution_version,
         'first_closed_at': int(trades[0][0]) if trades else None,
         'last_closed_at': int(trades[-1][0]) if trades else None,
         'repeated_losses': repeated_losses,
@@ -123,16 +152,23 @@ def entry_enabled(book):
 
 
 def accepted_activity_version(key, activity_version, activity_versions=None):
-    """Entry-policy version whose closes count as evidence for one book.
+    """Entry-policy version(s) whose closes count as evidence for one book.
 
     Books that stamp their own entry policy (for example the COST_FIRST pair)
-    are compared against that version; every other book uses the shared one.
+    are compared against that version or sequence of versions (current first);
+    every other book uses the shared one. A malformed map entry keeps the
+    shared version.
     """
     if isinstance(activity_versions, dict):
         version = activity_versions.get(key)
-        if isinstance(version, str) and version:
+        if accepted_versions(version):
             return version
     return activity_version
+
+
+def _published(versions):
+    """JSON form of an accepted version: the string, or the list (current first)."""
+    return versions if isinstance(versions, str) else list(accepted_versions(versions))
 
 
 def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
@@ -141,8 +177,10 @@ def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
 
     A retirement remains in place after restart and does not expire on a timer.
     Re-enabling it requires an explicit reviewed policy change. activity_versions
-    maps a book id to the entry-policy version its own closes carry, so a book
+    maps a book id to the entry-policy version(s) its own closes carry, so a book
     with its own policy is judged by exactly the same rules on its own rows.
+    ``activity_version`` and each map value may be one version or a sequence,
+    current first, of versions whose closes all count (see the module notes).
     """
     retired = []
     active = []
@@ -184,10 +222,15 @@ def apply_lifecycle(books, *, registered_ids, promoted_ids, activity_version,
                    'minimum_unique_closed_trades_if_all_losses': MIN_ALL_LOSS_TRADES,
                    'maximum_win_rate_upper_bound_95': MAX_WIN_RATE_UPPER_BOUND,
                    'negative_total_and_both_chronological_halves_required': True,
-                   'activity_version': activity_version,
+                   # The current shared version; accepted_activity_versions adds the
+                   # entry-only predecessors whose closes still count (V2).
+                   'activity_version': (accepted_versions(activity_version) or (None,))[0],
+                   'accepted_activity_versions': list(accepted_versions(activity_version)),
                    'activity_versions_by_strategy': {
-                       key: version for key, version in sorted((activity_versions or {}).items())
-                       if key in registered_ids and isinstance(version, str) and version},
+                       key: _published(version) for key, version in sorted(
+                           (activity_versions if isinstance(activity_versions, dict) else {}).items())
+                       if key in registered_ids and accepted_versions(version)},
+                   'evidence_carried_across_entry_only_version_bumps': True,
                    'execution_version': execution_version,
                    'promoted_cohort_exempt': True, 'automatic_reactivation': False},
     }

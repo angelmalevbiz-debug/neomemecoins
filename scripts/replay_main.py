@@ -49,6 +49,11 @@ def main():
                              'stop_pct, take_profit_pct, disable_exit_impact_emergency, max_hold_minutes. '
                              'Exit decisions only; the report is labelled EXIT_VARIANT.')
     parser.add_argument('--variant-label',help='Label stored in the variant report (default derived from the rules)')
+    parser.add_argument('--entry-defense',choices=('recorded_policy','apply','without_layer'),
+                        help='DEFENSIVE_ENTRY_LAYER_V1 in the replay: recorded_policy (default; only journals '
+                             'recorded before the layer, refuses rows recorded under it), apply (labelled '
+                             'counterfactual on the replayed rows only) or without_layer (labelled counterfactual '
+                             'that skips the layer)')
     parser.add_argument('--overwrite',action='store_true',
                         help='Replace an existing --output, only when it is a report of the same report_kind')
     args=parser.parse_args()
@@ -65,7 +70,10 @@ def main():
     rows=[json.loads(line) for line in args.input.read_text(encoding='utf-8').splitlines() if line.strip()]
     if args.engine_backend:
         sys.path.insert(0,str(args.engine_backend.resolve()))
+    import main_replay
     from main_replay import MainReplay, parse_exit_variant
+    # Archived harnesses (--engine-backend) predate the recorded_policy cutover check.
+    refused=getattr(main_replay,'RecordedPolicyRefused',None)
     exit_variant=None
     if args.exit_variant:
         try:
@@ -77,8 +85,14 @@ def main():
     refusal=output_refusal(args.output,'EXIT_VARIANT' if exit_variant else 'BASELINE',args.overwrite)
     if refusal:
         raise SystemExit(refusal)
-    with MainReplay(root,adaptive=args.adaptive,exit_variant=exit_variant,label=args.variant_label) as replay:
-        result=replay.replay(rows)
+    options={'entry_defense':args.entry_defense} if args.entry_defense else {}
+    with MainReplay(root,adaptive=args.adaptive,exit_variant=exit_variant,label=args.variant_label,**options) as replay:
+        try:
+            result=replay.replay(rows)
+        except Exception as exc:
+            if refused is not None and isinstance(exc,refused):
+                raise SystemExit(str(exc))
+            raise
     # Re-check after the run: the path may have been written in the meantime.
     refusal=output_refusal(args.output,result['report_kind'],args.overwrite)
     if refusal:

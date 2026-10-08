@@ -34,8 +34,51 @@ import lab_activity
 import live_tape as tape
 import paper_market_feasibility as feasibility
 import strategy_lab as lab
+import structural_rug_guard
 import tape_pool_scheduler as scheduler_module
 from tape_pool_scheduler import PersonalEnginePositions, TapePoolScheduler
+import entry_defense as _isolation_entry_defense
+import live_tape as _isolation_live_tape
+import strategy_lab as _isolation_lab
+import tape_pool_scheduler as _isolation_tape
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def _path_less_layers():
+    """Path-less layers for the module globals that otherwise build one from the env paths."""
+    return (
+        (_isolation_lab, 'DEFENSE', _isolation_entry_defense.DefensiveEntryLayer()),
+        (_isolation_live_tape, '_POOL_SCHEDULER', _isolation_tape.TapePoolScheduler()),
+    )
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_lab, 'defensive_entry_decision'), (_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+    # The layer's ticker registry stays in memory here. Run on its own (without
+    # scripts/run_python_checks.py), this module must never write a ticker sidecar next
+    # to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (or the /var/lib/neo-market
+    # defaults): strategy_lab.maybe_open observes through lab.DEFENSE and
+    # live_tape.feed_snapshot through the module-level _POOL_SCHEDULER.
+    for target, name, value in _path_less_layers():
+        isolation = patch.object(target, name, value)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 NOW = 1_800_000_000_000
@@ -59,8 +102,14 @@ def cost_first_coin(name, *, activity=60, liquidity=1_500_000, cap=10_000_000):
     """In the COST_FIRST universe (37.5 bps tier, >= $250k) but matching no
     main or funded market rule (score 0, no momentum)."""
     coin = market_coin(name, cap=cap, liquidity=liquidity, activity=activity, score=0)
-    coin.update(priceChange={'m5': -40, 'h1': -60}, ageMinutes=100_000, volume={'h1': 0})
+    coin.update(priceChange={'m5': -40, 'h1': -60}, ageMinutes=100_000, volume={'h1': 0},
+                pairCreatedAt=NOW - 100_000 * 60_000)
     return coin
+
+
+def universe_candidate(coin, **kwargs):
+    """cost_first_established.candidate (V2: with STRUCTURAL_RUG_GUARD_V1) for a fresh registry at NOW."""
+    return cost_first.candidate(coin, now=NOW, ticker_registry=structural_rug_guard.TickerRegistry(), **kwargs)
 
 
 def feasible_coin(name):
@@ -85,7 +134,7 @@ def pin(name, dex='pumpswap'):
 
 class FixturePreconditions(unittest.TestCase):
     def test_fixtures_are_what_the_tests_claim(self):
-        self.assertTrue(cost_first.candidate(cost_first_coin('cf'), cap_usd=150))
+        self.assertTrue(universe_candidate(cost_first_coin('cf'), cap_usd=150))
         self.assertEqual(lab_activity.market_features(cost_first_coin('cf'))['score'], 0)
         _, report = TapePoolScheduler().select({'feed': [cost_first_coin('cf')]}, now=NOW, max_tracked=1)
         self.assertEqual((report['estimated_feasible_market_candidates'],
@@ -93,7 +142,7 @@ class FixturePreconditions(unittest.TestCase):
                           report['estimated_cost_unknown']), (0, 0, 0))
         _, report = TapePoolScheduler().select({'feed': [over_budget_coin('ob')]}, now=NOW, max_tracked=1)
         self.assertEqual(report['estimated_fixed_cost_over_budget'], 1)
-        self.assertFalse(cost_first.candidate(over_budget_coin('ob'), cap_usd=150))
+        self.assertFalse(universe_candidate(over_budget_coin('ob'), cap_usd=150))
 
     def test_planning_notional_is_the_lab_book_definition(self):
         self.assertEqual(scheduler_module.COST_FIRST_PLANNING_NOTIONAL_USD, lab.TRADE_NOTIONAL)
@@ -105,7 +154,8 @@ class CostFirstSeatTests(unittest.TestCase):
         feed = [over_budget_coin('costly'), cost_first_coin('cheap')]
         selected, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
         self.assertEqual([row['symbol'] for row in selected], ['cheap'])
-        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS')
+        self.assertEqual(report['policy_version'], scheduler_module.POLICY_VERSION)
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS')
         self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (1, 0))
         self.assertEqual(report['cost_first']['candidate_pools'], 1)
         self.assertEqual(report['estimated_fixed_cost_over_budget'], 1)
@@ -117,7 +167,7 @@ class CostFirstSeatTests(unittest.TestCase):
         unknown = market_coin('unknown')
         unknown['quoteTokenAddress'] = None
         exploration = cost_first_coin('explore', liquidity=20_000)
-        self.assertFalse(cost_first.candidate(exploration, cap_usd=150))
+        self.assertFalse(universe_candidate(exploration, cap_usd=150))
         feed = [unknown, exploration, cost_first_coin('cheap')]
         selected, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
         self.assertEqual([row['symbol'] for row in selected], ['cheap'])
@@ -125,7 +175,7 @@ class CostFirstSeatTests(unittest.TestCase):
 
     def test_estimated_feasible_candidate_still_precedes_cost_first(self):
         feasible = feasible_coin('feasible')
-        self.assertFalse(cost_first.candidate(feasible, cap_usd=150))
+        self.assertFalse(universe_candidate(feasible, cap_usd=150))
         selected, report = TapePoolScheduler().select(
             {'feed': [cost_first_coin('cheap', activity=900), feasible]}, now=NOW, max_tracked=1)
         self.assertEqual([row['symbol'] for row in selected], ['feasible'])
@@ -135,7 +185,8 @@ class CostFirstSeatTests(unittest.TestCase):
 
     def test_cost_first_member_that_is_also_estimated_feasible_stays_in_the_feasible_group(self):
         both = market_coin('both')
-        self.assertTrue(cost_first.candidate(both, cap_usd=150))
+        both['pairCreatedAt'] = NOW - 100_000 * 60_000   # established pool: the structural guard passes
+        self.assertTrue(universe_candidate(both, cap_usd=150))
         _, report = TapePoolScheduler().select({'feed': [both]}, now=NOW, max_tracked=1)
         self.assertEqual(report['cost_first']['also_estimated_feasible'], 1)
         self.assertEqual(report['selected_exploration_pools'], 0)
@@ -192,7 +243,7 @@ class CostFirstSeatTests(unittest.TestCase):
         feed = [cost_first_coin('cheap'), cost_first_coin('thin', liquidity=100_000),
                 cost_first_coin('pricey', cap=100_000), over_budget_coin('costly')]
         _, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=4)
-        expected = sum(cost_first.candidate(coin, cap_usd=lab.TRADE_NOTIONAL,
+        expected = sum(universe_candidate(coin, cap_usd=lab.TRADE_NOTIONAL,
                                             minimum_notional_usd=lab_activity.MIN_NOTIONAL_USD)
                        for coin in feed)
         self.assertEqual(report['cost_first']['candidate_pools'], expected)

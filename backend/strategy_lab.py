@@ -10,6 +10,9 @@ from lab_portfolio_migration import promote_strategy_lab
 import lab_activity as activity
 import promoted_entry_guard as promoted_guard
 import cost_first_established as cost_first
+import entry_defense
+import heat_veto
+import pool_loss_memory
 import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -60,6 +63,26 @@ REENTRY_COOLDOWN_MIN=activity.REENTRY_SECONDS/60.0
 def lab_cost_cap_pct():
     """LAB_ACTIVE_V6: one admission cap (0.5 x net stop) for every Lab book."""
     return activity.admission_cost_cap_pct(STOP_LOSS)
+
+# DEFENSIVE_ENTRY_LAYER_V1 of the Lab process: its own ticker registry (sidecar
+# next to the Lab ledger) and pair history, fed with every entry refresh.
+DEFENSE=None
+DEFENSE_LOCK=threading.Lock()
+
+def entry_defense_layer():
+    global DEFENSE
+    with DEFENSE_LOCK:
+        if DEFENSE is None:
+            path=entry_defense.registry_path_for(STATE_PATH)
+            # A registry without current coverage merges main's and the tape's ticker memory.
+            DEFENSE=entry_defense.DefensiveEntryLayer(
+                registry_path=path,seed_paths=entry_defense.sibling_registry_paths(path))
+        return DEFENSE
+
+def defensive_entry_decision(coin,now,*,blocked_pools,heat_log_only=False):
+    """Structural rug guard, the book's pool loss memory and the heat veto (log-only for
+    the reserved surge/dip hypothesis arms); asked before flow, safety, price probes and fills."""
+    return entry_defense_layer().evaluate(coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only)
 
 def cost_first_exit_reason(exits,net_pct,hold_minutes):
     """Net-basis exits of one COST_FIRST book; gaps below the stop are not clamped."""
@@ -493,17 +516,20 @@ def registry_compatibility(books):
     }
 
 def lifecycle_activity_versions():
-    """Entry-policy version each TEST book stamps on its own closes.
+    """Entry-policy versions whose closes count as retirement evidence, per own-policy book.
 
-    The COST_FIRST pair records COST_FIRST_ESTABLISHED_V1, every other TEST book
-    the shared LAB_ACTIVE policy; retirement evidence is counted on exactly those.
+    The COST_FIRST pair stamps cost_first.ENTRY_POLICY_VERSION (V2 since the
+    structural rug guard joined its universe) and every other TEST book the
+    shared LAB_ACTIVE policy. LAB_STRATEGY_LIFECYCLE_V2 also counts the closes
+    of the entry-only predecessor (COST_FIRST_ESTABLISHED_V1, LAB_ACTIVE_V6),
+    so the defensive-layer bump never delays a retirement.
     """
-    return {book_id:cost_first.ENTRY_POLICY_VERSION for book_id in cost_first.BOOK_IDS}
+    return {book_id:cost_first.LIFECYCLE_EVIDENCE_VERSIONS for book_id in cost_first.BOOK_IDS}
 
 def review_strategy_lifecycle(books):
     return lifecycle.apply_lifecycle(
         books,registered_ids={s['id'] for s in STRATEGIES},
-        promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.POLICY_VERSION,
+        promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.LIFECYCLE_EVIDENCE_VERSIONS,
         activity_versions=lifecycle_activity_versions(),
         execution_version=EXECUTION_MODEL_VERSION,now=now_ms())
 
@@ -726,6 +752,10 @@ def maybe_open(feed,flows):
             if key not in by_pair or num(c.get('updatedAt'))>num(by_pair[key].get('updatedAt')):
                 by_pair[key]=c
     candidates=[(c,enrich(c,flows)) for c in by_pair.values()]
+    # Every entry refresh feeds the defensive layer's ticker registry and pair
+    # history (idempotent for an already observed coin snapshot).
+    defense=entry_defense_layer()
+    defense.observe(feed,now)
     # Continue gathering causal observations while the Rush book has a position;
     # another strategy's outcomes or number of polls do not affect this memory.
     rush_observations={
@@ -805,14 +835,23 @@ def maybe_open(feed,flows):
         rule=activity.RULES[strategy['id']]
         is_promoted=book.get('portfolio_group')=='PROMOTED_PAPER'
         is_cost_first=strategy['id'] in cost_first.BOOK_IDS
+        # POOL_LOSS_MEMORY_V1 from this book's own closed history (read-only).
+        blocked_pools=pool_loss_memory.index(book.get('history') or [],now)
+        heat_log_only=strategy['id'] in heat_veto.LOG_ONLY_BOOK_IDS
+        defensive_summary=entry_defense.new_summary()
+        defensive_summary['pool_loss_cooldown_pools']=len(blocked_pools)
+        defensive_summary['heat_log_only']=heat_log_only
+        defensive_rejected=0
         for coin,features in candidates:
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
             if is_cost_first:
-                # Physical cost universe. Confirmed flow, fresh safety, price
-                # identity and the Lab cost cap are still required below.
+                # Physical cost universe plus STRUCTURAL_RUG_GUARD_V1. Confirmed
+                # flow, fresh safety, price identity and the Lab cost cap are
+                # still required below.
                 universe_rejections=cost_first.rejections(
-                    coin,cap_usd=entry_limit,minimum_notional_usd=min_notional)
+                    coin,cap_usd=entry_limit,minimum_notional_usd=min_notional,
+                    now=now,ticker_registry=defense.registry)
                 matched=not universe_rejections
                 for reason in universe_rejections:
                     cost_first_rejections[reason]=cost_first_rejections.get(reason,0)+1
@@ -828,6 +867,15 @@ def maybe_open(feed,flows):
                     market_rejected+=1
                 continue
             signal_candidates+=1
+            # DEFENSIVE_ENTRY_LAYER_V1 for every book, before the planning
+            # estimate, flow promotion, RugCheck, Jupiter price probes and fills.
+            defensive=defensive_entry_decision(coin,now,blocked_pools=blocked_pools,
+                                               heat_log_only=heat_log_only)
+            # Two examples per book keep the 2-second Lab ledger write small.
+            entry_defense.record(defensive_summary,defensive,coin,example_limit=2)
+            if not defensive['allowed']:
+                defensive_rejected+=1
+                continue
             # Transparent planning estimate for every book. It never grants
             # admission, replaces a price check, or assumes a future gain.
             feasibility=market_feasibility.execution_feasibility(
@@ -932,9 +980,10 @@ def maybe_open(feed,flows):
                     promoted_block_reasons[reason]=promoted_block_reasons.get(reason,0)+1
                     continue
             eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
-                             coin,features,proposed,validation,brain,risk,candidate_limit))
+                             coin,features,proposed,validation,brain,risk,candidate_limit,defensive))
         book['entry_diagnostics']={
             'at':now,'signal_candidates':signal_candidates,
+            'defensive_rejected':defensive_rejected,'defensive_entry':defensive_summary,
             'market_rejected_candidates':market_rejected,
             'matched_candidates':checked,'cost_rejected':blocked_cost,
             'network_cost_rejected':blocked_network,
@@ -1040,9 +1089,14 @@ def maybe_open(feed,flows):
                 # LAB_ACTIVE_V6: every checked candidate exceeded the cost cap.
                 # This is reported, never hidden and never answered by a looser cap.
                 book['entry_diagnostics']['blocked_reason']='modeled_roundtrip_cost_limit'
+            if signal_candidates>0 and defensive_rejected==signal_candidates:
+                # Every matched candidate was removed by the defensive layer:
+                # name its most frequent highest-priority reason, not a later gate.
+                book['entry_diagnostics']['blocked_reason']=(
+                    entry_defense.primary_reason(defensive_summary) or 'defensive_entry')
             continue
         rank=(lambda item:(num((item[6] or {}).get('final_score')),item[0],item[1])) if strategy['id']==rush_brain.STRATEGY_ID else (lambda item:(item[0],item[1]))
-        _,_,coin,features,proposed,validation,brain,risk,candidate_limit=max(eligible,key=rank)
+        _,_,coin,features,proposed,validation,brain,risk,candidate_limit,defensive=max(eligible,key=rank)
         if is_promoted or is_cost_first:
             # Provider work may outlast the short evidence window. Its clock
             # cannot make a new safety receipt future-dated or revive old flow.
@@ -1055,6 +1109,20 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']=refusal
                 book['entry_diagnostics']['commit_recheck_rejected']=1
                 continue
+        # DEFENSIVE_ENTRY_LAYER_V1 again at commit, as the engine does: on the commit clock
+        # and this book's closed history as it is now. The Lab has no newer observation than
+        # this refresh, so a pool that turns hot after it is refused at the next refresh;
+        # here a stale pair history, a moved 5-minute reference or a new loss refuses it.
+        commit_at=now_ms()
+        final_defensive=defensive_entry_decision(
+            coin,commit_at,blocked_pools=pool_loss_memory.index(book.get('history') or [],commit_at),
+            heat_log_only=heat_log_only)
+        if not final_defensive['allowed']:
+            defensive_summary['commit_recheck_blocked']=int(defensive_summary.get('commit_recheck_blocked') or 0)+1
+            book['entry_diagnostics']['blocked_reason']=(final_defensive['reasons'] or ['defensive_entry'])[0]
+            book['entry_diagnostics']['commit_recheck_rejected']=1
+            continue
+        defensive=final_defensive
         if brain:
             book['entry_diagnostics']['risk_limited_notional_usd']=round(candidate_limit,4)
         address=coin['address']; price=num(coin['priceUsd'])
@@ -1098,6 +1166,8 @@ def maybe_open(feed,flows):
             'stop_loss_net_pct':position_stop,
             'stop_headroom_pct':activity.stop_headroom_pct(position_stop,proposed['initial_pnl_pct']),
             'entry_size_reduced':notional+0.02<candidate_limit,
+            # DEFENSIVE_ENTRY_LAYER_V1 decision this entry passed at commit (log-only heat flags included).
+            'defensive_entry':entry_defense.compact(defensive),
             'pnl_pct':round(proposed['initial_pnl_pct'],3),
             'open_pnl_usd':round(proposed['initial_pnl_usd'],4),
             'execution_exit_price':round(mark['fill_price'],12),
@@ -1123,7 +1193,8 @@ def maybe_open(feed,flows):
                 'entry_evidence_guard_version':promoted_guard.VERSION,
                 'promotion_eligible':False,
                 'entry_universe_version':cost_first.UNIVERSE_VERSION,
-                'entry_universe':cost_first.describe(coin,cap_usd=entry_limit,minimum_notional_usd=min_notional),
+                'entry_universe':cost_first.describe(coin,cap_usd=entry_limit,minimum_notional_usd=min_notional,
+                                                     now=now,ticker_registry=defense.registry),
                 'entry_size_rule':cost_first.config()['size_rule'],
                 'entry_liquidity_usd':pair_liquidity_usd(coin),
                 'exit_policy_label':exits.label,'exit_parameters':asdict(exits),
@@ -1190,6 +1261,12 @@ def persist(status='online',error=None):
     STATE['activity_config']['promoted_entry_policy']=promoted_guard.funded_policy_config(
         STOP_LOSS,promoted_candidate_config())
     STATE['activity_config']['cost_first_established']=cost_first.config()
+    STATE['activity_config']['defensive_entry']=entry_defense.config()
+    if DEFENSE is not None:
+        STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
+        if status=='stopped':
+            # Keep the Lab's ticker memory across a restart (atomic; never raises).
+            DEFENSE.registry.flush()
     STATE['activity_config'].update({
         'rush_stop_loss_net_pct':STOP_LOSS,'rush_take_profit_net_pct':RUSH_TAKE_PROFIT,
         'rush_max_hold_minutes':RUSH_MAX_HOLD_MIN,'rush_trail_arm_net_pct':RUSH_TRAIL_ARM,

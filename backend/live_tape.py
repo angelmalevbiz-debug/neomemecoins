@@ -22,6 +22,7 @@ from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
 import winner_ensemble
+import entry_defense
 from tape_pool_scheduler import PersonalEnginePositions, TapePoolScheduler
 from pool_reference_proof import proves_no_pool_swap
 from shared_snapshot_io import read_shared_text, replace_shared_snapshot
@@ -101,7 +102,32 @@ STATUS = {'status':'starting','tracked_pairs':0,'updated_at':0,
                      'unvalidated_flow_quality':'DEGRADED'}}
 _RECORDER = None
 _NEXT_REFERENCE_AT = 0
-_POOL_SCHEDULER = TapePoolScheduler()
+
+
+def scheduler_registry_path(out=OUT):
+    """The scheduler's ticker registry sidecar next to the tape file (live_tape.ticker_registry.json)."""
+    out = Path(out)
+    return out.with_name(f'{out.stem}.ticker_registry.json')
+
+
+# The scheduler's DEFENSIVE_ENTRY_LAYER_V1 keeps its ticker registry in that
+# sidecar, so a tape restart keeps the ticker memory and its coverage; a registry
+# without current coverage merges main's and the Lab's sidecars (read-only).
+_POOL_SCHEDULER = TapePoolScheduler(
+    registry_path=scheduler_registry_path(),
+    registry_seed_paths=entry_defense.sibling_registry_paths(scheduler_registry_path()))
+
+
+def flush_scheduler_registry():
+    """Save the seat screen's ticker registry now (clean shutdown; never raises).
+
+    The registry saves at most every 5 minutes while the tape runs; the service
+    runner calls this on a clean stop so a restart loses no ticker sighting.
+    """
+    try:
+        return bool(_POOL_SCHEDULER.defense.registry.flush())
+    except Exception:
+        return False
 
 
 # Personal-engine reads run on the refresher thread, so they use their own

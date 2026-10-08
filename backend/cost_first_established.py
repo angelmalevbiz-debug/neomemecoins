@@ -14,15 +14,33 @@ are the only observed universe whose fee+impact round trip leaves several
 percentage points of gross headroom before the stop. Nothing here claims that
 such pools have positive expectancy; the two books exist to measure that on
 future, untouched observations under docs/STRATEGY_VALIDATION.md.
+
+V2 (2026-10-08, DEFENSIVE_ENTRY_LAYER_V1): the fee tier is computed from
+market cap, so an inflated fake market cap earns the cheapest tier. Over the
+research's 22.8 h, 50 of the 61 pools that ever passed the V1 universe were
+rug-family flagged and 10 of the 64 that entered it drained; the cost-first
+account opened 3 rug-family positions within 80 s of going live. A pool that
+passes every physical screen is therefore also screened by
+STRUCTURAL_RUG_GUARD_V1 (structural_rug_guard.py) here, the one definition
+shared by the cost-first engine profile, both COST_FIRST Lab books and the
+tape scheduler's cost-first seat group. The guard fails closed: without a
+ticker registry or a pair age the pool is not a candidate.
 """
 from dataclasses import asdict, dataclass
 import math
+import time
 
 import paper_market_feasibility as feasibility
+import structural_rug_guard
 
-VERSION = 'COST_FIRST_ESTABLISHED_V1'
-ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_V1'
-UNIVERSE_VERSION = 'COST_FIRST_UNIVERSE_V1'
+VERSION = 'COST_FIRST_ESTABLISHED_V2'
+ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_V2'
+PREVIOUS_ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_V1'
+UNIVERSE_VERSION = 'COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD'
+PREVIOUS_UNIVERSE_VERSION = 'COST_FIRST_UNIVERSE_V1'
+# Retirement evidence of the pair (LAB_STRATEGY_LIFECYCLE_V2): V2 only removes
+# entries from V1 (the structural guard), so V1 closes keep counting.
+LIFECYCLE_EVIDENCE_VERSIONS = (ENTRY_POLICY_VERSION, PREVIOUS_ENTRY_POLICY_VERSION)
 CONTROL_BOOK_ID = 'COST_FIRST_CONTROL'
 SCALED_BOOK_ID = 'COST_FIRST_SCALED'
 BOOK_IDS = (CONTROL_BOOK_ID, SCALED_BOOK_ID)
@@ -85,7 +103,7 @@ REJECTION_REASONS = (
     'market_cap_unknown', 'liquidity_unknown', 'liquidity_below_minimum',
     'fee_tier_above_maximum', 'size_below_minimum', 'cost_model_unavailable',
     'fee_impact_roundtrip_above_maximum',
-)
+) + structural_rug_guard.REASONS
 
 
 def _finite(value):
@@ -155,9 +173,40 @@ def fee_impact_roundtrip_pct(coin: dict, notional: float, *,
     return None if pnl is None else max(0.0, -pnl)
 
 
+def _decision_time(now) -> float:
+    return now if isinstance(now, (int, float)) and not isinstance(now, bool) else time.time() * 1000
+
+
+def structural_screen(coin: dict, *, now=None, ticker_registry=None) -> dict:
+    """STRUCTURAL_RUG_GUARD_V1 at ``now`` (ms; wall clock when None) with the caller's registry."""
+    return structural_rug_guard.check(coin, _decision_time(now), ticker_registry)
+
+
 def rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
-               params: UniverseParameters = UNIVERSE) -> list[str]:
-    """Every universe rule the observation fails, in evaluation order (empty = candidate)."""
+               params: UniverseParameters = UNIVERSE, now=None, ticker_registry=None) -> list[str]:
+    """Every universe rule the observation fails, in evaluation order (empty = candidate).
+
+    The physical screens come first; a pool that passes all of them is then
+    screened by STRUCTURAL_RUG_GUARD_V1 (its reasons are returned in the
+    guard's order). ``ticker_registry`` is the caller's TickerRegistry; without
+    it the guard fails closed (rug_input_unknown).
+    """
+    physical = physical_rejections(coin, cap_usd=cap_usd, minimum_notional_usd=minimum_notional_usd,
+                                   params=params)
+    if physical:
+        return physical
+    structural = structural_screen(coin, now=now, ticker_registry=ticker_registry)
+    return list(structural['reasons']) if structural['blocked'] else []
+
+
+def physical_rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
+                        params: UniverseParameters = UNIVERSE) -> list[str]:
+    """The physical screens alone: the COST_FIRST_UNIVERSE_V1 rule (PREVIOUS_UNIVERSE_VERSION).
+
+    Not an entry screen (``rejections`` is, with the structural guard). The
+    archived 2026-10-08 research measured this V1 universe and reproduces its
+    numbers through it.
+    """
     reasons: list[str] = []
     if str(coin.get('dexId') or '').lower() != params.dex_id:
         reasons.append('dex_not_pumpswap')
@@ -189,14 +238,14 @@ def rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
 
 
 def candidate(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
-              params: UniverseParameters = UNIVERSE) -> bool:
+              params: UniverseParameters = UNIVERSE, now=None, ticker_registry=None) -> bool:
     """True only when every universe rule holds. Never an entry authorization."""
     return not rejections(coin, cap_usd=cap_usd, minimum_notional_usd=minimum_notional_usd,
-                          params=params)
+                          params=params, now=now, ticker_registry=ticker_registry)
 
 
 def describe(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
-             params: UniverseParameters = UNIVERSE) -> dict:
+             params: UniverseParameters = UNIVERSE, now=None, ticker_registry=None) -> dict:
     """Transparent planning record for diagnostics and the entry ledger."""
     liquidity = liquidity_usd(coin)
     size = size_for(liquidity or 0.0, cap_usd, params=params)
@@ -207,7 +256,10 @@ def describe(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
         'planned_notional_usd': size,
         'fee_impact_roundtrip_pct': fee_impact_roundtrip_pct(coin, size, params=params) if size > 0 else None,
         'rejections': rejections(coin, cap_usd=cap_usd,
-                                 minimum_notional_usd=minimum_notional_usd, params=params),
+                                 minimum_notional_usd=minimum_notional_usd, params=params,
+                                 now=now, ticker_registry=ticker_registry),
+        'structural_rug_guard': structural_rug_guard.compact(
+            structural_screen(coin, now=now, ticker_registry=ticker_registry)),
         'is_execution_quote': False,
     }
 
@@ -224,6 +276,8 @@ def config() -> dict:
                             'max_hold_reason': EXITS[book_id].max_hold_reason}
                   for book_id in BOOK_IDS},
         'universe': asdict(UNIVERSE),
+        'previous_universe_version': PREVIOUS_UNIVERSE_VERSION,
+        'structural_rug_guard': structural_rug_guard.config(),
         'size_rule': 'min(book_entry_cap_usd, liquidity_usd * liquidity_size_fraction)',
         'starting_balance_usd': START_BALANCE_USD,
         'portfolio_group': PORTFOLIO_GROUP,

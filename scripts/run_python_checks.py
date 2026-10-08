@@ -24,6 +24,8 @@ def main():
                'NEO_JUPITER_LOCK_PATH':'quote.lock','NEO_JUPITER_STAMP_PATH':'quote-stamp.txt',
                'NEO_TRAINING_ROOT':'training','NEO_TAPE_DB_PATH':'tape.sqlite'}
         env.update({key:str(directory/value) for key,value in paths.items()})
+        # A shell's main-engine path (personal engines' ticker registry seed) never reaches the tests.
+        env.pop('NEO_MAIN_MARKET_STATE_PATH',None)
         results=[]
         for suite in ['tests','backend/tests']:
             command=[sys.executable,'-m','unittest','discover','-s',suite,'-v']

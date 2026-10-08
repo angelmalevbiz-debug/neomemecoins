@@ -19,6 +19,29 @@ import market_monitor as m
 import engine_entry_policy as policy
 import winner_ensemble
 import promoted_entry_guard as promoted_guard
+import entry_defense as _isolation_entry_defense
+import market_monitor as _isolation_engine
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_engine.Monitor, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 class EngineEntryTests(unittest.TestCase):
@@ -113,7 +136,7 @@ class EngineEntryTests(unittest.TestCase):
         self.monitor.maybe_open([self.coin])
         self.assertEqual(len(m.STATE.positions), 1)
         self.assertEqual(m.STATE.positions[0]['strategy_matches'], ['COST_EFFICIENT_FLOW'])
-        self.assertEqual(m.STATE.positions[0]['entry_policy_version'], 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V4')
+        self.assertEqual(m.STATE.positions[0]['entry_policy_version'], 'WINNER_ENSEMBLE_VERIFIED_ENTRY_V5')
 
     def test_mature_liquid_candidate_with_expensive_exit_still_cannot_open(self):
         self.coin.update(ageMinutes=20_000, marketCap=10_000_000,

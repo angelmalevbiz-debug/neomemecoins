@@ -117,9 +117,12 @@ def run(service, run_token='', ready_file=''):
                 else:
                     print('PAPER ledger was never loaded; shutdown did not write it', flush=True)
             module.training_bridge.stop()
-        elif service == 'tape' and module._RECORDER is not None:
-            module._RECORDER.db.commit()
-            module._RECORDER.close()
+        elif service == 'tape':
+            # Keep the seat screen's ticker memory across a restart (atomic; never raises).
+            module.flush_scheduler_registry()
+            if module._RECORDER is not None:
+                module._RECORDER.db.commit()
+                module._RECORDER.close()
         elif service == 'lab':
             if getattr(module, 'LOADED', False):
                 module.persist('stopped')

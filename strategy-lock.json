@@ -3,7 +3,7 @@
   "locked_at_utc": "2026-10-07",
   "source_commit": "USER_AUTHORIZED_FUNDED_PAPER_REPAIR_20261007",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "935faef51980d3bb7337a8fe6f79480bd523a6507d30a45229e85e45bc893488",
+  "sha256": "ede5a43c87b04cbd854653f684b76ee35d341970245f5cc1f011a754b24f3e6c",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
     "entry_score": 76,
@@ -28,10 +28,10 @@
     "quote_size_backoff_min_usd": 25,
     "quote_size_backoff_max_attempts": 3
   },
-  "policy": "A broader market candidate rule joins four selective rules in the shared PAPER account. Every entry still requires fresh confirmed exact-pool flow, completed same-pool safety, independently verified price, executable quotes and strict risk/cost limits. Current-policy closed trades are attributed to matched rules; a rule may be throttled only after at least 12 closes show weak posterior win rate and negative net PnL. This does not establish or promise profitability. Version V4 prospectively adds a mature liquid market candidate rule, shared bounded address discovery, cost-aware tape scheduling, and coordinated quote preparation; all final cost/safety/flow gates are preserved. Funded Lab candidate filters are aligned under separate version V2. No prior ledger is reset or reclassified. Infrastructure repair preserves V4 candidate and execution limits while fixing Windows tape replacement, bounded address discovery, fee-aware quote priority and strict proof of foreign references that executed no Pump swap. No profitable outcome is inferred from these changes. Funded V3 prospectively adds physical established-liquid branches for Momentum and Precision; original young branches and final evidence/cost/risk gates remain. Reversed PumpSwap pool orientation is decoded with exact cash/token legs. No trade frequency or profitable outcome is inferred.",
+  "policy": "A broader market candidate rule joins four selective rules in the shared PAPER account. Every entry still requires fresh confirmed exact-pool flow, completed same-pool safety, independently verified price, executable quotes and strict risk/cost limits. Current-policy closed trades are attributed to matched rules; a rule may be throttled only after at least 12 closes show weak posterior win rate and negative net PnL. This does not establish or promise profitability. Version V4 prospectively adds a mature liquid market candidate rule, shared bounded address discovery, cost-aware tape scheduling, and coordinated quote preparation; all final cost/safety/flow gates are preserved. Funded Lab candidate filters are aligned under separate version V2. No prior ledger is reset or reclassified. Infrastructure repair preserves V4 candidate and execution limits while fixing Windows tape replacement, bounded address discovery, fee-aware quote priority and strict proof of foreign references that executed no Pump swap. No profitable outcome is inferred from these changes. Funded V3 prospectively adds physical established-liquid branches for Momentum and Precision; original young branches and final evidence/cost/risk gates remain. Reversed PumpSwap pool orientation is decoded with exact cash/token legs. No trade frequency or profitable outcome is inferred. DEFENSIVE_ENTRY_LAYER_V1 (2026-10-08) puts STRUCTURAL_RUG_GUARD_V1, POOL_LOSS_MEMORY_V1 and HEAT_VETO_STACK_V1 in front of every PAPER entry path before quotes, flow promotion and RugCheck; it only removes entries, exits and ledgers are unchanged, and the research found no strategy with positive expectancy after costs.",
   "integrity_note": "Mandatory fresh confirmed flow coverage, exact pool/mint checks, complete same-pool safety, independent price confirmation, modeled expected round-trip cost at most 1.5%, conservative cost at most 2.5%, bounded quotes and uncapped actual modeled losses.",
   "execution_mode": "PAPER_QUOTE_OR_OBSERVED_POOL_MODEL",
-  "entry_policy_version": "WINNER_ENSEMBLE_VERIFIED_ENTRY_V4",
+  "entry_policy_version": "WINNER_ENSEMBLE_VERIFIED_ENTRY_V5",
   "entry_policy_limits": {
     "ensemble": [
       "VERIFIED_FLOW_MOMENTUM",
@@ -47,6 +47,7 @@
     "max_daily_loss_usd": 100,
     "max_drawdown_pct": 20,
     "execution_gates": [
+      "DEFENSIVE_ENTRY_LAYER_V1 after the market screen: structural rug guard, pool loss memory, heat veto (fail closed, no quote, flow promotion or RugCheck before it)",
       "fresh market snapshot",
       "fresh confirmed 30-second exact-pool PumpSwap flow with at least three swaps from two wallets and at least 1.2x buy/sell USD",
       "fresh completed safety report for the exact mint and pool",
@@ -133,12 +134,20 @@
         3
       ],
       "profitability_proven": false
+    },
+    "defensive_entry": {
+      "version": "DEFENSIVE_ENTRY_LAYER_V1",
+      "module": "backend/entry_defense.py",
+      "rechecked_at_entry_commit": true,
+      "recorded_on_positions": true,
+      "entry_diagnostics_field": "defensive_entry",
+      "doc": "docs/DEFENSIVE_ENTRY_LAYER.md"
     }
   },
   "support_files_sha256": {
     "backend/astra6_brain.py": "00e189ede49cded7b523c276006d2aa7fd9399b30505284cfdf6d7aa2929c05a",
     "backend/compat_file_lock.py": "8ba79d6e53250fba0a3f0dc2f997ed89094210d170d84c4b66c200f5ab9d64df",
-    "backend/engine_entry_policy.py": "c521c66df9cb4a86d1308b15eca1738218569e5a1dbfa31179d6e22449198a0f",
+    "backend/engine_entry_policy.py": "0890dbbe3f04f0fa783d87bd5bc930ff4a4678da145cd9d7085186087452c3ec",
     "backend/engine_execution.py": "f48dd7a6c7c78aeffe57cfb8531045dc1e03517aa384ca0e143ee3432620171c",
     "backend/engine_exit_policy.py": "822dcd7db129897e215a49a4fa2aee48dd1fa36ecb358f5789fd4eb7b9da5a4a",
     "backend/engine_rug_guard.py": "5c732df903fdfcb692a8b2d64afd1276f1350658471d17c4c8363cefd58ae7e3",
@@ -146,33 +155,33 @@
     "backend/entry_size_backoff.py": "20bbabd06df2b9aa61b006cd06fb56f216f48b54f2743c38cd21a174a44cbb41",
     "backend/gold_order_flow.py": "f6f75a52af72a3163a0a453f8384b5ce6b9c6cfc08712c6c6a371b7f2260fe0a",
     "backend/honest_quote_transport.py": "01dc18a6d603e332b28ec6b6100582fdaad18e5952ed7ef30674f62a6d81b511",
-    "backend/lab_activity.py": "458805bc6b70ddd152e75d5aca27788d28f904c314a936dd4d557d86cd29aff5",
-    "backend/lab_dashboard_projection.py": "693af4d2468e9509f42326b0026f14538f42312b27599ec9f0e38bb5842f707e",
+    "backend/lab_activity.py": "f590aeed3b30391ad8508b38376eb8fc5aa4016dabd7696d8cce43685c7c5fb2",
+    "backend/lab_dashboard_projection.py": "97707c8641383ceeb36a2bfae820448f832728cecbf5139e6d7a1484636d7ca5",
     "backend/lab_paired_runner.py": "2556bd9dd34dbf9561bab59423fb6013e6a60c915b97bfda4d334cb74c1f6e66",
     "backend/lab_position_marks.py": "7dc9ed982810769c1efd3788c5a919ef88701d95e5fc6d1b17fd64a45e6062f9",
-    "backend/live_tape.py": "f054c63e302de80503da006a7ac49ad910028000e5ebfd14374bf21c370ff012",
-    "backend/main_replay.py": "2daebe4e7f61e91052d62b7227de6feb5842259972ed3ac878df888a1f92381a",
-    "backend/market_monitor.py": "935faef51980d3bb7337a8fe6f79480bd523a6507d30a45229e85e45bc893488",
+    "backend/live_tape.py": "9e7f7e93ff6448ff0047dec45167bc86d07283e6e5b3d3818e63b10421e541fc",
+    "backend/main_replay.py": "a0e1334a0477d834ab49a620d0c90b59e011ff3553fd4e7858416ccb00ee8df7",
+    "backend/market_monitor.py": "ede5a43c87b04cbd854653f684b76ee35d341970245f5cc1f011a754b24f3e6c",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",
     "backend/pair_price_integrity.py": "f301d4adecf6fa3aa93692bf1d4feb250203a4d76db74dce02fc77c57c43f1cb",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
     "backend/paper_lab_metrics.py": "3a6743c8791033ff40b8aea20f6fabb4d48de5935ad4e979a69486ccc0787621",
     "backend/paper_state_reset.py": "94ac7050e8dfbd151f66ab5d45d08bc3ba0c1f7b2599abdb3af3ce74a348ec91",
-    "backend/paper_training.py": "c129bb8212b75571199a7533e95e2a47a2cb7593bba7c6c4275864c689d060ec",
+    "backend/paper_training.py": "06d4b67c67bfa6f96bfb47c4ae6a41183378604a73876d1e6cfa3774c15c2598",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "f442d71f8b444213c0ebce5c7205b1d31f5aaf4789083e8d8d5b5b3b4cb69891",
+    "backend/strategy_lab.py": "34cec10b77683d100ac0f8ff8afd016fa1aca05790ec7115bb3afc920a695eb2",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "108d4e87093f9269bd79ab5ff60aad07181f44e95f0eec94b66805b1a31a5a03",
-    "backend/user_gateway.py": "401e04c2a088f7dfe7e5121d1741de2ff4ee5769f29fdf028761e10feb368b9a",
-    "backend/winner_ensemble.py": "b4bbbbb000c1f818887360d92ed1d00625af940b03d372d78f57b46127efec9c",
-    "backend/promoted_entry_guard.py": "7dd94c8ace89bbc6caa4af47aa791f99db12498beaa398afa2922230ac1d37e8",
+    "backend/user_gateway.py": "2a65751deca2b1cf35b8980043d65900064bbdcb39389fb07f46e1b1d3a013d0",
+    "backend/winner_ensemble.py": "bdec89fdc220c4f47ab34e72c65d7f798ba504d859649fe152f4268713c5ce72",
+    "backend/promoted_entry_guard.py": "5c396dcbd6a3946e76c48e3273ff39101228f266f8cdefed536b8d42caec5166",
     "scripts/start_local_paper.ps1": "71ef04abf1d06aa4840800e0e90349da21e7c5aedf616b426a91d37ccd44fec2",
-    "scripts/local_paper_service.py": "b19a1b671dbc53a99ef8585f250f4a15c1e4d3da35439c1c0b5e4f17dcaab106",
-    "backend/lab_strategy_lifecycle.py": "187e64976e411fec8a3c88c30b09dc948f75d3afc93660560cc16a402a39652a",
+    "scripts/local_paper_service.py": "bad9d26c461380912c4db13ceb25eed9c88e1088a70ea94f6f3f4b306727ede7",
+    "backend/lab_strategy_lifecycle.py": "c8836b85bc8b7cb6a5f7b61a6554557269d4a62a7069fcfd4e19c4690a7ee7d5",
     "backend/market_discovery.py": "c8085461c796455898b1be3f7d441296d3f8abc57097d025ba0aa392b6ba4cd0",
     "backend/paper_market_feasibility.py": "39fdbb2e91a3612abb63c5a6aa36d98cadc74be787f1c645b8107dae43484aa1",
-    "backend/tape_pool_scheduler.py": "8bb1d68eccbc1558819b0ff6995b886903ca49bdb081a6a806fc8f414579d10f",
+    "backend/tape_pool_scheduler.py": "4f34cddbc2952765eb724178cb46d46725ccdd312415f66eb3718c034ee5775a",
     "docs/entry-pipeline-repair.md": "7a972df176f4cda1cee727dd4d2b351d465830506e8021c9b6f091d404f323cf",
     "scripts/local_paper_watchdog.ps1": "2b0ccde9292d4562352b3297b30cce10cae7c14cf94886cd96a8f16b9bddc83d",
     "backend/shared_snapshot_io.py": "ea4699d1ad28d1b331013d9fd2fcec316a189bd587fc1881dfa369884609b3a7",
@@ -183,11 +192,17 @@
     "docs/funded-zero-trades-repair.md": "1f257cf13407f02c2b0d391df661c66f7227b1012bfc3ccf6dc13f5539bc7935",
     "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
     "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4",
-    "src/lib/labStrategyView.ts": "19016791407ffc597550f9088c11fd3167d8749771d863bd4546c52db98bc6c8",
-    "backend/order_flow_adaptive_oct4.py": "7071c5d5b30952536b25b763432113e5cdead5d2858e82795fd324e8fcc1cbb1",
-    "backend/cost_first_established.py": "44f0fa8b97e23b7e5c6e3278d5cc32c36b5d18bcfd19729712ed0957e73a9404",
+    "src/lib/labStrategyView.ts": "37da74aed0cb70b9a732c3cb906f447226968ed5b2c183a7828346f6193f7cf9",
+    "backend/order_flow_adaptive_oct4.py": "8035eb83b352688e36944c6c580978e08c22fa221ca87d29c88c07b27926c857",
+    "backend/cost_first_established.py": "1b5369f37b8fd2887a06bf9979ecfff674e2bb16fbeb7bcd78e3cd7657d8a029",
     "docs/tape-decoder-shadow-and-seat-shedding.md": "30109889dc5598e6c99b0922ca733e79f26a3198ed7ff16cd80f613306c3e067",
-    "backend/cost_first_engine_profile.py": "0035af8dac5e2a96162b349b11017e16ccdf617d94ebe6d52497792c6b94f6e0"
+    "backend/cost_first_engine_profile.py": "3bbbb86a4c7a8165765a29bf16af52645802f6ce7c0930568896ac37eb8d177f",
+    "backend/structural_rug_guard.py": "5626d8dc1546bb41c75ec7141f9136594128e49781f297b8e884e729a7169974",
+    "backend/heat_veto.py": "83dc32db8fc5a7c8d9562c19b063592b1c6d0a1b7de26b3e1d0f6099649a0438",
+    "backend/pool_loss_memory.py": "ba771aea0dc8b8daf39f4afd6d74d9fdd8099a194f065d4ecbde1b42620d518f",
+    "backend/entry_defense.py": "84f4f098b58cc2c1831bfcaf9d5f1c74b04a92881a4b1f12ff1109dcca6cbac4",
+    "docs/DEFENSIVE_ENTRY_LAYER.md": "d81e45404e7dde416573a9105dc7eda25b060aa3954e8332003b11d332e0599d",
+    "scripts/build_ticker_registry_seed.py": "6ba3273bc9043f46cba1e455a6441e03502023998eb5ef81a42e1ee78c84cb86"
   },
   "runtime_version": "RUNTIME_DURABLE_PAPER_V2",
   "runtime_note": "Primary PAPER account runs one broad verified-flow candidate rule and four selective entry rules against one shared balance; bounded same-policy outcome feedback is shown separately from isolated validated training, and no path can send live orders.",
@@ -229,10 +244,15 @@
       "window_max_closed_trades_per_rule": 100,
       "valid_unique_closed_outcomes_only": true,
       "retain_original_overlapping_rule_matches": true,
-      "automatic_time_based_recovery": false
+      "automatic_time_based_recovery": false,
+      "learning_policy_versions": [
+        "WINNER_ENSEMBLE_VERIFIED_ENTRY_V5",
+        "WINNER_ENSEMBLE_VERIFIED_ENTRY_V4"
+      ],
+      "version_bump_releases_throttle": false
     },
     "research_strategy_retirement": {
-      "version": "LAB_STRATEGY_LIFECYCLE_V1",
+      "version": "LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE",
       "same_execution_and_activity_regime_required": true,
       "unique_valid_closed_outcomes_only": true,
       "minimum_closed_trades": 12,
@@ -242,8 +262,22 @@
       "preserve_money_history_and_position_exits": true,
       "promoted_cohort_exempt": true,
       "automatic_reactivation": false,
-      "independent_profitability_proof": false
-    }
+      "independent_profitability_proof": false,
+      "previous_version": "LAB_STRATEGY_LIFECYCLE_V1",
+      "accepted_entry_policy_versions": {
+        "TEST books": [
+          "LAB_ACTIVE_V7_DEFENSIVE_ENTRY",
+          "LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP"
+        ],
+        "COST_FIRST_CONTROL and COST_FIRST_SCALED": [
+          "COST_FIRST_ESTABLISHED_V2",
+          "COST_FIRST_ESTABLISHED_V1"
+        ]
+      },
+      "entry_only_version_bump_carries_evidence": true
+    },
+    "score_version": "NEO_MARKET_SCORE_V1",
+    "context_conviction_basis": "NEO_MARKET_SCORE_V1 (Monitor.training_context)"
   },
   "discovery": {
     "primary_early": "GECKOTERMINAL_SOLANA_NEW_POOLS_PUMPSWAP",
@@ -261,20 +295,20 @@
   "baseline_manifest": "docs/strategy-lock-before-repair.json",
   "hash_basis": "UTF8_LF",
   "exit_policy_version": "HONEST_NET_EXIT_V1",
-  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged. Funded sizing V4 prospectively raises the per-book PAPER entry cap from 25% to 50%; the 1.5% round-trip cost gate and 3% net stop remain, so cost floors near the stop stay blocked. Larger notional increases dollar gains and losses; no return or trade-frequency guarantee. ORDER_FLOW_ADAPTIVE restore V1: the October 4, 2026 decision policy (ORDER_FLOW_BALANCED_V4 entry filter, conviction/context model, ADAPTIVE_CONTEXT_HOLD modes, adaptive net exit ladder) becomes an explicit, versioned, opt-in per-account strategy profile selected through NEO_SIGNAL_STRATEGY. The default production strategy, its thresholds, cost caps, exits and every ledger are unchanged; the conviction table and hold modes moved verbatim into the policy module. Profile values are strategy-owned and published with a config ownership map. No trade frequency or profitable outcome is inferred. Single-writer stabilization V1: after a live incident in which a slow health probe made the gateway start a second engine for one account on a new port (both wrote the same ledger), the gateway never reallocates a port or spawns while the account engine is tracked or its port is in use (port of legacy edaadfa), caches verified Supabase users for 30 s (port of legacy f8975ac), keeps the last known strategy choice on a transient registry read error, merges the operator strategy field before every registry write, and market_monitor holds an exclusive per-ledger engine lock for its lifetime. The launcher pins shared services to the default strategy. No trading threshold, cost, exit or ledger changes. Shutdown and exit safety V1 (pre-deploy review): the service runner and the Strategy Lab never write a ledger they did not load (a failed or interrupted load, or a second engine refused by the ledger lock, previously saved an empty $1,000 account or 34 empty Lab books over the real ledger); an unreadable Lab ledger is refused instead of rebuilt. ORDER_FLOW_ADAPTIVE positions whose pool has no COMPLETE 30 s exact-pool window keep their entry hold mode and skip the flow-driven exits instead of reading missing tape coverage as selling; the profile no longer spends quotes on a feed older than 6 s. Default strategy thresholds, costs, exits and ledgers are unchanged. Stale-market exit forensics: the archived 2026-10-06/07 main ledger closed 14 same-pool re-entries as STALE_MARKET_EXIT 2-4 s after entry because the exit path preferred the market record pinned during the previous trade in that pool; the newest-observation selection of 2026-10-07 repairs that, and the entry commit now also pins the exact-pool observation that passed the final freshness check. Genuinely stale data still exits, no threshold changes, and no ledger is reset or reclassified. Watchdog supervision V2: the local PAPER watchdog task gains a repeating 5-minute trigger (IgnoreNew) in addition to the logon trigger, because a hidden console closed with 0xC000013A on 2026-10-07 was never re-launched by restart-on-failure and nothing supervised the services; the watchdog also gains a read-only -Probe mode and reports gateway-spawned personal engines without ever starting or stopping one. No trading, cost, exit or ledger change. Replay harness reconciliation V1 (measurement validity, no strategy change): the offline primary replay derives every freshness window from the live engine and guard constants (engine_execution MAX_AGE_MS and the newly named preflight bounds FINAL_QUOTE_MAX_AGE_MS/PREFLIGHT_PREVIEW_MAX_AGE_MS/PREFLIGHT_MAX_SLOT_GAP, engine_rug_guard.TTL_MS, promoted_entry_guard SAFETY_MAX_AGE_MS/FLOW_MAX_AGE_MS, pair_price_integrity.TTL_MS, engine_entry_policy.MAX_ENTRY_QUOTE_AGE_MS) instead of its own 4 s/30 s literals, evaluates entry-stage facts at the recorded preflight start and the commit at the recorded row with the scanner-refreshed feed and commit-time flow, ticks positions only on recorded guard rows, never arms the quote-retry cooldown from rows without quote evidence, and offers labelled offline exit variants (REPLAY_EXIT_VARIANT_V1) that change exit decisions only; engine_exit_policy gains named hold-limit constants and an optional max_hold_minutes override with unchanged defaults. Live thresholds, costs, exits, sizing and every ledger are unchanged; replayed trades reproduce the recorded ledger, which proves measurement identity, not profitability. Review follow-up: the preflight consistency chain is evaluated at the recorded prepare clock min(row, final quote landing) so recording lag is not quote age, the post-quote Jupiter price-tiebreak rejections link to their bundle as commit-stage outcomes, a max_hold_minutes override labels its exit MAX_HOLD_<limit> (live MAX_HOLD_60 unchanged), replay_main.py never overwrites an existing report unless --overwrite and the same report_kind, and a SHA-256-pinned 1,339-row slice of the 2026-10-07 main journal must reproduce the booked live pnl within $0.01. LAB_ACTIVE_V6 and COST_FIRST_ESTABLISHED_V1 (2026-10-08): every Strategy Lab book now admits a modeled round-trip cost of at most promoted_guard.max_entry_cost_pct(STOP_LOSS) (1.5%, 0.5 x the 3% net stop) instead of the 2.75% TEST-book cap (ledger evidence: median gross stop headroom 0.28%, 40.4% of 1,398 Lab stops fired on moves under 1%), records entry_cost_cap_pct/stop_headroom_pct on every new Lab position and close, reports cost-infeasible candidates per book instead of hiding them, and adds the isolated $500 TEST book pair COST_FIRST_CONTROL (-3/+10/60) and COST_FIRST_SCALED (-3/+4/60) on the cost-defined universe in backend/cost_first_established.py (PumpSwap fee tier <= 50 bps, liquidity >= $250k, fee+impact round trip <= 1.2% at min(entry cap, liquidity x 0.001)) with the funded flow, safety, price and commit-recheck gates unchanged; the default production strategy, its thresholds, cost caps, exits, every ledger, balance, history and open position are unchanged, the model ceiling stays 2.75, and no trade frequency or profitable outcome is claimed; the PR #16 review fix makes the repeated-loss retirement heuristic count each TEST book on its own accepted entry-policy version (COST_FIRST_ESTABLISHED_V1 for the pair, LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP for the others; it was silently inert for the pair), names cost_first_size_below_minimum and reentry_cooldown blocks, and keeps best_candidates only on PROMOTED_PAPER books in the compact dashboard payload; retirement still only stops new entries and never touches money, history or exits. Tape decoder shadow path and seat shedding V1: since PR #7 the reversed-orientation branch required a balance entry for the user wrapped SOL cash account, which is created and closed inside the swap on real bodies, so 87% of unclassified bodies and 33 zero-yield pools were lost; the repaired reversed cash-leg path reads the exact event legs (proven against pool vault and user token account deltas on committed public bodies), carries decoder_version PUMP_SWAP_REVERSED_CASH_LEG_EVENT_V2 with the DECODER_PATH_UNVALIDATED quality flag so the engine and the Lab keep treating it as DEGRADED flow until NEO_TAPE_VALIDATED_DECODER_VERSIONS lists it after a 24 h shadow comparison, and the tape scheduler now sheds entry/exploration seats of pools with zero engine-usable swaps after 40 fetched bodies for a 30-minute cooldown with the shed list published; pinned exit pools, admission gates, cost caps, exits and every ledger are unchanged; review follow-up: shadow-path events are journaled in a separate shadow_events table so they never enter the 5-minute projection or count against NEO_TAPE_MAX_EVENTS (which would mark every pool UI_WINDOW_TRUNCATED and block all PAPER entries), seats are shed only on zero decoded swaps (events whose only flags are QUOTE_USD_UNKNOWN or QUOTE_ASSET_USD_REFERENCE_ESTIMATE count as decoded, so a SOL/USD reference outage cannot shed every candidate) with decoded_swaps and usable_swaps both published, a shed pool's retry floor survives a feed gap within the yield window, and pending bodies of shed or de-selected pools no longer spend the per-poll body budget. Quote funnel observability and defer accounting (2026-10-08): a cross-process ENTRY_SEQUENCE_BUSY or EXIT_PRIORITY_PENDING defer is no longer charged against the per-scan quote budget (it already armed no per-token cooldown), quote-preparation failure codes are kept as bounded per-scan, rolling and engine-lifetime histograms in entry_diagnostics with one diagnostics row per failure, and every EXIT_IMPACT_EMERGENCY close records the trigger quote, confirming re-quote, entry preflight impacts, threshold and entry-versus-exit liquidity; the exit rule, every admission gate and the provider-failure accounting (TIMEOUT, RATE_LIMITED, route consistency) are unchanged and no profitability is implied; review fix: those rows go to a 5 MB size-capped quote_preparation.jsonl sidecar next to audit.jsonl (plain append without fsync, outside STATE.lock, newest rows kept on compaction, at most one row per pair and code per QUOTE_RETRY_COOLDOWN_MS), audit.jsonl receives no per-failure rows so ledger commits stay unaffected, the rolling histogram is the last 60 minutes and the lifetime histogram is labelled since engine start (not persisted, ledger schema unchanged). Tape seats for the cost-first universe and personal-engine pins (2026-10-08, STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS): the tape scheduler ranks COST_FIRST universe pools (cost_first_established.candidate at the Lab entry cap) directly below estimated feasible main/funded candidates and above matched candidates whose modeled round trip exceeds the cost cap or is unknown, inside the unchanged seat, lease and body budgets, and pins the exact (mint, pool) of open positions of every personal PAPER engine in the read-only account registry (127.0.0.1 /state, short timeout, at most once per 5 s per port, failures ignored, last positions retained 30 s), publishing cost-first selected/unselected counts and pinned_personal_pools in live_tape_status.entry_scheduling; no entry, exit, cost, risk, size, ledger or engine file changes, the default and ORDER_FLOW_ADAPTIVE effective_config_hash values are unchanged and no profitability is implied. COST_FIRST engine profile (2026-10-08): market_monitor.py and user_gateway.py accept the opt-in per-account strategy COST_FIRST_ESTABLISHED_PAPER_V1 (new module cost_first_engine_profile.py: cost-first universe as the market screen on the unchanged engine gates, caps and risk limits, liquidity size rule through the engine daily-budget sizing, exit policy cost_first / COST_FIRST_NET_EXIT_V1 with EXIT_IMPACT_EMERGENCY_V2 sell-anchored arm-then-confirm), while the default WINNER_ENSEMBLE_PAPER_V1 and ORDER_FLOW_ADAPTIVE effective_config_hash values and /state configs are unchanged and every position keeps the exit policy it was opened with; review follow-up: EXIT_IMPACT_EMERGENCY_V2 arms only on a mark routed through the exact entry pool (an off-pool best route can never confirm and previously took a forced exit-priority quote every 2 s from the shared keyless Jupiter budget), applies a 15 s re-arm cooldown after any disarm and at most 3 forced confirmation quotes per position per 5 minutes (blocked triggers are counted, never quoted), runs the fixed net geometry on every finite fresh confirmation quote before disarming, size_limited_by_daily_budget compares a cost-first entry with its size-rule base, and engine_exit_policy maps an unknown exit policy to the fixed net geometry with a logged warning instead of raising (a code rollback still requires the cost_first account to be flat). Training checkpoint temporaries (2026-10-08): service restarts hard-stop the learner worker (TerminateProcess), often while it writes its 100-250 MB checkpoint, so atomic_json's cleanup never ran and 68 abandoned .training.json<random> copies (~7.6 GB) accumulated in the three live training directories, their mtimes matching restart times; paper_training.py now removes the temporary on every catchable failure without masking the original error, and the engine reclaims its own stale (older than 10 minutes) temporaries at start and at most every 10 minutes after a save, matching only the exact tempfile name pattern of its checkpoint in its own directory. No learner decision, threshold, cost, exit, training state field or ledger changes.",
+  "hash_change_reasons": "Professional local PAPER review: repair actual-worker ownership and persistence retry handling, validate and bound loss feedback, and recheck liquidation availability/drawdown at entry commit. Preserve history and admission safeguards. Profitability and the 80 percent win-rate target remain unvalidated. User-requested strategy review: archive repeated losing research entries while retaining exit management and ledgers, correct market/flow diagnostic attribution and show honest training state. Current promoted profitability remains unvalidated. Entry pipeline repair: reconcile funded market filters, prospectively add mature liquid candidates, stable cost-aware observation, quote bundle reservations and exact refusals, bounded discovery, preserve real observation timestamps. No claim of demonstrated profit. Funded zero-trade repair: separate mature physical market branches, exact reversed cash-leg decoder, distinct event coverage and final funded receipt/commit checks; no ledger reset, altered exits, or return guarantees. Observed fee recorder: retain complete authenticated fee facts for evaluation only; current PAPER entry/exit fees, prospective strategy version and all ledgers remain unchanged. Funded sizing V4 prospectively raises the per-book PAPER entry cap from 25% to 50%; the 1.5% round-trip cost gate and 3% net stop remain, so cost floors near the stop stay blocked. Larger notional increases dollar gains and losses; no return or trade-frequency guarantee. ORDER_FLOW_ADAPTIVE restore V1: the October 4, 2026 decision policy (ORDER_FLOW_BALANCED_V4 entry filter, conviction/context model, ADAPTIVE_CONTEXT_HOLD modes, adaptive net exit ladder) becomes an explicit, versioned, opt-in per-account strategy profile selected through NEO_SIGNAL_STRATEGY. The default production strategy, its thresholds, cost caps, exits and every ledger are unchanged; the conviction table and hold modes moved verbatim into the policy module. Profile values are strategy-owned and published with a config ownership map. No trade frequency or profitable outcome is inferred. Single-writer stabilization V1: after a live incident in which a slow health probe made the gateway start a second engine for one account on a new port (both wrote the same ledger), the gateway never reallocates a port or spawns while the account engine is tracked or its port is in use (port of legacy edaadfa), caches verified Supabase users for 30 s (port of legacy f8975ac), keeps the last known strategy choice on a transient registry read error, merges the operator strategy field before every registry write, and market_monitor holds an exclusive per-ledger engine lock for its lifetime. The launcher pins shared services to the default strategy. No trading threshold, cost, exit or ledger changes. Shutdown and exit safety V1 (pre-deploy review): the service runner and the Strategy Lab never write a ledger they did not load (a failed or interrupted load, or a second engine refused by the ledger lock, previously saved an empty $1,000 account or 34 empty Lab books over the real ledger); an unreadable Lab ledger is refused instead of rebuilt. ORDER_FLOW_ADAPTIVE positions whose pool has no COMPLETE 30 s exact-pool window keep their entry hold mode and skip the flow-driven exits instead of reading missing tape coverage as selling; the profile no longer spends quotes on a feed older than 6 s. Default strategy thresholds, costs, exits and ledgers are unchanged. Stale-market exit forensics: the archived 2026-10-06/07 main ledger closed 14 same-pool re-entries as STALE_MARKET_EXIT 2-4 s after entry because the exit path preferred the market record pinned during the previous trade in that pool; the newest-observation selection of 2026-10-07 repairs that, and the entry commit now also pins the exact-pool observation that passed the final freshness check. Genuinely stale data still exits, no threshold changes, and no ledger is reset or reclassified. Watchdog supervision V2: the local PAPER watchdog task gains a repeating 5-minute trigger (IgnoreNew) in addition to the logon trigger, because a hidden console closed with 0xC000013A on 2026-10-07 was never re-launched by restart-on-failure and nothing supervised the services; the watchdog also gains a read-only -Probe mode and reports gateway-spawned personal engines without ever starting or stopping one. No trading, cost, exit or ledger change. Replay harness reconciliation V1 (measurement validity, no strategy change): the offline primary replay derives every freshness window from the live engine and guard constants (engine_execution MAX_AGE_MS and the newly named preflight bounds FINAL_QUOTE_MAX_AGE_MS/PREFLIGHT_PREVIEW_MAX_AGE_MS/PREFLIGHT_MAX_SLOT_GAP, engine_rug_guard.TTL_MS, promoted_entry_guard SAFETY_MAX_AGE_MS/FLOW_MAX_AGE_MS, pair_price_integrity.TTL_MS, engine_entry_policy.MAX_ENTRY_QUOTE_AGE_MS) instead of its own 4 s/30 s literals, evaluates entry-stage facts at the recorded preflight start and the commit at the recorded row with the scanner-refreshed feed and commit-time flow, ticks positions only on recorded guard rows, never arms the quote-retry cooldown from rows without quote evidence, and offers labelled offline exit variants (REPLAY_EXIT_VARIANT_V1) that change exit decisions only; engine_exit_policy gains named hold-limit constants and an optional max_hold_minutes override with unchanged defaults. Live thresholds, costs, exits, sizing and every ledger are unchanged; replayed trades reproduce the recorded ledger, which proves measurement identity, not profitability. Review follow-up: the preflight consistency chain is evaluated at the recorded prepare clock min(row, final quote landing) so recording lag is not quote age, the post-quote Jupiter price-tiebreak rejections link to their bundle as commit-stage outcomes, a max_hold_minutes override labels its exit MAX_HOLD_<limit> (live MAX_HOLD_60 unchanged), replay_main.py never overwrites an existing report unless --overwrite and the same report_kind, and a SHA-256-pinned 1,339-row slice of the 2026-10-07 main journal must reproduce the booked live pnl within $0.01. LAB_ACTIVE_V6 and COST_FIRST_ESTABLISHED_V1 (2026-10-08): every Strategy Lab book now admits a modeled round-trip cost of at most promoted_guard.max_entry_cost_pct(STOP_LOSS) (1.5%, 0.5 x the 3% net stop) instead of the 2.75% TEST-book cap (ledger evidence: median gross stop headroom 0.28%, 40.4% of 1,398 Lab stops fired on moves under 1%), records entry_cost_cap_pct/stop_headroom_pct on every new Lab position and close, reports cost-infeasible candidates per book instead of hiding them, and adds the isolated $500 TEST book pair COST_FIRST_CONTROL (-3/+10/60) and COST_FIRST_SCALED (-3/+4/60) on the cost-defined universe in backend/cost_first_established.py (PumpSwap fee tier <= 50 bps, liquidity >= $250k, fee+impact round trip <= 1.2% at min(entry cap, liquidity x 0.001)) with the funded flow, safety, price and commit-recheck gates unchanged; the default production strategy, its thresholds, cost caps, exits, every ledger, balance, history and open position are unchanged, the model ceiling stays 2.75, and no trade frequency or profitable outcome is claimed; the PR #16 review fix makes the repeated-loss retirement heuristic count each TEST book on its own accepted entry-policy version (COST_FIRST_ESTABLISHED_V1 for the pair, LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP for the others; it was silently inert for the pair), names cost_first_size_below_minimum and reentry_cooldown blocks, and keeps best_candidates only on PROMOTED_PAPER books in the compact dashboard payload; retirement still only stops new entries and never touches money, history or exits. Tape decoder shadow path and seat shedding V1: since PR #7 the reversed-orientation branch required a balance entry for the user wrapped SOL cash account, which is created and closed inside the swap on real bodies, so 87% of unclassified bodies and 33 zero-yield pools were lost; the repaired reversed cash-leg path reads the exact event legs (proven against pool vault and user token account deltas on committed public bodies), carries decoder_version PUMP_SWAP_REVERSED_CASH_LEG_EVENT_V2 with the DECODER_PATH_UNVALIDATED quality flag so the engine and the Lab keep treating it as DEGRADED flow until NEO_TAPE_VALIDATED_DECODER_VERSIONS lists it after a 24 h shadow comparison, and the tape scheduler now sheds entry/exploration seats of pools with zero engine-usable swaps after 40 fetched bodies for a 30-minute cooldown with the shed list published; pinned exit pools, admission gates, cost caps, exits and every ledger are unchanged; review follow-up: shadow-path events are journaled in a separate shadow_events table so they never enter the 5-minute projection or count against NEO_TAPE_MAX_EVENTS (which would mark every pool UI_WINDOW_TRUNCATED and block all PAPER entries), seats are shed only on zero decoded swaps (events whose only flags are QUOTE_USD_UNKNOWN or QUOTE_ASSET_USD_REFERENCE_ESTIMATE count as decoded, so a SOL/USD reference outage cannot shed every candidate) with decoded_swaps and usable_swaps both published, a shed pool's retry floor survives a feed gap within the yield window, and pending bodies of shed or de-selected pools no longer spend the per-poll body budget. Quote funnel observability and defer accounting (2026-10-08): a cross-process ENTRY_SEQUENCE_BUSY or EXIT_PRIORITY_PENDING defer is no longer charged against the per-scan quote budget (it already armed no per-token cooldown), quote-preparation failure codes are kept as bounded per-scan, rolling and engine-lifetime histograms in entry_diagnostics with one diagnostics row per failure, and every EXIT_IMPACT_EMERGENCY close records the trigger quote, confirming re-quote, entry preflight impacts, threshold and entry-versus-exit liquidity; the exit rule, every admission gate and the provider-failure accounting (TIMEOUT, RATE_LIMITED, route consistency) are unchanged and no profitability is implied; review fix: those rows go to a 5 MB size-capped quote_preparation.jsonl sidecar next to audit.jsonl (plain append without fsync, outside STATE.lock, newest rows kept on compaction, at most one row per pair and code per QUOTE_RETRY_COOLDOWN_MS), audit.jsonl receives no per-failure rows so ledger commits stay unaffected, the rolling histogram is the last 60 minutes and the lifetime histogram is labelled since engine start (not persisted, ledger schema unchanged). Tape seats for the cost-first universe and personal-engine pins (2026-10-08, STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS): the tape scheduler ranks COST_FIRST universe pools (cost_first_established.candidate at the Lab entry cap) directly below estimated feasible main/funded candidates and above matched candidates whose modeled round trip exceeds the cost cap or is unknown, inside the unchanged seat, lease and body budgets, and pins the exact (mint, pool) of open positions of every personal PAPER engine in the read-only account registry (127.0.0.1 /state, short timeout, at most once per 5 s per port, failures ignored, last positions retained 30 s), publishing cost-first selected/unselected counts and pinned_personal_pools in live_tape_status.entry_scheduling; no entry, exit, cost, risk, size, ledger or engine file changes, the default and ORDER_FLOW_ADAPTIVE effective_config_hash values are unchanged and no profitability is implied. COST_FIRST engine profile (2026-10-08): market_monitor.py and user_gateway.py accept the opt-in per-account strategy COST_FIRST_ESTABLISHED_PAPER_V1 (new module cost_first_engine_profile.py: cost-first universe as the market screen on the unchanged engine gates, caps and risk limits, liquidity size rule through the engine daily-budget sizing, exit policy cost_first / COST_FIRST_NET_EXIT_V1 with EXIT_IMPACT_EMERGENCY_V2 sell-anchored arm-then-confirm), while the default WINNER_ENSEMBLE_PAPER_V1 and ORDER_FLOW_ADAPTIVE effective_config_hash values and /state configs are unchanged and every position keeps the exit policy it was opened with; review follow-up: EXIT_IMPACT_EMERGENCY_V2 arms only on a mark routed through the exact entry pool (an off-pool best route can never confirm and previously took a forced exit-priority quote every 2 s from the shared keyless Jupiter budget), applies a 15 s re-arm cooldown after any disarm and at most 3 forced confirmation quotes per position per 5 minutes (blocked triggers are counted, never quoted), runs the fixed net geometry on every finite fresh confirmation quote before disarming, size_limited_by_daily_budget compares a cost-first entry with its size-rule base, and engine_exit_policy maps an unknown exit policy to the fixed net geometry with a logged warning instead of raising (a code rollback still requires the cost_first account to be flat). Training checkpoint temporaries (2026-10-08): service restarts hard-stop the learner worker (TerminateProcess), often while it writes its 100-250 MB checkpoint, so atomic_json's cleanup never ran and 68 abandoned .training.json<random> copies (~7.6 GB) accumulated in the three live training directories, their mtimes matching restart times; paper_training.py now removes the temporary on every catchable failure without masking the original error, and the engine reclaims its own stale (older than 10 minutes) temporaries at start and at most every 10 minutes after a save, matching only the exact tempfile name pattern of its checkpoint in its own directory. No learner decision, threshold, cost, exit, training state field or ledger changes. DEFENSIVE_ENTRY_LAYER_V1 (2026-10-08, research on 22.8 h of the engine scan log, PAPER): every entry path (main WINNER_ENSEMBLE_PAPER_V1, ORDER_FLOW_ADAPTIVE, COST_FIRST_ESTABLISHED_PAPER_V1, the training quote probe, every Strategy Lab book and the tape scheduler seat groups) consults STRUCTURAL_RUG_GUARD_V1 (rug_input_unknown, rug_lp_pullable liq/mcap >= 1, rug_young_pool < 720 min, rug_fake_market_cap mcap >= $20M with liq/mcap < 2% under 14 days, rug_ticker_reuse of another mint under 14 days; fail closed; ticker registry sidecar next to each state file, atomic, 14-day pruning, corrupt file starts empty), HEAT_VETO_STACK_V1 (5-min return >= +3%, m5 buy share >= 0.70, volume acceleration >= 1.3, 6h >= +200% or 24h >= +150%, paid profile in the last 60 min at >= 100 bps, price <= 75% of the 15-min high or 5-min return <= -20%, m5 turnover >= 0.095, and a conservative veto while a pool has < 300 s of history; log-only reserved for the unregistered LAB_A/LAB_B arms) and POOL_LOSS_MEMORY_V1 (2 consecutive losses on one pool in one ledger block it for 6 h, read-only from the closed history) before any quote, flow promotion or RugCheck call, rechecked at the engine commit, with versions and reasons in entry diagnostics and on new positions; the cost-first universe embeds the structural guard (COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD) so the engine profile, both COST_FIRST Lab books and the scheduler cost-first group share it; blocked pools get no tape seat while pins stay untouched; score_pair gives the +9 liquidity/MC bonus only for 0.15 <= liq/MC < 0.6 and scores liq/MC >= 1 as an LP risk (-10, NEO_MARKET_SCORE_V2_LIQ_MC_BAND). Entry versions WINNER_ENSEMBLE_VERIFIED_ENTRY_V5 (loss feedback still counts V4 closes, so no throttle is released), ORDER_FLOW_BALANCED_V5 (decision checks ORDER_FLOW_BALANCED_V4 unchanged), COST_FIRST_ESTABLISHED_ENTRY_V2 / COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY, COST_FIRST_ESTABLISHED_V2, LAB_ACTIVE_V7_DEFENSIVE_ENTRY, PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5 and tape STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY change every effective_config_hash visibly; exits, cost caps, RUG_GUARD_V2, sizes, ledgers, balances and open positions are unchanged, no history is reset or rewritten, the offline replay of journals recorded before the layer runs it in a labelled recorded_policy mode, and no profitable outcome is claimed (the research found none after costs; the layer cuts measured loss tails). DEFENSIVE_ENTRY_LAYER_V1 review follow-up (PR #23, before merge): the companion score change is entry-only, because the ORDER_FLOW_ADAPTIVE exit context reads the V1 score of each observation (scoreV1, EXIT_CONTEXT_SCORE_VERSION NEO_MARKET_SCORE_V1) and a new position's blind-flow hold mode comes from the V1-basis conviction, so adaptive exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged; tape seats are withheld only for structurally blocked pools (heat log-only at seats, no cross-ledger loss memory: one seat serves every ledger and each entry path applies its own memory and heat); the 15-minute crash high spans feed gaps as in the research window; a malformed txns.m5 no longer raises and any unexpected evaluation error blocks only that candidate (defensive_entry_error, fail closed); the Lab dashboard labels every defensive reason. No threshold, cost cap, exit rule, ledger or balance changes and no profitability is claimed. DEFENSIVE_ENTRY_LAYER_V1 second review follow-up (PR #23, before merge): the heat veto compares the warm-up span unrounded and treats a missing 5-minute reference as warming, and rules (e) and (f) need their own window coverage in the in-memory pair history (the pair seen by this process for 15 min; at a fee tier >= 100 bps the process observing for 60 min unless the pool is known paid), so after a restart an engine or the Lab waits 15 min (60 min at >= 100 bps) instead of judging on partial windows; the Lab rechecks the layer at commit like the engine; the RugCheck prewarm targets established market candidates the layer allows (PREWARM_V2_DEFENSIVE_POPULATION); the ticker registry keeps up to 40,000 entries (14 days at the research rate), publishes its effective horizon, is seeded read-only from the other services' sidecars when new or empty (TICKER_REGISTRY_SEED_V1) and the tape flushes it at a clean stop; LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE counts the closes of the entry-only predecessors (LAB_ACTIVE_V6, COST_FIRST_ESTABLISHED_V1) so the bump never delays a retirement; the archived research forensics reproduce the V1 universe through a physical-only helper; the three engine effective_config_hash values are pinned exactly. No threshold, cost cap, exit rule, ledger or balance changes; filters only become stricter and no profitability is claimed. DEFENSIVE_ENTRY_LAYER_V1 third review follow-up (PR #23, before merge): the ticker rule no longer fails open on an empty or interrupted registry: TICKER_REGISTRY_V2_COVERAGE persists continuous market coverage (a gap over 60 min or a cap eviction restarts it) and rug_ticker_registry_warming blocks a pool under 14 days with no reuse found until coverage reaches 24 h, so USDF/DOTF-like relaunches no longer pass on the first deploy; TICKER_REGISTRY_SEED_V2 seeds any registry without current coverage (personal engines also from main's sidecar via NEO_MAIN_MARKET_STATE_PATH) and adopts a current sibling's coverage, and scripts/build_ticker_registry_seed.py builds main's first-deploy sidecar offline from a training journal copy; the missing-symbol placeholder TOKEN is a missing ticker (rug_input_unknown); the PAPER_TRAINING_V1 learners stay on the V1 score (recorded context for GOLD_ADAPTIVE exits, min_score) without a training version bump or reset; tape seats withhold new seats from hot pools while running leases expire (the tape's own warm-up stays log-only; loss memory is not applied at seats, ACCEPTED 2026-10-08 by the operator under the owner's delegation: one seat serves every ledger, so it is enforced per ledger at entry); the heat warm-up label names the 5/15/60-min windows; the test module never touches a shell account path. Filters only become stricter; no threshold, cost cap, exit rule, ledger or balance changes and no profitability is claimed. DEFENSIVE_ENTRY_LAYER_V1 fourth review follow-up (PR #23, before merge): owner decision (1) on POOL_LOSS_MEMORY_V1 at tape seats is recorded as ACCEPTED 2026-10-08 by the operator under the owner's delegation (per ledger at entry, never at shared seats; no code change); ticker registry coverage is marked only by discovered market rows (DISCOVERED_MARKET_ROWS_V2): a row whose sources name only a held position (open-position, open-position-pinned-pair) is still registered but never extends coverage, so a discovery outage with a position open lets coverage lapse instead of reporting a covered registry (held_only_scans published), and the offline seed builder ignores held-position and position-mark rows for coverage; a missing ticker is rug_input_unknown only under 14 days (an established pool named TOKEN, an emoji or nothing is judged by rules 2-4 without one; placeholders are still never registered); a registry whose current coverage is still under 24 h at start is seeded too and adopts a current sibling's longer span; scripts/build_ticker_registry_seed.py gains --replace-stale (replaces only a sidecar that does not vouch, keeps a .replaced-<ms> copy, merges its sightings) and documents that the journal holds the bounded 90-coin feed (a Lab/tape-grade seed); the three engine effective_config_hash values change with the published guard config. Filters only become stricter or stop blocking pools that no ticker rule judges; no threshold, cost cap, exit rule, ledger or balance changes and no profitability is claimed. DEFENSIVE_ENTRY_LAYER_V1 fifth review follow-up (PR #23, before merge): scripts/build_ticker_registry_seed.py refuses to write into a runtime whose services/processes.json exists without services/stop.request (first run and --replace-stale alike; a running main rewrote the seed at its next periodic save, so every registry warmed for 24 h while the operator believed the seed was in place), never replaces a sidecar it cannot read, and the runbook spells the full command from the live checkout root plus a post-Start check of main, Lab and tape coverage; TICKER_REGISTRY_SIDECAR_READ_V1: an own sidecar that cannot be read (I/O error after 3 attempts) is never overwritten during the run, is re-read every 60 s and at a clean stop, and adopts no sibling coverage until read (it previously counted as corrupt, was replaced without a copy and vouched with a sibling's coverage, which could pass rug_ticker_reuse for up to 14 days); a corrupt one is copied to <sidecar>.corrupt-<ms> before it is replaced; TICKER_REGISTRY_SEED_V3 also seeds a running registry after a coverage gap and every 5 min while it is under 24 h, so a stalled tape no longer withholds seats of pools under 14 days for 24 h while main vouches; the replay default recorded_policy refuses journals with rows recorded under the layer (coin.scoreVersion) and a labelled without_layer counterfactual exists; the ORDER_FLOW_ADAPTIVE profile publishes that its unchanged V4 checks read the V2 entry score; two persistence tests stamp by the registry clock so they pass after 2027-01-29; the COST_FIRST doc verifies and samples COST_FIRST_ESTABLISHED_ENTRY_V2. Filters only stay as strict or become stricter; no threshold, cost cap, exit rule, ledger or balance changes and no profitability is claimed; the three engine effective_config_hash values change with the published guard config. DEFENSIVE_ENTRY_LAYER_V1 sixth review follow-up (PR #23, before merge): every gate test module that isolates the layer also replaces strategy_lab.DEFENSE and live_tape._POOL_SCHEDULER with path-less layers, so a module run alone (without scripts/run_python_checks.py) never writes a ticker sidecar next to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (six modules did, with the January 2027 test clock), with a sentinel regression test; TICKER_COVERAGE_CLOCK_V1: coverage stamped more than 5 min after the reference clock is never current, is dropped from the own sidecar at load and re-read, is never adopted from a sibling at a seed and is dropped from memory at the next scan (a future observed_until kept coverage current and hid every gap); TICKER_REGISTRY_SEED_V4: a vouching registry merges its siblings' sightings, never their coverage, every 5 min, so main's untrimmed-feed sightings reach the Lab and the tape; the comments of entry_defense, market_monitor and user_gateway name the current seed version; scripts/build_ticker_registry_seed.py (SEED_REPLAY_WINDOW_V1) replays only the last --window-days (default 15) capped at --max-replay-minutes (default 40) of journal, judges coverage at the clock after the replay, prints start_services_before_utc and exits 2 when written but not vouching; engines publish the layer status as /state defensive_entry_layer after every scan, also while paused (in memory only); the runbook adds the file sync, the still-flushing wait and the cases where no rerun helps; the docs record the learner-sample boundary (first row with coin.scoreVersion). Filters only stay as strict or become stricter; no threshold, cost cap, exit rule, ledger or balance changes and no profitability is claimed; the three engine effective_config_hash values change with the published guard config.",
   "support_file_changes": {
-    "backend/strategy_lab.py": "Raise prospective funded PAPER per-book entry cap from $62.50 to $125 ($250 allocation at 50%), without resizing open positions or weakening cost, flow, price, or risk gates. Refuses an unreadable ledger instead of rebuilding empty books; marks LOADED for shutdown. LAB_ACTIVE_V6: one admission cost cap (promoted_guard.max_entry_cost_pct(STOP_LOSS)) for every Lab book, headroom/cap fields on every new position and close, per-book cost feasibility and modeled_roundtrip_cost_limit diagnostics; COST_FIRST_ESTABLISHED_V1 book pair registered as isolated TEST books with the funded evidence gates and their own net exit geometries. Standard exits and every ledger unchanged. lifecycle_activity_versions() passes COST_FIRST_ESTABLISHED_V1 for the pair to the retirement review; cost-first books report cost_first_size_below_minimum or reentry_cooldown when every universe candidate was refused only for size or cooldown.",
-    "backend/promoted_entry_guard.py": "Version the funded PAPER size-cap policy as V4; preserve the 1.5% expected cost cap, 3% net stop and all admission evidence.",
-    "src/lib/labStrategyView.ts": "Explain the two-way estimated DEX fees and slippage/latency buffers, and show the remaining net-stop headroom. Explain LAB_ACTIVE_V6 cost-infeasible candidates for every Lab book (cap, stop, rejected count) without hiding them; the funded-only planning summary stays funded-only. Label cost_first_size_below_minimum and reentry_cooldown blocks.",
+    "backend/strategy_lab.py": "Raise prospective funded PAPER per-book entry cap from $62.50 to $125 ($250 allocation at 50%), without resizing open positions or weakening cost, flow, price, or risk gates. Refuses an unreadable ledger instead of rebuilding empty books; marks LOADED for shutdown. LAB_ACTIVE_V6: one admission cost cap (promoted_guard.max_entry_cost_pct(STOP_LOSS)) for every Lab book, headroom/cap fields on every new position and close, per-book cost feasibility and modeled_roundtrip_cost_limit diagnostics; COST_FIRST_ESTABLISHED_V1 book pair registered as isolated TEST books with the funded evidence gates and their own net exit geometries. Standard exits and every ledger unchanged. lifecycle_activity_versions() passes COST_FIRST_ESTABLISHED_V1 for the pair to the retirement review; cost-first books report cost_first_size_below_minimum or reentry_cooldown when every universe candidate was refused only for size or cooldown. DEFENSIVE_ENTRY_LAYER_V1 for every Lab book after the rule or universe match and before the cost estimate, flow promotion, RugCheck, Jupiter price probes and fills; per-book pool loss memory; heat log-only only for the reserved LAB_A/LAB_B ids; cost-first universe with the Lab registry; defensive diagnostics, blocked reason and position record; registry sidecar strategy_lab.ticker_registry.json flushed at stop. Review 2: the layer is rechecked at commit on the commit clock and the book's current history (commit_recheck_blocked, commit_recheck_rejected); a new or empty registry is seeded from the sibling sidecars; the retirement review counts LAB_ACTIVE_V7 and V6 closes and the pair's V2 and V1 closes (LAB_STRATEGY_LIFECYCLE_V2). Review 3: comment only (a registry without current coverage is seeded, TICKER_REGISTRY_SEED_V2).",
+    "backend/promoted_entry_guard.py": "Version the funded PAPER size-cap policy as V4; preserve the 1.5% expected cost cap, 3% net stop and all admission evidence. FUNDED_POLICY_VERSION PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5 (funded screen behind the defensive layer); evidence gates unchanged.",
+    "src/lib/labStrategyView.ts": "Explain the two-way estimated DEX fees and slippage/latency buffers, and show the remaining net-stop headroom. Explain LAB_ACTIVE_V6 cost-infeasible candidates for every Lab book (cap, stop, rejected count) without hiding them; the funded-only planning summary stays funded-only. Label cost_first_size_below_minimum and reentry_cooldown blocks. Label every DEFENSIVE_ENTRY_LAYER_V1 reason code and the defensive_entry fallback in Bulgarian (same meaning as engine_entry_policy.LABELS), never a raw code. Review 3: Lab labels for rug_ticker_registry_warming and the relabelled heat_history_warming.",
     "docs/funded-zero-trades-repair.md": "Record the prospective larger PAPER position cap and unchanged entry cost and stop rules.",
-    "backend/live_tape.py": "Retain existing exact instruction/event coverage and swap decoder; append reconciled observed fees only after successful authenticated decoding, without changing admission or execution fees. Reversed cash-leg shadow decoder path (versioned, DEGRADED until validated) for wrapped SOL accounts closed in the swap; in-memory per-pool decode yield (decoded and usable swaps) for seat shedding; shadow-path events journaled in a separate shadow_events table outside the projection window; pending-body queue restricted to the current selection; decoder versions published in the status. Feed collection also passes personal-engine open positions (loopback /state of each registry engine_port, injected fetch) to the scheduler; those reads run only on a daemon refresher thread with its own session, the poll reads its latest snapshot without HTTP, and the personal-engine aggregates are published in the tape file's operator-only personal_engines status instead of entry_scheduling.",
+    "backend/live_tape.py": "Retain existing exact instruction/event coverage and swap decoder; append reconciled observed fees only after successful authenticated decoding, without changing admission or execution fees. Reversed cash-leg shadow decoder path (versioned, DEGRADED until validated) for wrapped SOL accounts closed in the swap; in-memory per-pool decode yield (decoded and usable swaps) for seat shedding; shadow-path events journaled in a separate shadow_events table outside the projection window; pending-body queue restricted to the current selection; decoder versions published in the status. Feed collection also passes personal-engine open positions (loopback /state of each registry engine_port, injected fetch) to the scheduler; those reads run only on a daemon refresher thread with its own session, the poll reads its latest snapshot without HTTP, and the personal-engine aggregates are published in the tape file's operator-only personal_engines status instead of entry_scheduling. The scheduler keeps its ticker registry in live_tape.ticker_registry.json next to the tape file. scheduler_registry_path() names that sidecar for the module scheduler and the restart test. Review 2: flush_scheduler_registry() for the clean-stop path; the scheduler registry is seeded from main's and the Lab's sidecars when new or empty. Review 3: comment only (a registry without current coverage is seeded, TICKER_REGISTRY_SEED_V2).",
     "backend/lab_position_marks.py": "Choose the newest exact-mint/pool observation by source timestamp rather than receipt time, so a newly received stale cache row cannot mask a more recent market observation; retain freshness checks.",
-    "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances. Project LAB_ACTIVE_V6 cap/headroom fields, per-book cost feasibility, cost-infeasible counts and cost-first universe diagnostics for the dashboard. Non-PROMOTED books publish only the scalar cost_feasibility fields (best_candidates stays funded-only).",
-    "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock. Add explicit strategy selection (activate_strategy) with the ensemble as the unchanged default; when ORDER_FLOW_ADAPTIVE is selected use its profile values, the 60-second exact-pool decision window, flat notional without size backoff, adaptive exit policy on positions and publish strategy identity, profile and config ownership in /state. market_context delegates its conviction table and hold modes to the policy module without numeric change. Hold an exclusive per-ledger engine lock (state.json.engine.lock) for the process lifetime so a second engine on the same account refuses to start. State.loaded guards shutdown writes; ORDER_FLOW_ADAPTIVE exits keep the entry hold mode when the held pool has no COMPLETE fast window (flow_context_unavailable); no quotes on a feed older than 6 s. Pin the exact-pool observation that passed the final entry freshness check atomically with the ENTRY commit so the first position checks never fall back to a record left by an earlier trade in the same pool; the 60 s STALE_MARKET_EXIT protection is unchanged. Quote funnel observability (2026-10-08): ENTRY_SEQUENCE_BUSY/EXIT_PRIORITY_PENDING defers count as quote_defers, not quote_attempts, and arm no retry cooldown; provider failures keep their accounting. quote_preparation_codes (scan), quote_preparation_codes_rolling and quote_preparation_codes_lifetime histograms plus QUOTE_PREPARATION_FAILED diagnostics rows (code, abbreviated pool, notional, latency) in a 5 MB size-capped quote_preparation.jsonl sidecar, never audit.jsonl, written without fsync outside STATE.lock and rate-limited to one row per pair and code per QUOTE_RETRY_COOLDOWN_MS; the rolling histogram covers the last 60 minutes. EXIT_IMPACT_EMERGENCY closes carry exit_impact_emergency forensics (trigger quote, confirming quote, entry preflight buy/sell impact, threshold, liquidity at entry vs exit) and compact_public_trade exposes them with entry/exit impact, liquidity and route-match fields; the rule is unchanged. COST_FIRST_ESTABLISHED_PAPER_V1 is a selectable strategy (activate_strategy, NEO_SIGNAL_STRATEGY): the cost-first universe replaces the ensemble market screen with its rejection reasons and metrics in entry_diagnostics, the universe is rechecked at commit, notional is min(engine notional, liquidity x 0.001) through plan_notional and the default size backoff, and positions use exit_policy cost_first (fixed net geometry, EXIT_IMPACT_EMERGENCY_V2 anchored to the entry preflight sell impact, armed by the first mark and confirmed only by a fresh forced exact-pool quote >= 2 s later, otherwise disarmed and recorded; only an exact-pool mark arms, with a 15 s re-arm cooldown after any disarm and at most 3 forced confirmation quotes per position per 5 minutes, and the net geometry runs on every finite fresh confirmation quote before a disarm; size_limited_by_daily_budget compares a cost-first entry with its size-rule base); /state config gains the profile overlay and config_ownership marks risk limits engine-owned. Default and ORDER_FLOW_ADAPTIVE paths, hashes and /state configs are unchanged.",
-    "backend/engine_entry_policy.py": "Explain broad market, confirmed-flow and loss-feedback holds in entry diagnostics.",
-    "backend/lab_activity.py": "Keep the research cost model intact while allowing a caller to enforce a stricter bounded round-trip cost cap for funded PAPER entries. LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP: admission_cost_cap_pct ties the Lab cap to the promoted guard (1.5%), stop_headroom_pct records headroom, policy_config publishes the cap basis, and the COST_FIRST_CONTROL/COST_FIRST_SCALED registry rules are added; MAX_ENTRY_COST_PCT remains the 2.75 model ceiling, not an admission cap.",
-    "backend/winner_ensemble.py": "Validate unique finite closed outcomes, report excluded data, bound statistics to the latest 100 closes per rule and retain actual overlapping outcomes; held rules require reviewed policy or new valid evidence, never a timed resume.",
-    "backend/paper_training.py": "Require fresh complete exact-pool flow before allocating quote capacity to learner route evidence. Checkpoint temporaries: atomic_json always attempts to remove its temporary (also on KeyboardInterrupt/SystemExit) and a failed removal never masks the write error; the engine deletes .training.json<8 tempfile characters> copies of its own checkpoint older than 10 minutes in its own directory at start and at most every 10 minutes after a save (the checkpoint, observations.jsonl and all other files are never touched). Learner decisions, training state schema and every ledger are unchanged.",
+    "backend/lab_dashboard_projection.py": "Expose preserved retirement evidence, archive summary and actual market mismatch diagnostics without dropping positions or balances. Project LAB_ACTIVE_V6 cap/headroom fields, per-book cost feasibility, cost-infeasible counts and cost-first universe diagnostics for the dashboard. Non-PROMOTED books publish only the scalar cost_feasibility fields (best_candidates stays funded-only). Project defensive_rejected and defensive_entry counts (no examples) per Lab book. Review 2: also projects commit_recheck_blocked.",
+    "backend/market_monitor.py": "Preserve verified flow, safety, price, cost, cash and exposure guards; retain original matching rules for descriptive learning and recheck liquidation availability and drawdown under the final entry lock. Add explicit strategy selection (activate_strategy) with the ensemble as the unchanged default; when ORDER_FLOW_ADAPTIVE is selected use its profile values, the 60-second exact-pool decision window, flat notional without size backoff, adaptive exit policy on positions and publish strategy identity, profile and config ownership in /state. market_context delegates its conviction table and hold modes to the policy module without numeric change. Hold an exclusive per-ledger engine lock (state.json.engine.lock) for the process lifetime so a second engine on the same account refuses to start. State.loaded guards shutdown writes; ORDER_FLOW_ADAPTIVE exits keep the entry hold mode when the held pool has no COMPLETE fast window (flow_context_unavailable); no quotes on a feed older than 6 s. Pin the exact-pool observation that passed the final entry freshness check atomically with the ENTRY commit so the first position checks never fall back to a record left by an earlier trade in the same pool; the 60 s STALE_MARKET_EXIT protection is unchanged. Quote funnel observability (2026-10-08): ENTRY_SEQUENCE_BUSY/EXIT_PRIORITY_PENDING defers count as quote_defers, not quote_attempts, and arm no retry cooldown; provider failures keep their accounting. quote_preparation_codes (scan), quote_preparation_codes_rolling and quote_preparation_codes_lifetime histograms plus QUOTE_PREPARATION_FAILED diagnostics rows (code, abbreviated pool, notional, latency) in a 5 MB size-capped quote_preparation.jsonl sidecar, never audit.jsonl, written without fsync outside STATE.lock and rate-limited to one row per pair and code per QUOTE_RETRY_COOLDOWN_MS; the rolling histogram covers the last 60 minutes. EXIT_IMPACT_EMERGENCY closes carry exit_impact_emergency forensics (trigger quote, confirming quote, entry preflight buy/sell impact, threshold, liquidity at entry vs exit) and compact_public_trade exposes them with entry/exit impact, liquidity and route-match fields; the rule is unchanged. COST_FIRST_ESTABLISHED_PAPER_V1 is a selectable strategy (activate_strategy, NEO_SIGNAL_STRATEGY): the cost-first universe replaces the ensemble market screen with its rejection reasons and metrics in entry_diagnostics, the universe is rechecked at commit, notional is min(engine notional, liquidity x 0.001) through plan_notional and the default size backoff, and positions use exit_policy cost_first (fixed net geometry, EXIT_IMPACT_EMERGENCY_V2 anchored to the entry preflight sell impact, armed by the first mark and confirmed only by a fresh forced exact-pool quote >= 2 s later, otherwise disarmed and recorded; only an exact-pool mark arms, with a 15 s re-arm cooldown after any disarm and at most 3 forced confirmation quotes per position per 5 minutes, and the net geometry runs on every finite fresh confirmation quote before a disarm; size_limited_by_daily_budget compares a cost-first entry with its size-rule base); /state config gains the profile overlay and config_ownership marks risk limits engine-owned. Default and ORDER_FLOW_ADAPTIVE paths, hashes and /state configs are unchanged. DEFENSIVE_ENTRY_LAYER_V1: Monitor.defense (per-process registry sidecar next to the state file, pair history) is fed every scan and every maybe_open feed; defensive_entry_decision runs after the market screen and before the quote retry state, flow promotion, price and RugCheck calls and quotes for every signal strategy, again on the commit-time observation, in the training probe scheduler and worker and in the RugCheck prewarm; the cost-first universe calls pass the engine registry; entry_diagnostics.defensive_entry and position defensive_entry/score_version record versions and reasons; score_pair NEO_MARKET_SCORE_V2_LIQ_MC_BAND; effective_config_hash and /state config include the layer and the score version. Review fix: score_pair_models returns the V2 score and the V1 score of one observation and make_coin publishes scoreV1; market_context of a held position reads the V1 score (EXIT_CONTEXT_SCORE_VERSION NEO_MARKET_SCORE_V1) and an entry context publishes exit_basis_conviction, which sets a new adaptive position's adaptive_hold, so ORDER_FLOW_ADAPTIVE exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged for positions opened before and after; exit_context_score_version is recorded in /state config, config ownership, effective_config_hash and on new positions. Review 2: prewarm_entry_checks warms established market candidates the layer allows (PREWARM_V2_DEFENSIVE_POPULATION, at most 4 per scan by activity; prewarm_version in /state config); Monitor.defense seeds a new or empty ticker registry read-only from the sibling sidecars. Review 3: Monitor.training_context records the V1-basis context for the PAPER_TRAINING_V1 learners at every training_bridge.observe call (an entry context gets exit_basis_conviction and its hold mode, conviction_score_version NEO_MARKET_SCORE_V1, entry_conviction for reference; a held context is only labelled), so the GOLD_ADAPTIVE book exits as before the V2 score; /state config publishes training_score_version. No engine entry, exit or hash input changes beyond the layer config. Review 6: STATE.defensive_entry_layer (the layer status, refreshed by every scan, paused or running; in memory only, never in the ledger) is published on /state; the defense comment names TICKER_REGISTRY_SEED_V4.",
+    "backend/engine_entry_policy.py": "Explain broad market, confirmed-flow and loss-feedback holds in entry diagnostics. Bulgarian labels for the defensive layer reason codes. Label for defensive_entry_error. Review 3: label for rug_ticker_registry_warming; heat_history_warming relabelled to name the 5/15/60-min window coverage after a restart.",
+    "backend/lab_activity.py": "Keep the research cost model intact while allowing a caller to enforce a stricter bounded round-trip cost cap for funded PAPER entries. LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP: admission_cost_cap_pct ties the Lab cap to the promoted guard (1.5%), stop_headroom_pct records headroom, policy_config publishes the cap basis, and the COST_FIRST_CONTROL/COST_FIRST_SCALED registry rules are added; MAX_ENTRY_COST_PCT remains the 2.75 model ceiling, not an admission cap. LAB_ACTIVE_V7_DEFENSIVE_ENTRY (previous V6); policy_config names the defensive layer. LIFECYCLE_EVIDENCE_VERSIONS (V7, V6) for LAB_STRATEGY_LIFECYCLE_V2.",
+    "backend/winner_ensemble.py": "Validate unique finite closed outcomes, report excluded data, bound statistics to the latest 100 closes per rule and retain actual overlapping outcomes; held rules require reviewed policy or new valid evidence, never a timed resume. WINNER_ENSEMBLE_VERIFIED_ENTRY_V5; same-policy loss feedback counts V5 and V4 closes so a version bump never releases a throttle.",
+    "backend/paper_training.py": "Require fresh complete exact-pool flow before allocating quote capacity to learner route evidence. Checkpoint temporaries: atomic_json always attempts to remove its temporary (also on KeyboardInterrupt/SystemExit) and a failed removal never masks the write error; the engine deletes .training.json<8 tempfile characters> copies of its own checkpoint older than 10 minutes in its own directory at start and at most every 10 minutes after a save (the checkpoint, observations.jsonl and all other files are never touched). Learner decisions, training state schema and every ledger are unchanged. Review 3 (DEFENSIVE_ENTRY_LAYER_V1): learner_score reads coin scoreV1, else score (rows recorded before the V2 market score), for min_score, the probe candidate signal and rejected-episode records (LEARNER_SCORE_VERSION NEO_MARKET_SCORE_V1, published in the snapshot), so learner decisions match the pre-change code and the validation sample stays one regime; PAPER_TRAINING_V1, its state schema and every ledger are unchanged (a version bump would refuse the saved state).",
     "backend/training_bridge.py": "Launch the actual Windows learner PID directly, coordinate spawn/close, retain deferred shutdown sentinel, and wait for the owned child to release its journal lock.",
     "backend/training_quote_probe.py": "Bounded read-only two-way exact-pool Jupiter quote evidence for isolated PAPER learning",
     "backend/paper_state_reset.py": "Archive and reset recorder/quote-probe diagnostics together with PAPER history so each authorized clean session starts with truthful zeroed counters.",
@@ -282,8 +316,8 @@
     "backend/paper_lab_metrics.py": "Read-only per-book measurements, malformed/truncated history detection and descriptive sample uncertainty; no automatic promotion.",
     "scripts/start_local_paper.ps1": "Pin shared PAPER services to the default strategy (NEO_SIGNAL_STRATEGY removed).",
     "tests/test_tape_execution_repair.py": "Verify that the live tape prioritizes eligible moderate-activity candidates while preserving PumpSwap-only and pinned-pool behavior.",
-    "scripts/local_paper_service.py": "Publish the actual worker identity, restrict handshake paths to isolated runtime and honor cancellation after slow imports. Persist the engine ledger or Lab books at shutdown only when they were loaded.",
-    "backend/lab_strategy_lifecycle.py": "Retire repeated observed losses only in the same validated PAPER research regime; keep original evidence, all money/history and normal position exits. Require negative total and both chronological halves plus bounded sample/win evidence. No timed reactivation or profitability promise. activity_versions maps a book to the entry-policy version its own closes carry (accepted_activity_version), so a book with its own policy is judged by the same rules on its own rows; the policy publishes activity_versions_by_strategy.",
+    "scripts/local_paper_service.py": "Publish the actual worker identity, restrict handshake paths to isolated runtime and honor cancellation after slow imports. Persist the engine ledger or Lab books at shutdown only when they were loaded. Review 2: the tape branch flushes the scheduler's ticker registry at a clean stop before closing the recorder.",
+    "backend/lab_strategy_lifecycle.py": "Retire repeated observed losses only in the same validated PAPER research regime; keep original evidence, all money/history and normal position exits. Require negative total and both chronological halves plus bounded sample/win evidence. No timed reactivation or profitability promise. activity_versions maps a book to the entry-policy version its own closes carry (accepted_activity_version), so a book with its own policy is judged by the same rules on its own rows; the policy publishes activity_versions_by_strategy. LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE: the accepted entry-policy version may be a sequence (current first), so the closes of an entry-only predecessor still count; evidence publishes accepted_activity_versions and closed_trades_by_activity_version; the policy publishes accepted_activity_versions and list-valued activity_versions_by_strategy.",
     "backend/training_worker.py": "Expose the actual learner worker PID for lifecycle verification without changing training or strategy accounting.",
     "scripts/local_paper_watchdog.ps1": "Acquire the shared lifecycle operation mutex before health probes and retain it through recovery; release before sleeping, recover abandoned owners, and keep automatic failures retryable. Read-only -Probe mode; reports gateway-owned personal engines; mutexes created only for the supervising loop.",
     "backend/honest_quote_transport.py": " Atomic shared JSON writes use unique temporary files and bounded retries for Windows replacement sharing violations; preserve the old complete file and raise persistent errors without changing quota or timestamps.",
@@ -295,17 +329,23 @@
     "backend/astra6_brain.py": "Read shared Windows observations without blocking the recorder; do not synthesize freshness or alter experimental admission.",
     "backend/lab_paired_runner.py": "Read the shared tape with native delete-sharing snapshot handles; experimental ledgers remain isolated.",
     "backend/funded_market_candidates.py": "Declare prospective physical established-liquid candidate branches for Momentum and Precision, retaining original screens without token-specific fitting or profit claims.",
-    "backend/tape_pool_scheduler.py": "Observe the same declared funded mature candidate branches, preserving bounded leases, exact exit pins and final entry gates. Shed entry/exploration seats of pools with zero decoded swaps (FX-reference-flagged events count as decoded) after a bounded number of fetched bodies, with cooldown, fresh re-evaluation that survives a feed gap and a published shed list; pinned exit pools exempt. STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS: COST_FIRST universe pools form a seat group below estimated feasible candidates and above over-budget or unknown-cost matched candidates (same seats, leases and pre-emption rule), and open positions of personal PAPER engines read from the account registry are pinned like main's (PersonalEnginePositions: read-only registry, bounded cached loopback /state reads, failures ignored). Personal-engine reads move to a background refresher (lock-protected snapshot, per-port failure backoff 5 s doubling to 60 s, rotation of ports over the per-pass read limit with known open positions first, stale-but-pinned positions until seen closed), and pools held only by personal engines are capped by NEO_TAPE_PERSONAL_PIN_LIMIT after uncapped main and Lab pins (fresh before stale, oldest opened first), with the over-limit count and aggregates kept operator-only.",
+    "backend/tape_pool_scheduler.py": "Observe the same declared funded mature candidate branches, preserving bounded leases, exact exit pins and final entry gates. Shed entry/exploration seats of pools with zero decoded swaps (FX-reference-flagged events count as decoded) after a bounded number of fetched bodies, with cooldown, fresh re-evaluation that survives a feed gap and a published shed list; pinned exit pools exempt. STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS: COST_FIRST universe pools form a seat group below estimated feasible candidates and above over-budget or unknown-cost matched candidates (same seats, leases and pre-emption rule), and open positions of personal PAPER engines read from the account registry are pinned like main's (PersonalEnginePositions: read-only registry, bounded cached loopback /state reads, failures ignored). Personal-engine reads move to a background refresher (lock-protected snapshot, per-port failure backoff 5 s doubling to 60 s, rotation of ports over the per-pass read limit with known open positions first, stale-but-pinned positions until seen closed), and pools held only by personal engines are capped by NEO_TAPE_PERSONAL_PIN_LIMIT after uncapped main and Lab pins (fresh before stale, oldest opened first), with the over-limit count and aggregates kept operator-only. STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY: candidate pools blocked by the defensive layer (own registry and pair history, loss memory over main and Lab histories) get no entry or exploration seat; pins untouched; cost-first universe with the structural guard; entry_scheduling.defensive_entry published. Review fix: seats are withheld only for structurally blocked pools. Heat runs log-only at seats (a running lease is never dropped for heat and a tape restart needs no warm-up) and no ledger's pool loss memory applies (visible_pool_loss_index removed), because one seat serves every ledger and every entry path applies its own memory and heat at decision and commit. Review 2: registry_seed_paths passes the cold-start seed to the scheduler's registry. Review 3: heat withholds a NEW entry or exploration seat (rules (a)-(g) and an unknown price, the scheduler's own pair history); a pool holding a running lease keeps it until the lease expires; the tape's own heat_history_warming stays log-only; loss memory is not applied at seats (ACCEPTED 2026-10-08 by the operator under the owner's delegation: one seat serves every ledger; each entry path applies its own ledger's memory); published seat_rule, heat_veto_mode, heat_withheld_new_seats, heat_running_leases_kept, heat_log_only_reasons; DEFENSIVE_EXAMPLE_LIMIT (6) is passed to the record.",
     "backend/pump_event_fees.py": "Decode complete supported public PumpSwap fee schemas, reconcile raw gross/net charges and reject partial or unsupported routing; observations never authorize entry or replace current execution fees.",
     "docs/paper-fee-observation.md": "Document observation-only fee evidence, unsupported schemas, preserved entry/exit models and the distinction between open positions and closed trades.",
-    "backend/order_flow_adaptive_oct4.py": "Versioned October 4 ORDER_FLOW_ADAPTIVE decision policy: strict entry checks with historical rejection names, conviction scoring, hold modes, strategy-owned profile values and config ownership.",
-    "backend/user_gateway.py": "Never churn ports or start a second engine for a tracked/listening account engine; 30 s verified-user cache; tolerant strategy refresh; merge operator strategy field before every registry write; per-account signal_strategy for that engine only. Accept COST_FIRST_ESTABLISHED_PAPER_V1 as a per-account signal_strategy; unknown values still start no engine.",
+    "backend/order_flow_adaptive_oct4.py": "Versioned October 4 ORDER_FLOW_ADAPTIVE decision policy: strict entry checks with historical rejection names, conviction scoring, hold modes, strategy-owned profile values and config ownership. Entry policy ORDER_FLOW_BALANCED_V5 (DECISION_FILTER_VERSION ORDER_FLOW_BALANCED_V4: check rules and thresholds unchanged, but the score check and the entry conviction read the V2 entry score, published as entry_score_version and decision_inputs_note in config_snapshot) with the defensive layer listed as a modern overlay.",
+    "backend/user_gateway.py": "Never churn ports or start a second engine for a tracked/listening account engine; 30 s verified-user cache; tolerant strategy refresh; merge operator strategy field before every registry write; per-account signal_strategy for that engine only. Accept COST_FIRST_ESTABLISHED_PAPER_V1 as a per-account signal_strategy; unknown values still start no engine. Review 3: personal engines receive NEO_MAIN_MARKET_STATE_PATH (the gateway's own NEO_MARKET_STATE_PATH, main's state) so their ticker registry can seed read-only from main's sidecar; no strategy, port or ledger change. Review 6: the seed comment names TICKER_REGISTRY_SEED_V4; no logic change.",
     "backend/engine_execution.py": "Name the existing preflight bounds (PREFLIGHT_MAX_QUANTITY_DRIFT 0.5%, FINAL_QUOTE_MAX_AGE_MS 750, PREFLIGHT_PREVIEW_MAX_AGE_MS 4000, PREFLIGHT_MAX_SLOT_GAP 25) so the replay adapter derives its windows from the live constants; values and admission unchanged.",
     "backend/engine_exit_policy.py": "Name the hold limits (FIXED_MAX_HOLD_MINUTES 60, ADAPTIVE_DEFAULT_MAX_HOLD_MINUTES 60, ABSOLUTE_MAX_HOLD_MINUTES 120) and accept an optional max_hold_minutes override used only by labelled offline replay exit variants and labelled MAX_HOLD_<limit>; the engine passes none, so live exits and the MAX_HOLD_60 label are unchanged. An unknown exit policy name falls back to the fixed net geometry with a warning logged once per name instead of raising (defensive mapping for code rollbacks); fixed and adaptive decisions are unchanged.",
-    "backend/main_replay.py": "Replay harness reconciliation V1: live-derived freshness windows with reported basis, entry-stage/commit-stage clocks, scanner-refreshed feed and commit-time flow at commit, guard-tick-only position valuation, no synthetic quote-retry cooldown, end-of-replay unknown valuation past the last recorded mark, per-row decision summary and labelled exit variants (REPLAY_EXIT_VARIANT_V1); preflight chain at the recorded prepare clock with reported clock basis, and post-quote price-tiebreak rejections as linked commit-stage outcomes.",
-    "backend/cost_first_established.py": "Pure COST_FIRST_ESTABLISHED_V1 definitions: universe parameters (PumpSwap tier <= 50 bps, liquidity >= $250k, fee+impact round trip <= 1.2%), liquidity-scaled size rule, both exit parameter sets, candidate/rejections/describe/config; never admits an entry by itself and claims no outcome.",
+    "backend/main_replay.py": "Replay harness reconciliation V1: live-derived freshness windows with reported basis, entry-stage/commit-stage clocks, scanner-refreshed feed and commit-time flow at commit, guard-tick-only position valuation, no synthetic quote-retry cooldown, end-of-replay unknown valuation past the last recorded mark, per-row decision summary and labelled exit variants (REPLAY_EXIT_VARIANT_V1); preflight chain at the recorded prepare clock with reported clock basis, and post-quote price-tiebreak rejections as linked commit-stage outcomes. entry_defense mode: 'recorded_policy' (default, labelled; journals predate the layer) or 'apply' (labelled counterfactual on replayed rows only); reported in the replay output. Review 5: recorded_policy refuses a journal with any row recorded under the layer (coin.scoreVersion, RecordedPolicyRefused) instead of labelling it as predating the layer; new labelled counterfactual mode without_layer; every report publishes rows_recorded_under_layer and the cutover check.",
+    "backend/cost_first_established.py": "Pure COST_FIRST_ESTABLISHED_V1 definitions: universe parameters (PumpSwap tier <= 50 bps, liquidity >= $250k, fee+impact round trip <= 1.2%), liquidity-scaled size rule, both exit parameter sets, candidate/rejections/describe/config; never admits an entry by itself and claims no outcome. V2: rejections/candidate/describe take now and a ticker registry and append STRUCTURAL_RUG_GUARD_V1 reasons after the physical screens (fail closed without a registry); universe COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD. Review 2: physical_rejections (the V1 universe) split out of rejections for the archived research; PREVIOUS_ENTRY_POLICY_VERSION and LIFECYCLE_EVIDENCE_VERSIONS (V2, V1) for the retirement review.",
     "docs/tape-decoder-shadow-and-seat-shedding.md": "Evidence, exactness proof, shadow-validation procedure and limits for the reversed cash-leg decoder path and tape seat shedding. Section on V4 cost-first seats and personal-engine pins: evidence, groups, budgets, published fields, equivalence proof, evaluation plan and limits, including the off-poll refresher, backoff, read-limit rotation operator alert, stale pins and the personal pin cap.",
-    "backend/cost_first_engine_profile.py": "New pure module: COST_FIRST_ESTABLISHED_PAPER_V1 engine profile identity, universe/size wrappers over cost_first_established (imported, not restated), EXIT_IMPACT_EMERGENCY_V2 threshold anchor, confirmation-quote checks and disarm records, exact-pool arming, re-arm cooldown and per-position confirmation budget (quote-budget bound), /state snapshot, config ownership and hash basis. No profitability claim."
+    "backend/cost_first_engine_profile.py": "New pure module: COST_FIRST_ESTABLISHED_PAPER_V1 engine profile identity, universe/size wrappers over cost_first_established (imported, not restated), EXIT_IMPACT_EMERGENCY_V2 threshold anchor, confirmation-quote checks and disarm records, exact-pool arming, re-arm cooldown and per-position confirmation budget (quote-budget bound), /state snapshot, config ownership and hash basis. No profitability claim. COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY / COST_FIRST_ESTABLISHED_ENTRY_V2: universe wrappers pass now and the engine ticker registry; universe parameters publish the structural guard; strategy id unchanged. Review 2: physical_universe_rejections (COST_FIRST_UNIVERSE_V1) for the archived research only; never an entry screen.",
+    "backend/structural_rug_guard.py": "New pure module: STRUCTURAL_RUG_GUARD_V1 check (fail closed; LP-pullable, young, fake market cap at 2%, ticker reuse of another mint), bounded TickerRegistry with an atomic sidecar, 14-day pruning and corrupt-file recovery, compact and config. No profitability claim. Review 2: registry bound 40,000 entries (14 days at the research rate) with the effective horizon in status(); a new or empty registry is seeded read-only from sibling sidecars (TICKER_REGISTRY_SEED_V1, delete-sharing reads); config publishes the registry bounds. Review 3: TICKER_REGISTRY_V2_COVERAGE persists covered_since/observed_until (a non-empty feed marks coverage at its newest updatedAt; a gap over 60 min, or a cap eviction, restarts it; TICKER_REGISTRY_V1 sidecars still load without coverage); new reason rug_ticker_registry_warming blocks a pool under 14 days with no reuse found while coverage at now is under 24 h (fail closed instead of an empty registry passing USDF/DOTF-like relaunches); the missing-symbol placeholder TOKEN is a missing ticker and never registered; TICKER_REGISTRY_SEED_V2 seeds any registry without current coverage and adopts the earliest current sibling coverage; check() and compact() publish registry_coverage_h; config() publishes the coverage rule, placeholders and the offline first-deploy seed. Review 4: coverage is marked by discovered market rows only (REGISTRY_COVERAGE_BASIS DISCOVERED_MARKET_ROWS_V2, market_observation, HELD_POSITION_SOURCES; held-only scans are counted in coverage.held_only_scans and still register their sightings); a missing ticker is rug_input_unknown only when pair age < 14 days (ticker_input_rule); a registry whose coverage at start is current but under 24 h is seeded too and keeps the earlier of its own and a current sibling's start; public read_sidecar and merge_rows for the offline seed builder; config publishes the coverage basis, the held-position sources and the seed rule. Review 5: TICKER_REGISTRY_SEED_V3 seeds a running registry again at once when a gap restarts its coverage and at most every 5 min while it is under 24 h (maybe_reseed; seed.running_reseeds, last_seed_at), so a tape whose polls stalled no longer withholds seats for 24 h while main vouches; TICKER_REGISTRY_SIDECAR_READ_V1 separates an unreadable own sidecar (I/O error after 3 attempts: kept, never overwritten during the run, re-read every 60 s and at flush, no sibling coverage adopted until read, LOADED_AFTER_REREAD) from a corrupt one (copied to <sidecar>.corrupt-<ms> before it is replaced); config publishes both. Review 6: TICKER_COVERAGE_CLOCK_V1 (coverage_ahead_ms; coverage stamped more than 5 min after the reference clock is never current, dropped by _read_sidecar with a reference at load, re-read and seed, and by drop_coverage_ahead at every observe; coverage.future_drops, last_future_ahead_minutes; SEEDED_COVERAGE_AHEAD_IGNORED); TICKER_REGISTRY_SEED_V4 maybe_merge_sibling_sightings (a vouching registry merges sibling sightings, never coverage, every 5 min; seed.sighting_merges); config publishes both.",
+    "backend/heat_veto.py": "New pure module: HEAT_VETO_STACK_V1 rules (a)-(g) plus warm-up and unknown price, bounded PairHistory (61 min, 120 s gap restart), log-only mode, config. No profitability claim. Review fix: the 15-minute crash high reads every retained sample across feed gaps (gaps kept per pair, at most 64; the opening price counts only while its segment was observed after the window start), as the research window does; the 5-minute return keeps the contiguous segment; a malformed txns or txns.m5 leaves rule (b) unevaluated instead of raising. Review 2: the warm-up compares the unrounded span; a missing reference after warm-up is warming (fail closed); rules (e) and (f) need window coverage on the process clock (pair first seen >= 900 s ago; process observing >= 3600 s at >= 100 bps unless known paid); metrics publish warming_windows, pair_coverage_s and process_coverage_s. Review 3: comment only (the tape scheduler withholds new seats on heat).",
+    "backend/pool_loss_memory.py": "New pure module: POOL_LOSS_MEMORY_V1 (2 consecutive losses on one pool block it for 6 h), read-only index over one ledger history, check, config. Review fix: the cross-ledger merge is removed; the memory is per account or per Lab book only (cross_ledger_union false).",
+    "backend/entry_defense.py": "New module: DEFENSIVE_ENTRY_LAYER_V1 combining the guard, the loss memory and the heat veto per process, with diagnostics summaries, compact position records, a labelled pass decision for recorded-policy replay, config. Review fix: evaluate and observe never raise; an unexpected error blocks that candidate with defensive_entry_error (fail closed, exception type only) and is counted in status(); REASONS_IN_ORDER is published; the tape seat screen uses the structural guard only. Review 2: sibling_registry_paths() and seed_paths for the cold-start seed. Review 3: SERVICE_STATE_ENV adds NEO_MAIN_MARKET_STATE_PATH (main's sidecar for personal engines); examples and metrics carry registry_coverage_h; the tape is described as withholding new seats on heat. Review 4: docstring names the seed trigger (coverage not current or under 24 h); no logic change. Review 6: docstrings name TICKER_REGISTRY_SEED_V4 and the vouching sighting merge; no logic change.",
+    "docs/DEFENSIVE_ENTRY_LAYER.md": "Evidence, rules, entry paths, version bumps, persistence, diagnostics, replay, tests and limits of DEFENSIVE_ENTRY_LAYER_V1. Review follow-up: structural-only tape seats and why, the V1 exit-context score basis, fail-closed evaluation errors, the gap-spanning crash window, and what diagnostics do not record. Review 2: restart window coverage, Lab commit recheck, prewarm population, registry bound, horizon and cold start, carried retirement evidence, pinned effective_config_hash values. Review 3: registry coverage and rug_ticker_registry_warming with the sibling-visibility evidence, TICKER_REGISTRY_SEED_V2 and the offline first-deploy seed, heat-for-new-seats at the tape, the training learners on the V1 score, placeholder ticker, new pinned effective_config_hash values. Review 4: owner decision (1) recorded as ACCEPTED 2026-10-08 by the operator under the owner's delegation; coverage from discovered market rows; ticker required only under 14 days; seed trigger includes a short current coverage; the first-deploy seed is a Lab/tape-grade memory of the bounded journalled feed; --replace-stale recovery; new pinned effective_config_hash values. Review 5: the seed tool only after Stop (refusal, full command, post-Start verification); running seeds (TICKER_REGISTRY_SEED_V3) and the tape stall case; unreadable versus corrupt sidecars (TICKER_REGISTRY_SIDECAR_READ_V1); recorded_policy refusing rows recorded under the layer and the without_layer counterfactual; the ORDER_FLOW_ADAPTIVE V4 checks on the V2 entry score; new pinned effective_config_hash values. Review 6: the coverage clock rule, TICKER_REGISTRY_SEED_V4 sighting merges, the seed replay window, budget, exit codes and the cases where a rerun cannot help, /state defensive_entry_layer for paused accounts, the learner-sample boundary, the test isolation of Lab and tape layers, new pinned effective_config_hash values.",
+    "scripts/build_ticker_registry_seed.py": "New offline, read-only tool (TICKER_REGISTRY_SEED_V3): replays a copy of the main training journal through structural_rug_guard.TickerRegistry and writes a TICKER_REGISTRY_V2_COVERAGE sidecar to a path that must not exist; never writes the journal, contacts no service. First-deploy step in PAPER_RUNBOOK.md. Review 4: coverage only from market rows (held-position sources and position-mark rows register sightings but never extend it; market_rows/held_position_rows published); --replace-stale replaces an existing sidecar only when it is unreadable, carries no coverage, or its coverage at the wall clock is not current or under 24 h, copies it to <out>.replaced-<ms> first and merges its sightings; coverage_at_now printed; the docstring says the journal holds the bounded MAX_FEED scan feed plus entry, probe and position rows (Gecko new pools beyond the cap are not journalled). Review 5: refuses to write into a runtime directory (the output folder or a parent) whose services/processes.json exists without services/stop.request, for the first run and --replace-stale alike (a running main rewrites its sidecar within 5 min); never replaces a sidecar it cannot read; the docstring spells the full command from the live checkout root and the post-Start verification, printed as verify_after_start. Review 6: SEED_REPLAY_WINDOW_V1 (binary search to the last --window-days, default 15, capped at --max-replay-minutes, default 40, of journal at the reference 54.6 MB/s; --full-journal), coverage judged at the clock read after the replay, start_services_before_utc and clock printed, exit 2 when written but not vouching; --replace-stale treats coverage stamped ahead of the wall clock as replaceable; verify_after_start reads main's /state defensive_entry_layer."
   },
   "momentum_rush": {
     "strategy_id": "MOMENTUM_RUSH_BRAIN",
@@ -325,7 +365,7 @@
     "catalog_prices_authorize_entry": false
   },
   "funded_paper_policy": {
-    "version": "PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V4",
+    "version": "PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5",
     "candidate_policy_version": "FUNDED_MARKET_BRANCHES_V1",
     "established_branches": [
       "ESTABLISHED_LIQUID_MOMENTUM",
@@ -337,7 +377,9 @@
     "evidence_rechecked_before_commit": true,
     "historical_outcomes_unchanged": true,
     "profitability_proven": false,
-    "size_change_note": "Prospective PAPER only: max per-book entry rises from $62.50 to $125; open positions are not resized. The 1.5% round-trip cost limit and 3% net stop are unchanged."
+    "size_change_note": "Prospective PAPER only: max per-book entry rises from $62.50 to $125; open positions are not resized. The 1.5% round-trip cost limit and 3% net stop are unchanged.",
+    "previous_version": "PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V4",
+    "defensive_entry": "DEFENSIVE_ENTRY_LAYER_V1 before flow, safety and price checks"
   },
   "observed_pump_fees": {
     "version": "OBSERVED_PUMP_EVENT_FEES_V1",
@@ -355,7 +397,7 @@
       "restore_version": "ORDER_FLOW_ADAPTIVE_OCT4_RESTORE_V1",
       "source_commit": "neo-meme-trade@5b78efd (2026-10-04)",
       "module": "backend/order_flow_adaptive_oct4.py",
-      "entry_policy_version": "ORDER_FLOW_BALANCED_V4",
+      "entry_policy_version": "ORDER_FLOW_BALANCED_V5",
       "learning_mode": "ADAPTIVE_CONTEXT_HOLD",
       "exit_policy_version": "GOLD_ADAPTIVE_NET_CANDIDATE_V1",
       "scan_seconds": 15,
@@ -459,6 +501,7 @@
         "max_hold_minutes": 7
       },
       "modern_overlays_retained": [
+        "entry_defense DEFENSIVE_ENTRY_LAYER_V1 (STRUCTURAL_RUG_GUARD_V1, POOL_LOSS_MEMORY_V1, HEAT_VETO_STACK_V1) before flow, safety and quotes",
         "promoted_entry_guard.flow_admission (confirmed 30s exact-pool PumpSwap window)",
         "engine_rug_guard fail-closed safety",
         "pair_price_integrity exact-pool price confirmation",
@@ -481,23 +524,28 @@
       ],
       "profitability_proven": false,
       "missing_flow_exit_policy": "KEEP_ENTRY_HOLD_MODE_SKIP_FLOW_EXITS",
-      "pre_quote_max_signal_age_ms": 6000
+      "pre_quote_max_signal_age_ms": 6000,
+      "decision_filter_version": "ORDER_FLOW_BALANCED_V4",
+      "exit_context_score_version": "NEO_MARKET_SCORE_V1",
+      "entry_score_version": "NEO_MARKET_SCORE_V2_LIQ_MC_BAND",
+      "decision_inputs_note": "ORDER_FLOW_BALANCED_V4 check rules and thresholds are unchanged, but the score check and the entry conviction read the V2 entry score (NEO_MARKET_SCORE_V2_LIQ_MC_BAND, never above V1), behind DEFENSIVE_ENTRY_LAYER_V1; both only remove entries. The exit context and hold modes of positions read the V1 score."
     },
     "COST_FIRST_ESTABLISHED_PAPER_V1": {
-      "profile_version": "COST_FIRST_ENGINE_PROFILE_V1",
+      "profile_version": "COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY",
       "module": "backend/cost_first_engine_profile.py",
       "universe_module": "backend/cost_first_established.py",
-      "entry_policy_version": "COST_FIRST_ESTABLISHED_ENTRY_V1",
+      "entry_policy_version": "COST_FIRST_ESTABLISHED_ENTRY_V2",
       "exit_policy": "cost_first",
       "exit_policy_version": "COST_FIRST_NET_EXIT_V1",
       "learning_mode": "NONE_FIXED_HYPOTHESIS",
       "universe": {
-        "version": "COST_FIRST_UNIVERSE_V1",
+        "version": "COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD",
         "dex_id": "pumpswap",
         "quote_token": "SOL",
         "max_fee_tier_bps": 50.0,
         "min_liquidity_usd": 250000.0,
-        "max_fee_impact_roundtrip_pct": 1.2
+        "max_fee_impact_roundtrip_pct": 1.2,
+        "structural_rug_guard": "STRUCTURAL_RUG_GUARD_V1 inside cost_first_established.rejections (engine ticker registry)"
       },
       "size_policy": "COST_FIRST_LIQUIDITY_SCALED_V1",
       "size_rule": "min(TRADE_NOTIONAL_USD, liquidity_usd * 0.001), then engine plan_notional daily-budget sizing and entry_size_backoff",
@@ -541,7 +589,10 @@
       "environment_overrides_honored": "engine values only, as for the default engine; no profile value",
       "evidence_status": "PROSPECTIVE_HYPOTHESIS_UNVALIDATED",
       "profitability_proven": false,
-      "doc": "docs/COST_FIRST_ENGINE_PROFILE.md"
+      "doc": "docs/COST_FIRST_ENGINE_PROFILE.md",
+      "previous_profile_version": "COST_FIRST_ENGINE_PROFILE_V1",
+      "previous_entry_policy_version": "COST_FIRST_ESTABLISHED_ENTRY_V1",
+      "defensive_entry": "DEFENSIVE_ENTRY_LAYER_V1: heat veto and pool loss memory after the universe, before flow, safety and quotes; rechecked at commit"
     }
   },
   "tape_decoder": {
@@ -553,21 +604,21 @@
     "unvalidated_event_flag": "DECODER_PATH_UNVALIDATED",
     "unvalidated_flow_quality": "DEGRADED",
     "shadow_validation_hours_required": 24,
-    "seat_shedding_policy_version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS",
+    "seat_shedding_policy_version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY",
     "seat_shedding_min_bodies": 40,
     "seat_shedding_cooldown_ms": 1800000,
     "changes_entry_exit_cost_or_ledgers": false
   },
   "tape_seat_policy": {
-    "version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS",
-    "previous_version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V3_YIELD_SHED",
+    "version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY",
+    "previous_version": "STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS",
     "seat_groups_best_first": [
       "ESTIMATED_FEASIBLE_MAIN_OR_FUNDED",
       "COST_FIRST_UNIVERSE",
       "MATCHED_OVER_BUDGET_OR_UNKNOWN_COST",
       "EXPLORATION"
     ],
-    "cost_first_universe_version": "COST_FIRST_UNIVERSE_V1",
+    "cost_first_universe_version": "COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD",
     "cost_first_planning_notional_env": "NEO_LAB_TRADE_NOTIONAL",
     "cost_first_planning_notional_default_usd": 150.0,
     "lease_preemption_only_by_estimated_feasible": true,
@@ -600,6 +651,320 @@
     "is_entry_authorization": false,
     "profitability_proven": false,
     "personal_registry_unreadable": "SKIPPED_LAST_GOOD_PORTS_KEPT",
-    "personal_registry_missing": "NO_PERSONAL_PINS"
+    "personal_registry_missing": "NO_PERSONAL_PINS",
+    "defensive_entry_seats": {
+      "rule": "NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL",
+      "pins_exempt": true,
+      "own_pair_history_and_ticker_registry": true,
+      "pool_loss_memory_scope": "NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY",
+      "published": "live_tape_status.entry_scheduling.defensive_entry",
+      "heat_veto_mode": "NEW_SEATS_WITHHELD_RUNNING_LEASES_KEPT_WARMING_LOG_ONLY",
+      "lease_dropped_for_heat": false,
+      "warm_up_after_tape_restart": false,
+      "registry_flushed_at_clean_stop": true,
+      "heat_log_only_reasons": [
+        "heat_history_warming"
+      ],
+      "new_seat_for_hot_pool": false,
+      "examples_limit": 6,
+      "pool_loss_memory_owner_signoff": "ACCEPTED 2026-10-08 by the operator under the owner's delegation: one seat serves every ledger, so a per-ledger loss cooldown at seats would starve accounts without losses of a COMPLETE window; each entry path applies its own ledger's memory before quoting"
+    }
+  },
+  "defensive_entry": {
+    "version": "DEFENSIVE_ENTRY_LAYER_V1",
+    "modules": {
+      "layer": "backend/entry_defense.py",
+      "structural_rug_guard": "backend/structural_rug_guard.py",
+      "heat_veto": "backend/heat_veto.py",
+      "pool_loss_memory": "backend/pool_loss_memory.py"
+    },
+    "structural_rug_guard": {
+      "version": "STRUCTURAL_RUG_GUARD_V1",
+      "registry_version": "TICKER_REGISTRY_V2_COVERAGE",
+      "reasons_in_order": [
+        "rug_input_unknown",
+        "rug_lp_pullable",
+        "rug_young_pool",
+        "rug_fake_market_cap",
+        "rug_ticker_reuse",
+        "rug_ticker_registry_warming"
+      ],
+      "lp_pullable_min_liq_to_mcap": 1.0,
+      "young_pool_max_age_minutes": 720.0,
+      "fake_mcap_min_usd": 20000000.0,
+      "fake_mcap_max_liq_to_mcap": 0.02,
+      "fake_mcap_max_age_days": 14,
+      "ticker_reuse_max_age_days": 14,
+      "ticker_reuse_rule": "normalized ticker (alphanumerics, casefolded) already seen at or before now on another pool with a DIFFERENT mint",
+      "market_cap_basis": "marketCap, else fdv",
+      "age_basis": "pairCreatedAt at decision time",
+      "fail_closed": true,
+      "distinct_from_rug_guard_v2": true,
+      "registry_sidecars": [
+        "<state>.ticker_registry.json next to each engine state.json",
+        "strategy_lab.ticker_registry.json",
+        "live_tape.ticker_registry.json"
+      ],
+      "registry_retention_days": 14,
+      "registry_max_entries": 40000,
+      "registry_write": "atomic temp+fsync+replace on the first observation, then at most once every 5 minutes, and at a clean shutdown (main engine, Lab and tape)",
+      "registry_corrupt_or_missing": "STARTS_EMPTY_NEVER_RAISES; a corrupt sidecar is copied to <sidecar>.corrupt-<ms> before it is replaced",
+      "fake_market_cap_threshold_note": "2% is holdout-informed (research froze 1%); conservative, not validated",
+      "registry_effective_horizon": "status() publishes cap_evictions, cap_evicted_at, cap_limited_horizon_days (age of the newest sighting the cap evicted) and oldest_last_seen_days; 40,000 entries cover 14 days at the research rate of about 2,150 pairs a day (the earlier 20,000 cap forgot a sibling mint after about 8.4 days)",
+      "registry_seed": {
+        "version": "TICKER_REGISTRY_SEED_V4",
+        "when": "a registry whose own coverage after loading its sidecar does not vouch: new, empty, legacy, last observation over 60 min ago, or current but shorter than 24 h; and a running registry at its next observation after a gap over 60 min restarted its coverage, or at most every 5 min while its coverage is under 24 h",
+        "sources": "the other services' sidecars named by NEO_MAIN_MARKET_STATE_PATH (set by the gateway for personal engines), NEO_MARKET_STATE_PATH, NEO_STRATEGY_LAB_PATH and NEO_LIVE_TAPE_PATH (own sidecar excluded)",
+        "coverage_adoption": "earliest covered_since of a sibling whose own coverage is current; the registry's own current span is kept when it starts earlier; none while its own sidecar is kept unread",
+        "read_only": true,
+        "only_adds_sightings": true,
+        "first_deploy_tool": "scripts/build_ticker_registry_seed.py (offline, read-only on a training journal copy; coverage from market rows only; output must not exist unless --replace-stale and the existing sidecar does not vouch; only after start_local_paper.ps1 -Action Stop: it refuses a runtime directory whose services/processes.json exists without services/stop.request, because a running main rewrites its sidecar within 5 min)",
+        "replace_stale": "replaces an existing sidecar only when corrupt (reads but does not parse), without coverage, with coverage stamped more than 5 min after the wall clock (TICKER_COVERAGE_CLOCK_V1, coverage_ahead_minutes), or its coverage at the wall clock is not current or under 24 h; copies it to <out>.replaced-<ms> first and merges its sightings; a sidecar with current coverage >= 24 h or one that cannot be read (I/O error) is never replaced; services stopped, like the first run",
+        "first_deploy_seed_view": "the journal holds the bounded scan feed (MAX_FEED 90) plus entry, probe and position rows; Gecko new pools beyond the cap are not journalled, so the seed is a Lab/tape-grade memory, not main's untrimmed view",
+        "previous_version": "TICKER_REGISTRY_SEED_V3 (no sighting merge while vouching; never released); TICKER_REGISTRY_SEED_V2 (seeded only when a registry was built; never released)",
+        "running_reseed_interval_minutes": 5,
+        "running_reseed_reason": "a tape whose polls stalled for over 60 min while main kept scanning restarted its coverage and withheld every seat of a pool under 14 days for 24 h although main vouched; only a tape restart cleared it",
+        "verify_after_start": [
+          "defensive_entry_layer.ticker_registry.load_status == LOADED",
+          "defensive_entry_layer.ticker_registry.coverage.warming == false",
+          "strategy_lab.activity_config.defensive_entry_state.ticker_registry.coverage.warming == false (seed.sources SEEDED or coverage.adopted_from set)",
+          "live_tape_status.entry_scheduling.defensive_entry.layer.ticker_registry.coverage.warming == false"
+        ],
+        "vouching_sighting_merge": "a registry whose coverage vouches merges the sibling sidecars' sightings, never their coverage, at most every 5 min (seed.sighting_merges, sighting_merge_new_pools, sighting_merge_sources, last_sighting_merge_at; a seed counts as a merge)",
+        "vouching_sighting_merge_interval_minutes": 5,
+        "vouching_sighting_merge_reason": "review finding: main observes the untrimmed feed (Gecko new pools cut by bounded_feed at MAX_FEED 90) while the Lab and the tape see main's trimmed published feed; under V3 they adopted main's coverage at start, vouched and never picked up main's later sightings, so for up to 14 days a relaunch main refused as rug_ticker_reuse could be entered by a COST_FIRST Lab book and seated by the tape; main saves at most every 5 min, so its sightings now reach them within about 10 min",
+        "first_deploy_replay": {
+          "version": "SEED_REPLAY_WINDOW_V1",
+          "window": "replays from the first row of the last --window-days (default 15: 14-day retention plus the 24 h coverage span, at least 2) before the newest row, found by a binary search on observed_at by byte offset with 1 h of slack; --full-journal replays everything",
+          "replay_budget": "the replay starts no earlier than --max-replay-minutes (default 40) of journal at the reference 54.6 MB/s before its end (about 131 GB, about 9 journal days at 13.9 GB a day): limited_by_replay_budget, effective_window_days, estimated_replay_minutes",
+          "coverage_clock": "coverage_at_now is judged at the clock read after the replay and the write; start_services_before_utc (observed_until + 60 min, ISO UTC) and clock.elapsed_seconds printed",
+          "exit_codes": {
+            "0": "written and vouching at the end",
+            "1": "not written",
+            "2": "written (sightings count) but coverage at the end lapsed or under 24 h"
+          },
+          "reason": "review finding: coverage_at_now used the clock read before a replay of the whole journal (about 4 min per journal day); once the journal was about 13 days old the replay alone outlasted the 60-minute window, the tool printed warming false and exited 0, and every registry warmed for 24 h"
+        }
+      },
+      "legacy_registry_versions_loaded": [
+        "TICKER_REGISTRY_V1"
+      ],
+      "unknown_ticker_placeholders": [
+        "token"
+      ],
+      "registry_coverage": {
+        "reason": "rug_ticker_registry_warming",
+        "rule": "pair age < 14 days, no reuse found, continuous registry coverage at now < 24 h",
+        "min_coverage_hours": 24,
+        "max_gap_minutes": 60,
+        "observation_basis": "newest updatedAt of the feed's discovered market rows (at most 5 s after the scan clock); an empty scan, a stale published feed or a feed of held positions only never extends coverage",
+        "persisted": "covered_since, observed_until and coverage_resets in the sidecar",
+        "cap_eviction": "covered_since moves to the newest evicted sighting",
+        "evidence": "research log: median other-mint sibling of a reused ticker visible about 1 min; 82% of 561 reuse candidates (liquidity >= $20k) had every earlier sibling visible < 60 min",
+        "first_deploy_without_seed": "pools under 14 days wait 24 h in every engine and Lab book",
+        "basis_version": "DISCOVERED_MARKET_ROWS_V2",
+        "previous_basis_version": "ANY_FEED_ROW_V1 (never released)",
+        "held_position_sources": [
+          "open-position",
+          "open-position-pinned-pair"
+        ],
+        "held_position_rows": "registered as sightings, never mark coverage; counted in coverage.held_only_scans",
+        "clock": {
+          "version": "TICKER_COVERAGE_CLOCK_V1",
+          "max_ahead_minutes": 5,
+          "rule": "observed_until more than 5 min after the reference clock (scan clock, load clock, seed clock) was never observed: never current (coverage 0), dropped from the own sidecar at load and re-read, never adopted from a sibling at a seed (SEEDED_COVERAGE_AHEAD_IGNORED; sightings still merged), dropped from memory at the next scan, which starts coverage again and seeds at once (coverage.future_drops)",
+          "tolerance_reason": "5 min, not the 5 s feed skew: the engine's concurrent scan and entry threads and the offline replay (entry-stage checks at the recorded preflight start) look seconds to a minute behind the newest observation",
+          "reason": "review finding: a sidecar written by a standalone test run with the fixed test clock (January 2027) kept coverage current and hid every gap; the Lab vouched through a 5 h outage and allowed a 3-day-old pool, saved the stamp again, and a sibling seeding from it would have vouched at once"
+        }
+      },
+      "ticker_input_rule": "a missing ticker (empty after normalization, or the placeholder) is rug_input_unknown only when pair age < 14 days; rules 5 and 6 alone read it",
+      "sidecar_read": {
+        "version": "TICKER_REGISTRY_SIDECAR_READ_V1",
+        "attempts": 3,
+        "unreadable": "an I/O error after the attempts (a sharing violation, a permission error) is not corruption: the own sidecar is kept and never overwritten during the run (UNREADABLE_NOT_OVERWRITTEN, save_error OWN_SIDECAR_KEPT_UNREAD), read again at most every 60 s and at a clean stop, merged with its coverage once readable (LOADED_AFTER_REREAD)",
+        "coverage_while_unread": "no sibling coverage adopted (sightings still merged): fail closed, the registry warms",
+        "corrupt": "copied to <sidecar>.corrupt-<ms> (CORRUPT_STARTED_EMPTY, sidecar_read.corrupt_backup); kept like an unreadable one when the copy fails (CORRUPT_NOT_OVERWRITTEN)",
+        "reason": "review finding: an I/O error was treated as corruption, the intact sidecar was replaced at the first save without a copy, and a sibling's coverage vouched for memory the registry had lost"
+      }
+    },
+    "heat_veto": {
+      "version": "HEAT_VETO_STACK_V1",
+      "history_version": "PAIR_HISTORY_V1",
+      "reasons_in_order": [
+        "heat_history_warming",
+        "heat_input_unknown",
+        "heat_return_5m_surge",
+        "heat_buy_share_5m",
+        "heat_volume_acceleration",
+        "heat_extended_move",
+        "heat_paid_profile_high_fee",
+        "heat_crash_in_progress",
+        "heat_turnover_5m"
+      ],
+      "min_history_seconds": 300,
+      "return_5m_surge_pct": 3.0,
+      "buy_share_5m": 0.7,
+      "volume_acceleration": 1.3,
+      "change_6h_pct": 200.0,
+      "change_24h_pct": 150.0,
+      "paid_profile_source": "latest (token-profiles/latest)",
+      "paid_profile_min_fee_bps": 100.0,
+      "paid_profile_lookback_minutes": 60,
+      "crash_fraction_of_15m_high": 0.75,
+      "crash_return_5m_pct": -20.0,
+      "turnover_5m": 0.095,
+      "history_retention_minutes": 61,
+      "history_max_gap_seconds": 120,
+      "history_max_samples_per_pair": 720,
+      "history_max_pairs": 2048,
+      "log_only_book_ids": [
+        "LAB_A_SURGE_EST_GUARD",
+        "LAB_B_DIP_MKTDIP_GUARD"
+      ],
+      "log_only_books_registered": false,
+      "warming_is_a_veto": true,
+      "crash_high_window": "every retained sample of the last 15 min across feed gaps (research P.window); the opening price counts only while its segment was observed after the window start",
+      "history_max_gaps_per_pair": 64,
+      "malformed_inputs": "the affected rule stays unevaluated; never raises",
+      "tape_seats": "NEW_SEATS_WITHHELD_ON_RULES_A_TO_G_AND_UNKNOWN_PRICE; a running lease is kept until it expires; the tape's own heat_history_warming is log-only",
+      "window_coverage": {
+        "return_5m": ">= 300 s of contiguous history compared unrounded, and a price at or before now - 300 s inside the segment",
+        "crash_15m": "the pair first observed by this process >= 900 s ago, unless rule (f) already fires",
+        "paid_profile_60m": "fee tier >= 100 bps and the pair not known paid: this process observing the feed for >= 3600 s",
+        "clock": "process clock (now), never an older updatedAt",
+        "uncovered": "heat_history_warming with metrics.warming_windows"
+      },
+      "history_persistent": false,
+      "restart_wait_minutes": {
+        "every_pool": 15,
+        "fee_tier_at_least_100_bps": 60,
+        "tape_seats": 0
+      }
+    },
+    "pool_loss_memory": {
+      "version": "POOL_LOSS_MEMORY_V1",
+      "reason": "pool_loss_cooldown",
+      "consecutive_losses": 2,
+      "cooldown_hours": 6,
+      "scope": "same (mint, pool) within one account or one Lab book",
+      "source": "existing closed history, read-only",
+      "ledger_schema_changed": false,
+      "tape_scheduler_scope": "not applied at tape seats (one seat serves every ledger); each entry path applies its own ledger's memory before quoting; deviation from spec item 4 ACCEPTED 2026-10-08 by the operator under the owner's delegation (owner decision 1): loss memory is enforced per ledger at entry, never at shared seats",
+      "cross_ledger_union": false
+    },
+    "applies_to": [
+      "main engine WINNER_ENSEMBLE_PAPER_V1",
+      "ORDER_FLOW_ADAPTIVE",
+      "COST_FIRST_ESTABLISHED_PAPER_V1",
+      "training quote probe",
+      "every Strategy Lab book (rechecked at commit)",
+      "tape scheduler seat groups (structural guard; heat withholds new seats, running leases expire; the tape's own heat warm-up log-only; no loss memory)",
+      "engine RugCheck prewarm (PREWARM_V2_DEFENSIVE_POPULATION: established market candidates the layer allows, at most 4 per scan)"
+    ],
+    "cost_first_universe_includes_structural_guard": true,
+    "pins_of_held_positions_screened": false,
+    "exits_changed": false,
+    "replay_default": "recorded_policy (labelled REPLAY_RECORDED_POLICY_PREDATES_DEFENSIVE_ENTRY_LAYER_V1; refuses a journal with any row recorded under the layer, marked by coin.scoreVersion, RECORDED_POLICY_REFUSES_ROWS_RECORDED_UNDER_THE_LAYER_V1)",
+    "not_wired": [
+      "backend/lab_paired_runner.py (VPS-only service)",
+      "backend/astra6_brain.py (VPS-only service)",
+      "backend/paper_training.py learner books (isolated training on the NEO_MARKET_SCORE_V1 basis; the route-quote probe feeding them is gated)"
+    ],
+    "evidence": {
+      "source": "research 2026-10-08, 22.8 h of the engine scan log, PAPER",
+      "cost_first_universe_pools_drained": "10 of 64 within 22.8 h",
+      "large_pool_drain_families": "19 drains in >= $250k pools: 10 fake market cap, 9 LP-pullable",
+      "young_pool_drain_rate_2h_under_15_min": 0.87,
+      "cost_first_account_rug_family_entries_first_80s": 3,
+      "closes_on_one_falling_token": "21 of 23 (re-bought every 30-40 min while it fell 76%)",
+      "rug_guard_holdout_event_recall": 0.897,
+      "rug_guard_holdout_point_fpr": 0.148,
+      "drain_hazard_per_position_hour": "4.39% -> 1.31% (cost-first 3.48% -> 0.99%)",
+      "heat_veto_forward_difference_pp": -5.07,
+      "heat_veto_forward_ci95": [
+        -11.0,
+        -0.95
+      ],
+      "positive_expectancy_found": false
+    },
+    "is_entry_authorization": false,
+    "profitability_proven": false,
+    "doc": "docs/DEFENSIVE_ENTRY_LAYER.md",
+    "reasons_in_order": [
+      "rug_input_unknown",
+      "rug_lp_pullable",
+      "rug_young_pool",
+      "rug_fake_market_cap",
+      "rug_ticker_reuse",
+      "rug_ticker_registry_warming",
+      "pool_loss_cooldown",
+      "heat_history_warming",
+      "heat_input_unknown",
+      "heat_return_5m_surge",
+      "heat_buy_share_5m",
+      "heat_volume_acceleration",
+      "heat_extended_move",
+      "heat_paid_profile_high_fee",
+      "heat_crash_in_progress",
+      "heat_turnover_5m",
+      "defensive_entry_error"
+    ],
+    "evaluation_error": {
+      "reason": "defensive_entry_error",
+      "fail_closed": true,
+      "never_raises": true,
+      "recorded": "exception type only, counted in the layer status()"
+    },
+    "exit_context_score_version": "NEO_MARKET_SCORE_V1",
+    "per_candidate_forward_log": "NOT_IMPLEMENTED (diagnostics keep per-scan counts and examples only)",
+    "commit_recheck": {
+      "engine": "the commit-time observation under the entry lock (commit_recheck_blocked)",
+      "lab": "the commit clock and the book history at commit (commit_recheck_blocked); the Lab has no observation newer than its refresh"
+    },
+    "prewarm_version": "PREWARM_V2_DEFENSIVE_POPULATION",
+    "effective_config_hashes": {
+      "basis": "code defaults, no NEO_* overrides; pinned exactly in tests/test_cost_first_engine_profile.py",
+      "WINNER_ENSEMBLE_PAPER_V1": "274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9",
+      "ORDER_FLOW_ADAPTIVE": "8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890",
+      "COST_FIRST_ESTABLISHED_PAPER_V1": "baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba"
+    },
+    "research_reproduction": "the archived research forensics call cost_first_engine_profile.physical_universe_rejections (COST_FIRST_UNIVERSE_V1, physical screens only); the live V2 universe fails closed without a ticker registry",
+    "training_score_basis": {
+      "version": "NEO_MARKET_SCORE_V1",
+      "learner_score": "paper_training.learner_score: coin scoreV1, else score (rows recorded before V2)",
+      "recorded_context": "Monitor.training_context: V1-basis conviction and hold mode (GOLD_ADAPTIVE exits)",
+      "paper_training_version_unchanged": "PAPER_TRAINING_V1",
+      "learner_sample_boundary": "per-row learner decisions are the pre-change ones, but the journalled population is the V2-ranked bounded feed (scan_once sorts by the V2 score; bounded_feed keeps the V2-screened market candidates first), so pools at liquidity/MC >= 0.6 drop out of the 90 more often from the deploy on; the boundary is the first journal row stamped coin.scoreVersion (main_replay entry_defense.rows_recorded_under_layer.earliest_at); learner samples are never pooled across it"
+    },
+    "test_isolation": "tests/test_defensive_entry_layer.py assigns its NEO_* paths unconditionally and pins market_monitor/strategy_lab ledger paths to its temp dir; a shell account path survives an engine test (regression test); every gate test module that isolates the layer also replaces strategy_lab.DEFENSE and live_tape._POOL_SCHEDULER with path-less layers in setUpModule, and a regression test runs each such module alone with NEO_MARKET_STATE_PATH, NEO_MAIN_MARKET_STATE_PATH, NEO_STRATEGY_LAB_PATH and NEO_LIVE_TAPE_PATH at a sentinel directory that must stay empty (six modules wrote strategy_lab.ticker_registry.json or live_tape.ticker_registry.json there)",
+    "replay_modes": {
+      "recorded_policy": "journals recorded before the layer only; the layer is skipped and the report labelled",
+      "apply": "COUNTERFACTUAL_LAYER_ON_REPLAYED_ROWS_ONLY",
+      "without_layer": "COUNTERFACTUAL_WITHOUT_DEFENSIVE_ENTRY_LAYER_V1 (any journal)",
+      "layer_era_marker": "coin.scoreVersion (market_monitor.make_coin; absent before the layer)"
+    },
+    "engine_state_publication": "/state defensive_entry_layer: the layer status (ticker registry with coverage and seeds, pair history) refreshed by every scan, also while the account is paused (maybe_open, which fills entry_diagnostics.defensive_entry.layer, returns at once then); in memory only, never written to the ledger"
+  },
+  "score_model": {
+    "version": "NEO_MARKET_SCORE_V2_LIQ_MC_BAND",
+    "previous_version": "NEO_MARKET_SCORE_V1",
+    "good_liquidity_mc_bonus": 9,
+    "good_liquidity_mc_range": [
+      0.15,
+      0.6
+    ],
+    "lp_risk_at_or_above_liquidity_mc": 1.0,
+    "lp_risk_points": -10,
+    "lp_risk_label": "Likvidnost >= MC (LP risk) [Bulgarian label in market_monitor.score_pair]",
+    "neutral_liquidity_mc_range": [
+      0.6,
+      1.0
+    ],
+    "published_as": "coin scoreVersion and scoreV1, position score_version and exit_context_score_version, /state config score_version and exit_context_score_version",
+    "part_of_effective_config_hash": true,
+    "applies_to": "entries only (ranking, thresholds, entry conviction)",
+    "exit_context_score_version": "NEO_MARKET_SCORE_V1",
+    "exit_context_rule": "market_context of a held ORDER_FLOW_ADAPTIVE position reads coin scoreV1; a new position's adaptive_hold comes from exit_basis_conviction (same flow, V1 score); an observation recorded before V2 keeps its own score",
+    "training_score_basis": "NEO_MARKET_SCORE_V1 (paper_training.LEARNER_SCORE_VERSION; Monitor.training_context)"
   }
 }

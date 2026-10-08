@@ -131,7 +131,8 @@ def ofa_signal(variant):
 def cf_market(P):
     if not (P('liq') > 0):
         return False
-    if CFP.universe_rejections(coin(P), 200.0):
+    # The V1 universe this study measured (see funnel.py); the rug screen follows.
+    if CFP.physical_universe_rejections(coin(P), 200.0):
         return False
     return not H.interim_rug_risk(P)
 

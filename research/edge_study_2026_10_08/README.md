@@ -96,7 +96,14 @@ python research/edge_study_2026_10_08/rescore_lab_hypotheses.py
 - `leaderboard/run_all.py` rebuilds the full leaderboard. It is slow.
 
 Use the repo virtualenv's Python. The research code uses only the standard library and
-imports `backend/paper_market_feasibility.py` read-only.
+imports backend modules read-only: `backend/paper_market_feasibility.py` everywhere, and in
+`forensics/` (`funnel.py`, `families.py`, `seatuse.py`) also the live rule modules
+(`winner_ensemble`, `order_flow_adaptive_oct4`, `cost_first_engine_profile`,
+`promoted_entry_guard`). Their COST_FIRST stage calls
+`cost_first_engine_profile.physical_universe_rejections`, the `COST_FIRST_UNIVERSE_V1` rule this
+study measured. The live universe is now `COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD`: it adds
+`STRUCTURAL_RUG_GUARD_V1`, which needs a ticker registry and a decision time and fails closed
+without them (every pool would be `rug_input_unknown`), so it cannot reproduce these numbers.
 
 ## Map
 

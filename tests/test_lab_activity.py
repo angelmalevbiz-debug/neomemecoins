@@ -11,6 +11,45 @@ os.environ['NEO_STRATEGY_LAB_RESET_FLAG']=str(Path(TMP.name)/'reset')
 import lab_activity as a
 import strategy_lab as lab
 import promoted_entry_guard as promoted_guard
+import entry_defense as _isolation_entry_defense
+import strategy_lab as _isolation_lab
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def _path_less_layers():
+    """Path-less layers for the module globals that otherwise build one from the env paths."""
+    return (
+        (_isolation_lab, 'DEFENSE', _isolation_entry_defense.DefensiveEntryLayer()),
+    )
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_lab, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+    # The layer's ticker registry stays in memory here. Run on its own (without
+    # scripts/run_python_checks.py), this module must never write a ticker sidecar next
+    # to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (or the /var/lib/neo-market
+    # defaults): strategy_lab.maybe_open observes through lab.DEFENSE and
+    # live_tape.feed_snapshot through the module-level _POOL_SCHEDULER.
+    for target, name, value in _path_less_layers():
+        isolation = patch.object(target, name, value)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 ADDRESS='So11111111111111111111111111111111111111112'
 PAIR='EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -256,7 +295,7 @@ class ActivityTests(unittest.TestCase):
         for b in opened:
             self.assertEqual(b['balance'],b['starting_balance'])
             self.assertEqual(b['position']['entry_policy_version'],a.POLICY_VERSION)
-            self.assertEqual(b['position']['entry_policy_version'],'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP')
+            self.assertEqual(b['position']['entry_policy_version'],'LAB_ACTIVE_V7_DEFENSIVE_ENTRY')
             self.assertLess(b['position']['open_pnl_usd'],0)
             # LAB_ACTIVE_V6: TEST books share the funded 0.5 x stop cost cap.
             self.assertGreaterEqual(b['position']['entry_roundtrip_pnl_pct'],-1.5)

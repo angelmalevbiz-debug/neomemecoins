@@ -207,3 +207,25 @@ test('funded rows with the published V6 cap do not repeat the strict cost limit 
   assert.ok(segment > 0);
   assert.match(source.slice(segment - 200, segment), /diagnostics\.max_entry_roundtrip_cost_pct == null \?/);
 });
+
+test('DEFENSIVE_ENTRY_LAYER_V1: every defensive block reason is named in Bulgarian, never shown as a raw code', () => {
+  // entry_defense.REASONS_IN_ORDER plus the Lab fallback 'defensive_entry'
+  // (tests/test_defensive_entry_layer.py checks this map against the backend list).
+  const codes = ['defensive_entry', 'rug_input_unknown', 'rug_lp_pullable', 'rug_young_pool', 'rug_fake_market_cap',
+    'rug_ticker_reuse', 'rug_ticker_registry_warming', 'pool_loss_cooldown', 'heat_history_warming',
+    'heat_input_unknown', 'heat_return_5m_surge',
+    'heat_buy_share_5m', 'heat_volume_acceleration', 'heat_extended_move', 'heat_paid_profile_high_fee',
+    'heat_crash_in_progress', 'heat_turnover_5m', 'defensive_entry_error'];
+  const statuses = new Set<string>();
+  for (const blocked_reason of codes) {
+    const view = labEntryView({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+      signal_candidates: 2, affordable_candidates: 0, blocked_reason } });
+    assert.doesNotMatch(view.status, /Входът изчаква/, blocked_reason);
+    assert.ok(!view.status.includes(blocked_reason), blocked_reason);
+    assert.equal(view.costLimited, false);
+    statuses.add(view.status);
+  }
+  assert.equal(statuses.size, codes.length, 'each reason has its own label');
+  assert.equal(labEntryStatus({ ...book('TREND', 500, 500, 'TEST'), entry_diagnostics: {
+    signal_candidates: 1, blocked_reason: 'rug_young_pool' } }), 'Pool-ът е по-млад от 12 часа');
+});

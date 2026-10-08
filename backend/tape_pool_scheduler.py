@@ -25,6 +25,26 @@ flow coverage. Each engine's /state is read on 127.0.0.1 by a background
 refresher, never on the tape poll; the poll only reads the latest snapshot.
 Pools held only by personal engines are capped (NEO_TAPE_PERSONAL_PIN_LIMIT)
 after main's and Lab's pins, which are never capped.
+
+Defensive entry seats (V5): a pool that STRUCTURAL_RUG_GUARD_V1 blocks
+(DEFENSIVE_ENTRY_LAYER_V1 with the scheduler's own ticker registry) cannot
+be entered by any engine, so it gets no entry or exploration seat. Pins of
+held positions are never affected. Every candidate group, including the
+cost-first universe (cost_first_established V2 includes the structural
+guard), shares this screen; nothing here admits a pool.
+HEAT_VETO_STACK_V1 with the scheduler's own pair history: a hot or crashing
+pool (rules (a)-(g), or an unknown price) gets no NEW entry or exploration
+seat, since no engine would enter it. A pool that already holds a running
+lease keeps it until the lease expires (dropping a lease on one hot poll
+would reset its tape coverage); after that it competes again under the same
+screen. heat_history_warming is log-only at seats: it describes the
+scheduler's own history after a restart, a seat is how pool data is
+gathered, and every engine enforces its own warm-up at decision and commit.
+A seat serves every ledger, so POOL_LOSS_MEMORY_V1 (per ledger) does not
+withhold one: a loss cooldown in one account or Lab book says nothing about
+the others, and a withheld seat would leave every engine without the
+COMPLETE exact-pool window it needs. Each entry path applies its own
+ledger's memory before quoting.
 """
 import json
 import math
@@ -35,6 +55,7 @@ from pathlib import Path
 
 import lab_activity
 import cost_first_established as cost_first
+import entry_defense
 import funded_market_candidates
 import paper_market_feasibility as feasibility
 from shared_snapshot_io import read_shared_text
@@ -43,7 +64,13 @@ import winner_ensemble
 
 FUNDED_RULES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 LEASE_MS = 60_000
-POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS'
+POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY'
+PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS'
+DEFENSIVE_EXAMPLE_LIMIT = 6
+SEAT_RULE = 'NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL'
+HEAT_SEAT_MODE = 'NEW_SEATS_WITHHELD_RUNNING_LEASES_KEPT_WARMING_LOG_ONLY'
+# Heat reasons that never withhold a seat: the tape's own warm-up (each engine enforces its own).
+SEAT_HEAT_LOG_ONLY_REASONS = frozenset({'heat_history_warming'})
 SHED_MIN_BODIES = max(1, int(os.getenv('NEO_TAPE_SHED_MIN_BODIES', '40')))
 SHED_COOLDOWN_MS = max(60_000, int(os.getenv('NEO_TAPE_SHED_COOLDOWN_MS', '1800000')))
 SHED_REASON = 'ZERO_DECODED_SWAPS_AFTER_BODIES'
@@ -397,7 +424,7 @@ class PersonalEnginePositions:
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
                  shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS,
-                 personal_pin_limit=PERSONAL_PIN_LIMIT):
+                 personal_pin_limit=PERSONAL_PIN_LIMIT, registry_path=None, registry_seed_paths=()):
         self.lease_ms = max(30_000, int(lease_ms))
         self.personal_pin_limit = max(0, int(personal_pin_limit))
         self.leases = {}
@@ -407,6 +434,34 @@ class TapePoolScheduler:
         self.yield_window_ms = max(60_000, int(yield_window_ms))
         self.shed = {}
         self.yield_since = {}
+        # DEFENSIVE_ENTRY_LAYER_V1 of the tape process (own registry and history); a
+        # registry without current coverage is seeded read-only from ``registry_seed_paths``.
+        self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path,
+                                                         seed_paths=registry_seed_paths)
+
+    def defensive_entry_decision(self, coin, now, *, leased=False):
+        """Seat screen: no seat for a structurally blocked pool, no NEW seat for a hot one.
+
+        The structural guard withholds every entry/exploration seat. A heat
+        rule ((a)-(g) or an unknown price) withholds a new seat, while a pool
+        holding a running lease (``leased``) keeps it until the lease expires,
+        so its tape coverage is not reset by one hot poll. heat_history_warming
+        stays log-only here: it describes this process's own history (a seat
+        is how pool data is gathered), and every engine enforces its own
+        warm-up at decision and commit. No ledger's pool loss memory applies
+        (a seat serves every ledger; each entry path applies its own).
+        """
+        decision = self.defense.evaluate(coin, now, blocked_pools={}, heat_log_only=True)
+        if not decision.get('allowed'):
+            return decision
+        flags = list(decision.get('log_only_flags') or [])
+        enforced = [reason for reason in flags if reason not in SEAT_HEAT_LOG_ONLY_REASONS]
+        if not enforced:
+            return decision
+        if leased:
+            return {**decision, 'seat_heat_lease_kept': True}
+        return {**decision, 'allowed': False, 'reasons': list(decision.get('reasons') or []) + enforced,
+                'log_only_flags': [flag for flag in flags if flag not in enforced], 'seat_heat_withheld': True}
 
     def _shed_record(self, identity, coin, now, decode_yield):
         """Return the active shed record for a supported entry candidate, if any."""
@@ -464,6 +519,12 @@ class TapePoolScheduler:
         unsupported_pins = [coin for coin in held if not _supported(coin)]
         candidates, examples, cost_first_examples = [], [], []
         cost_first_rejections = {}
+        # Every poll feeds the scheduler's ticker registry and pair history.
+        self.defense.observe(list(market.values()), now)
+        defensive_summary = entry_defense.new_summary()
+        defensive_summary['heat_log_only'] = False
+        defensive_blocked = []
+        heat_withheld = heat_leases_kept = 0
         model_possible = model_excluded = model_unknown = 0
         main_cost_cap = feasibility.number((state.get('config') or {}).get(
             'strict_max_roundtrip_cost_pct'), 1.5)
@@ -489,6 +550,19 @@ class TapePoolScheduler:
             shed = self._shed_record(identity, coin, now, decode_yield)
             if shed is not None:
                 shed_now.append(shed)
+                continue
+            # A pool the structural guard blocks for every entry path spends no
+            # seat (pins are exempt above); a hot pool gets no new seat, while a
+            # running lease runs out; heat warming is counted log-only.
+            start = self.leases.get(identity)
+            leased = start is not None and 0 <= now - start < self.lease_ms
+            defensive = self.defensive_entry_decision(coin, now, leased=leased)
+            entry_defense.record(defensive_summary, defensive, coin, example_limit=DEFENSIVE_EXAMPLE_LIMIT)
+            if defensive.get('seat_heat_lease_kept'):
+                heat_leases_kept += 1
+            if not defensive['allowed']:
+                defensive_blocked.append(identity)
+                heat_withheld += int(bool(defensive.get('seat_heat_withheld')))
                 continue
             features = lab_activity.market_features(coin)
             main_rules = winner_ensemble.market_candidates(coin)
@@ -521,7 +595,8 @@ class TapePoolScheduler:
             # never an admission, and full flow/safety/quote gates still apply.
             universe_rejections = cost_first.rejections(
                 coin, cap_usd=COST_FIRST_PLANNING_NOTIONAL_USD,
-                minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD)
+                minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD,
+                now=now, ticker_registry=self.defense.registry)
             in_cost_first = not universe_rejections
             for reason in universe_rejections:
                 cost_first_rejections[reason] = cost_first_rejections.get(reason, 0) + 1
@@ -583,7 +658,8 @@ class TapePoolScheduler:
         for row in sorted(cost_first_rows, key=lambda row: (row['identity'] not in selected_ids,
                                                              row['identity']))[:COST_FIRST_EXAMPLE_LIMIT]:
             described = cost_first.describe(row['coin'], cap_usd=COST_FIRST_PLANNING_NOTIONAL_USD,
-                                            minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD)
+                                            minimum_notional_usd=COST_FIRST_MIN_NOTIONAL_USD,
+                                            now=now, ticker_registry=self.defense.registry)
             cost_first_examples.append({
                 'symbol': row['coin'].get('symbol'), 'address': row['identity'][0],
                 'pairAddress': row['identity'][1], 'selected': row['identity'] in selected_ids,
@@ -595,6 +671,18 @@ class TapePoolScheduler:
         personal_pins = [coin for coin in pins if _identity(coin) in personal_held]
         shed_records = sorted(self.shed.values(), key=lambda row: (-int(row['shed_at']), row['pairAddress']))
         diagnostics = {'policy_version': POLICY_VERSION,
+                       'previous_policy_version': PREVIOUS_POLICY_VERSION,
+                       'defensive_entry': {
+                           **defensive_summary, 'examples': defensive_summary['examples'][:DEFENSIVE_EXAMPLE_LIMIT],
+                           'blocked_pools_in_feed': len(defensive_blocked),
+                           'heat_withheld_new_seats': heat_withheld,
+                           'heat_running_leases_kept': heat_leases_kept,
+                           'seat_rule': SEAT_RULE,
+                           'pinned_exit_pools_exempt': True,
+                           'heat_veto_mode': HEAT_SEAT_MODE,
+                           'heat_log_only_reasons': sorted(SEAT_HEAT_LOG_ONLY_REASONS),
+                           'pool_loss_memory_scope': 'NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY',
+                           'layer': self.defense.status(), 'is_entry_authorization': False},
                        'funded_candidate_policy_version':funded_market_candidates.VERSION,
                        'checked_at': now, 'model_is_execution_quote': False,
                        'cost_estimates_are_planning_hints': True,

@@ -25,6 +25,11 @@ quote at least 2 s after the first trigger before it exits. Only an exact-pool
 mark arms, and a re-arm cooldown plus a per-position confirmation budget bound
 the forced quotes it spends from the shared quote budget. Whether that is
 better or worse for this universe is unknown; it is a versioned hypothesis.
+
+V2 (DEFENSIVE_ENTRY_LAYER_V1): the universe includes STRUCTURAL_RUG_GUARD_V1
+(cost_first_established V2) with the engine's own ticker registry, and the
+engine applies the heat veto and the pool loss memory before any quote. The
+strategy id stays COST_FIRST_ESTABLISHED_PAPER_V1 (the account registry value).
 """
 from dataclasses import asdict, dataclass
 import math
@@ -34,8 +39,9 @@ import cost_first_established as cost_first
 import engine_exit_policy as exit_policy
 
 STRATEGY_ID = 'COST_FIRST_ESTABLISHED_PAPER_V1'
-PROFILE_VERSION = 'COST_FIRST_ENGINE_PROFILE_V1'
-ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_ENTRY_V1'
+PROFILE_VERSION = 'COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY'
+ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_ENTRY_V2'
+PREVIOUS_ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_ENTRY_V1'
 EXIT_POLICY = 'cost_first'
 EXIT_POLICY_VERSION = 'COST_FIRST_NET_EXIT_V1'
 # The stop / target / hold decision is engine_exit_policy's fixed geometry,
@@ -43,16 +49,17 @@ EXIT_POLICY_VERSION = 'COST_FIRST_NET_EXIT_V1'
 EXIT_GEOMETRY_POLICY = 'fixed'
 LEARNING_MODE = 'NONE_FIXED_HYPOTHESIS'
 SIGNAL_SOURCE = cost_first.VERSION
-SIGNAL_EVIDENCE = 'COST_FIRST_UNIVERSE_V1_ON_CONFIRMED_EXACT_POOL_FLOW_WITH_VERIFIED_EXECUTION_CHECKS'
+SIGNAL_EVIDENCE = 'COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD_ON_CONFIRMED_EXACT_POOL_FLOW_WITH_VERIFIED_EXECUTION_CHECKS'
 SIZE_POLICY = 'COST_FIRST_LIQUIDITY_SCALED_V1'
 SIZE_RULE = ('min(TRADE_NOTIONAL_USD, liquidity_usd * liquidity_size_fraction), then the engine '
              'daily-budget sizing (engine_runtime.plan_notional) and entry_size_backoff steps')
 # The engine refuses any planned entry below $10 (risk_budget_unavailable).
 MIN_ENTRY_NOTIONAL_USD = 10.0
 EXECUTION_NOTE = ('PAPER only; COST_FIRST_ESTABLISHED universe (PumpSwap tier <= 50 bps, liquidity >= '
-                  '$250k, modeled fee+impact round trip <= 1.2%) on the engine\'s exact-pool flow, safety, '
-                  'price and executable-quote gates. Quotes and fees are modeled, not executed fills; gaps '
-                  'and unsellable losses remain possible. Unvalidated hypothesis, no profitability claim.')
+                  '$250k, modeled fee+impact round trip <= 1.2%, STRUCTURAL_RUG_GUARD_V1) behind the '
+                  'defensive entry layer and the engine\'s exact-pool flow, safety, price and '
+                  'executable-quote gates. Quotes and fees are modeled, not executed fills; gaps and '
+                  'unsellable losses remain possible. Unvalidated hypothesis, no profitability claim.')
 # No outcome-based throttling or sizing: a fixed, pre-registered hypothesis.
 NO_LEARNING = {'closed_trades': 0, 'win_rate_pct': None, 'profit_factor': None,
                'losses': 0, 'mode': LEARNING_MODE, 'throttled_strategies': []}
@@ -116,18 +123,34 @@ def finite(value: Any) -> float | None:
 
 # ---------------------------------------------------------------- entry ----
 
-def universe_rejections(coin: dict[str, Any], cap_usd: float) -> list[str]:
-    """Cost-first universe failures in evaluation order; empty means candidate."""
-    return cost_first.rejections(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD)
+def universe_rejections(coin: dict[str, Any], cap_usd: float, *, now=None,
+                        ticker_registry=None) -> list[str]:
+    """Cost-first universe failures in evaluation order; empty means candidate.
+
+    The universe includes STRUCTURAL_RUG_GUARD_V1, which needs the engine's
+    ticker registry and fails closed without it.
+    """
+    return cost_first.rejections(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD,
+                                 now=now, ticker_registry=ticker_registry)
 
 
-def is_market_candidate(coin: dict[str, Any], cap_usd: float) -> bool:
-    return not universe_rejections(coin, cap_usd)
+def physical_universe_rejections(coin: dict[str, Any], cap_usd: float) -> list[str]:
+    """COST_FIRST_UNIVERSE_V1 (physical screens only), for the archived research forensics.
+
+    Never an entry screen: the engine uses universe_rejections, which adds
+    STRUCTURAL_RUG_GUARD_V1 and fails closed without a ticker registry.
+    """
+    return cost_first.physical_rejections(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD)
 
 
-def universe_metrics(coin: dict[str, Any], cap_usd: float) -> dict[str, Any]:
+def is_market_candidate(coin: dict[str, Any], cap_usd: float, *, now=None, ticker_registry=None) -> bool:
+    return not universe_rejections(coin, cap_usd, now=now, ticker_registry=ticker_registry)
+
+
+def universe_metrics(coin: dict[str, Any], cap_usd: float, *, now=None, ticker_registry=None) -> dict[str, Any]:
     """Rejection-example metrics: the observed values each universe rule used."""
-    described = cost_first.describe(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD)
+    described = cost_first.describe(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD,
+                                    now=now, ticker_registry=ticker_registry)
     roundtrip = described.get('fee_impact_roundtrip_pct')
     return {
         'universe_version': described['universe_version'],
@@ -140,6 +163,7 @@ def universe_metrics(coin: dict[str, Any], cap_usd: float) -> dict[str, Any]:
         'planned_notional_usd': described.get('planned_notional_usd'),
         'fee_impact_roundtrip_pct': None if roundtrip is None else round(roundtrip, 4),
         'max_fee_impact_roundtrip_pct': cost_first.UNIVERSE.max_fee_impact_roundtrip_pct,
+        'structural_rug_guard': described.get('structural_rug_guard'),
         'is_execution_quote': False,
     }
 
@@ -305,6 +329,7 @@ def universe_parameters() -> dict[str, Any]:
     return {**asdict(cost_first.UNIVERSE), 'universe_version': cost_first.UNIVERSE_VERSION,
             'minimum_entry_notional_usd': MIN_ENTRY_NOTIONAL_USD,
             'rejection_reasons': list(cost_first.REJECTION_REASONS),
+            'structural_rug_guard': cost_first.structural_rug_guard.config(),
             'source_module': 'backend/cost_first_established.py'}
 
 
@@ -354,6 +379,8 @@ def config_snapshot(*, cap_usd: float, stop_loss_pct: float, take_profit_pct: fl
         'signal_source': SIGNAL_SOURCE, 'signal_evidence': SIGNAL_EVIDENCE,
         'universe': universe_parameters(), 'size_rule': size_rule(cap_usd),
         'exit': exit_parameters(stop_loss_pct, take_profit_pct),
+        'defensive_entry': ('DEFENSIVE_ENTRY_LAYER_V1: STRUCTURAL_RUG_GUARD_V1 inside the universe; '
+                            'POOL_LOSS_MEMORY_V1 and HEAT_VETO_STACK_V1 before flow, safety and quotes'),
         'engine_gates_unchanged': [
             'engine_entry_policy.signal_data_rejections',
             'promoted_entry_guard.flow_admission (confirmed 30 s exact-pool PumpSwap window)',

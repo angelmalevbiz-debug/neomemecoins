@@ -19,6 +19,45 @@ os.environ['NEO_STRATEGY_LAB_RESET_FLAG'] = str(Path(TMP.name) / 'reset')
 import lab_activity as a
 import promoted_entry_guard as promoted_guard
 import strategy_lab as lab
+import entry_defense as _isolation_entry_defense
+import strategy_lab as _isolation_lab
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def _path_less_layers():
+    """Path-less layers for the module globals that otherwise build one from the env paths."""
+    return (
+        (_isolation_lab, 'DEFENSE', _isolation_entry_defense.DefensiveEntryLayer()),
+    )
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_lab, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+    # The layer's ticker registry stays in memory here. Run on its own (without
+    # scripts/run_python_checks.py), this module must never write a ticker sidecar next
+    # to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (or the /var/lib/neo-market
+    # defaults): strategy_lab.maybe_open observes through lab.DEFENSE and
+    # live_tape.feed_snapshot through the module-level _POOL_SCHEDULER.
+    for target, name, value in _path_less_layers():
+        isolation = patch.object(target, name, value)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 ADDRESS = 'So11111111111111111111111111111111111111112'
 PAIR = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -56,8 +95,8 @@ class CapConsistencyTests(unittest.TestCase):
         lab.STATE = {'started_at': 42, 'books': {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}}
 
     def test_policy_version_and_cap_are_tied_to_the_promoted_guard(self):
-        self.assertEqual(a.POLICY_VERSION, 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP')
-        self.assertEqual(a.PREVIOUS_POLICY_VERSION, 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN')
+        self.assertEqual(a.POLICY_VERSION, 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY')
+        self.assertEqual(a.PREVIOUS_POLICY_VERSION, 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP')
         self.assertEqual(a.admission_cost_cap_pct(lab.STOP_LOSS), promoted_guard.max_entry_cost_pct(lab.STOP_LOSS))
         self.assertEqual(lab.lab_cost_cap_pct(), 1.5)
         # The research model ceiling is unchanged and still bounds any caller.
@@ -139,7 +178,7 @@ class CapConsistencyTests(unittest.TestCase):
         closed = book['history'][0]
         self.assertEqual(closed['exit_reason'], 'STOP_LOSS_3_NET')
         self.assertEqual(closed['pnl_usd'], -6)
-        self.assertEqual(closed['entry_policy_version'], 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP')
+        self.assertEqual(closed['entry_policy_version'], 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY')
         self.assertEqual(closed['entry_cost_cap_pct'], 1.5)
         self.assertEqual(closed['stop_headroom_pct'], position['stop_headroom_pct'])
         self.assertEqual(lab.stats(book)['active_policy_trades'], 1)

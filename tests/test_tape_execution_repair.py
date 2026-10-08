@@ -10,6 +10,46 @@ import live_tape as tape
 import engine_execution as execution
 import honest_quote_transport as transport
 import pumpswap_stop_quote as pump
+import entry_defense as _isolation_entry_defense
+import live_tape as _isolation_live_tape
+import tape_pool_scheduler as _isolation_tape
+
+_DEFENSIVE_ISOLATION = []
+
+
+def _defensive_pass(*_args, **_kwargs):
+    return _isolation_entry_defense.pass_decision('TEST_GATE_ISOLATION')
+
+
+def _path_less_layers():
+    """Path-less layers for the module globals that otherwise build one from the env paths."""
+    return (
+        (_isolation_live_tape, '_POOL_SCHEDULER', _isolation_tape.TapePoolScheduler()),
+    )
+
+
+def setUpModule():
+    """These tests isolate other entry gates. DEFENSIVE_ENTRY_LAYER_V1 (structural rug
+    guard, pool loss memory, heat veto and its warm-up) has its own suite in
+    tests/test_defensive_entry_layer.py, which proves every path consults it."""
+    for target, name in ((_isolation_tape.TapePoolScheduler, 'defensive_entry_decision'),):
+        isolation = patch.object(target, name, _defensive_pass)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+    # The layer's ticker registry stays in memory here. Run on its own (without
+    # scripts/run_python_checks.py), this module must never write a ticker sidecar next
+    # to the shell's NEO_STRATEGY_LAB_PATH / NEO_LIVE_TAPE_PATH (or the /var/lib/neo-market
+    # defaults): strategy_lab.maybe_open observes through lab.DEFENSE and
+    # live_tape.feed_snapshot through the module-level _POOL_SCHEDULER.
+    for target, name, value in _path_less_layers():
+        isolation = patch.object(target, name, value)
+        isolation.start()
+        _DEFENSIVE_ISOLATION.append(isolation)
+
+
+def tearDownModule():
+    while _DEFENSIVE_ISOLATION:
+        _DEFENSIVE_ISOLATION.pop().stop()
 
 
 def pubkey(number):
@@ -71,8 +111,11 @@ class ParserTests(unittest.TestCase):
                     ],
                 }
 
+        # A fresh path-less scheduler per call, as the other tape suites do (its registry
+        # never writes a sidecar next to the shell's NEO_LIVE_TAPE_PATH).
         with patch.object(tape.SESSION,'get',return_value=Response()), \
              patch.object(tape,'shared_quote_reference',return_value=None), \
+             patch.object(tape,'_POOL_SCHEDULER',_isolation_tape.TapePoolScheduler()), \
              patch.object(tape,'MAX_TRACKED',1):
             feed=tape.feed_snapshot()
         self.assertEqual({row['pair'] for row in feed},{pubkey(29)})
@@ -101,6 +144,7 @@ class ParserTests(unittest.TestCase):
 
         with patch.object(tape.SESSION, 'get', return_value=Response()), \
              patch.object(tape, 'shared_quote_reference', return_value=None), \
+             patch.object(tape, '_POOL_SCHEDULER', _isolation_tape.TapePoolScheduler()), \
              patch.object(tape, 'MAX_TRACKED', 1):
             feed = tape.feed_snapshot()
         self.assertEqual([row['symbol'] for row in feed], ['C44'])

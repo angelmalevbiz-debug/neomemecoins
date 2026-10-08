@@ -6,6 +6,25 @@ entry `COST_FIRST_ESTABLISHED_ENTRY_V1`, exit policy `cost_first` /
 this change submits swaps, resets or rewrites a ledger, switches an account, or
 claims that the profile is profitable. It is an unvalidated, versioned hypothesis.
 
+Update 2026-10-08 (`DEFENSIVE_ENTRY_LAYER_V1`, [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md)):
+profile `COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY`, entry `COST_FIRST_ESTABLISHED_ENTRY_V2`,
+universe `COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD` (the structural rug guard is part of
+`cost_first_established.rejections`), and the heat veto and pool loss memory run before quotes.
+The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default and
+`ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
+With the layer, the `effective_config_hash` values (code defaults, no `NEO_*` overrides,
+pinned exactly by `tests/test_cost_first_engine_profile.py`) are:
+`COST_FIRST_ESTABLISHED_PAPER_V1` `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba`,
+`WINNER_ENSEMBLE_PAPER_V1` `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9`,
+`ORDER_FLOW_ADAPTIVE` `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890`.
+A new cost-first account's ticker registry is seeded from main's, the Lab's and the
+tape's sidecars and adopts their current coverage; until it has 24 h of coverage, pools
+younger than 14 days are blocked (`rug_ticker_registry_warming`). Check that the
+account's `defensive_entry_layer.ticker_registry.coverage.warming` is false on its
+`/state` before relying on its entry frequency; that status is published after every
+scan, also while the account is paused (see
+[DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#seeding-ticker_registry_seed_v4)).
+
 ## What it is
 
 Stage 2 of the cost-first research line (`docs/STRATEGY_VALIDATION.md`,
@@ -197,7 +216,9 @@ On the account's engine port (`/state`) and through the authenticated dashboard
 (`/user/state`):
 
 - `config.signal_strategy = COST_FIRST_ESTABLISHED_PAPER_V1`,
-  `entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V1`, `exit_policy = cost_first`,
+  `entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V2` (since `DEFENSIVE_ENTRY_LAYER_V1`;
+  `COST_FIRST_ESTABLISHED_ENTRY_V1` appears only on positions and closes opened before the
+  layer), profile `COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY`, `exit_policy = cost_first`,
   `exit_policy_version = COST_FIRST_NET_EXIT_V1`,
   `exit_impact_emergency_version = EXIT_IMPACT_EMERGENCY_V2`,
   `universe_parameters.max_fee_tier_bps = 50`, `min_liquidity_usd = 250000`,
@@ -206,7 +227,10 @@ On the account's engine port (`/state`) and through the authenticated dashboard
   `paper_only = true`, `effective_config_hash` changed for this account, and
   `account_scope.strategy_matches_request = true`.
 - `entry_diagnostics.rejections` shows universe reasons with metrics in `examples`;
-  `market_cost_feasibility.checked_market_candidates` counts universe candidates.
+  `market_cost_feasibility.checked_market_candidates` counts universe candidates;
+  `defensive_entry_layer.ticker_registry.coverage.warming` is false (published after
+  every scan, paused or running; `entry_diagnostics.defensive_entry.layer` carries the
+  same status once the engine evaluates entries).
 - Compare `trade_seq`, history length, `demo_balance_usd` and `demo_session_id` with
   the values before the stop; the main engine and every other account still report
   `WINNER_ENSEMBLE_PAPER_V1` (or their own profile) with their previous
@@ -232,8 +256,11 @@ this universe would be its own versioned change.
 Copied from `docs/STRATEGY_VALIDATION.md` (COST_FIRST_ESTABLISHED_V1 block), with the
 engine account added. "Engine account" = the one account running
 `COST_FIRST_ESTABLISHED_PAPER_V1`, counted only on closes stamped
-`entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V1`, from the first close after
-the switch.
+`entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V2`, from the first such close
+after the deploy of `DEFENSIVE_ENTRY_LAYER_V1` (or after the switch, if later). The V1
+sample (closes stamped `COST_FIRST_ESTABLISHED_ENTRY_V1`, a universe without the
+structural rug guard) closed at that deploy; it is reported on its own and never pooled
+into the V2 sample (see `docs/STRATEGY_VALIDATION.md`, "Defensive entry layer").
 
 | Gate | Lab books (`COST_FIRST_CONTROL`, `COST_FIRST_SCALED`) | Engine account (`COST_FIRST_ESTABLISHED_PAPER_V1`) |
 | --- | --- | --- |

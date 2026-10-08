@@ -23,6 +23,41 @@ from unittest.mock import patch
 
 FRESHNESS_WINDOWS_VERSION = 'REPLAY_LIVE_DERIVED_WINDOWS_V1'
 EXIT_VARIANT_VERSION = 'REPLAY_EXIT_VARIANT_V1'
+# DEFENSIVE_ENTRY_LAYER_V1 decides from a per-process pair history (every scan
+# of the whole feed) and ticker registry that a recorded journal slice cannot
+# reconstruct. 'recorded_policy' (default) replays the recorded decision path
+# of a journal recorded BEFORE the layer existed without the layer, labelled in
+# the report; it refuses a journal with any row recorded under the layer
+# (RecordedPolicyRefused), because skipping the layer there would admit entries
+# the live engine refused and the label would be false. 'apply' runs the layer
+# on the replayed rows only and 'without_layer' skips it on any journal; both
+# are labelled counterfactuals, never identity replays.
+ENTRY_DEFENSE_MODES = ('recorded_policy', 'apply', 'without_layer')
+ENTRY_DEFENSE_RECORDED_POLICY_LABEL = 'REPLAY_RECORDED_POLICY_PREDATES_DEFENSIVE_ENTRY_LAYER_V1'
+ENTRY_DEFENSE_APPLY_LABEL = 'COUNTERFACTUAL_LAYER_ON_REPLAYED_ROWS_ONLY'
+ENTRY_DEFENSE_WITHOUT_LAYER_LABEL = 'COUNTERFACTUAL_WITHOUT_DEFENSIVE_ENTRY_LAYER_V1'
+ENTRY_DEFENSE_CUTOVER_CHECK = 'RECORDED_POLICY_REFUSES_ROWS_RECORDED_UNDER_THE_LAYER_V1'
+# Engines running the layer stamp every market observation (market_monitor.make_coin)
+# with coin.scoreVersion; observations recorded before it carry no such field.
+LAYER_ERA_COIN_FIELD = 'scoreVersion'
+
+
+class RecordedPolicyRefused(ValueError):
+    """recorded_policy was asked to replay rows an engine recorded under DEFENSIVE_ENTRY_LAYER_V1."""
+
+
+def rows_recorded_under_layer(observations) -> dict:
+    """Count of rows whose coin was recorded by an engine running the layer, and the earliest such time."""
+    count = 0
+    earliest = None
+    for row in observations or ():
+        coin = row.get('coin') if isinstance(row, dict) else None
+        if isinstance(coin, dict) and coin.get(LAYER_ERA_COIN_FIELD):
+            count += 1
+            stamp = row.get('observed_at') or row.get('available_at')
+            if isinstance(stamp, (int, float)) and not isinstance(stamp, bool):
+                earliest = stamp if earliest is None else min(earliest, stamp)
+    return {'rows': count, 'earliest_at': earliest}
 EXIT_VARIANT_FIELDS = ('stop_pct', 'take_profit_pct', 'disable_exit_impact_emergency', 'max_hold_minutes')
 # Archived engines (compare_main.py frozen arm) can predate the named preflight
 # and guard constants. Only then are these documented legacy values used, and
@@ -168,8 +203,11 @@ def variant_label(rules):
 
 
 class MainReplay:
-    def __init__(self, root, *, adaptive=False, exit_variant=None, label=None):
+    def __init__(self, root, *, adaptive=False, exit_variant=None, label=None, entry_defense='recorded_policy'):
         import market_monitor as market
+        if entry_defense not in ENTRY_DEFENSE_MODES:
+            raise ValueError(f'entry_defense must be one of {ENTRY_DEFENSE_MODES}')
+        self.entry_defense_mode = entry_defense
         self.market = market
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
@@ -185,6 +223,19 @@ class MainReplay:
         self._patch(market, 'sol_usd_market_price', lambda:0.)
         self._patch(market, 'STATE', market.State())
         self.monitor = market.Monitor()
+        # Archived engines (compare_main.py frozen arm) predate the layer.
+        self.entry_defense_applied = False
+        self.engine_has_entry_defense = hasattr(self.monitor, 'defensive_entry_decision')
+        if self.engine_has_entry_defense:
+            if entry_defense in ('recorded_policy', 'without_layer'):
+                import entry_defense as defense
+                label = (ENTRY_DEFENSE_RECORDED_POLICY_LABEL if entry_defense == 'recorded_policy'
+                         else ENTRY_DEFENSE_WITHOUT_LAYER_LABEL)
+                self._patch(self.monitor, 'defensive_entry_decision',
+                            lambda *_args, **_kwargs: defense.pass_decision(label))
+            else:
+                self.entry_defense_applied = True
+        self.layer_era_rows = {'rows': 0, 'earliest_at': None}
         self._patch(market.STATE, 'live_flow', self.flow)
         self._patch(market.price_integrity, 'check', self.price)
         self._patch(market.price_integrity, 'jupiter_tiebreak', self.tiebreak)
@@ -798,6 +849,18 @@ class MainReplay:
             state.save()
 
     def replay(self, observations):
+        observations = list(observations)
+        self.layer_era_rows = rows_recorded_under_layer(observations)
+        if (self.entry_defense_mode == 'recorded_policy' and self.engine_has_entry_defense
+                and self.layer_era_rows['rows']):
+            # Skipping the layer on rows it decided would admit entries the live engine
+            # refused, and the report label (predates the layer) would be false.
+            raise RecordedPolicyRefused(
+                f'recorded_policy refuses this journal: {self.layer_era_rows["rows"]} row(s) were recorded by '
+                f'an engine running DEFENSIVE_ENTRY_LAYER_V1 (coin.{LAYER_ERA_COIN_FIELD} present; earliest '
+                f'{self.layer_era_rows["earliest_at"]}). Replay only the rows recorded before the layer, or '
+                'choose a labelled counterfactual: entry_defense=apply (layer on the replayed rows) or '
+                'entry_defense=without_layer (layer skipped)')
         ordered = [row for _, row in sorted(enumerate(observations), key=lambda item:(item[1].get('available_at',0),item[0]))]
         linked = self.link_commit_outcomes(ordered)
         for index, row in enumerate(ordered):
@@ -824,6 +887,18 @@ class MainReplay:
                 'freshness_windows':{'version':FRESHNESS_WINDOWS_VERSION,'windows':dict(self.windows),
                                      'basis':dict(self.window_basis),'clock_basis':dict(CLOCK_BASIS)},
                 'records':self.replayed,'invalid_records':self.unusable,
+                'entry_defense':{'mode':self.entry_defense_mode,'applied':self.entry_defense_applied,
+                                 'label':(ENTRY_DEFENSE_APPLY_LABEL if self.entry_defense_applied
+                                          else ENTRY_DEFENSE_WITHOUT_LAYER_LABEL
+                                          if self.entry_defense_mode == 'without_layer'
+                                          else ENTRY_DEFENSE_RECORDED_POLICY_LABEL),
+                                 'cutover_check':ENTRY_DEFENSE_CUTOVER_CHECK,
+                                 'rows_recorded_under_layer':dict(self.layer_era_rows),
+                                 'note':'The layer needs whole-feed pair history and a ticker registry that a '
+                                        'journal slice cannot reconstruct; recorded_policy reproduces the '
+                                        'recorded decisions of journals recorded before the layer and refuses '
+                                        'rows recorded under it; apply and without_layer are counterfactuals, '
+                                        'never identity replays'},
                 'decision_summary':self.decision_summary(),
                 'coverage_note':'Only recorded exact-quantity raw quotes are executable; sparse snapshots cannot reconstruct missing history',
                 # Export the actual ledger, not the public UI's compact recent

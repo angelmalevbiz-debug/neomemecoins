@@ -150,7 +150,9 @@ def stage_ofa(r, coin):
 def stage_cf(r, coin):
     if not (r['dex'] == 'pumpswap' and r['quote_sol'] == 1 and (r['price'] or 0) > 0):
         return 0
-    if CFP.universe_rejections(coin, 200.0):
+    # The V1 universe this study measured (physical screens). The live V2 universe adds
+    # STRUCTURAL_RUG_GUARD_V1, which needs a ticker registry and fails closed without one.
+    if CFP.physical_universe_rejections(coin, 200.0):
         return 1
     f = flow_of(r)
     if f is None:

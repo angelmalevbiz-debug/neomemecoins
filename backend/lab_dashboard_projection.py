@@ -90,12 +90,20 @@ def compact_strategy_lab(data):
                     # LAB_ACTIVE_V6: every book publishes its cap and cost-infeasible count.
                     'entry_policy_version', 'max_entry_roundtrip_cost_pct', 'stop_loss_net_pct',
                     'cost_infeasible_candidates', 'cost_feasibility', 'cost_first', 'evidence_guard_version',
+                    # DEFENSIVE_ENTRY_LAYER_V1: counts only (examples stay in the full ledger).
+                    'defensive_rejected', 'defensive_entry',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']
             } if isinstance(raw.get('entry_diagnostics'), dict) else {},
         }
         diagnostics = books[key]['entry_diagnostics']
+        if isinstance(diagnostics.get('defensive_entry'), dict):
+            defensive = diagnostics['defensive_entry']
+            diagnostics['defensive_entry'] = {
+                field: defensive[field] for field in (
+                    'version', 'checked', 'blocked', 'rejections', 'primary_rejections', 'log_only_flags',
+                    'pool_loss_cooldown_pools', 'heat_log_only', 'commit_recheck_blocked') if field in defensive}
         if 'cost_feasibility' in diagnostics:
             diagnostics['cost_feasibility'] = compact_cost_feasibility(
                 diagnostics['cost_feasibility'],

@@ -17,8 +17,17 @@ import promoted_entry_guard as promoted_guard
 # under 1%). Fewer entries are expected and are reported as cost-infeasible
 # candidates, never answered by raising the cap. Existing ledgers, balances
 # and open positions are untouched; only new closes carry this version.
-POLICY_VERSION = 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP'
-PREVIOUS_POLICY_VERSION = 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN'
+# LAB_ACTIVE_V7 (2026-10-08): the V6 rules and cap behind DEFENSIVE_ENTRY_LAYER_V1
+# (structural rug guard, pool loss memory per book, heat veto), applied to every
+# Lab book before flow, safety, price probes and modeled fills. It only removes
+# entries; exits, costs, ledgers and open positions are unchanged.
+POLICY_VERSION = 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY'
+PREVIOUS_POLICY_VERSION = 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP'
+DEFENSIVE_ENTRY_VERSION = 'DEFENSIVE_ENTRY_LAYER_V1'
+# Retirement evidence of a TEST book (LAB_STRATEGY_LIFECYCLE_V2): V7 only removes
+# entries from V6, so V6 closes keep counting and the bump never delays a
+# retirement (as the ensemble keeps V4 closes in its loss throttle).
+LIFECYCLE_EVIDENCE_VERSIONS = (POLICY_VERSION, PREVIOUS_POLICY_VERSION)
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
 SCALPER_REENTRY_SECONDS = 600
@@ -286,5 +295,6 @@ def policy_config(stop_loss_pct: float | None = None) -> dict:
             'model_cost_ceiling_pct': MAX_ENTRY_COST_PCT,
             'previous_test_book_cost_cap_pct': MAX_ENTRY_COST_PCT,
             'records_stop_headroom_pct': True,
+            'defensive_entry_version': DEFENSIVE_ENTRY_VERSION,
             'feed_max_age_seconds': MAX_FEED_AGE_MS / 1000,
             'execution_basis': 'ESTIMATED_PAPER_COSTS_NOT_LIVE_FILLS'}

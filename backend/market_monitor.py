@@ -19,6 +19,9 @@ import training_bridge
 import winner_ensemble
 import order_flow_adaptive_oct4 as oct4
 import cost_first_engine_profile as cost_first_profile
+import entry_defense
+import pool_loss_memory
+import structural_rug_guard
 import promoted_entry_guard as promoted_guard
 import entry_size_backoff
 import market_discovery
@@ -26,7 +29,8 @@ import honest_quote_transport as quote_transport
 import paper_market_feasibility as market_feasibility
 import entry_quote_priority
 import compat_file_lock as file_lock
-from paper_training import DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, training_candidate_signal
+from paper_training import (DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, LEARNER_SCORE_VERSION as TRAINING_SCORE_VERSION,
+                            training_candidate_signal)
 from training_quote_probe import collect_exact_pool_quotes
 from lab_dashboard_projection import compact_strategy_lab
 from shared_snapshot_io import read_shared_text
@@ -80,6 +84,26 @@ STALE_MIN_PROFIT_PCT = 3.0
 LEARNING_WINDOW = 60
 HEALTH_WINDOW = 12
 STARTING_BALANCE_USD = 1000.0
+# Market score model of score_pair. V2 (2026-10-08): the +9 'good liquidity/MC'
+# bonus applies only for 0.15 <= liq/MC < 0.6; liq/MC >= 1 is an LP-pull risk
+# (-10). Research: LP-pullable pools scored 86.7 on average and sat at SETUP on
+# 96.9% of rows under the unbounded V1 bonus.
+SCORE_VERSION = 'NEO_MARKET_SCORE_V2_LIQ_MC_BAND'
+PREVIOUS_SCORE_VERSION = 'NEO_MARKET_SCORE_V1'
+SCORE_GOOD_LIQ_MC_RANGE = (0.15, 0.6)
+SCORE_LP_RISK_LIQ_MC = 1.0
+# V2 is an entry change only. The ORDER_FLOW_ADAPTIVE exit context of a held
+# position (conviction -> CONVICTION_EXIT/PROFIT_LOCK, hold mode, max hold)
+# and the entry hold mode its blind-flow fallback keeps read the V1 score
+# (coin scoreV1), so exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged
+# for positions opened before and after this change. The PAPER_TRAINING_V1
+# learners stay on V1 as well: their recorded context (GOLD_ADAPTIVE exits)
+# comes from Monitor.training_context and their min_score reads scoreV1
+# (paper_training.LEARNER_SCORE_VERSION).
+EXIT_CONTEXT_SCORE_VERSION = PREVIOUS_SCORE_VERSION
+# RugCheck/price prewarm population (see Monitor.prewarm_entry_checks).
+PREWARM_VERSION = 'PREWARM_V2_DEFENSIVE_POPULATION'
+PREWARM_MAX_CANDIDATES = 4
 TRADE_NOTIONAL_USD = float(os.getenv('NEO_TRADE_NOTIONAL_USD', '200'))
 MAX_DAILY_LOSS_USD = float(os.getenv('NEO_MAX_DAILY_LOSS_USD', '100'))
 MAX_POSITION_RISK_USD = float(os.getenv('NEO_MAX_POSITION_RISK_USD', '250'))
@@ -196,12 +220,18 @@ def activate_strategy(strategy_id: str) -> str:
     return SIGNAL_STRATEGY
 
 
-def market_candidate(coin: dict[str, Any], now: int | None = None) -> bool:
-    """Market-only candidate screen of the active strategy; flow and conviction follow."""
+def market_candidate(coin: dict[str, Any], now: int | None = None, ticker_registry=None) -> bool:
+    """Market-only candidate screen of the active strategy; flow and conviction follow.
+
+    The cost-first universe includes STRUCTURAL_RUG_GUARD_V1, which needs the
+    engine's ticker registry (Monitor.defense.registry) and fails closed
+    without it.
+    """
     if ADAPTIVE_PROFILE is not None:
         return oct4.is_market_candidate(coin, now=now_ms() if now is None else now, profile=ADAPTIVE_PROFILE)
     if COST_FIRST_ACTIVE:
-        return cost_first_profile.is_market_candidate(coin, TRADE_NOTIONAL_USD)
+        return cost_first_profile.is_market_candidate(
+            coin, TRADE_NOTIONAL_USD, now=now_ms() if now is None else now, ticker_registry=ticker_registry)
     return bool(winner_ensemble.market_candidates(coin))
 
 
@@ -541,6 +571,10 @@ class State:
         self.audit_status = 'ok'
         self.equity_peak_usd = STARTING_BALANCE_USD
         self.entry_diagnostics = {'status': 'starting', 'policy_version': ENTRY_POLICY_VERSION}
+        # DEFENSIVE_ENTRY_LAYER_V1 status (ticker registry and pair history) published by
+        # every scan, also while the account is paused (entry_diagnostics only refreshes
+        # when entries are evaluated). In memory only; never part of the ledger.
+        self.defensive_entry_layer: dict[str, Any] | None = None
         self.risk_day_key = time.strftime('%Y-%m-%d', time.gmtime())
         self.risk_day_start_balance_usd = STARTING_BALANCE_USD
         if load_state: self.load()
@@ -833,6 +867,8 @@ class State:
                 'events': self.events[:30],
                 'source_status': self.source_status,
                 'entry_diagnostics': self.entry_diagnostics,
+                # Refreshed by every scan, paused or running (ticker registry coverage, seeds).
+                'defensive_entry_layer': self.defensive_entry_layer,
                 'live_tape': [],
                 'live_tape_status': {k: tape.get(k) for k in ('status','tracked_pairs','updated_at','source','error','entry_scheduling')},
             'strategy_lab': read_strategy_lab(),
@@ -890,6 +926,12 @@ class State:
                     'risk_overlay': 'PLANNED_NET_STOP_NO_FILL_GUARANTEE',
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
                     'rug_guard': rug_guard.VERSION,
+                    'defensive_entry': dict(entry_defense.VERSIONS),
+                    'score_version': SCORE_VERSION,
+                    'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
+                    # PAPER_TRAINING_V1 learners: min_score and recorded context conviction.
+                    'training_score_version': TRAINING_SCORE_VERSION,
+                    'prewarm_version': PREWARM_VERSION,
                     'paper_only': True,
                     'runtime_version': runtime.VERSION,
                     'daily_budget_sizing': True,
@@ -1057,7 +1099,11 @@ def effective_config_hash():
               'slippage_tolerance_bps': paper_quotes.SLIPPAGE_BPS,
               'assumed_execution_buffer_bps': paper_quotes.BUFFER_BPS,
               'simulated_execution_delay_ms': paper_quotes.SIMULATED_DELAY_MS,
-              'max_signal_age_ms': paper_quotes.MAX_SIGNAL_AGE_MS}
+              'max_signal_age_ms': paper_quotes.MAX_SIGNAL_AGE_MS,
+              # Every strategy: DEFENSIVE_ENTRY_LAYER_V1 and the market score model.
+              'defensive_entry': entry_defense.config(),
+              'score_version': SCORE_VERSION,
+              'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION}
     if ADAPTIVE_PROFILE is not None:
         config.update({'signal_strategy': SIGNAL_STRATEGY, 'strategy_profile': ADAPTIVE_PROFILE.as_dict(),
                        'exit_policy': POSITION_EXIT_POLICY, 'exit_version': exit_policy_version(),
@@ -1175,6 +1221,9 @@ def _engine_config_ownership() -> dict[str, str]:
         'strict_max_roundtrip_cost_pct': 'min(NEO_STRICT_MAX_ROUNDTRIP_COST_PCT env, policy 1.5, stop budget fraction)',
         'strict_max_worst_case_cost_pct': 'min(NEO_STRICT_MAX_WORST_CASE_COST_PCT env, policy 2.5, stop budget fraction)',
         'max_quoted_candidates_per_scan': 'engine_entry_policy.MAX_QUOTED_CANDIDATES constant',
+        'defensive_entry': 'entry_defense DEFENSIVE_ENTRY_LAYER_V1 constants for every strategy (no environment override)',
+        'score_version': f'market_monitor.SCORE_VERSION constant {SCORE_VERSION}',
+        'exit_context_score_version': f'market_monitor.EXIT_CONTEXT_SCORE_VERSION constant {EXIT_CONTEXT_SCORE_VERSION} (adaptive exit context reads coin scoreV1)',
         'environment_overrides_honored': 'scan, position scan, notional, daily loss, risk caps, strict thresholds (cost caps can only be lowered)',
     }
 
@@ -1438,7 +1487,8 @@ def early_market_pairs(early_pairs, dex_pairs, current):
     return markets
 
 
-def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
+def score_pair_models(pair: dict[str, Any], meta: dict[str, Any]):
+    """score_pair plus the NEO_MARKET_SCORE_V1 score of the same observation (exit context basis)."""
     liq = num((pair.get('liquidity') or {}).get('usd'))
     volume = pair.get('volume') or {}
     vol_h1 = num(volume.get('h1'))
@@ -1503,11 +1553,25 @@ def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
         score -= 5; signals.append(signal('risk', 'Pair под 15 секунди', f'{age:.2f} мин.'))
     elif age > 4320:
         score -= 4
+    exit_basis_offset = 0.0
     if mc > 0:
-        if liq_mc >= 0.15:
+        # NEO_MARKET_SCORE_V2_LIQ_MC_BAND: a pool holding most of the supply is an
+        # LP-pull risk, not good liquidity; 0.6 <= liq/MC < 1 earns no bonus.
+        if liq_mc >= SCORE_LP_RISK_LIQ_MC:
+            score -= 10; signals.append(signal('risk', 'Ликвидност >= MC (LP риск)', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = -10
+        elif SCORE_GOOD_LIQ_MC_RANGE[0] <= liq_mc < SCORE_GOOD_LIQ_MC_RANGE[1]:
             score += 9; signals.append(signal('positive', 'Добро liquidity/MC', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = 9
         elif liq_mc < 0.03:
             score -= 10; signals.append(signal('risk', 'Слаб liquidity/MC', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = -10
+        else:
+            v2_liq_mc = 0
+        # NEO_MARKET_SCORE_V1 term (+9 for any liq/MC >= 0.15), kept only for the
+        # exit context (EXIT_CONTEXT_SCORE_VERSION); every other term is shared.
+        v1_liq_mc = 9 if liq_mc >= 0.15 else -10 if liq_mc < 0.03 else 0
+        exit_basis_offset = float(v1_liq_mc - v2_liq_mc)
 
     if 0.10 <= vol_liq <= 4.0:
         score += 6
@@ -1519,14 +1583,30 @@ def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
     if abs(change_h1) > 250:
         score -= 8; signals.append(signal('risk', 'Екстремен 1h move', f'{change_h1:+.0f}%'))
 
+    score_v1 = round(clamp(score + exit_basis_offset), 1)
     score = round(clamp(score), 1)
     risk = round(100 - score, 1)
     posture = 'SETUP' if score >= ENTRY_SCORE else 'WATCH' if score >= 60 else 'WAIT' if score >= 45 else 'SKIP'
-    return score, risk, posture, signals[:8]
+    return score, risk, posture, signals[:8], score_v1
+
+
+def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
+    """NEO_MARKET_SCORE_V2_LIQ_MC_BAND score, risk, posture and signals of one pair."""
+    return score_pair_models(pair, meta)[:4]
+
+
+def exit_context_score(coin: dict[str, Any]) -> float:
+    """EXIT_CONTEXT_SCORE_VERSION (V1) score of an observation for the adaptive exit context.
+
+    make_coin publishes it as scoreV1; an observation recorded before the V2
+    model carries only 'score', which was computed by V1.
+    """
+    value = num(coin.get('scoreV1'), math.nan)
+    return value if math.isfinite(value) else num(coin.get('score'))
 
 
 def make_coin(address: str, pair: dict[str, Any], meta: dict[str, Any]) -> dict[str, Any]:
-    score, risk, posture, signals = score_pair(pair, meta)
+    score, risk, posture, signals, score_v1 = score_pair_models(pair, meta)
     base, info = pair.get('baseToken') or {}, pair.get('info') or {}
     volume, changes, txns = pair.get('volume') or {}, pair.get('priceChange') or {}, pair.get('txns') or {}
     created = int(pair.get('pairCreatedAt') or 0)
@@ -1558,7 +1638,9 @@ def make_coin(address: str, pair: dict[str, Any], meta: dict[str, Any]) -> dict[
         'boostAmount': num(meta.get('boost_amount')),
         'websites': (info.get('websites') or [])[:3],
         'socials': (info.get('socials') or [])[:5],
-        'score': score, 'riskScore': risk, 'posture': posture,
+        'score': score, 'riskScore': risk, 'posture': posture, 'scoreVersion': SCORE_VERSION,
+        # Exit-context basis of held ORDER_FLOW_ADAPTIVE positions (EXIT_CONTEXT_SCORE_VERSION).
+        'scoreV1': score_v1,
         'signals': signals, 'updatedAt': int(pair.get('_market_observed_at') or now_ms()),
     }
 
@@ -1580,7 +1662,54 @@ class Monitor:
         self.training_probe_inflight = False
         self.training_probe_last_attempt_at = 0
         self.training_probe_retry_after: dict[tuple[str, str], int] = {}
+        # DEFENSIVE_ENTRY_LAYER_V1 of this engine process: its own ticker
+        # registry (sidecar next to the account state) and pair history, created
+        # on first use so importing the module reads no file.
+        self._entry_defense = None
+        self._entry_defense_lock = threading.Lock()
         self.discovery = runtime.DiscoveryCache(discover, refresh_seconds=8, max_age_seconds=90)
+
+    @property
+    def defense(self):
+        """This engine's entry_defense.DefensiveEntryLayer."""
+        with self._entry_defense_lock:
+            if self._entry_defense is None:
+                # A registry without current coverage is seeded read-only from the other
+                # services' sidecars (main's for a personal engine, the Lab's and the
+                # tape's; see sibling_registry_paths, TICKER_REGISTRY_SEED_V4: also while
+                # running, and their sightings every 5 min while it vouches).
+                path = entry_defense.registry_path_for(STATE_PATH)
+                self._entry_defense = entry_defense.DefensiveEntryLayer(
+                    registry_path=path, seed_paths=entry_defense.sibling_registry_paths(path))
+            return self._entry_defense
+
+    def defensive_layer_status(self) -> dict[str, Any]:
+        """The layer's status() for /state (never raises; an error is named, never hidden)."""
+        try:
+            return self.defense.status()
+        except Exception as exc:
+            return {'version': entry_defense.VERSION, 'status_error': type(exc).__name__}
+
+    def observe_entry_defense(self, feed: list[dict[str, Any]], now: int | None = None) -> None:
+        """Feed one scan into the ticker registry and pair history (never raises)."""
+        try:
+            self.defense.observe(feed, now_ms() if now is None else now)
+        except Exception as exc:
+            with STATE.lock:
+                STATE.event('Defensive entry observation: ' + type(exc).__name__)
+
+    @staticmethod
+    def entry_loss_index(now: int) -> dict:
+        """POOL_LOSS_MEMORY_V1 index of this account's own closed history (read-only)."""
+        with STATE.lock:
+            history = list(getattr(STATE, 'history', None) or [])
+        return pool_loss_memory.index(history, now)
+
+    def defensive_entry_decision(self, coin: dict[str, Any], now: int, *, blocked_pools=None) -> dict[str, Any]:
+        """DEFENSIVE_ENTRY_LAYER_V1 decision; asked before flow promotion, RugCheck and quotes."""
+        if blocked_pools is None:
+            blocked_pools = self.entry_loss_index(now)
+        return self.defense.evaluate(coin, now, blocked_pools=blocked_pools)
 
     @staticmethod
     def _bounded_code_add(histogram: dict[str, int], code: str, count: int = 1) -> None:
@@ -1655,23 +1784,32 @@ class Monitor:
         return report
 
     def prewarm_entry_checks(self, feed: list[dict[str, Any]]) -> None:
-        """Warm only the most time-sensitive candidates; avoid provider queues."""
+        """Warm the price and RugCheck reports of likely next entries; avoid provider queues.
+
+        PREWARM_V2_DEFENSIVE_POPULATION: only pools the defensive entry layer
+        can allow are warmed. STRUCTURAL_RUG_GUARD_V1 blocks every pool younger
+        than 12 h, so the old young-pool population (ageMinutes <= 360) could
+        never be entered; candidates are now established pools (pair age >= 720
+        min at now) that pass the active strategy's market screen and the layer,
+        ranked by 5-minute activity and score, at most 4 per scan. Prewarming
+        never admits an entry; every gate still runs at entry.
+        """
         candidates = []
+        stamp = now_ms()
+        blocked_pools = self.entry_loss_index(stamp)
+        registry = self.defense.registry
         for coin in feed:
-            age = num(coin.get('ageMinutes'), 999999)
-            if num(coin.get('score')) < 60 or num(coin.get('liquidityUsd')) < 4000 or age > 360:
+            age = structural_rug_guard.age_minutes(coin, stamp)
+            if (age is None or age < structural_rug_guard.PARAMS.young_pool_max_age_minutes
+                    or num(coin.get('liquidityUsd')) < 4000 or not market_candidate(coin, stamp, registry)):
+                continue
+            if not self.defensive_entry_decision(coin, stamp, blocked_pools=blocked_pools)['allowed']:
                 continue
             tx = (coin.get('txns') or {}).get('m5') or {}
             activity = num(tx.get('buys')) + num(tx.get('sells'))
-            priority = (
-                1 if age <= 45 else 0,
-                1 if age <= 180 else 0,
-                activity,
-                num(coin.get('score')),
-            )
-            candidates.append((priority, coin))
+            candidates.append(((activity, num(coin.get('score'))), coin))
         candidates.sort(key=lambda row: row[0], reverse=True)
-        for _, coin in candidates[:4]:
+        for _, coin in candidates[:PREWARM_MAX_CANDIDATES]:
             price_integrity.check(coin)
             rug_guard.check(coin)
 
@@ -1693,6 +1831,14 @@ class Monitor:
             STATE.price_history[address] = points[-480:]
 
     def market_context(self, coin: dict[str, Any], position: dict[str, Any] | None = None) -> dict[str, Any]:
+        """October 4 conviction context of one observation.
+
+        With a held ``position`` (the ORDER_FLOW_ADAPTIVE exit path) the
+        neo_score term reads the EXIT_CONTEXT_SCORE_VERSION score (V1), so the
+        V2 score model never changes exits. Without one (entries) it reads the
+        current score and also publishes ``exit_basis_conviction`` (same flow,
+        V1 score) for the hold mode a new position keeps for blind-flow exits.
+        """
         address = coin.get('address') or (position or {}).get('address')
         fast = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
         slow = STATE.live_flow(address, 300, str(coin.get('pairAddress') or ''))
@@ -1704,17 +1850,25 @@ class Monitor:
         liquidity = num(coin.get('liquidityUsd'))
         entry_liquidity = num((position or {}).get('entry_liquidity_usd'), liquidity)
         liquidity_ratio = liquidity / max(entry_liquidity, 1.0)
-        conviction = oct4.conviction_score(
-            fast_ratio=num(fast.get('buy_sell_usd_ratio')), slow_ratio=num(slow.get('buy_sell_usd_ratio')),
-            unique_wallets=num(slow.get('unique_wallets')), repeat_buy_wallets=num(slow.get('repeat_buy_wallets')),
-            whale_buy_usd=num(slow.get('whale_buy_usd')), whale_sell_usd=num(slow.get('whale_sell_usd')),
-            m5=m5, h1=h1, market_ratio=market_ratio, liquidity_ratio=liquidity_ratio,
-            neo_score=num(coin.get('score')))
+
+        def conviction_for(neo_score):
+            return oct4.conviction_score(
+                fast_ratio=num(fast.get('buy_sell_usd_ratio')), slow_ratio=num(slow.get('buy_sell_usd_ratio')),
+                unique_wallets=num(slow.get('unique_wallets')), repeat_buy_wallets=num(slow.get('repeat_buy_wallets')),
+                whale_buy_usd=num(slow.get('whale_buy_usd')), whale_sell_usd=num(slow.get('whale_sell_usd')),
+                m5=m5, h1=h1, market_ratio=market_ratio, liquidity_ratio=liquidity_ratio,
+                neo_score=neo_score)
+
+        held = bool(position)
+        exit_basis_score = exit_context_score(coin)
+        conviction = conviction_for(exit_basis_score if held else num(coin.get('score')))
         hold = oct4.hold_mode(conviction)
         mode, max_hold, target, trail_arm, trail = (hold['mode'], hold['max_hold_minutes'], hold['target_pct'],
                                                     hold['trail_arm_pct'], hold['trail_pct'])
+        basis = {} if held else {'exit_basis_conviction': conviction_for(exit_basis_score)}
 
         return {
+            **basis,
             'conviction': conviction, 'mode': mode, 'max_hold_minutes': max_hold,
             'target_pct': target, 'trail_arm_pct': trail_arm, 'trail_pct': trail,
             'm5': round(m5, 3), 'h1': round(h1, 3), 'market_buy_sell_ratio': round(market_ratio, 3),
@@ -1728,6 +1882,31 @@ class Monitor:
                 'whale_sell_usd_5m': slow.get('whale_sell_usd', 0),
             },
         }
+
+    def training_context(self, coin: dict[str, Any], position: dict[str, Any] | None = None,
+                         context: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Context recorded for the PAPER_TRAINING_V1 learners: the V1 score basis.
+
+        GOLD_ADAPTIVE (exit_policy 'adaptive') exits read the recorded
+        conviction and hold mode, so like ORDER_FLOW_ADAPTIVE exits they stay
+        on EXIT_CONTEXT_SCORE_VERSION: an entry context (it carries
+        exit_basis_conviction) gets the V1-basis conviction and hold mode; a
+        held position's context already is V1-based. The learners' min_score
+        reads coin scoreV1 (paper_training.learner_score).
+        """
+        context = self.market_context(coin, position) if context is None else context
+        if not isinstance(context, dict) or not context:
+            return context
+        if 'exit_basis_conviction' not in context:
+            return {**context, 'conviction_score_version': EXIT_CONTEXT_SCORE_VERSION}
+        conviction = context['exit_basis_conviction']
+        hold = oct4.hold_mode(conviction)
+        return {**context, 'conviction': conviction, 'mode': hold['mode'],
+                'max_hold_minutes': hold['max_hold_minutes'], 'target_pct': hold['target_pct'],
+                'trail_arm_pct': hold['trail_arm_pct'], 'trail_pct': hold['trail_pct'],
+                'conviction_score_version': EXIT_CONTEXT_SCORE_VERSION,
+                # The engine's own entry conviction (SCORE_VERSION), for reference only.
+                'entry_conviction': context.get('conviction'), 'entry_score_version': SCORE_VERSION}
 
     def _quote_unavailable(self, position, session, reason, error='no_sell_route', forensics=None):
         with STATE.lock:
@@ -1853,7 +2032,7 @@ class Monitor:
             if training_bridge.enabled():
                 training_bridge.observe(coin,STATE.live_flow(address,pair_address=pair),
                     safety=rug_guard.check(coin),validation=price_integrity.check(coin),
-                    context=self.market_context(coin,position),
+                    context=self.training_context(coin,position),
                     quotes={'mark':quote} if mark_valid else None, reasons=['exit_quote'] if not mark_valid else None,
                     now=now_ms())
             if not mark_valid:
@@ -2075,13 +2254,19 @@ class Monitor:
                   'quoted': 0, 'quote_attempts': 0, 'quote_defers': 0, 'size_retries': 0, 'opened': 0,
                   'rejections': {}, 'examples': [], 'max_positions': MAX_POSITIONS,
                   'max_quote_attempts_per_scan': MAX_QUOTED_CANDIDATES,
-                  'quote_preparation_codes': {}}
+                  'quote_preparation_codes': {},
+                  'defensive_entry': entry_defense.new_summary(), 'score_version': SCORE_VERSION}
+        # The decision feed is part of the pair history and ticker registry
+        # (idempotent: an already observed coin snapshot adds nothing).
+        self.observe_entry_defense(feed, report['checked_at'])
+        registry = self.defense.registry
+        report['defensive_entry']['layer'] = self.defense.status()
         estimates = [market_feasibility.execution_feasibility(
                          coin, STRICT_MAX_ROUNDTRIP_COST_PCT,
                          base_slippage_bps=0, latency_buffer_bps=0)
                      for coin in feed
                      if not entry_policy.signal_data_rejections(coin, now=report['checked_at'])
-                     and market_candidate(coin, report['checked_at'])]
+                     and market_candidate(coin, report['checked_at'], registry)]
         report['market_cost_feasibility'] = {
             'basis': 'OPTIMISTIC_PAPER_FEE_AND_BUFFER_MODEL', 'is_execution_quote': False,
             'checked_market_candidates': len(estimates),
@@ -2119,6 +2304,7 @@ class Monitor:
                 return
         blocked_reason = None
         qualified_flow = False
+        blocked_pools = self.entry_loss_index(stamp)
         for coin in feed:
             mint, pair = str(coin.get('address') or ''), str(coin.get('pairAddress') or '')
             if not mint or not pair:
@@ -2131,6 +2317,12 @@ class Monitor:
             if not training_candidate_signal(coin, flow, now=stamp):
                 continue
             qualified_flow = True
+            # DEFENSIVE_ENTRY_LAYER_V1 before the price and RugCheck calls and
+            # before any probe quote; a blocked pool spends nothing.
+            defensive = self.defensive_entry_decision(coin, stamp, blocked_pools=blocked_pools)
+            if not defensive['allowed']:
+                blocked_reason = blocked_reason or (defensive['reasons'] or ['defensive_entry'])[0]
+                continue
             # These checks are cached/non-blocking. The only quote work below
             # is placed on its own thread after both independent checks pass.
             validation = price_integrity.check(coin)
@@ -2219,6 +2411,11 @@ class Monitor:
             if not training_candidate_signal(current, current_flow, now=now):
                 training_bridge.note_quote_probe('SKIPPED', reason='signal_or_flow_expired', at=now)
                 return
+            defensive = self.defensive_entry_decision(current, now)
+            if not defensive['allowed']:
+                training_bridge.note_quote_probe(
+                    'SKIPPED', reason=(defensive['reasons'] or ['defensive_entry'])[0], at=now)
+                return
             quotes, reason = collect_exact_pool_quotes(
                 current, current_flow, safety, validation, now=now)
             if not quotes:
@@ -2226,7 +2423,7 @@ class Monitor:
                 # cannot become an executed trade or reuse an older route.
                 training_bridge.observe(current, current_flow, safety=safety,
                     validation=validation, reasons=[reason, 'entry_quote'],
-                    context=self.market_context(current, {}), now=now_ms())
+                    context=self.training_context(current), now=now_ms())
                 training_bridge.note_quote_probe('ROUTE_REJECTED', reason=reason, at=now_ms())
                 return
             stamp = now_ms()
@@ -2236,7 +2433,7 @@ class Monitor:
                 return
             recorded = training_bridge.observe(
                 current, current_flow, safety=safety, validation=validation,
-                quotes=quotes, context=self.market_context(current, {}), now=stamp)
+                quotes=quotes, context=self.training_context(current), now=stamp)
             training_bridge.note_quote_probe(
                 'ROUTE_EVIDENCE_RECORDED' if recorded else 'RECORDING_REFUSED',
                 reason='' if recorded else 'observation_not_queued', at=stamp,
@@ -2279,9 +2476,14 @@ class Monitor:
         now = now_ms()
         # Keep per-token cooldown so high frequency does not become revenge re-entry.
         recent = {t.get('address') for t in STATE.history if now-int(t.get('closed_at',0))<SAME_TOKEN_COOLDOWN_SECONDS*1000}
+        registry = self.defense.registry
+        # POOL_LOSS_MEMORY_V1 from this account's own closed history, once per scan.
+        blocked_pools = self.entry_loss_index(now)
+        defensive_summary = report.setdefault('defensive_entry', entry_defense.new_summary())
+        defensive_summary['pool_loss_cooldown_pools'] = len(blocked_pools)
         prioritized_feed = entry_quote_priority.prioritize_entry_candidates(
             feed, STRICT_MAX_ROUNDTRIP_COST_PCT,
-            is_candidate=lambda coin: market_candidate(coin, now)
+            is_candidate=lambda coin: market_candidate(coin, now, registry)
                 and not entry_policy.signal_data_rejections(coin, now=now),
         )
         for coin in prioritized_feed:
@@ -2315,11 +2517,15 @@ class Monitor:
                 market_candidates = [oct4.STRATEGY_ID]
             elif COST_FIRST_ACTIVE:
                 # The cost-first universe replaces the ensemble market screen; its
-                # rejection names and observed values are kept as examples.
-                universe_rejected = cost_first_profile.universe_rejections(coin, TRADE_NOTIONAL_USD)
+                # rejection names and observed values are kept as examples. It
+                # includes STRUCTURAL_RUG_GUARD_V1 with this engine's registry.
+                screen_at = now_ms()
+                universe_rejected = cost_first_profile.universe_rejections(
+                    coin, TRADE_NOTIONAL_USD, now=screen_at, ticker_registry=registry)
                 if universe_rejected:
                     reject(report, universe_rejected, coin,
-                           cost_first_profile.universe_metrics(coin, TRADE_NOTIONAL_USD))
+                           cost_first_profile.universe_metrics(
+                               coin, TRADE_NOTIONAL_USD, now=screen_at, ticker_registry=registry))
                     continue
                 market_candidates = [cost_first_profile.STRATEGY_ID]
             else:
@@ -2327,6 +2533,13 @@ class Monitor:
                 if not market_candidates:
                     reject(report, ['winner_signal'], coin)
                     continue
+            # DEFENSIVE_ENTRY_LAYER_V1 for every signal strategy, before the quote
+            # retry state, flow promotion, the price and RugCheck calls and quotes.
+            defensive = self.defensive_entry_decision(coin, now_ms(), blocked_pools=blocked_pools)
+            entry_defense.record(defensive_summary, defensive, coin)
+            if not defensive['allowed']:
+                reject(report, defensive['reasons'], coin, entry_defense.metrics(defensive))
+                continue
             retry_after = self.entry_quote_retry_after.get(address, 0)
             if retry_after > now_ms():
                 reject(report, ['quote_retry_cooldown'], coin, {'retry_after_ms': retry_after})
@@ -2386,7 +2599,8 @@ class Monitor:
             # latency without weakening known-risk vetoes.
             validation=price_integrity.check(coin)
             safety=rug_guard.check(coin)
-            training_bridge.observe(coin,flow,safety=safety,validation=validation,context=context,now=now_ms())
+            training_bridge.observe(coin,flow,safety=safety,validation=validation,
+                                    context=self.training_context(coin,context=context),now=now_ms())
             price_review=(
                 validation.get('status')=='review'
                 and validation.get('reason') in {
@@ -2591,7 +2805,7 @@ class Monitor:
                 quotes={'entry':dict(live_quote,entry_network_fee_usd=entry_network_fee,
                                      entry_account_reserve_usd=entry_rent),
                         'exit':dict(initial_exit,exit_network_fee_usd=entry_network_fee)},
-                context=context,now=now_ms())
+                context=self.training_context(coin,context=context),now=now_ms())
             with STATE.lock:
                 if STATE.demo_session_id!=session_at_check or not STATE.running or len(STATE.positions)>=MAX_POSITIONS:
                     return
@@ -2630,10 +2844,13 @@ class Monitor:
                     final_market_candidates = final_raw_strategy_matches = final_strategy_matches = [oct4.STRATEGY_ID]
                     final_policy_learning = dict(oct4.NO_LEARNING)
                 elif COST_FIRST_ACTIVE:
-                    final_universe_rejected = cost_first_profile.universe_rejections(current_coin, TRADE_NOTIONAL_USD)
+                    final_at = now_ms()
+                    final_universe_rejected = cost_first_profile.universe_rejections(
+                        current_coin, TRADE_NOTIONAL_USD, now=final_at, ticker_registry=registry)
                     if final_universe_rejected:
                         reject(report, final_universe_rejected, coin,
-                               cost_first_profile.universe_metrics(current_coin, TRADE_NOTIONAL_USD))
+                               cost_first_profile.universe_metrics(
+                                   current_coin, TRADE_NOTIONAL_USD, now=final_at, ticker_registry=registry))
                         continue
                     final_decision_flow = final_flow
                     final_market_candidates = final_raw_strategy_matches = final_strategy_matches = [
@@ -2658,6 +2875,16 @@ class Monitor:
                         reject(report, [reason], coin)
                         continue
                     final_context = self.market_context(current_coin)
+                # The defensive layer is rechecked on the commit-time observation
+                # (heat and loss memory can change during quote preparation).
+                final_defensive_at = now_ms()
+                final_defensive = self.defensive_entry_decision(
+                    current_coin, final_defensive_at, blocked_pools=self.entry_loss_index(final_defensive_at))
+                if not final_defensive['allowed']:
+                    defensive_summary['commit_recheck_blocked'] = int(
+                        defensive_summary.get('commit_recheck_blocked') or 0) + 1
+                    reject(report, final_defensive['reasons'], coin, entry_defense.metrics(final_defensive))
+                    continue
                 final_risk_admission = promoted_guard.risk_admission(
                     current_coin, safety, now_ms(), promoted_guard.SAFETY_MAX_AGE_MS)
                 if not final_risk_admission['allow']:
@@ -2696,7 +2923,10 @@ class Monitor:
                     'learning_mode': oct4.LEARNING_MODE if ADAPTIVE_PROFILE is not None else 'SAME_POLICY_PAPER_OUTCOME_THROTTLE_V1',
                     'entry_flow': final_flow,
                     'entry_decision_flow': final_decision_flow if ADAPTIVE_PROFILE is not None else None,
-                    'adaptive_hold': oct4.hold_mode(num(final_context.get('conviction'))) if ADAPTIVE_PROFILE is not None else None,
+                    # The hold mode the blind-flow exit fallback keeps is an exit input:
+                    # it reads the EXIT_CONTEXT_SCORE_VERSION (V1) conviction of the same flow.
+                    'adaptive_hold': oct4.hold_mode(num(final_context.get(
+                        'exit_basis_conviction', final_context.get('conviction')))) if ADAPTIVE_PROFILE is not None else None,
                     'verified_entry_flow': final_flow.get('verified_flow'),
                     'entry_context': final_context if ADAPTIVE_PROFILE is not None else context,
                     'entry_conviction': (final_context if ADAPTIVE_PROFILE is not None else context).get('conviction'),
@@ -2748,6 +2978,10 @@ class Monitor:
                     'exit_policy': POSITION_EXIT_POLICY, 'exit_policy_version': exit_policy_version(),
                     'effective_config_hash': effective_config_hash(),
                     'effective_entry_thresholds': strategy_rule_config(),
+                    # DEFENSIVE_ENTRY_LAYER_V1 decision on the commit-time observation.
+                    'defensive_entry': entry_defense.compact(final_defensive),
+                    'score_version': SCORE_VERSION,
+                    'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
                     'signal_source_commit': oct4.SOURCE_COMMIT if ADAPTIVE_PROFILE is not None else winner_ensemble.VERSION,
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
                     'entry_quote': live_quote.get('raw_quote'),
@@ -2786,7 +3020,8 @@ class Monitor:
                         'learning_mode': cost_first_profile.LEARNING_MODE,
                         'signal_source_commit': cost_first_profile.SIGNAL_SOURCE,
                         'strategy_profile_version': cost_first_profile.PROFILE_VERSION,
-                        'cost_first_universe': cost_first_profile.universe_metrics(current_coin, TRADE_NOTIONAL_USD),
+                        'cost_first_universe': cost_first_profile.universe_metrics(
+                            current_coin, TRADE_NOTIONAL_USD, now=final_defensive_at, ticker_registry=registry),
                         'size_policy': cost_first_profile.SIZE_POLICY,
                         'size_rule_notional_usd': round(requested_base, 8),
                         # Anchor of EXIT_IMPACT_EMERGENCY_V2: the entry preflight sell quote.
@@ -2869,12 +3104,20 @@ class Monitor:
                 if coin['priceUsd'] > 0:
                     feed.append(coin)
             feed.sort(key=lambda c: (num(c.get('score')), num((c.get('volume') or {}).get('h1'))), reverse=True)
+            # Every scan feeds the defensive layer's ticker registry and pair
+            # history with the whole discovered feed, before it is trimmed.
+            scan_at = now_ms()
+            self.observe_entry_defense(feed, scan_at)
+            registry = self.defense.registry
+            # Published on /state by every scan, also while the account is paused
+            # (maybe_open, which fills entry_diagnostics, returns at once then).
+            layer_status = self.defensive_layer_status()
             # Retain plausible market candidates before the bounded feed is
             # trimmed. Display order stays score-ranked; all entry gates still
             # run later and held pools are independently refreshed below.
             feed = entry_quote_priority.bounded_feed(
                 feed, MAX_FEED, STRICT_MAX_ROUNDTRIP_COST_PCT,
-                is_candidate=lambda coin: market_candidate(coin),
+                is_candidate=lambda coin: market_candidate(coin, scan_at, registry),
             )
             by_address = {c['address']: c for c in feed}
             for position in STATE.positions:
@@ -2901,6 +3144,7 @@ class Monitor:
                     if held and held.get('pairAddress') == position.get('pairAddress'):
                         STATE.position_market[f"{position.get('address')}:{position.get('pairAddress')}"] = dict(held)
                 STATE.feed = feed
+                STATE.defensive_entry_layer = layer_status
                 STATE.last_scan_at = now_ms()
                 STATE.scan_count += 1
                 STATE.status = 'monitoring'
@@ -2909,11 +3153,12 @@ class Monitor:
                 setups = sum(1 for c in feed if c.get('posture') == 'SETUP')
                 STATE.message = STATE.entry_diagnostics.get('message') or f'Проверени {len(feed)} token-а; отворени позиции: {len(STATE.positions)}.'
                 STATE.save()
-            # Prewarm provider checks before the short EARLY flow window fires.
+            # Prewarm the price and RugCheck reports of the established pools the
+            # defensive layer can allow (PREWARM_V2_DEFENSIVE_POPULATION).
             if training_bridge.enabled():
                 for coin in feed:
                     training_bridge.observe(coin,STATE.live_flow(coin['address'],pair_address=coin.get('pairAddress')),
-                        context=self.market_context(coin,{}),now=now_ms())
+                        context=self.training_context(coin),now=now_ms())
             self.prewarm_entry_checks(feed)
             # Entry preparation and quotes must not hold the account/UI lock.
             self.maybe_open(feed)
@@ -2937,6 +3182,9 @@ class Monitor:
     def stop(self) -> None:
         self.stop_event.set()
         self.discovery.stop()
+        # Keep the ticker memory across a restart (atomic sidecar; never raises).
+        if self._entry_defense is not None:
+            self._entry_defense.registry.flush()
 
 
 MONITOR = Monitor()

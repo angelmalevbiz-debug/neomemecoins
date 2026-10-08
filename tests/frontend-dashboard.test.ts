@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import PaperPortfolioHistory from '../src/components/PaperPortfolioHistory';
+import PaperPortfolioHistory, { exitImpactEmergencySummary } from '../src/components/PaperPortfolioHistory';
 import { promotedPaperPortfolio } from '../src/lib/paperPortfolioState';
 import {
   backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus,
@@ -199,4 +199,36 @@ test('switching the selected mint cannot reuse the previous token chart or flow'
   assert.equal(tokenDetailForAddress(detail, 'mint-b'), null);
   assert.equal(tokenDetailForAddress(detail, 'mint-a'), detail);
   assert.equal(tokenDetailForAddress(null, 'mint-a'), null);
+});
+
+test('history shows the recorded EXIT_IMPACT_EMERGENCY evidence and invents nothing without it', () => {
+  const base = {
+    id: 't1', trade_no: 7, symbol: 'SWORD', address: 'mint-a', pairAddress: 'pool-a', opened_at: at, closed_at: at + 26_000,
+    execution_entry_price: 0.02, execution_exit_price: 0.0195, notional_usd: 200, pnl_usd: -4.9, pnl_pct: -2.45,
+    balance_before: 1000, balance_after: 995.1, exit_reason: 'EXIT_IMPACT_EMERGENCY',
+  };
+  const record = {
+    threshold_pct: 1.35, booked_impact_pct: 1.62, booked_quote: 'confirming',
+    entry_preflight: { buy_impact_pct: 0.85, preflight_sell_impact_pct: 1.18 },
+    trigger_quote: { impact_pct: 1.5, quoted_at: at + 25_000, route_pools: ['pool-a'], route_matches_entry_pool: true, from_cache: true },
+    confirming_quote: { impact_pct: 1.62, quoted_at: at + 25_400, route_pools: ['pool-b'], route_matches_entry_pool: false, from_cache: false },
+    confirming_quote_meets_threshold: true,
+    liquidity: { entry_usd: 450_000, exit_usd: 450_000, exit_to_entry_ratio: 1 },
+  };
+  const render = (trades: Parameters<typeof PaperPortfolioHistory>[0]['trades']) => renderToStaticMarkup(createElement(PaperPortfolioHistory, {
+    trades, total: trades.length, loaded: true, promoted: false,
+    onSelectAddress: () => {}, formatPrice: value => `$${value.toFixed(4)}`, formatTime: value => String(value),
+  }));
+  const withRecord = render([{ ...base, exit_impact_emergency: record }]);
+  assert.match(withRecord, /EXIT_IMPACT_EMERGENCY/);
+  assert.match(withRecord, /тригер impact 1\.50% ≥ праг 1\.35%/);
+  assert.match(withRecord, /вход buy 0\.85% \/ preflight sell 1\.18%/);
+  assert.match(withRecord, /потвърждаваща котировка 1\.62%/);
+  assert.match(withRecord, /ликвидност изход\/вход ×1\.00/);
+  assert.doesNotMatch(withRecord, /под прага|NaN|undefined/);
+  const withoutRecord = render([base]);
+  assert.match(withoutRecord, /EXIT_IMPACT_EMERGENCY/);
+  assert.doesNotMatch(withoutRecord, /тригер impact|праг|exit-impact-emergency/);
+  assert.equal(exitImpactEmergencySummary(null), '');
+  assert.match(exitImpactEmergencySummary({ threshold_pct: 0.75, trigger_quote: { impact_pct: 0.9 }, confirming_quote: { impact_pct: 0.6 }, confirming_quote_meets_threshold: false }), /0\.60% \(под прага\)/);
 });

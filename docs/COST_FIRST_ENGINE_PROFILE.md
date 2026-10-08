@@ -105,7 +105,15 @@ one 25.5 h regime, 100 engine closes on 7 mints (about 30 effective episodes):
     `ENTRY_BUY_IMPACT_FALLBACK_V1` (V1's buy-side anchor); with neither, the 0.75 floor
     (`NO_ENTRY_IMPACT_FLOOR_ONLY`). The anchor and its source are recorded.
   - arm then confirm: the first mark at/above the threshold only arms
-    (`exit_impact_emergency_v2.armed_at`, `trigger_quote`). After ≥ 2,000 ms the
+    (`exit_impact_emergency_v2.armed_at`, `trigger_quote`), and only when that mark
+    was routed through the exact entry pool (`route_matches_entry_pool = true`). A
+    mark at/above the threshold that cannot arm is counted in
+    `exit_impact_emergency_v2.trigger_blocks` (with `last_trigger_block`) and takes no
+    forced quote: `trigger_not_exact_pool` (an off-pool best route could never
+    confirm), `trigger_in_rearm_cooldown` (within 15,000 ms of any disarm,
+    `rearm_not_before`) or `trigger_confirm_budget_exhausted` (already 3 forced
+    confirmation quotes for this position in the last 5 minutes,
+    `confirm_attempts_at`). After ≥ 2,000 ms the
     engine takes a forced sell quote. It exits only if that quote is newly received
     (not cached), fresh, routed through the exact entry pool, received ≥ 2 s after
     arming and still at/above the threshold. Anything else disarms with a recorded
@@ -116,6 +124,18 @@ one 25.5 h regime, 100 engine closes on 7 mints (about 30 effective episodes):
   - priority: a pending exit, `LIQUIDITY_EMERGENCY`, `STALE_MARKET_EXIT`, the stop,
     the target and the max hold all come first, on the arming mark and again on the
     confirmation quote (a confirmation quote at −5% net books `STOP_LOSS_NET_TARGET`).
+    The net geometry runs on every finite, fresh confirmation quote before it can
+    disarm — also a cached, off-pool, early or below-threshold one — and books the
+    stop, target or max hold on it; only an unavailable, invalid or stale
+    confirmation quote is not used as a mark.
+  - quote budget: every confirmation is one forced exit-priority Jupiter quote from
+    the shared keyless budget (one quote per about 2.1 s for all engine, Lab and
+    gateway processes together; exits pre-empt entries). Before this bound a review
+    probe of an off-pool route at the threshold took 8 forced quotes in 40 position
+    ticks (20 s) without ever exiting. With the exact-pool arming rule, the 15 s
+    re-arm cooldown and at most 3 confirmations per position per 5 minutes, V2 spends
+    at most 3 forced quotes per open position per 5 minutes (24 with the 8-position
+    cap, about 17% of the shared budget in the worst case).
   - evidence on the close reuses PR #15's `exit_impact_emergency` fields
     (`trigger_quote`, `confirming_quote`, `confirming_quote_meets_threshold`,
     `booked_quote = confirming`, `booked_impact_pct`, `entry_preflight`, `liquidity`,
@@ -125,6 +145,14 @@ one 25.5 h regime, 100 engine closes on 7 mints (about 30 effective episodes):
 - Never retroactive: every position keeps the `exit_policy` it was opened with. A
   `fixed` or `adaptive` position held by this engine keeps V1 and its own ladder; a
   `cost_first` position keeps V2 if the account is switched back to the default.
+- Code rollback: roll the deployed source back to a commit before this profile only
+  while the `cost_first` account is flat. Older code does not know the `cost_first`
+  exit policy and raises `unknown exit policy` from `engine_exit_policy.exit_reason`
+  for every open `cost_first` position, so those positions would not be managed.
+  From this change on, `engine_exit_policy` maps any unknown exit policy name to the
+  fixed net geometry (−5% / +10% / 60 min) and logs the name once instead of raising,
+  so a later rollback degrades to the fixed geometry (without V2) rather than
+  stranding positions; the flat-account rule still applies.
 
 ## `/state` config of the profile
 
@@ -222,8 +250,9 @@ the switch.
 Engineering checks for V2 (not performance): every `EXIT_IMPACT_EMERGENCY` close of
 this account carries `rule_version = EXIT_IMPACT_EMERGENCY_V2`, a trigger and a
 confirming quote ≥ 2,000 ms apart, `confirming_quote.from_cache = false` and
-`route_matches_entry_pool = true`; report arms, disarms by code and confirmations
-per day. Passing any gate is not a profitability claim, and the 80% win-rate target
+`route_matches_entry_pool = true`; report arms, disarms by code, trigger blocks by
+code and forced confirmation quotes per day (never more than 3 per position per 5
+minutes). Passing any gate is not a profitability claim, and the 80% win-rate target
 is not an acceptance criterion.
 
 ## Evaluation plan

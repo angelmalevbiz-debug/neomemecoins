@@ -1987,6 +1987,15 @@ class Monitor:
             return out
         if not state.get('armed'):
             if num(quote.get('impact_pct')) >= threshold:
+                # Only an exact-entry-pool mark can ever confirm, and every confirmation
+                # spends a forced exit-priority quote from the shared budget: an off-pool
+                # mark, a mark inside the re-arm cooldown or beyond the per-position
+                # confirmation budget is counted without arming.
+                blocked = cost_first_profile.arm_block(state, quote, now=now_ms(), params=params)
+                if blocked:
+                    out['state'] = cost_first_profile.blocked_trigger(state, code=blocked, now=now_ms(),
+                                                                      impact_pct=quote.get('impact_pct'))
+                    return out
                 out['state'] = {**state, **rule, 'armed': True, 'armed_at': now_ms(),
                                 'arm_count': int(state.get('arm_count') or 0) + 1,
                                 'trigger_quote': compact_exit_quote_evidence(quote)}
@@ -1995,12 +2004,18 @@ class Monitor:
         if now_ms()-armed_at < params.confirm_delay_ms:
             return out
         confirm = paper_quotes.position_mark(position, coin, network, force=True) if is_quote else None
+        if is_quote:
+            state = cost_first_profile.confirm_attempted(state, now_ms(), params)
+            out['state'] = state
         problem = cost_first_profile.confirm_quote_problem(
             confirm, armed_at=armed_at, now=now_ms(), max_age_ms=entry_policy.MAX_ENTRY_QUOTE_AGE_MS,
             threshold_pct=threshold, params=params)
         compact_confirm = compact_exit_quote_evidence(confirm) if isinstance(confirm, dict) else None
-        if problem in (None, 'confirm_below_threshold'):
-            # The fresh exact-pool quote is the newest valid mark; the stop keeps priority on it.
+        if cost_first_profile.confirm_quote_is_mark(confirm, problem, now=now_ms(),
+                                                    max_age_ms=entry_policy.MAX_ENTRY_QUOTE_AGE_MS):
+            # Any finite, fresh confirmation quote is the newest valid mark: the net
+            # geometry (stop first, then target and max hold) is evaluated on it before
+            # the emergency decides or disarms.
             pnl = num(confirm.get('net_proceeds_usd'))-notional-entry_cost
             pct = pnl/max(notional,1e-18)*100
             out.update(quote=confirm, pnl=pnl, pct=pct, peak_pct=max(peak_pct, pct))
@@ -2703,7 +2718,11 @@ class Monitor:
                     },
                     'requested_notional_usd': round(requested_notional, 8),
                     'notional_usd': round(notional, 8),
-                    'size_limited_by_daily_budget': notional<min(TRADE_NOTIONAL_USD,available_before-fixed_cost_budget),
+                    # The cost-first size rule may set a smaller base than the engine
+                    # notional; only a cut below that base is a daily-budget limit.
+                    'size_limited_by_daily_budget': notional<min(
+                        requested_base if COST_FIRST_ACTIVE else TRADE_NOTIONAL_USD,
+                        available_before-fixed_cost_budget),
                     'planned_risk_usd': notional*(STOP_LOSS_PCT+STOP_EXECUTION_BUFFER_PCT)/100+fixed_cost_budget,
                     'conservative_risk_usd': notional+quote_network_fee+entry_rent,
                     'original_notional_usd': notional,

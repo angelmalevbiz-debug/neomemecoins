@@ -267,6 +267,8 @@ class CostFirstEntryTests(unittest.TestCase):
         self.assertEqual(report['status'], 'opened', report)
         self.assertEqual(m.STATE.positions[0]['size_rule_notional_usd'], 300.0)
         self.assertEqual(m.STATE.positions[0]['notional_usd'], 300.0)
+        # The size rule, not the daily budget, set 300 < the 500 engine notional.
+        self.assertFalse(m.STATE.positions[0]['size_limited_by_daily_budget'])
 
     def test_universe_is_rechecked_at_commit(self):
         drained = dict(self.coin, liquidityUsd=200_000)
@@ -318,11 +320,15 @@ class CostFirstExitTests(unittest.TestCase):
         self.mark = self.quote(impact=0.3, from_cache=True)
         self.confirm = self.quote(impact=1.7)
         self.calls = []
+        self.forced_at = []
+        self.confirm_age_ms = 0
 
         def position_mark(position, coin, network, force=False):
             self.calls.append(force)
             if force:
-                return None if self.confirm is None else dict(self.confirm, quoted_at=self.clock[0])
+                self.forced_at.append(self.clock[0])
+                return (None if self.confirm is None
+                        else dict(self.confirm, quoted_at=self.clock[0] - self.confirm_age_ms))
             return dict(self.mark, quoted_at=self.clock[0])
 
         p = patch.object(m.paper_quotes, 'position_mark', side_effect=position_mark)
@@ -439,11 +445,16 @@ class CostFirstExitTests(unittest.TestCase):
         self.assertEqual(state['last_disarm']['confirm_quote']['impact_pct'], 1.2)
         self.assertEqual(state['last_disarm']['trigger_impact_pct'], 1.6)
         self.assertEqual(m.STATE.positions[0]['exit_state'], 'OPEN')
-        # A later trigger arms again; it never exits on the first sight.
+        # Inside the re-arm cooldown a trigger is only counted; after it, a trigger
+        # arms again and never exits on the first sight.
         self.mark = self.quote(impact=1.6)
         self.tick(500)
+        self.assertFalse(self.state_v2()['armed'])
+        self.assertEqual(self.state_v2()['trigger_blocks'], {'trigger_in_rearm_cooldown': 1})
+        self.tick(cfp.EIE_V2.rearm_cooldown_ms)
         self.assertTrue(self.state_v2()['armed'])
         self.assertEqual(self.state_v2()['arm_count'], 2)
+        self.assertEqual(len(m.STATE.positions), 1)
 
     def test_fresh_forced_exact_pool_quote_is_required(self):
         cases = {'confirm_quote_cached': self.quote(impact=1.9, from_cache=True),
@@ -470,6 +481,117 @@ class CostFirstExitTests(unittest.TestCase):
         self.assertEqual(problem(dict(good, quoted_at=3000), 5000), 'confirm_quote_before_delay')
         self.assertEqual(problem(good, 16_000), 'confirm_quote_stale')
         self.assertEqual(problem(dict(good, impact_pct=None), 5000), 'confirm_quote_invalid')
+
+    def test_off_pool_mark_never_arms_or_takes_a_forced_quote(self):
+        # Review probe: an off-pool best route at/above the threshold re-armed every
+        # 0.5 s and took a forced exit-priority quote every 2 s, although confirmation
+        # requires the exact entry pool (40 ticks -> 8 forced quotes, no exit).
+        self.position()
+        self.mark = self.quote(impact=1.9, exact_pool=False)
+        for _ in range(40):
+            self.tick(500)
+        self.assertEqual(len(m.STATE.positions), 1)
+        self.assertFalse(m.STATE.history)
+        self.assertNotIn(True, self.calls, 'no forced quote for a mark that can never confirm')
+        state = self.state_v2()
+        self.assertFalse(state['armed'])
+        self.assertEqual(state['arm_count'], 0)
+        self.assertEqual(state['trigger_blocks'], {'trigger_not_exact_pool': 40})
+        self.assertEqual(state['last_trigger_block']['reason'], 'trigger_not_exact_pool')
+        self.assertEqual(state['last_trigger_block']['impact_pct'], 1.9)
+        # The same impact on the exact entry pool arms and is confirmed as before.
+        self.mark = self.quote(impact=1.9)
+        self.tick(500)
+        self.assertTrue(self.state_v2()['armed'])
+        self.tick(cfp.EIE_V2.confirm_delay_ms)
+        self.assertEqual(m.STATE.history[0]['exit_reason'], 'EXIT_IMPACT_EMERGENCY')
+        self.assertEqual(self.forced_at, [self.clock[0]])
+
+    def test_oscillating_trigger_spends_a_bounded_number_of_forced_quotes(self):
+        params = cfp.EIE_V2
+        self.position()
+        self.confirm = self.quote(impact=1.2)   # never confirms
+        high, low = self.quote(impact=1.6), self.quote(impact=0.4)
+        start = self.clock[0]
+        for i in range(1200):   # 10 minutes of 0.5 s position ticks around the 1.5% threshold
+            self.mark = high if i % 2 == 0 else low
+            self.tick(500)
+        self.assertEqual(len(m.STATE.positions), 1)
+        self.assertFalse(m.STATE.history)
+        # At most max_confirms_per_window forced quotes per rolling window, each one
+        # separated by at least the confirmation delay plus the re-arm cooldown.
+        self.assertLessEqual(len(self.forced_at), 2 * params.max_confirms_per_window)
+        first_window = [t for t in self.forced_at if t - self.forced_at[0] < params.confirm_window_ms]
+        self.assertEqual(len(first_window), params.max_confirms_per_window)
+        for earlier, later in zip(self.forced_at, self.forced_at[1:]):
+            self.assertGreaterEqual(later - earlier, params.rearm_cooldown_ms + params.confirm_delay_ms)
+        for t in self.forced_at:
+            in_window = [u for u in self.forced_at if 0 <= t - u < params.confirm_window_ms]
+            self.assertLessEqual(len(in_window), params.max_confirms_per_window)
+        state = self.state_v2()
+        self.assertEqual(state['disarm_count'], len(self.forced_at))
+        self.assertEqual(state['confirm_count'], len(self.forced_at))
+        self.assertEqual(state['arm_count'], len(self.forced_at) + int(bool(state['armed'])))
+        self.assertGreater(state['trigger_blocks']['trigger_in_rearm_cooldown'], 0)
+        self.assertGreater(state['trigger_blocks']['trigger_confirm_budget_exhausted'], 0)
+        self.assertLessEqual(len(state['confirm_attempts_at']), params.max_confirms_per_window)
+        self.assertLess(len(self.forced_at), (self.clock[0] - start) / 2000 / 10)
+
+    def test_net_geometry_runs_on_any_fresh_confirm_quote(self):
+        stop, target = dict(net=188.0), dict(net=221.0)   # about -6.1% / +10.4% net
+        cases = [('off-pool stop', self.quote(impact=1.9, exact_pool=False, **stop), 'STOP_LOSS_NET_TARGET'),
+                 ('cached stop', self.quote(impact=1.9, from_cache=True, **stop), 'STOP_LOSS_NET_TARGET'),
+                 ('below-threshold stop', self.quote(impact=1.2, **stop), 'STOP_LOSS_NET_TARGET'),
+                 ('off-pool target', self.quote(impact=1.9, exact_pool=False, **target), 'TAKE_PROFIT_10_NET')]
+        for label, confirm, expected in cases:
+            with self.subTest(label):
+                m.STATE.history = []
+                self.position()
+                self.mark = self.quote(impact=1.6)
+                self.tick()
+                self.assertTrue(self.state_v2()['armed'])
+                self.confirm = confirm
+                self.tick(2500)
+                self.assertFalse(m.STATE.positions)
+                closed = m.STATE.history[0]
+                self.assertEqual(closed['exit_reason'], expected)
+                self.assertEqual(closed['exit_impact_emergency_v2']['superseded_by'], expected)
+                self.assertNotIn('exit_impact_emergency', closed)
+        # A stale or missing confirmation quote is not a mark: it only disarms.
+        for code, age, confirm in (('confirm_quote_stale', 11_000, self.quote(impact=1.9, **stop)),
+                                   ('confirm_quote_unavailable', 0, None)):
+            with self.subTest(code):
+                m.STATE.history = []
+                self.confirm_age_ms = 0
+                self.position()
+                self.mark = self.quote(impact=1.6)
+                self.tick()
+                self.confirm, self.confirm_age_ms = confirm, age
+                self.tick(2500)
+                self.assertEqual(len(m.STATE.positions), 1)
+                self.assertFalse(m.STATE.history)
+                self.assertEqual(self.state_v2()['last_disarm']['reason'], code)
+
+    def test_unknown_exit_policy_falls_back_to_the_fixed_geometry(self):
+        # Older code raised 'unknown exit policy' inside the position loop; the
+        # defensive mapping uses the fixed net geometry and logs the name once.
+        exit_policy._FALLBACK_LOGGED.discard('FUTURE_POLICY_PROBE')
+        decide = lambda **kw: exit_policy.exit_reason({}, {}, policy='FUTURE_POLICY_PROBE', peak_net_pct=0, **kw)
+        with self.assertLogs(exit_policy.LOG, level='WARNING') as logs:
+            self.assertEqual(decide(net_pct=-6, hold_minutes=1), 'STOP_LOSS_NET_TARGET')
+            self.assertEqual(decide(net_pct=11, hold_minutes=1), 'TAKE_PROFIT_10_NET')
+            self.assertEqual(decide(net_pct=0, hold_minutes=61), 'MAX_HOLD_60')
+            self.assertIsNone(decide(net_pct=0, hold_minutes=1))
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn('FUTURE_POLICY_PROBE', logs.output[0])
+        self.assertEqual(exit_policy.geometry_policy('adaptive'), 'adaptive')
+        self.assertEqual(exit_policy.geometry_policy('fixed'), 'fixed')
+        # In the engine the position is managed instead of crashing the position loop.
+        self.position(exit_policy='FUTURE_POLICY_PROBE')
+        self.mark = self.quote(impact=0.3, net=221.0)
+        self.tick()
+        self.assertFalse(m.STATE.positions)
+        self.assertEqual(m.STATE.history[0]['exit_reason'], 'TAKE_PROFIT_10_NET')
 
     def test_stop_loss_has_priority_on_the_arming_mark(self):
         self.position()
@@ -567,6 +689,10 @@ class CostFirstConfigTests(unittest.TestCase):
         self.assertEqual((exits['stop_loss_net_pct'], exits['take_profit_net_pct'], exits['max_hold_minutes']),
                          (-5.0, 10.0, 60))
         self.assertEqual(exits['exit_impact_emergency']['confirm_delay_ms'], 2000)
+        self.assertEqual((exits['exit_impact_emergency']['rearm_cooldown_ms'],
+                          exits['exit_impact_emergency']['max_confirms_per_window'],
+                          exits['exit_impact_emergency']['confirm_window_ms']), (15_000, 3, 300_000))
+        self.assertEqual(exits['exit_impact_emergency']['trigger_block_codes'], list(cfp.TRIGGER_BLOCKS))
         ownership = config['config_ownership']
         for key in ('max_positions', 'max_daily_loss_usd', 'stop_loss_pct', 'same_token_cooldown_seconds',
                     'strict_max_roundtrip_cost_pct'):

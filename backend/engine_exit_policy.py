@@ -3,6 +3,9 @@
 The historical chart stop/clamp is intentionally excluded. A planned stop is
 an exit intent, never a promise of the eventual proceeds through a price gap.
 """
+import logging
+
+LOG = logging.getLogger(__name__)
 VERSION = 'HONEST_NET_EXIT_V1'
 ADAPTIVE_VERSION = 'GOLD_ADAPTIVE_NET_CANDIDATE_V1'
 # Named hold limits (unchanged values). The engine passes no override; only the
@@ -15,8 +18,25 @@ def max_hold_label(limit_minutes):
     """Fixed-policy hold exit label: MAX_HOLD_60 live, MAX_HOLD_<limit> for an override."""
     return f'MAX_HOLD_{float(limit_minutes):g}'
 
+# Geometries this module decides. Any other exit policy name (for example one
+# written by newer code before a rollback) falls back to the fixed net geometry
+# instead of raising inside the position loop; the fallback is logged once per name.
+KNOWN_POLICIES = ('fixed', 'adaptive')
+_FALLBACK_LOGGED = set()
+
+def geometry_policy(policy):
+    """The geometry used for a position's exit policy: unknown names use 'fixed'."""
+    if policy in KNOWN_POLICIES:
+        return policy
+    name = str(policy)
+    if name not in _FALLBACK_LOGGED:
+        _FALLBACK_LOGGED.add(name)
+        LOG.warning('unknown exit policy %r: using the fixed net geometry (%s)', name, VERSION)
+    return 'fixed'
+
 def exit_reason(position, context, *, net_pct, peak_net_pct, hold_minutes,
                 stop_pct=5.0, take_profit_pct=10.0, policy='fixed', max_hold_minutes=None):
+    policy = geometry_policy(policy)
     if net_pct <= -stop_pct:
         return 'STOP_LOSS_NET_TARGET'
     if policy == 'fixed':
@@ -29,7 +49,6 @@ def exit_reason(position, context, *, net_pct, peak_net_pct, hold_minutes,
         limit = float(max_hold_minutes)
         if hold_minutes >= limit: return max_hold_label(limit)
         return None
-    if policy != 'adaptive': raise ValueError('unknown exit policy')
     conviction = float(context.get('conviction') or 0)
     fast = context.get('fast_flow') or {}
     if conviction < 35 and net_pct < 0: return 'CONVICTION_EXIT'

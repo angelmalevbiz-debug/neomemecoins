@@ -21,7 +21,9 @@ and EXIT_IMPACT_EMERGENCY_V2 instead of V1. V2 anchors the threshold to the
 entry preflight SELL quote impact (research 2026-10-08: sell-side quotes ran
 about +0.33 pp above buy-side quotes at the same instant and 15/100 trades met
 the V1 condition already at entry) and requires a fresh forced exact-pool sell
-quote at least 2 s after the first trigger before it exits. Whether that is
+quote at least 2 s after the first trigger before it exits. Only an exact-pool
+mark arms, and a re-arm cooldown plus a per-position confirmation budget bound
+the forced quotes it spends from the shared quote budget. Whether that is
 better or worse for this universe is unknown; it is a versioned hypothesis.
 """
 from dataclasses import asdict, dataclass
@@ -63,11 +65,20 @@ ANCHOR_NONE = 'NO_ENTRY_IMPACT_FLOOR_ONLY'
 EIE_V2_RULE = ('arm when the exit quote impact >= max(exit_impact_emergency_pct, entry preflight sell '
                'impact + entry_margin_pct) (entry buy impact only when no sell impact was recorded); exit '
                'only if a fresh forced exact-pool sell quote taken >= confirm_delay_ms after arming still '
-               'meets the threshold, otherwise disarm and record it')
+               'meets the threshold, otherwise disarm and record it; only an exact-entry-pool mark arms, '
+               'and after any disarm no re-arm for rearm_cooldown_ms and at most max_confirms_per_window '
+               'forced confirmation quotes per position per confirm_window_ms')
 # Confirmation-quote problems that disarm instead of exiting.
 CONFIRM_PROBLEMS = ('confirm_quote_unavailable', 'confirm_quote_invalid', 'confirm_quote_cached',
                     'confirm_quote_stale', 'confirm_quote_before_delay', 'confirm_quote_not_exact_pool',
                     'confirm_below_threshold')
+# Confirmation problems whose quote is still a finite, fresh mark: the net
+# geometry (stop/target/max hold) is evaluated on it before disarming.
+CONFIRM_PROBLEMS_WITHOUT_MARK = ('confirm_quote_unavailable', 'confirm_quote_invalid', 'confirm_quote_stale')
+# Marks at/above the threshold that do not arm (counted, never a forced quote).
+# An off-pool best route can never confirm (confirmation requires the exact entry
+# pool), so arming on it would only spend shared quote budget.
+TRIGGER_BLOCKS = ('trigger_not_exact_pool', 'trigger_in_rearm_cooldown', 'trigger_confirm_budget_exhausted')
 
 
 @dataclass(frozen=True)
@@ -77,6 +88,12 @@ class ImpactEmergencyV2:
     entry_margin_pct: float = 0.50   # equals the engine V1 margin; only the anchor changes
     confirm_delay_ms: int = 2000
     max_disarm_records: int = 10
+    # Quote-budget bounds: every confirmation is one forced exit-priority Jupiter
+    # quote from the shared keyless budget (one quote per ~2.1 s for all processes,
+    # and exits pre-empt entries).
+    rearm_cooldown_ms: int = 15_000
+    max_confirms_per_window: int = 3
+    confirm_window_ms: int = 300_000
 
     def __post_init__(self):
         for name, value in asdict(self).items():
@@ -199,6 +216,21 @@ def confirm_quote_problem(quote: dict[str, Any] | None, *, armed_at: float, now:
     return None
 
 
+def confirm_quote_is_mark(quote: dict[str, Any] | None, problem: str | None, *, now: float,
+                          max_age_ms: float) -> bool:
+    """True when a confirmation quote is a finite, fresh mark the net geometry may act on.
+
+    Every problem except unavailable/invalid/stale qualifies (cached, before the delay,
+    off-pool, below the threshold); freshness is checked again because the cached
+    check precedes the age check in confirm_quote_problem.
+    """
+    if problem in CONFIRM_PROBLEMS_WITHOUT_MARK or not isinstance(quote, dict):
+        return False
+    quoted_at = finite(quote.get('quoted_at'))
+    return (finite(quote.get('net_proceeds_usd')) is not None and quoted_at is not None
+            and 0 <= now - quoted_at <= max_age_ms)
+
+
 def disarmed(state: dict[str, Any], *, code: str, now: float, confirm: dict[str, Any] | None,
              params: ImpactEmergencyV2 = EIE_V2) -> dict[str, Any]:
     """Return the V2 state after a disarm; the record keeps the last few disarms."""
@@ -209,7 +241,41 @@ def disarmed(state: dict[str, Any], *, code: str, now: float, confirm: dict[str,
     disarms = (list(state.get('disarms') or []) + [record])[-int(params.max_disarm_records):]
     return {**state, 'armed': False, 'armed_at': None, 'trigger_quote': None,
             'disarm_count': int(state.get('disarm_count') or 0) + 1, 'last_disarm': record,
-            'disarms': disarms}
+            'disarms': disarms, 'rearm_not_before': now + params.rearm_cooldown_ms}
+
+
+def recent_confirms(state: dict[str, Any], now: float, params: ImpactEmergencyV2 = EIE_V2) -> list[float]:
+    """Forced confirmation quote times inside the rolling confirm window."""
+    times = (finite(value) for value in state.get('confirm_attempts_at') or [])
+    return [value for value in times if value is not None and 0 <= now - value < params.confirm_window_ms]
+
+
+def arm_block(state: dict[str, Any], quote: dict[str, Any], *, now: float,
+              params: ImpactEmergencyV2 = EIE_V2) -> str | None:
+    """None when a mark at/above the threshold may arm, else the TRIGGER_BLOCKS code."""
+    if quote.get('route_matches_entry_pool') is not True:
+        return 'trigger_not_exact_pool'
+    rearm_not_before = finite(state.get('rearm_not_before'))
+    if rearm_not_before is not None and now < rearm_not_before:
+        return 'trigger_in_rearm_cooldown'
+    if len(recent_confirms(state, now, params)) >= params.max_confirms_per_window:
+        return 'trigger_confirm_budget_exhausted'
+    return None
+
+
+def blocked_trigger(state: dict[str, Any], *, code: str, now: float, impact_pct: Any) -> dict[str, Any]:
+    """Count a mark that met the threshold but did not arm (no forced quote is taken)."""
+    counts = dict(state.get('trigger_blocks') or {})
+    counts[code] = int(counts.get(code) or 0) + 1
+    return {**state, 'trigger_blocks': counts,
+            'last_trigger_block': {'reason': code, 'at': now, 'impact_pct': finite(impact_pct)}}
+
+
+def confirm_attempted(state: dict[str, Any], now: float, params: ImpactEmergencyV2 = EIE_V2) -> dict[str, Any]:
+    """Record one forced confirmation quote (bounded to the rolling window)."""
+    attempts = recent_confirms(state, now, params) + [now]
+    return {**state, 'confirm_attempts_at': attempts[-int(params.max_confirms_per_window):],
+            'confirm_count': int(state.get('confirm_count') or 0) + 1}
 
 
 def exit_parameters(stop_loss_pct: float, take_profit_pct: float) -> dict[str, Any]:
@@ -223,7 +289,9 @@ def exit_parameters(stop_loss_pct: float, take_profit_pct: float) -> dict[str, A
         'safety_exits_unchanged': ['LIQUIDITY_EMERGENCY', 'STALE_MARKET_EXIT'],
         'exit_impact_emergency': {'version': EIE_VERSION, 'rule': EIE_V2_RULE, **asdict(EIE_V2),
                                   'anchors': [ANCHOR_SELL, ANCHOR_BUY_FALLBACK, ANCHOR_NONE],
-                                  'disarm_codes': list(CONFIRM_PROBLEMS)},
+                                  'disarm_codes': list(CONFIRM_PROBLEMS),
+                                  'trigger_block_codes': list(TRIGGER_BLOCKS),
+                                  'geometry_on_confirm_quote_unless': list(CONFIRM_PROBLEMS_WITHOUT_MARK)},
         # Engine order, unchanged: a pending exit or a safety exit first, then the net
         # geometry; V2 can only act when none of them fired, on the arming mark and
         # again on the confirmation quote.

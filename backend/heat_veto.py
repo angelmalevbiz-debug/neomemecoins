@@ -27,7 +27,9 @@ Rules (any one vetoes; every rule that fires is recorded, in this order):
   heat_paid_profile_high_fee (e) fee tier >= 100 bps and the pair carried the
                              paid-profile 'latest' source in the last 60 min
   heat_crash_in_progress     (f) price <= 75% of its 15-min high, or 5-min
-                             return <= -20%
+                             return <= -20% (the 15-min high spans feed
+                             gaps, as the research window; the 5-min return
+                             needs the current contiguous segment)
   heat_turnover_5m           (g) volume.m5 / liquidityUsd >= 0.095 (the 80th
                              percentile on pre-cutoff data)
 A missing m5 txn count, a zero h1 volume or unknown liquidity leave (b), (c)
@@ -53,7 +55,9 @@ PAID_PROFILE_SOURCE = 'latest'
 # Reserved ids of the pre-registered surge (LAB_A) and dip (LAB_B) hypothesis
 # arms of the research. They are not registered Lab books yet; a book listed
 # here records the heat flags without being blocked. Every registered book,
-# the engine accounts, the training probe and the tape scheduler enforce.
+# the engine accounts and the training probe enforce. The tape scheduler's
+# seats (shared by every ledger) record the flags log-only; see
+# tape_pool_scheduler.TapePoolScheduler.defensive_entry_decision.
 LOG_ONLY_BOOK_IDS = frozenset({'LAB_A_SURGE_EST_GUARD', 'LAB_B_DIP_MKTDIP_GUARD'})
 
 
@@ -86,6 +90,8 @@ class HistoryParameters:
     heartbeat_ms: int = 30_000         # an unchanged price is still stored this often
     max_samples_per_pair: int = 720
     max_pairs: int = 2048
+    # Feed gaps kept per pair; each is > max_gap_ms long, so 64 cover the retention.
+    max_gaps_per_pair: int = 64
 
 
 HISTORY_PARAMS = HistoryParameters()
@@ -120,6 +126,8 @@ class PairHistory:
     or the paid flag changes, on a heartbeat, and at the start of a contiguous
     segment; an observation older than the pair's last one is ignored, and an
     absence longer than ``max_gap_ms`` restarts the segment (and the warm-up).
+    Each such absence is kept as a (last seen before, first seen after) gap so
+    the 15-minute crash window can span gaps like the research window does.
     The observation time is the coin's ``updatedAt`` when it is a valid past
     stamp, else ``now``. Thread-safe.
     """
@@ -150,7 +158,7 @@ class PairHistory:
             record = self._pairs.get(key)
             if record is None:
                 record = {'samples': deque(maxlen=params.max_samples_per_pair), 'since': stamp,
-                          'last_seen': None, 'last_paid_at': None}
+                          'last_seen': None, 'last_paid_at': None, 'gaps': deque(maxlen=params.max_gaps_per_pair)}
                 self._pairs[key] = record
             elif record['last_seen'] is not None and stamp <= record['last_seen']:
                 return False
@@ -158,6 +166,8 @@ class PairHistory:
             samples = record['samples']
             restart = record['last_seen'] is None or stamp - record['last_seen'] > params.max_gap_ms
             if restart:
+                if record['last_seen'] is not None:
+                    record['gaps'].append((record['last_seen'], stamp))
                 record['since'] = stamp
             last = samples[-1] if samples else None
             if (restart or last is None or last[1] != price or last[2] != paid
@@ -169,6 +179,9 @@ class PairHistory:
             horizon = stamp - params.retention_ms
             while samples and samples[0][0] < horizon:
                 samples.popleft()
+            gaps = record['gaps']
+            while gaps and gaps[0][1] < horizon:
+                gaps.popleft()
             while len(self._pairs) > params.max_pairs:
                 self._pairs.popitem(last=False)
             return True
@@ -191,7 +204,7 @@ class PairHistory:
             return len(stale)
 
     def view(self, coin):
-        """A copy of one pair's record (samples, segment start, last seen, last paid), or None."""
+        """A copy of one pair's record (samples, segment start, last seen, last paid, gaps), or None."""
         key = _identity(coin) if isinstance(coin, dict) else None
         if key is None:
             return None
@@ -200,7 +213,8 @@ class PairHistory:
             if record is None:
                 return None
             return {'samples': list(record['samples']), 'since': record['since'],
-                    'last_seen': record['last_seen'], 'last_paid_at': record['last_paid_at']}
+                    'last_seen': record['last_seen'], 'last_paid_at': record['last_paid_at'],
+                    'gaps': list(record.get('gaps') or ())}
 
     def __len__(self):
         with self._lock:
@@ -223,6 +237,38 @@ def _price_at_or_before(samples, since, target):
             break
         found = price
     return found
+
+
+def window_prices(record, now, seconds):
+    """Prices observed over (now - seconds, now], across feed gaps (the research P.window).
+
+    Every retained sample inside the window counts, whatever its segment. The
+    history stores a sample only on a change, a heartbeat or a segment start,
+    so the price in effect at the window start is the last sample at or before
+    it; it counts only when that sample's contiguous segment was still observed
+    after the window start (a pair absent then contributed no observation).
+    """
+    current = _finite(now)
+    if record is None or current is None:
+        return []
+    start = current - seconds * 1000
+    samples = record.get('samples') or ()
+    window = [price for stamp, price, _paid in samples if stamp > start]
+    opening = None
+    for stamp, price, _paid in samples:
+        if stamp > start:
+            break
+        opening = (stamp, price)
+    if opening is not None:
+        # The opening sample's segment ends at the first gap after it (or is the current one).
+        segment_end = record.get('last_seen')
+        for gap_start, _gap_end in record.get('gaps') or ():
+            if gap_start >= opening[0]:
+                segment_end = gap_start
+                break
+        if segment_end is not None and segment_end > start:
+            window.append(opening[1])
+    return window
 
 
 def evaluate(coin, now, history, *, log_only=False, params: HeatParameters = PARAMS) -> dict:
@@ -259,7 +305,9 @@ def evaluate(coin, now, history, *, log_only=False, params: HeatParameters = PAR
     ret5 = metrics['return_5m_pct']
     if ret5 is not None and ret5 >= params.return_5m_surge_pct:
         reasons.append('heat_return_5m_surge')
-    tx = ((coin.get('txns') or {}).get('m5') or {}) if isinstance(coin.get('txns'), dict) else {}
+    # A malformed txns or txns.m5 (not a dict) leaves (b) unevaluated, never raises.
+    m5_txns = coin['txns'].get('m5') if isinstance(coin.get('txns'), dict) else None
+    tx = m5_txns if isinstance(m5_txns, dict) else {}
     buys, sells = _finite(tx.get('buys')), _finite(tx.get('sells'))
     if buys is not None and sells is not None and buys >= 0 and sells >= 0 and buys + sells >= 1:
         metrics['buy_share_5m'] = round(buys / (buys + sells), 4)
@@ -288,14 +336,11 @@ def evaluate(coin, now, history, *, log_only=False, params: HeatParameters = PAR
     if paid and fee >= params.paid_profile_min_fee_bps:
         reasons.append('heat_paid_profile_high_fee')
     if price is not None:
-        # The 15-minute high is read only from current (fresh) contiguous history.
-        current_history = span is not None and since is not None and current is not None
-        window = [p for stamp, p, _paid in samples
-                  if current_history and stamp >= since
-                  and stamp > current - params.crash_window_seconds * 1000]
-        opening = (_price_at_or_before(samples, since, current - params.crash_window_seconds * 1000)
-                   if current_history else None)
-        high = max(window + ([opening] if opening else []) + [price])
+        # The 15-minute high spans feed gaps (every retained sample in the
+        # window, as the research P.window('price', 900)); the contiguous
+        # segment only gates the warm-up and the 5-minute return.
+        window = [p for p in window_prices(record, current, params.crash_window_seconds) if p > 0]
+        high = max(window + [price])
         metrics['fraction_of_15m_high'] = round(price / high, 6)
         if price <= params.crash_fraction_of_high * high or (
                 ret5 is not None and ret5 <= params.crash_return_5m_pct):
@@ -316,5 +361,7 @@ def config(params: HeatParameters = PARAMS, history: HistoryParameters = HISTORY
             'paid_profile_source': f"'{PAID_PROFILE_SOURCE}' (DexScreener token-profiles/latest)",
             'fee_tier_basis': 'paper_market_feasibility.pumpswap_fee_bps',
             'log_only_book_ids': sorted(LOG_ONLY_BOOK_IDS),
+            'crash_high_window': 'every retained sample in the last 15 min, across feed gaps',
+            'malformed_inputs': 'leave the affected rule unevaluated; never raise',
             'warming_is_a_veto': True, 'exits_changed': False,
             'is_entry_authorization': False, 'profitability_proven': False}

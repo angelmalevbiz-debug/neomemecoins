@@ -90,6 +90,12 @@ SCORE_VERSION = 'NEO_MARKET_SCORE_V2_LIQ_MC_BAND'
 PREVIOUS_SCORE_VERSION = 'NEO_MARKET_SCORE_V1'
 SCORE_GOOD_LIQ_MC_RANGE = (0.15, 0.6)
 SCORE_LP_RISK_LIQ_MC = 1.0
+# V2 is an entry change only. The ORDER_FLOW_ADAPTIVE exit context of a held
+# position (conviction -> CONVICTION_EXIT/PROFIT_LOCK, hold mode, max hold)
+# and the entry hold mode its blind-flow fallback keeps read the V1 score
+# (coin scoreV1), so exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged
+# for positions opened before and after this change.
+EXIT_CONTEXT_SCORE_VERSION = PREVIOUS_SCORE_VERSION
 TRADE_NOTIONAL_USD = float(os.getenv('NEO_TRADE_NOTIONAL_USD', '200'))
 MAX_DAILY_LOSS_USD = float(os.getenv('NEO_MAX_DAILY_LOSS_USD', '100'))
 MAX_POSITION_RISK_USD = float(os.getenv('NEO_MAX_POSITION_RISK_USD', '250'))
@@ -908,6 +914,7 @@ class State:
                     'rug_guard': rug_guard.VERSION,
                     'defensive_entry': dict(entry_defense.VERSIONS),
                     'score_version': SCORE_VERSION,
+                    'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
                     'paper_only': True,
                     'runtime_version': runtime.VERSION,
                     'daily_budget_sizing': True,
@@ -1078,7 +1085,8 @@ def effective_config_hash():
               'max_signal_age_ms': paper_quotes.MAX_SIGNAL_AGE_MS,
               # Every strategy: DEFENSIVE_ENTRY_LAYER_V1 and the market score model.
               'defensive_entry': entry_defense.config(),
-              'score_version': SCORE_VERSION}
+              'score_version': SCORE_VERSION,
+              'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION}
     if ADAPTIVE_PROFILE is not None:
         config.update({'signal_strategy': SIGNAL_STRATEGY, 'strategy_profile': ADAPTIVE_PROFILE.as_dict(),
                        'exit_policy': POSITION_EXIT_POLICY, 'exit_version': exit_policy_version(),
@@ -1198,6 +1206,7 @@ def _engine_config_ownership() -> dict[str, str]:
         'max_quoted_candidates_per_scan': 'engine_entry_policy.MAX_QUOTED_CANDIDATES constant',
         'defensive_entry': 'entry_defense DEFENSIVE_ENTRY_LAYER_V1 constants for every strategy (no environment override)',
         'score_version': f'market_monitor.SCORE_VERSION constant {SCORE_VERSION}',
+        'exit_context_score_version': f'market_monitor.EXIT_CONTEXT_SCORE_VERSION constant {EXIT_CONTEXT_SCORE_VERSION} (adaptive exit context reads coin scoreV1)',
         'environment_overrides_honored': 'scan, position scan, notional, daily loss, risk caps, strict thresholds (cost caps can only be lowered)',
     }
 
@@ -1461,7 +1470,8 @@ def early_market_pairs(early_pairs, dex_pairs, current):
     return markets
 
 
-def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
+def score_pair_models(pair: dict[str, Any], meta: dict[str, Any]):
+    """score_pair plus the NEO_MARKET_SCORE_V1 score of the same observation (exit context basis)."""
     liq = num((pair.get('liquidity') or {}).get('usd'))
     volume = pair.get('volume') or {}
     vol_h1 = num(volume.get('h1'))
@@ -1526,15 +1536,25 @@ def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
         score -= 5; signals.append(signal('risk', 'Pair под 15 секунди', f'{age:.2f} мин.'))
     elif age > 4320:
         score -= 4
+    exit_basis_offset = 0.0
     if mc > 0:
         # NEO_MARKET_SCORE_V2_LIQ_MC_BAND: a pool holding most of the supply is an
         # LP-pull risk, not good liquidity; 0.6 <= liq/MC < 1 earns no bonus.
         if liq_mc >= SCORE_LP_RISK_LIQ_MC:
             score -= 10; signals.append(signal('risk', 'Ликвидност >= MC (LP риск)', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = -10
         elif SCORE_GOOD_LIQ_MC_RANGE[0] <= liq_mc < SCORE_GOOD_LIQ_MC_RANGE[1]:
             score += 9; signals.append(signal('positive', 'Добро liquidity/MC', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = 9
         elif liq_mc < 0.03:
             score -= 10; signals.append(signal('risk', 'Слаб liquidity/MC', f'{liq_mc * 100:.1f}%'))
+            v2_liq_mc = -10
+        else:
+            v2_liq_mc = 0
+        # NEO_MARKET_SCORE_V1 term (+9 for any liq/MC >= 0.15), kept only for the
+        # exit context (EXIT_CONTEXT_SCORE_VERSION); every other term is shared.
+        v1_liq_mc = 9 if liq_mc >= 0.15 else -10 if liq_mc < 0.03 else 0
+        exit_basis_offset = float(v1_liq_mc - v2_liq_mc)
 
     if 0.10 <= vol_liq <= 4.0:
         score += 6
@@ -1546,14 +1566,30 @@ def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
     if abs(change_h1) > 250:
         score -= 8; signals.append(signal('risk', 'Екстремен 1h move', f'{change_h1:+.0f}%'))
 
+    score_v1 = round(clamp(score + exit_basis_offset), 1)
     score = round(clamp(score), 1)
     risk = round(100 - score, 1)
     posture = 'SETUP' if score >= ENTRY_SCORE else 'WATCH' if score >= 60 else 'WAIT' if score >= 45 else 'SKIP'
-    return score, risk, posture, signals[:8]
+    return score, risk, posture, signals[:8], score_v1
+
+
+def score_pair(pair: dict[str, Any], meta: dict[str, Any]):
+    """NEO_MARKET_SCORE_V2_LIQ_MC_BAND score, risk, posture and signals of one pair."""
+    return score_pair_models(pair, meta)[:4]
+
+
+def exit_context_score(coin: dict[str, Any]) -> float:
+    """EXIT_CONTEXT_SCORE_VERSION (V1) score of an observation for the adaptive exit context.
+
+    make_coin publishes it as scoreV1; an observation recorded before the V2
+    model carries only 'score', which was computed by V1.
+    """
+    value = num(coin.get('scoreV1'), math.nan)
+    return value if math.isfinite(value) else num(coin.get('score'))
 
 
 def make_coin(address: str, pair: dict[str, Any], meta: dict[str, Any]) -> dict[str, Any]:
-    score, risk, posture, signals = score_pair(pair, meta)
+    score, risk, posture, signals, score_v1 = score_pair_models(pair, meta)
     base, info = pair.get('baseToken') or {}, pair.get('info') or {}
     volume, changes, txns = pair.get('volume') or {}, pair.get('priceChange') or {}, pair.get('txns') or {}
     created = int(pair.get('pairCreatedAt') or 0)
@@ -1586,6 +1622,8 @@ def make_coin(address: str, pair: dict[str, Any], meta: dict[str, Any]) -> dict[
         'websites': (info.get('websites') or [])[:3],
         'socials': (info.get('socials') or [])[:5],
         'score': score, 'riskScore': risk, 'posture': posture, 'scoreVersion': SCORE_VERSION,
+        # Exit-context basis of held ORDER_FLOW_ADAPTIVE positions (EXIT_CONTEXT_SCORE_VERSION).
+        'scoreV1': score_v1,
         'signals': signals, 'updatedAt': int(pair.get('_market_observed_at') or now_ms()),
     }
 
@@ -1763,6 +1801,14 @@ class Monitor:
             STATE.price_history[address] = points[-480:]
 
     def market_context(self, coin: dict[str, Any], position: dict[str, Any] | None = None) -> dict[str, Any]:
+        """October 4 conviction context of one observation.
+
+        With a held ``position`` (the ORDER_FLOW_ADAPTIVE exit path) the
+        neo_score term reads the EXIT_CONTEXT_SCORE_VERSION score (V1), so the
+        V2 score model never changes exits. Without one (entries) it reads the
+        current score and also publishes ``exit_basis_conviction`` (same flow,
+        V1 score) for the hold mode a new position keeps for blind-flow exits.
+        """
         address = coin.get('address') or (position or {}).get('address')
         fast = STATE.live_flow(address, 30, str(coin.get('pairAddress') or ''))
         slow = STATE.live_flow(address, 300, str(coin.get('pairAddress') or ''))
@@ -1774,17 +1820,25 @@ class Monitor:
         liquidity = num(coin.get('liquidityUsd'))
         entry_liquidity = num((position or {}).get('entry_liquidity_usd'), liquidity)
         liquidity_ratio = liquidity / max(entry_liquidity, 1.0)
-        conviction = oct4.conviction_score(
-            fast_ratio=num(fast.get('buy_sell_usd_ratio')), slow_ratio=num(slow.get('buy_sell_usd_ratio')),
-            unique_wallets=num(slow.get('unique_wallets')), repeat_buy_wallets=num(slow.get('repeat_buy_wallets')),
-            whale_buy_usd=num(slow.get('whale_buy_usd')), whale_sell_usd=num(slow.get('whale_sell_usd')),
-            m5=m5, h1=h1, market_ratio=market_ratio, liquidity_ratio=liquidity_ratio,
-            neo_score=num(coin.get('score')))
+
+        def conviction_for(neo_score):
+            return oct4.conviction_score(
+                fast_ratio=num(fast.get('buy_sell_usd_ratio')), slow_ratio=num(slow.get('buy_sell_usd_ratio')),
+                unique_wallets=num(slow.get('unique_wallets')), repeat_buy_wallets=num(slow.get('repeat_buy_wallets')),
+                whale_buy_usd=num(slow.get('whale_buy_usd')), whale_sell_usd=num(slow.get('whale_sell_usd')),
+                m5=m5, h1=h1, market_ratio=market_ratio, liquidity_ratio=liquidity_ratio,
+                neo_score=neo_score)
+
+        held = bool(position)
+        exit_basis_score = exit_context_score(coin)
+        conviction = conviction_for(exit_basis_score if held else num(coin.get('score')))
         hold = oct4.hold_mode(conviction)
         mode, max_hold, target, trail_arm, trail = (hold['mode'], hold['max_hold_minutes'], hold['target_pct'],
                                                     hold['trail_arm_pct'], hold['trail_pct'])
+        basis = {} if held else {'exit_basis_conviction': conviction_for(exit_basis_score)}
 
         return {
+            **basis,
             'conviction': conviction, 'mode': mode, 'max_hold_minutes': max_hold,
             'target_pct': target, 'trail_arm_pct': trail_arm, 'trail_pct': trail,
             'm5': round(m5, 3), 'h1': round(h1, 3), 'market_buy_sell_ratio': round(market_ratio, 3),
@@ -2813,7 +2867,10 @@ class Monitor:
                     'learning_mode': oct4.LEARNING_MODE if ADAPTIVE_PROFILE is not None else 'SAME_POLICY_PAPER_OUTCOME_THROTTLE_V1',
                     'entry_flow': final_flow,
                     'entry_decision_flow': final_decision_flow if ADAPTIVE_PROFILE is not None else None,
-                    'adaptive_hold': oct4.hold_mode(num(final_context.get('conviction'))) if ADAPTIVE_PROFILE is not None else None,
+                    # The hold mode the blind-flow exit fallback keeps is an exit input:
+                    # it reads the EXIT_CONTEXT_SCORE_VERSION (V1) conviction of the same flow.
+                    'adaptive_hold': oct4.hold_mode(num(final_context.get(
+                        'exit_basis_conviction', final_context.get('conviction')))) if ADAPTIVE_PROFILE is not None else None,
                     'verified_entry_flow': final_flow.get('verified_flow'),
                     'entry_context': final_context if ADAPTIVE_PROFILE is not None else context,
                     'entry_conviction': (final_context if ADAPTIVE_PROFILE is not None else context).get('conviction'),
@@ -2868,6 +2925,7 @@ class Monitor:
                     # DEFENSIVE_ENTRY_LAYER_V1 decision on the commit-time observation.
                     'defensive_entry': entry_defense.compact(final_defensive),
                     'score_version': SCORE_VERSION,
+                    'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
                     'signal_source_commit': oct4.SOURCE_COMMIT if ADAPTIVE_PROFILE is not None else winner_ensemble.VERSION,
                     'execution_verification_version': 'QUOTE_EVIDENCE_V9',
                     'entry_quote': live_quote.get('raw_quote'),

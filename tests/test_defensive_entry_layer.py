@@ -490,6 +490,70 @@ class HeatVetoRuleTests(unittest.TestCase):
         history.prune(self.now + 3_700_000)
         self.assertEqual(len(history), 0)
 
+    def observe_series(self, history, coin, points):
+        """``points``: (seconds before self.now, price) every 20 s, gaps where the pair is absent."""
+        for back, price in points:
+            stamp = self.now - back * 1000
+            history.observe_coin(dict(coin, priceUsd=price, updatedAt=stamp), stamp)
+
+    def test_f_crash_during_a_feed_gap_longer_than_120_s(self):
+        # Seen at 1.0 from t-14 to t-9 min, absent 3 min, back at 0.70 and flat for 6 min:
+        # the research window (P.window('price', 900)) spans the gap and flags the crash.
+        coin = dict(self.coin, address=MINT, pairAddress=PAIR)
+        history = heat_veto.PairHistory()
+        before = [(back, 1.0) for back in range(14 * 60, 9 * 60 - 1, -20)]
+        after = [(back, 0.70) for back in range(6 * 60, 0, -20)]
+        self.observe_series(history, coin, before + after)
+        view = history.view(coin)
+        self.assertEqual(len(view['gaps']), 1, 'one absence longer than 120 s')
+        self.assertGreater(view['since'], self.now - 7 * MINUTE, 'the contiguous segment restarted')
+        result = heat_veto.evaluate(dict(coin, priceUsd=0.70), self.now, history)
+        self.assertIn('heat_crash_in_progress', result['reasons'], result['metrics'])
+        self.assertEqual(result['metrics']['fraction_of_15m_high'], 0.7)
+        self.assertNotIn('heat_history_warming', result['reasons'], 'six minutes of current segment')
+        # The 5-minute return stays on the current segment (flat): only (f)'s high spans the gap.
+        self.assertEqual(result['metrics']['return_5m_pct'], 0.0)
+
+    def test_f_a_price_from_a_segment_that_ended_before_the_window_does_not_count(self):
+        # Seen at 2.0 until t-40 min, absent until t-10 min, then flat at 1.0: the 2.0
+        # sample is the last one at or before the window start, but its segment ended
+        # 25 minutes before the window, so (as in the research) it is no 15-min high.
+        coin = dict(self.coin, address=MINT, pairAddress=PAIR)
+        history = heat_veto.PairHistory()
+        self.observe_series(history, coin, [(back, 2.0) for back in range(45 * 60, 40 * 60 - 1, -20)]
+                            + [(back, 1.0) for back in range(10 * 60, 0, -20)])
+        result = heat_veto.evaluate(dict(coin, priceUsd=1.0), self.now, history)
+        self.assertNotIn('heat_crash_in_progress', result['reasons'], result['metrics'])
+        self.assertEqual(result['metrics']['fraction_of_15m_high'], 1.0)
+        # A segment still observed after the window start keeps the price in effect at the
+        # start: unchanged prices are stored only as 30 s heartbeats, so the last 1.0 sample
+        # (t-930 s) lies before the window although the pair showed 1.0 until t-910 s.
+        history = heat_veto.PairHistory()
+        self.observe_series(history, coin, [(back, 1.0) for back in range(1200, 905, -10)]
+                            + [(back, 0.7) for back in range(890, 0, -10)])
+        samples = history.view(coin)['samples']
+        self.assertEqual([s[1] for s in samples if s[0] > self.now - 900_000 and s[1] == 1.0], [])
+        self.assertEqual([s for s in samples if s[0] <= self.now - 900_000][-1][1], 1.0)
+        self.assertEqual(history.view(coin)['gaps'], [])
+        self.assertIn('heat_crash_in_progress',
+                      heat_veto.evaluate(dict(coin, priceUsd=0.7), self.now, history)['reasons'])
+
+    def test_malformed_inputs_never_raise_and_leave_the_rule_unevaluated(self):
+        malformed = [{'txns': {'m5': 5}}, {'txns': {'m5': [1, 2]}}, {'txns': 7}, {'txns': {'m5': {'buys': 'x'}}},
+                     {'volume': 'hot'}, {'volume': {'m5': [1], 'h1': None}}, {'priceChange': [200]},
+                     {'priceChange': {'h6': 'NaN'}}, {'symbol': 42}, {'sources': 'latest'}, {'liquidityUsd': 'x'},
+                     {'marketCap': {'usd': 1}}, {'pairCreatedAt': 'yesterday'}, {'updatedAt': 'now'}]
+        for change in malformed:
+            with self.subTest(change=change):
+                result = self.evaluate(dict(self.coin, **change))
+                self.assertEqual(result['version'], 'HEAT_VETO_STACK_V1')
+        self.assertIsNone(self.evaluate(dict(self.coin, txns={'m5': 5}))['metrics']['buy_share_5m'])
+        self.assertIsNone(self.evaluate(dict(self.coin, txns={'m5': [90, 10]}))['metrics']['buy_share_5m'])
+        for coin in (None, [], 'x', 5):
+            with self.subTest(coin=coin):
+                self.assertTrue(heat_veto.evaluate(coin, self.now, self.history)['vetoed'])
+                self.assertFalse(self.history.observe_coin(coin, self.now))
+
 
 # ------------------------------------------------------------------ pool loss memory
 
@@ -537,12 +601,13 @@ class PoolLossMemoryTests(unittest.TestCase):
             clock += 35 * MINUTE
         self.assertEqual(entered, [0, 1])
 
-    def test_merge_keeps_the_latest_block(self):
-        a = pool_loss_memory.index(losses(MINT, PAIR, self.NOW, first_age=60 * MINUTE), self.NOW)
-        b = pool_loss_memory.index(losses(MINT, PAIR, self.NOW, first_age=10 * MINUTE), self.NOW)
-        merged = pool_loss_memory.merge(a, b)
-        self.assertEqual(merged[(MINT, PAIR)]['blocked_until'], b[(MINT, PAIR)]['blocked_until'])
-        self.assertEqual(pool_loss_memory.config()['cooldown_hours'], 6.0)
+    def test_memory_is_one_ledger_only(self):
+        # No cross-ledger union exists: one ledger's index never contains another's pools.
+        self.assertFalse(hasattr(pool_loss_memory, 'merge'))
+        config = pool_loss_memory.config()
+        self.assertFalse(config['cross_ledger_union'])
+        self.assertEqual(config['cooldown_hours'], 6.0)
+        self.assertEqual(config['scope'], 'same (mint, pool) within one account or one Lab book')
 
 
 # ------------------------------------------------------------------ combined layer
@@ -587,6 +652,50 @@ class DefensiveLayerTests(unittest.TestCase):
         self.assertFalse(config['profitability_proven'])
         self.assertEqual(config['heat_veto']['parameters']['turnover_5m'], 0.095)
         self.assertEqual(config['pool_loss_memory']['consecutive_losses'], 2)
+        self.assertEqual(config['reasons_in_order'][-1], 'defensive_entry_error')
+
+    def test_an_unexpected_error_blocks_the_candidate_and_never_escapes(self):
+        layer = entry_defense.DefensiveEntryLayer()
+        coin = established(self.NOW)
+        warm(layer.history, coin, self.NOW)
+        with patch.object(heat_veto, 'evaluate', side_effect=RuntimeError('boom')):
+            decision = layer.evaluate(coin, self.NOW, blocked_pools={})
+        self.assertFalse(decision['allowed'])
+        self.assertEqual(decision['reasons'], ['defensive_entry_error'])
+        self.assertEqual(decision['error'], 'RuntimeError')
+        self.assertEqual(layer.status()['evaluate_errors'], 1)
+        self.assertEqual(layer.status()['last_error'], 'evaluate:RuntimeError')
+        summary = entry_defense.new_summary()
+        entry_defense.record(summary, decision, coin)
+        self.assertEqual(summary['rejections'], {'defensive_entry_error': 1})
+        self.assertEqual(entry_defense.primary_reason(summary), 'defensive_entry_error')
+        self.assertEqual(entry_defense.compact(decision)['error'], 'RuntimeError')
+        self.assertEqual(entry_defense.metrics(decision)['error'], 'RuntimeError')
+        # A failing observation is counted, never raised; the history stays short (warming).
+        fresh = entry_defense.DefensiveEntryLayer()
+        with patch.object(fresh.history, 'observe', side_effect=ValueError('bad feed')):
+            fresh.observe([coin], self.NOW)
+        fresh.observe(None, self.NOW)
+        fresh.observe(5, self.NOW)
+        self.assertEqual(fresh.status()['observe_errors'], 2)
+        self.assertEqual(fresh.evaluate(coin, self.NOW)['reasons'], ['heat_history_warming'])
+        # The real layer tolerates a malformed txns.m5 without the error path.
+        for txns in ({'m5': 5}, {'m5': [1, 2]}, 7):
+            with self.subTest(txns=txns):
+                decision = layer.evaluate(dict(coin, txns=txns), self.NOW, blocked_pools={})
+                self.assertTrue(decision['allowed'], decision)
+        self.assertEqual(layer.status()['evaluate_errors'], 1)
+
+    def test_every_reason_has_engine_and_lab_dashboard_labels(self):
+        import engine_entry_policy
+        source = (Path(__file__).resolve().parents[1] / 'src' / 'lib' / 'labStrategyView.ts').read_text(encoding='utf-8')
+        block = source[source.index('const reasons: Record<string, string> = {'):]
+        block = block[:block.index('};')]
+        for reason in entry_defense.REASONS_IN_ORDER + ('defensive_entry',):
+            with self.subTest(reason=reason):
+                self.assertIn(f'\n  {reason}: ', block.replace('\r\n', '\n'))
+                if reason != 'defensive_entry':
+                    self.assertIn(reason, engine_entry_policy.LABELS)
 
 
 # ------------------------------------------------------------------ score companion
@@ -596,7 +705,8 @@ class ScoreBandTests(unittest.TestCase):
         # Volume scales with liquidity so only the liq/MC component differs between the cases.
         return {'liquidity': {'usd': liquidity}, 'marketCap': cap, 'volume': {'h1': liquidity * .5},
                 'priceChange': {'m5': 0, 'h1': 0}, 'txns': {'m5': {'buys': 10, 'sells': 10}},
-                'pairCreatedAt': m.now_ms() - 3 * DAY}
+                # 3.5 days: clear of score_pair's 4,320-minute age boundary between calls.
+                'pairCreatedAt': m.now_ms() - 3 * DAY - 12 * 60 * MINUTE}
 
     def titles(self, liquidity, cap):
         score, _risk, _posture, signals = m.score_pair(self.pair(liquidity, cap), {})
@@ -624,6 +734,82 @@ class ScoreBandTests(unittest.TestCase):
         self.assertNotIn('Добро liquidity/MC', titles)
         made = m.make_coin(MINT, {**pair, 'pairAddress': PAIR, 'priceUsd': 1, 'baseToken': {'symbol': 'X'}}, {})
         self.assertEqual(made['scoreVersion'], m.SCORE_VERSION)
+
+
+class ExitContextScoreTests(unittest.TestCase):
+    """NEO_MARKET_SCORE_V2 is an entry change only: held ORDER_FLOW_ADAPTIVE positions keep
+    the exit context (conviction, hold mode, max hold, target, trail) of the V1 score."""
+
+    FAST = {'quality': 'COMPLETE', 'buy_sell_usd_ratio': 1.5}
+    SLOW = {'buy_sell_usd_ratio': 1.2, 'unique_wallets': 6, 'repeat_buy_wallets': 1,
+            'whale_buy_usd': 0, 'whale_sell_usd': 0}
+
+    def setUp(self):
+        self.monitor = m.Monitor()
+        self.addCleanup(self.monitor.stop)
+        flows = {30: self.FAST, 300: self.SLOW}
+        p = patch.object(m.STATE, 'live_flow', side_effect=lambda address, seconds, pair='': dict(flows[seconds]))
+        p.start()
+        self.addCleanup(p.stop)
+
+    @staticmethod
+    def pair(ratio):
+        cap = 1_000_000
+        return {'liquidity': {'usd': ratio * cap}, 'marketCap': cap, 'volume': {'h1': 60_000},
+                'priceChange': {'m5': 2, 'h1': 5}, 'txns': {'m5': {'buys': 70, 'sells': 50}},
+                # 3.5 days: clear of score_pair's 4,320-minute age boundary between calls.
+                'pairCreatedAt': m.now_ms() - 3 * DAY - 12 * 60 * MINUTE, 'pairAddress': PAIR, 'priceUsd': 1,
+                'baseToken': {'symbol': 'X'}}
+
+    @staticmethod
+    def pre_change_score(pair):
+        """The score_pair of origin/main (+9 for any liq/MC >= 0.15, no LP-risk term)."""
+        with patch.object(m, 'SCORE_GOOD_LIQ_MC_RANGE', (0.15, float('inf'))), \
+             patch.object(m, 'SCORE_LP_RISK_LIQ_MC', float('inf')):
+            return m.score_pair(pair, {})[0]
+
+    def test_adaptive_exit_context_is_unchanged_at_liq_mc_0_7_and_1_1(self):
+        sensitive = False
+        for ratio in (0.7, 1.1):
+            with self.subTest(liq_mc=ratio):
+                pair = self.pair(ratio)
+                coin = m.make_coin(MINT, pair, {})
+                before = self.pre_change_score(pair)
+                self.assertEqual(coin['scoreV1'], before)
+                self.assertLess(coin['score'], before, 'V2 removes the bonus in this band')
+                # The coin the pre-change engine saw: 'score' was the V1 score, no scoreV1.
+                old_coin = {key: value for key, value in coin.items() if key != 'scoreV1'}
+                old_coin['score'] = before
+                for opened_under in (m.PREVIOUS_SCORE_VERSION, m.SCORE_VERSION, None):
+                    position = {'address': MINT, 'pairAddress': PAIR, 'exit_policy': 'adaptive',
+                                'entry_liquidity_usd': coin['liquidityUsd'], 'score_version': opened_under}
+                    now_context = self.monitor.market_context(coin, position)
+                    old_context = self.monitor.market_context(old_coin, position)
+                    for field in ('conviction', 'mode', 'max_hold_minutes', 'target_pct', 'trail_arm_pct', 'trail_pct'):
+                        self.assertEqual(now_context[field], old_context[field], (field, opened_under))
+                    self.assertNotIn('exit_basis_conviction', now_context)
+                    self.assertEqual(m.adaptive_exit_context(position, now_context),
+                                     m.adaptive_exit_context(position, old_context))
+                # Entries use V2; the hold mode a new position keeps is the V1-basis one.
+                entry = self.monitor.market_context(coin)
+                old_entry = self.monitor.market_context(old_coin)
+                self.assertEqual(entry['exit_basis_conviction'], old_entry['conviction'])
+                if entry['conviction'] != old_entry['conviction']:
+                    sensitive = True
+                    # What feeding V2 to exits would have done (the reviewed regression).
+                    v2_fed = self.monitor.market_context(dict(coin, scoreV1=coin['score']), {'address': MINT, 'x': 1})
+                    self.assertNotEqual(v2_fed['conviction'], old_entry['conviction'])
+        self.assertTrue(sensitive, 'the fixture must make V1 and V2 convictions differ')
+
+    def test_an_observation_recorded_before_v2_keeps_its_own_score(self):
+        old = {'address': MINT, 'pairAddress': PAIR, 'score': 97.0}
+        self.assertEqual(m.exit_context_score(old), 97.0)
+        self.assertEqual(m.exit_context_score(dict(old, scoreV1=100.0)), 100.0)
+        self.assertEqual(m.exit_context_score(dict(old, scoreV1='bad')), 97.0)
+        self.assertEqual(m.exit_context_score({}), 0.0)
+        self.assertEqual(m.EXIT_CONTEXT_SCORE_VERSION, 'NEO_MARKET_SCORE_V1')
+        config = m.STATE.snapshot()['config']
+        self.assertEqual(config['exit_context_score_version'], 'NEO_MARKET_SCORE_V1')
 
 
 # ------------------------------------------------------------------ engine entry paths
@@ -722,6 +908,7 @@ class DefaultEnginePathTests(EngineHarness):
         self.assertEqual(position['defensive_entry']['versions']['heat_veto'], 'HEAT_VETO_STACK_V1')
         self.assertEqual(position['defensive_entry']['versions']['pool_loss_memory'], 'POOL_LOSS_MEMORY_V1')
         self.assertEqual(position['score_version'], m.SCORE_VERSION)
+        self.assertEqual(position['exit_context_score_version'], 'NEO_MARKET_SCORE_V1')
         self.assertEqual(report['defensive_entry']['checked'], 1)
         self.assertEqual(self.calls['quote'] > 0, True)
 
@@ -757,6 +944,27 @@ class DefaultEnginePathTests(EngineHarness):
         report = self.assert_blocked_before_any_quote('pool_loss_cooldown')
         self.assertEqual(report['defensive_entry']['pool_loss_cooldown_pools'], 1)
 
+    def test_rugcheck_prewarm_requests_nothing_for_a_blocked_pool(self):
+        # Prewarm only considers pools with ageMinutes <= 360, all of which the 12 h
+        # young-pool rule blocks in reality; 'passing' carries a 60-minute ageMinutes with
+        # a 30-day pairCreatedAt only to show that an unblocked pool is still prewarmed.
+        young = established(self.now, address=OTHER_MINT, pairAddress=OTHER_PAIR, symbol='YNG',
+                            ageMinutes=60, pairCreatedAt=self.now - 60 * MINUTE)
+        passing = dict(self.coin, ageMinutes=60)
+        self.warm(young)
+        self.warm(passing)
+        self.monitor.prewarm_entry_checks([young])
+        self.assertEqual((self.calls['price'], self.calls['rugcheck']), (0, 0), 'structural block')
+        self.monitor.prewarm_entry_checks([dict(passing, txns={'m5': {'buys': 95, 'sells': 5}})])
+        self.assertEqual((self.calls['price'], self.calls['rugcheck']), (0, 0), 'heat veto')
+        m.STATE.history = losses(MINT, PAIR, self.now, first_age=30 * MINUTE)
+        self.monitor.prewarm_entry_checks([passing])
+        self.assertEqual((self.calls['price'], self.calls['rugcheck']), (0, 0), 'loss memory')
+        m.STATE.history = []
+        self.monitor.prewarm_entry_checks([passing, young])
+        self.assertEqual((self.calls['price'], self.calls['rugcheck']), (1, 1), 'only the passing pool')
+        self.assertEqual(self.calls['quote'], 0)
+
 
 class OrderFlowAdaptivePathTests(EngineHarness):
     STRATEGY = oct4.STRATEGY_ID
@@ -780,6 +988,25 @@ class OrderFlowAdaptivePathTests(EngineHarness):
             self.assertIn('conviction', report['rejections'])
         self.assertEqual(m.ENTRY_POLICY_VERSION, 'ORDER_FLOW_BALANCED_V5')
         self.assertEqual(oct4.DECISION_FILTER_VERSION, 'ORDER_FLOW_BALANCED_V4')
+
+    def test_a_new_position_keeps_the_v1_basis_hold_mode_for_blind_flow_exits(self):
+        # Entry gates read the V2 conviction (70: NORMAL); the hold mode the blind-flow exit
+        # fallback keeps is the V1-basis one of the same flow (80: STRONG).
+        self.warm()
+        self.monitor.market_context.return_value = {
+            'conviction': 70.0, 'exit_basis_conviction': 80.0, 'mode': 'NORMAL', 'max_hold_minutes': 15,
+            'target_pct': 20, 'trail_arm_pct': 9, 'trail_pct': 5}
+        with patch.object(m.oct4, 'market_rejections', return_value=[]), \
+             patch.object(m.oct4, 'signal_rejections', return_value=[]):
+            report = self.open_once()
+        self.assertEqual(report['status'], 'opened', report['rejections'])
+        position = m.STATE.positions[0]
+        self.assertEqual(position['entry_conviction'], 70.0)
+        self.assertEqual(position['entry_hold_mode'], 'NORMAL')
+        self.assertEqual(position['adaptive_hold'], oct4.hold_mode(80.0))
+        self.assertEqual(position['adaptive_hold']['mode'], 'STRONG')
+        self.assertEqual(position['exit_context_score_version'], 'NEO_MARKET_SCORE_V1')
+        self.assertEqual(position['exit_policy_version'], 'GOLD_ADAPTIVE_NET_CANDIDATE_V1')
 
 
 class CostFirstProfilePathTests(EngineHarness):
@@ -996,6 +1223,7 @@ class LabPathTests(unittest.TestCase):
 # ------------------------------------------------------------------ tape scheduler
 
 class TapeSchedulerPathTests(unittest.TestCase):
+    """A seat serves every ledger: only the structural guard withholds one (V5)."""
     NOW = 1_800_000_000_000
 
     def coin(self, name, **changes):
@@ -1007,7 +1235,7 @@ class TapeSchedulerPathTests(unittest.TestCase):
         coin.update(changes)
         return coin
 
-    def test_blocked_pools_get_no_seat_and_pins_are_untouched(self):
+    def test_structurally_blocked_pools_get_no_seat_and_pins_are_untouched(self):
         scheduler = TapePoolScheduler()
         safe = self.coin('Safe')
         young = self.coin('Young', pairCreatedAt=self.NOW - 30 * MINUTE)
@@ -1019,51 +1247,105 @@ class TapeSchedulerPathTests(unittest.TestCase):
             warm(scheduler.defense.history, coin, self.NOW)
         held = {'address': young['address'], 'pairAddress': young['pairAddress'],
                 'coin_snapshot': {'dexId': 'pumpswap', 'symbol': 'Young', 'priceUsd': 1}}
+        # Two losses on 'Lost' in one Lab book: that book's own entry path blocks it, but
+        # the seat serves every other ledger too, so the pool keeps its seat.
         state = {'feed': [safe, young, fake, lost], 'positions': [held],
                  'history': [], 'strategy_lab': {'books': {'MOMENTUM': {'history': losses(
                      lost['address'], lost['pairAddress'], self.NOW, first_age=30 * MINUTE)}}}}
         selected, report = scheduler.select(state, now=self.NOW, max_tracked=4)
         symbols = [row['symbol'] for row in selected]
-        self.assertEqual(symbols, ['Young', 'Safe'], 'the held young pool stays pinned; only Safe gets a seat')
+        self.assertEqual(symbols[0], 'Young', 'the held young pool stays pinned')
+        self.assertEqual(sorted(symbols[1:]), ['Lost', 'Safe'], 'only the fake-cap pool is withheld')
         defensive = report['defensive_entry']
-        # Pinned pools are never screened; the fake-cap and the losing pool are.
+        # Pinned pools are never screened; the fake-cap pool is withheld structurally.
         self.assertEqual(defensive['checked'], 3)
-        self.assertEqual(defensive['blocked_pools_in_feed'], 2)
-        self.assertEqual(defensive['rejections']['rug_young_pool'], 1)
-        self.assertEqual(defensive['rejections']['rug_fake_market_cap'], 1)
-        self.assertEqual(defensive['rejections']['pool_loss_cooldown'], 1)
+        self.assertEqual(defensive['blocked_pools_in_feed'], 1)
+        self.assertEqual(defensive['rejections'], {'rug_young_pool': 1, 'rug_fake_market_cap': 1})
+        self.assertNotIn('pool_loss_cooldown', defensive['rejections'])
+        self.assertEqual(defensive['pool_loss_memory_scope'], 'NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY')
+        self.assertEqual(defensive['heat_veto_mode'], 'LOG_ONLY_AT_SEATS_ENFORCED_BY_EACH_ENGINE')
         # Without the pin the young pool is screened like any candidate.
         selected, report = scheduler.select(dict(state, positions=[]), now=self.NOW, max_tracked=4)
-        self.assertEqual([row['symbol'] for row in selected], ['Safe'])
-        self.assertEqual(report['defensive_entry']['blocked_pools_in_feed'], 3)
+        self.assertEqual(sorted(row['symbol'] for row in selected), ['Lost', 'Safe'])
+        self.assertEqual(report['defensive_entry']['blocked_pools_in_feed'], 2)
         self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
         self.assertTrue(defensive['pinned_exit_pools_exempt'])
         # The fake-cap pool sits in the 30 bps tier but never reaches the cost-first seat group.
         self.assertEqual(cost_first.fee_tier_bps(fake), 30.0)
-        self.assertEqual([row['symbol'] for row in report['cost_first']['examples']], ['Safe'])
+        self.assertEqual(sorted(row['symbol'] for row in report['cost_first']['examples']), ['Lost', 'Safe'])
+        self.assertFalse(hasattr(tape_scheduler, 'visible_pool_loss_index'), 'no cross-ledger loss union')
 
-    def test_heat_warm_up_withholds_seats_until_five_minutes_of_history(self):
-        scheduler = TapePoolScheduler()
-        coin = self.coin('Safe')
-        times = list(range(self.NOW - 400_000, self.NOW + 1, 50_000))
-        seated = []
-        for stamp in times:
-            selected, report = scheduler.select({'feed': [dict(coin, updatedAt=stamp)]}, now=stamp, max_tracked=2)
-            seated.append(bool(selected))
-        self.assertEqual(seated[:6], [False] * 6)
-        self.assertTrue(seated[-1])
-        self.assertEqual(report['defensive_entry']['blocked'], 0)
-
-    def test_main_history_losses_also_withhold_the_seat(self):
+    def test_losses_in_any_ledger_never_withhold_the_seat(self):
+        # Main's own history and every Lab book's history: each entry path applies its
+        # own ledger's memory before quoting; the shared seat is not withheld.
         scheduler = TapePoolScheduler()
         coin = self.coin('Safe')
         warm(scheduler.defense.history, coin, self.NOW)
-        state = {'feed': [coin], 'history': losses(coin['address'], coin['pairAddress'], self.NOW)}
+        book_losses = {f'BOOK_{index}': {'history': losses(coin['address'], coin['pairAddress'], self.NOW)}
+                       for index in range(15)}
+        state = {'feed': [coin], 'history': losses(coin['address'], coin['pairAddress'], self.NOW),
+                 'strategy_lab': {'books': book_losses}}
         selected, report = scheduler.select(state, now=self.NOW, max_tracked=2)
-        self.assertEqual(selected, [])
-        self.assertEqual(report['defensive_entry']['pool_loss_cooldown_pools'], 1)
-        self.assertEqual(tape_scheduler.visible_pool_loss_index(state, self.NOW)[(coin['address'], coin['pairAddress'])]
-                         ['consecutive_losses'], 2)
+        self.assertEqual([row['symbol'] for row in selected], ['Safe'])
+        self.assertEqual(report['defensive_entry']['blocked'], 0)
+        self.assertNotIn('pool_loss_cooldown_pools', report['defensive_entry'])
+
+    def test_heat_is_log_only_at_seats(self):
+        # After a tape-only restart the scheduler's own history is empty: seats are still
+        # given at once (the engines enforce their own warm-up), the flag is counted.
+        scheduler = TapePoolScheduler()
+        coin = self.coin('Safe')
+        selected, report = scheduler.select({'feed': [coin]}, now=self.NOW, max_tracked=2)
+        self.assertEqual([row['symbol'] for row in selected], ['Safe'])
+        self.assertEqual(report['defensive_entry']['blocked'], 0)
+        self.assertEqual(report['defensive_entry']['log_only_flags'], {'heat_history_warming': 1})
+        self.assertTrue(report['defensive_entry']['heat_log_only'])
+
+    def test_a_hot_poll_never_drops_a_running_lease(self):
+        # One entry seat, two pools. The seated pool flickers hot for one 2 s poll (buy
+        # share and turnover above their thresholds): it keeps its lease, so its tape
+        # coverage is not reset; the engines refuse the entry while it is hot.
+        scheduler = TapePoolScheduler()
+        first, second = self.coin('Aaaa'), self.coin('Bbbb')
+        for coin in (first, second):
+            warm(scheduler.defense.history, coin, self.NOW)
+        selected, _ = scheduler.select({'feed': [first, second]}, now=self.NOW, max_tracked=1)
+        seated = selected[0]['symbol']
+        hot = {'Aaaa': first, 'Bbbb': second}[seated]
+        other = second if hot is first else first
+        flicker = dict(hot, txns={'m5': {'buys': 95, 'sells': 5}}, volume={'m5': 300_000.0, 'h1': 750_000.0},
+                       updatedAt=self.NOW + 2_000)
+        decision = entry_defense.DefensiveEntryLayer(history=scheduler.defense.history,
+                                                     registry=scheduler.defense.registry).evaluate(
+            flicker, self.NOW + 2_000, blocked_pools={})
+        self.assertIn('heat_buy_share_5m', decision['reasons'], 'an engine would refuse this entry now')
+        selected, report = scheduler.select({'feed': [flicker, dict(other, updatedAt=self.NOW + 2_000)]},
+                                            now=self.NOW + 2_000, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], [seated])
+        self.assertEqual(report['defensive_entry']['blocked'], 0)
+        self.assertGreaterEqual(report['defensive_entry']['log_only_flags'].get('heat_buy_share_5m', 0), 1)
+
+    def test_live_tape_registry_sidecar_lives_next_to_the_tape_file_and_survives_a_restart(self):
+        import live_tape
+        self.assertEqual(live_tape._POOL_SCHEDULER.defense.registry.path, live_tape.scheduler_registry_path())
+        self.assertEqual(live_tape.scheduler_registry_path().name, f'{live_tape.OUT.stem}.ticker_registry.json')
+        self.assertEqual(live_tape.scheduler_registry_path().parent, live_tape.OUT.parent)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = live_tape.scheduler_registry_path(Path(tmp) / 'live_tape.json')
+            self.assertEqual(path, Path(tmp) / 'live_tape.ticker_registry.json')
+            first = TapePoolScheduler(registry_path=path)
+            original = self.coin('Wose', symbol='WOSE', pairCreatedAt=self.NOW - 10 * DAY)
+            first.select({'feed': [original]}, now=self.NOW, max_tracked=2)
+            self.assertTrue(path.exists(), 'saved on the first observation')
+            # A restarted tape process remembers the ticker: a relaunch under another mint
+            # is a reuse and gets no seat.
+            restarted = TapePoolScheduler(registry_path=path)
+            self.assertEqual(restarted.defense.registry.status()['load_status'], 'LOADED')
+            self.assertEqual(len(restarted.defense.registry), 1)
+            relaunch = self.coin('Xyse', symbol='WOSE', pairCreatedAt=self.NOW - 2 * DAY)
+            selected, report = restarted.select({'feed': [relaunch]}, now=self.NOW + MINUTE, max_tracked=2)
+            self.assertEqual(selected, [])
+            self.assertEqual(report['defensive_entry']['rejections'], {'rug_ticker_reuse': 1})
 
 
 # ------------------------------------------------------------------ versions and replay

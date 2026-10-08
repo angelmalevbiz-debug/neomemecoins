@@ -26,13 +26,21 @@ refresher, never on the tape poll; the poll only reads the latest snapshot.
 Pools held only by personal engines are capped (NEO_TAPE_PERSONAL_PIN_LIMIT)
 after main's and Lab's pins, which are never capped.
 
-Defensive entry seats (V5): a pool that DEFENSIVE_ENTRY_LAYER_V1 blocks
-(STRUCTURAL_RUG_GUARD_V1, HEAT_VETO_STACK_V1 with the scheduler's own pair
-history, or POOL_LOSS_MEMORY_V1 in any ledger visible here: main's history
-and every Lab book's) cannot be entered, so it gets no entry or exploration
-seat. Pins of held positions are never affected. Every candidate group,
-including the cost-first universe (cost_first_established V2 includes the
-structural guard), shares this screen; nothing here admits a pool.
+Defensive entry seats (V5): a pool that STRUCTURAL_RUG_GUARD_V1 blocks
+(DEFENSIVE_ENTRY_LAYER_V1 with the scheduler's own ticker registry) cannot
+be entered by any engine, so it gets no entry or exploration seat. Pins of
+held positions are never affected. Every candidate group, including the
+cost-first universe (cost_first_established V2 includes the structural
+guard), shares this screen; nothing here admits a pool.
+A seat serves every ledger, so two parts of the layer do not withhold one:
+- POOL_LOSS_MEMORY_V1 is per ledger. A loss cooldown in one account or Lab
+  book says nothing about the others, and a withheld seat would leave every
+  engine without the COMPLETE exact-pool window it needs. Each entry path
+  applies its own ledger's memory before quoting.
+- HEAT_VETO_STACK_V1 runs log-only here (flags are counted, never withhold or
+  drop a seat). Heat is short-lived; dropping a lease on one hot poll would
+  reset the pool's tape coverage, and every engine enforces heat with its own
+  pair history at decision and again at commit.
 """
 import json
 import math
@@ -46,7 +54,6 @@ import cost_first_established as cost_first
 import entry_defense
 import funded_market_candidates
 import paper_market_feasibility as feasibility
-import pool_loss_memory
 from shared_snapshot_io import read_shared_text
 import winner_ensemble
 
@@ -406,21 +413,6 @@ class PersonalEnginePositions:
             thread.join(timeout)
 
 
-def visible_pool_loss_index(state, now):
-    """POOL_LOSS_MEMORY_V1 blocked pools of every ledger in the main /state document.
-
-    A seat serves every engine, so a pool in a loss cooldown in main's history
-    or in any Lab book's history gets no entry seat (conservative union);
-    each account's own entry path still applies its own memory.
-    """
-    indexes = [pool_loss_memory.index(state.get('history') or [], now)]
-    books = (state.get('strategy_lab') or {}).get('books') or {}
-    for book in (books.values() if isinstance(books, dict) else books):
-        if isinstance(book, dict):
-            indexes.append(pool_loss_memory.index(book.get('history') or [], now))
-    return pool_loss_memory.merge(*indexes)
-
-
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
                  shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS,
@@ -437,9 +429,15 @@ class TapePoolScheduler:
         # DEFENSIVE_ENTRY_LAYER_V1 of the tape process (own registry and history).
         self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path)
 
-    def defensive_entry_decision(self, coin, now, *, blocked_pools):
-        """Whether an entry into this pool could pass the defensive layer now."""
-        return self.defense.evaluate(coin, now, blocked_pools=blocked_pools)
+    def defensive_entry_decision(self, coin, now):
+        """Seat screen: the structural guard withholds the seat; heat flags are log-only.
+
+        No ledger's pool loss memory applies here (a seat serves every ledger;
+        each entry path applies its own), and heat never withholds or drops a
+        seat (each engine enforces it with its own pair history at decision
+        and commit).
+        """
+        return self.defense.evaluate(coin, now, blocked_pools={}, heat_log_only=True)
 
     def _shed_record(self, identity, coin, now, decode_yield):
         """Return the active shed record for a supported entry candidate, if any."""
@@ -499,9 +497,8 @@ class TapePoolScheduler:
         cost_first_rejections = {}
         # Every poll feeds the scheduler's ticker registry and pair history.
         self.defense.observe(list(market.values()), now)
-        blocked_pools = visible_pool_loss_index(state, now)
         defensive_summary = entry_defense.new_summary()
-        defensive_summary['pool_loss_cooldown_pools'] = len(blocked_pools)
+        defensive_summary['heat_log_only'] = True
         defensive_blocked = []
         model_possible = model_excluded = model_unknown = 0
         main_cost_cap = feasibility.number((state.get('config') or {}).get(
@@ -529,8 +526,9 @@ class TapePoolScheduler:
             if shed is not None:
                 shed_now.append(shed)
                 continue
-            # A pool no entry path may enter spends no seat (pins are exempt above).
-            defensive = self.defensive_entry_decision(coin, now, blocked_pools=blocked_pools)
+            # A pool the structural guard blocks for every entry path spends no
+            # seat (pins are exempt above); heat flags are counted log-only.
+            defensive = self.defensive_entry_decision(coin, now)
             entry_defense.record(defensive_summary, defensive, coin)
             if not defensive['allowed']:
                 defensive_blocked.append(identity)
@@ -646,9 +644,10 @@ class TapePoolScheduler:
                        'defensive_entry': {
                            **defensive_summary, 'examples': defensive_summary['examples'][:DEFENSIVE_EXAMPLE_LIMIT],
                            'blocked_pools_in_feed': len(defensive_blocked),
-                           'seat_rule': 'NO_ENTRY_OR_EXPLORATION_SEAT_FOR_A_BLOCKED_POOL',
+                           'seat_rule': 'NO_ENTRY_OR_EXPLORATION_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL',
                            'pinned_exit_pools_exempt': True,
-                           'pool_loss_memory_scope': 'MAIN_HISTORY_AND_LAB_BOOK_HISTORIES_UNION',
+                           'heat_veto_mode': 'LOG_ONLY_AT_SEATS_ENFORCED_BY_EACH_ENGINE',
+                           'pool_loss_memory_scope': 'NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY',
                            'layer': self.defense.status(), 'is_entry_authorization': False},
                        'funded_candidate_policy_version':funded_market_candidates.VERSION,
                        'checked_at': now, 'model_is_execution_quote': False,

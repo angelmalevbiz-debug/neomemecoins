@@ -57,6 +57,25 @@ const reasons: Record<string, string> = {
   // COST_FIRST_ESTABLISHED_V1: every universe candidate refused only for size or re-entry cooldown.
   cost_first_size_below_minimum: 'Размерът по ликвидност е под минималния вход',
   reentry_cooldown: 'Пауза преди повторен вход в същия токен',
+  // DEFENSIVE_ENTRY_LAYER_V1: same meaning as engine_entry_policy.LABELS (structural rug guard,
+  // pool loss memory of this book, heat veto); every matched candidate was removed by the layer.
+  defensive_entry: 'Защитният слой блокира всички кандидати',
+  rug_input_unknown: 'Непълни данни за структурна rug проверка',
+  rug_lp_pullable: 'Ликвидност >= капитализация: създателят може да изтегли LP',
+  rug_young_pool: 'Pool-ът е по-млад от 12 часа',
+  rug_fake_market_cap: 'Надута капитализация (>= $20M) при ликвидност под 2%',
+  rug_ticker_reuse: 'Тикерът вече е използван от друг mint',
+  pool_loss_cooldown: 'Пауза 6 ч. след 2 поредни загуби в същия pool',
+  heat_history_warming: 'Под 5 минути история на pool-а',
+  heat_input_unknown: 'Липсва текуща цена за проверка на прегряване',
+  heat_return_5m_surge: 'Ръст >= 3% за 5 минути (гонене на движение)',
+  heat_buy_share_5m: 'Дял на покупките >= 70% за 5 минути',
+  heat_volume_acceleration: 'Ускорение на обема >= 1.3x спрямо часовото темпо',
+  heat_extended_move: 'Разтегнато движение (6ч >= +200% или 24ч >= +150%)',
+  heat_paid_profile_high_fee: 'Платен профил през последния час при такса >= 100 bps',
+  heat_crash_in_progress: 'Срив в ход (<= 75% от 15-мин. връх или -20% за 5 мин.)',
+  heat_turnover_5m: 'Оборот за 5 мин. / ликвидност >= 0.095',
+  defensive_entry_error: 'Грешка в защитната проверка: входът е блокиран',
 };
 
 export type CostFeasibility = {

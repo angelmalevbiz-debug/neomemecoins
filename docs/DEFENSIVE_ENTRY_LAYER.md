@@ -8,11 +8,15 @@ front of **every** PAPER entry path:
 - `POOL_LOSS_MEMORY_V1` (`backend/pool_loss_memory.py`)
 
 The vetoes run before any quote, flow promotion, RugCheck call or Jupiter price probe.
+The tape scheduler is the one exception to "all three": its seats serve every ledger, so
+it withholds a seat only on the structural guard (see [Where it runs](#where-it-runs)).
 
 The layer is PAPER only. It removes candidates. It never admits, sizes, prices or exits
 anything. Exits of open positions, cost caps, `engine_rug_guard` (`RUG_GUARD_V2`, the
 RugCheck report), every ledger and every balance are unchanged. Nothing is reset or
-rewritten.
+rewritten. The companion score change is an entry change only: the ORDER_FLOW_ADAPTIVE
+exit context keeps reading the V1 score (see
+[Exit context](#exit-context-the-v1-score-stays-the-exit-basis)).
 
 **No profitability claim.** The research behind this change found no strategy with
 positive expectancy after costs. These rules measurably cut losses. They do not create
@@ -136,7 +140,7 @@ recorded.
 | `heat_volume_acceleration` | (c) `volume.m5` / (`volume.h1` / 12) ≥ 1.3 |
 | `heat_extended_move` | (d) `priceChange.h6` ≥ +200, or `priceChange.h24` ≥ +150 |
 | `heat_paid_profile_high_fee` | (e) The fee tier (`paper_market_feasibility.pumpswap_fee_bps`) is at least 100 bps, and the pair carried the paid-profile `latest` source (`token-profiles/latest`) at any time in the last 60 min. |
-| `heat_crash_in_progress` | (f) The price is at or below 75% of its 15-min high, or the 5-min return is −20% or worse. |
+| `heat_crash_in_progress` | (f) The price is at or below 75% of its 15-min high, or the 5-min return is −20% or worse. The 15-min high reads every retained sample of the last 15 min across feed gaps, like the research window; the 5-min return needs the current contiguous segment. |
 | `heat_turnover_5m` | (g) `volume.m5` / `liquidityUsd` ≥ 0.095 (the 80th percentile on pre-cutoff data) |
 
 `PairHistory` keeps rolling samples of (t, price, paid flag) per pair, fed every scan:
@@ -145,17 +149,28 @@ recorded.
 - A sample is stored when the price or the paid flag changes, every 30 s as a heartbeat,
   and at the start of each segment.
 - An absence longer than 120 s restarts the segment, and with it the warm-up. A pair not
-  re-observed within 120 s is warming again.
+  re-observed within 120 s is warming again. Each absence is kept as a gap (at most 64
+  per pair), so the 15-min crash high still sees the prices from before it. The opening
+  price, the last sample at or before the window start, counts only when its segment was
+  still observed after the window start.
 
-A missing m5 transaction count, a zero 1-hour volume or an unknown liquidity leaves rule
-(b), (c) or (g) unevaluated, as in the research. An unknown liquidity already fails the
-structural guard.
+A missing or malformed m5 transaction count (`txns` or `txns.m5` not a dict), a zero
+1-hour volume or an unknown liquidity leaves rule (b), (c) or (g) unevaluated, as in the
+research. An unknown liquidity already fails the structural guard.
 
 In `log_only` mode a book receives the same flags with `vetoed` false. This mode is for a
 pre-registered surge or dip hypothesis arm. `heat_veto.LOG_ONLY_BOOK_IDS` reserves the
 research arms `LAB_A_SURGE_EST_GUARD` and `LAB_B_DIP_MKTDIP_GUARD`, which are not
-registered yet. Every registered Lab book, every engine account, the training probe and
-the tape scheduler enforce the veto.
+registered yet. Every registered Lab book, every engine account and the training probe
+enforce the veto. The tape scheduler records the flags log-only (see below).
+
+### Errors fail closed
+
+`DefensiveEntryLayer.evaluate` and `observe` never raise. If deciding one candidate raises
+unexpectedly, that candidate is blocked with `defensive_entry_error` (the exception type
+is recorded, never the data), the error is counted in the layer `status()`, and the scan,
+the Lab refresh or the tape poll continues with the other candidates. A failed
+observation leaves the pair history short, so the heat veto keeps warming.
 
 ### POOL_LOSS_MEMORY_V1
 
@@ -180,9 +195,28 @@ Streak rules:
 | `COST_FIRST_ESTABLISHED_PAPER_V1` | Structural guard inside `cost_first_established.rejections` (universe V2), with the engine's registry; heat and loss memory as for the default | The universe is also rechecked at commit. |
 | Both `COST_FIRST` Lab books | Structural guard inside the same `cost_first_established.rejections`, with the Lab's registry | Plus the layer, as for every Lab book. |
 | Every Strategy Lab book | `strategy_lab.maybe_open`, right after the book's rule or universe match | Before the cost estimate, flow promotion, RugCheck, Jupiter price probes and modeled fills. Loss memory uses that book's own history. |
-| Tape scheduler (all seat groups, including `COST_FIRST_UNIVERSE`) | `TapePoolScheduler.select`, per candidate pool | A blocked pool gets no entry or exploration seat, and its lease is released. Pins of held positions are never screened. Loss memory is the union of main's history and every Lab book's history in `/state`. |
+| Tape scheduler (all seat groups, including `COST_FIRST_UNIVERSE`) | `TapePoolScheduler.select`, per candidate pool | A pool the structural guard blocks gets no entry or exploration seat. Heat runs log-only and no loss memory applies (see below). Pins of held positions are never screened. |
 | Training quote probe | `schedule_training_quote_probe` before the price and RugCheck calls; `run_training_quote_probe` again before `collect_exact_pool_quotes` | Loss memory uses the main account's history. |
 | Engine RugCheck prewarm | `prewarm_entry_checks` | A blocked pool's price and RugCheck reports are not requested. |
+
+### Why the tape seat screen is structural only
+
+A tape seat is not an entry. It gives a pool the exact-pool flow coverage that every engine
+needs before it may enter (`promoted_entry_guard.flow_admission` requires a COMPLETE
+window, which only a seated pool has), and one seat serves every ledger.
+
+- **Loss memory is per ledger.** Two losses in one Lab book (or in main) say nothing
+  about another account. A withheld seat would leave every engine, including accounts
+  with no losses there, without a COMPLETE window for up to 6 h. Each entry path applies
+  its own ledger's memory before quoting, so the seat adds nothing.
+- **Heat is short-lived.** A buy share or turnover near its threshold flickers. Dropping
+  a lease on one hot 2 s poll re-queued the pool behind others and could reset its
+  coverage, so when the heat cleared no engine had a COMPLETE window. Every engine
+  enforces heat with its own pair history at decision and again at commit. The tape
+  counts the flags (`log_only_flags`) and never withholds or drops a seat for them; after
+  a tape-only restart, seats are given without waiting for the tape's warm-up.
+- **The structural guard is durable**: an LP-pullable, young, fake-cap or reused-ticker
+  pool stays blocked for every engine, so it gets no seat.
 
 Consequences, all visible in diagnostics:
 
@@ -206,6 +240,34 @@ The score version is published as:
 - `scoreVersion` on each feed coin
 - `score_version` on new positions, in `/state` config and in entry diagnostics
 - part of every `effective_config_hash`
+
+### Exit context: the V1 score stays the exit basis
+
+The ORDER_FLOW_ADAPTIVE exit path calls `market_context(coin, position)` on every tick.
+Its conviction includes a `neo_score` term (+4 at ≥ 95, −4 below 85), and conviction
+drives `CONVICTION_EXIT` (< 35), `CONVICTION_PROFIT_LOCK` (< 50), `ADAPTIVE_MAX_HOLD`
+(< 72) and the hold mode (max hold, target, trail). Feeding it the V2 score would have
+changed exits under the unchanged `GOLD_ADAPTIVE_NET_CANDIDATE_V1` (for example a pool at
+liquidity/MC 1.2 scored 100 under V1 and 82 under V2, and the same flow moved conviction
+from STRONG to NORMAL).
+
+So the score change is an entry change only:
+
+- `score_pair_models` computes both scores from one observation; `make_coin` publishes
+  the V1 score as `scoreV1`. Every other score term is shared.
+- `market_context` with a held position reads `scoreV1`
+  (`EXIT_CONTEXT_SCORE_VERSION = NEO_MARKET_SCORE_V1`); an observation recorded before
+  V2 carries only `score`, which V1 computed.
+- An entry context publishes `exit_basis_conviction` (same flow, V1 score). A new
+  adaptive position's `adaptive_hold`, which the blind-flow exit fallback keeps, comes
+  from it. Entry gates still use the V2 conviction (`entry_conviction`,
+  `entry_hold_mode`).
+- `exit_context_score_version` is recorded in `/state` config, in the config ownership
+  map, on new positions and in every `effective_config_hash`.
+
+Exit decisions are therefore identical to the pre-change code for positions opened before
+and after this change; `tests/test_defensive_entry_layer.py` checks this for pools at
+liquidity/MC 0.7 and 1.1.
 
 ## Version strings
 
@@ -251,7 +313,7 @@ The Lab's retirement review counts closes per entry-policy version, as before:
 
 The reasons are also counted in `rejections` with Bulgarian labels
 (`engine_entry_policy.LABELS`). New positions carry `defensive_entry` (the decision they
-passed, with versions) and `score_version`.
+passed, with versions), `score_version` and `exit_context_score_version`.
 
 ### Lab books
 
@@ -266,9 +328,24 @@ the most frequent highest-priority reason. New Lab positions carry `defensive_en
 `live_tape_status.entry_scheduling.defensive_entry` contains:
 
 - counts and up to 6 examples
-- `blocked_pools_in_feed`
-- `pool_loss_memory_scope`
+- `blocked_pools_in_feed` (structurally blocked pools)
+- `log_only_flags` (heat flags counted, never a seat change) and
+  `heat_veto_mode: LOG_ONLY_AT_SEATS_ENFORCED_BY_EACH_ENGINE`
+- `pool_loss_memory_scope: NOT_APPLIED_AT_SEATS_EACH_LEDGER_AT_ITS_OWN_ENTRY`
 - `layer`
+
+### Lab dashboard
+
+`src/lib/labStrategyView.ts` names every defensive reason code (and the `defensive_entry`
+fallback) in Bulgarian, with the same meaning as `engine_entry_policy.LABELS`, so a Lab
+book blocked by the layer never shows a raw code.
+
+### What is not recorded
+
+Diagnostics are per scan or per refresh: counts plus a few examples, overwritten on the
+next scan. No per-candidate record of blocked pools is persisted (no journal rows, nothing
+in `audit.jsonl`). Matching structural reason codes against later drains needs the
+forward log listed under follow-ups.
 
 ## Replay
 
@@ -299,12 +376,18 @@ series for heat warm-up, and one paid-profile observation.
 
 - every rule, its boundaries and the reason order
 - registry persistence: restart, atomic replace, corrupt file, pruning, bounds, failed
-  replace, and the engine sidecar surviving a restart
-- each heat rule, warm-up, gaps, staleness and `log_only`
+  replace, and the engine and tape sidecars surviving a restart
+- each heat rule, warm-up, gaps, staleness, a crash during a feed gap, malformed inputs
+  and `log_only`; a raising evaluation fails closed
 - loss-memory streaks, including the swordinu re-buy pattern
-- the score band
+- the score band, and unchanged ORDER_FLOW_ADAPTIVE exit context and hold mode at
+  liquidity/MC 0.7 and 1.1
 - an integration test per entry path, proving that the guard, veto and loss memory are
-  consulted before any quote, flow promotion, RugCheck or price probe
+  consulted before any quote, flow promotion, RugCheck or price probe, including the
+  RugCheck prewarm
+- tape seats: structural blocks withheld, another ledger's losses and heat flags never
+  withhold or drop a seat
+- the Lab dashboard labels every defensive reason code
 
 Existing gate tests isolate the layer with a module-level patch (`TEST_GATE_ISOLATION`).
 The cost-first universe's structural guard is not patched in those tests.
@@ -316,15 +399,17 @@ The cost-first universe's structural guard is not patched in those tests.
 - The isolated training learner books (`paper_training.py`, never promoted
   automatically) are not gated here. They simulate from the observations they receive.
   The route-quote probe that feeds them executable evidence is gated.
-- The scheduler sees main's and the Lab's closed history in `/state`, not personal
-  engines' histories. Each personal engine applies its own loss memory at entry.
-- Heat history is per process and starts empty after a restart, which costs a 5-min
-  warm-up. Only the ticker registry persists.
+- The scheduler applies no loss memory and only log-only heat at its seats; each engine,
+  personal engines included, applies its own loss memory and heat at entry.
+- Heat history is per process and starts empty after a restart, which costs an engine or
+  the Lab a 5-min warm-up (the tape seats do not wait). Only the ticker registry persists.
 - These research suggestions are not implemented:
   - the LAB_A and LAB_B arms (their ids are reserved as log-only)
   - the optional "exit on first paid-profile appearance" trigger
   - retiring `EXIT_IMPACT_EMERGENCY_V1` for main and ORDER_FLOW_ADAPTIVE
-- Keep a forward log of structural reason codes against later drains (liquidity to 0, or
-  price −80% within 10 min) for several days before trusting the precision numbers. Judge
+- Not implemented yet: a bounded forward log of blocked candidates (abbreviated mint and
+  pool, reasons, liquidity/MC, age, market cap) to match structural reason codes against
+  later drains (liquidity to 0, or price −80% within 10 min). Keep one for several days
+  before trusting the precision numbers. Judge
   every book on the `STRATEGY_VALIDATION.md` acceptance basis. The layer is never itself
   a reason to promote anything.

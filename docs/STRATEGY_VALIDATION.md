@@ -76,7 +76,8 @@ Every entry path now runs `STRUCTURAL_RUG_GUARD_V1`, `HEAT_VETO_STACK_V1` and `P
 - Closes after this change carry new entry-policy versions (`WINNER_ENSEMBLE_VERIFIED_ENTRY_V5`, `ORDER_FLOW_BALANCED_V5`, `COST_FIRST_ESTABLISHED_ENTRY_V2`, `COST_FIRST_ESTABLISHED_V2`, `LAB_ACTIVE_V7_DEFENSIVE_ENTRY`, `PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5`) and are a new sample; earlier closes are never relabelled or pooled into it as acceptance evidence.
 - The cost-first pair's acceptance criteria above apply unchanged to its V2 sample (structural guard inside the universe). Its V1 sample is a different universe that included rug-family pools.
 - A book or account that the layer leaves with too few entries to reach the gates is reported as such; filters are never loosened to force trades.
-- The layer's own precision is judged forward: structural reason codes are recorded on every blocked candidate, so later drains (liquidity → 0 or price −80% within 10 min) can be matched against them before the precision figures are trusted.
+- The layer's own precision is not yet measurable forward. Entry diagnostics keep only per-scan counts and a few examples, overwritten every scan; no per-candidate record of blocked pools is persisted. Matching structural reason codes against later drains (liquidity → 0 or price −80% within 10 min) needs the bounded forward log listed as a follow-up in DEFENSIVE_ENTRY_LAYER.md; until it exists and has run for several days, the research precision figures are not confirmed on live data.
+- Exits are unchanged: the ORDER_FLOW_ADAPTIVE exit context keeps the V1 market score (`EXIT_CONTEXT_SCORE_VERSION`), so an adaptive close is comparable across the change; the V2 score affects entries only.
 
 ## Dataset provenance and measurements
 

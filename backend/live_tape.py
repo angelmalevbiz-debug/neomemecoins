@@ -101,9 +101,17 @@ STATUS = {'status':'starting','tracked_pairs':0,'updated_at':0,
                      'unvalidated_flow_quality':'DEGRADED'}}
 _RECORDER = None
 _NEXT_REFERENCE_AT = 0
-# The scheduler's DEFENSIVE_ENTRY_LAYER_V1 keeps its ticker registry in a
-# sidecar next to the tape file (live_tape.ticker_registry.json).
-_POOL_SCHEDULER = TapePoolScheduler(registry_path=OUT.with_name(f'{OUT.stem}.ticker_registry.json'))
+
+
+def scheduler_registry_path(out=OUT):
+    """The scheduler's ticker registry sidecar next to the tape file (live_tape.ticker_registry.json)."""
+    out = Path(out)
+    return out.with_name(f'{out.stem}.ticker_registry.json')
+
+
+# The scheduler's DEFENSIVE_ENTRY_LAYER_V1 keeps its ticker registry in that
+# sidecar, so a tape restart keeps the ticker memory.
+_POOL_SCHEDULER = TapePoolScheduler(registry_path=scheduler_registry_path())
 
 
 # Personal-engine reads run on the refresher thread, so they use their own

@@ -78,16 +78,6 @@ def index(history, now, *, consecutive_losses=CONSECUTIVE_LOSSES, cooldown_ms=CO
     return blocked
 
 
-def merge(*indexes) -> dict:
-    """Union of several ledgers' indexes; a pool keeps its latest blocked_until."""
-    merged = {}
-    for blocked in indexes:
-        for key, record in (blocked or {}).items():
-            if key not in merged or record['blocked_until'] > merged[key]['blocked_until']:
-                merged[key] = dict(record)
-    return merged
-
-
 def check(coin, now, *, history=None, blocked=None) -> dict:
     """Decision for one candidate; pass a precomputed ``blocked`` index or a ``history``."""
     coin = coin if isinstance(coin, dict) else {}
@@ -106,6 +96,7 @@ def check(coin, now, *, history=None, blocked=None) -> dict:
 def config() -> dict:
     return {'version': VERSION, 'reason': REASON, 'consecutive_losses': CONSECUTIVE_LOSSES,
             'cooldown_hours': COOLDOWN_MS / 3_600_000, 'scope': 'same (mint, pool) within one account or one Lab book',
+            'cross_ledger_union': False,
             'loss_definition': 'net pnl_usd < 0 on a closed trade', 'unknown_pnl': 'skipped, does not break a streak',
             'source': 'existing closed history, read-only', 'ledger_schema_changed': False,
             'exits_changed': False, 'is_entry_authorization': False, 'profitability_proven': False}

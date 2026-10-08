@@ -109,26 +109,31 @@ Rules fixed before the run:
   one or from the pre-registered defaults (a `NEO_LAB_*` override fails closed instead
   of silently changing the hashes; `cost_model_overrides` names it). Nothing is retuned
   on the forward sample.
-- **Signal carry (`LAB_FORWARD_SIGNAL_CARRY_V1`, all four books).** A matched signal whose
+- **Signal carry (`LAB_FORWARD_SIGNAL_CARRY_V2`, all four books).** A matched signal whose
   only blocker is the asynchronous price cross-check is retried on the pool's current
-  observation for up to 60 s (the research fill window), with every other gate re-run.
-  Without it, single-observation signals (LAB_A fresh crossings, every random draw) were
-  lost on a cold price reference while LAB_B's persistent dip was not. A signal inside its
-  cooldown is not held (the harness skips such points), and a newer match of a held pool
-  continues the same signal run. Signals still lost to a pending check are counted per
-  book and published in the gate.
+  observation for up to 60 s after its run's first signal (the research fill window), with
+  every other gate re-run. Without it, single-observation signals (LAB_A fresh crossings,
+  every random draw) were lost on a cold price reference while LAB_B's persistent dip was
+  not. A signal inside its cooldown is not held (the harness skips such points), and a
+  newer match of a held pool continues the same signal run without extending its window,
+  so a persistent dip is held no longer than a random draw (V1, never released, restarted
+  the window at every match). Signals still lost to a pending check are counted per book
+  and published in the gate.
 - **Basis.** Booked P&L is the Lab's shared spot model plus CALIB_V1 per leg. Every close
   also records `net50` = booked net − 50 bps per leg − 200 bps more on stop exits − 100 bps
   on trailing exits. The kill rule and the gate below use net50.
-- **Fill basis (`LAB_FORWARD_FILL_BASIS_V3`).** The books book an entry at the entry
+- **Fill basis (`LAB_FORWARD_FILL_BASIS_V4`).** The books book an entry at the entry
   observation's DexScreener print and an exit at the triggering mark. The research judged
   every book on fills at the next DexScreener refresh (`harness_final` F1: the first later
   exact-pool observation within 60 s whose price differs from the decision print, the
   decision being the first signal point of a run). For a signal held past a pending price
-  check that is earlier than the entry observation, and V3 anchors the shadow at the run's
+  check that is earlier than the entry observation, and V4 anchors the shadow at the run's
   first signal for every book alike, whether the entry observation matched again (a
-  persistent LAB_B dip) or the signal was carried (a random draw); V2 decided a re-matched
-  dip at its entry observation and so filled it a refresh later than its control. That
+  persistent LAB_B dip) or the signal was carried (a random draw), never more than 60 s
+  before the entry (a run ends 60 s after its first signal). V3 kept that anchor through
+  a run whose window restarted at every match, so a dip held for minutes was anchored
+  minutes before its entry, where no draw could be; V2 decided a re-matched dip at its
+  entry observation and so filled it a refresh later than its control. That
   difference is not neutral: on the research data the next refresh averaged +0.335% above
   the print at LAB_B signals and −0.171% at RND_LAB_B draws, so booked fills favour LAB_B
   against its control (measured read-only by the code review). Each position and close

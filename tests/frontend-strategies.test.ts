@@ -295,7 +295,7 @@ test('LAB_FORWARD_CASH_STATE_V1 and CLOSE_POLICY_V1: a stalled book is not shown
   assert.match(source, /forwardCloseNote\(trade\.close_kind\)/);
 });
 
-test('LAB_FORWARD_CONTROL_CONTINUITY_V1 and SIGNAL_CARRY_V1: a control keeps measuring for its hypothesis, lost signals are named', () => {
+test('LAB_FORWARD_CONTROL_CONTINUITY_V1 and SIGNAL_CARRY_V2: a control keeps measuring for its hypothesis, lost signals are named', () => {
   const control = { ...book('RND_LAB_B', 185, 500), strategy_lifecycle: {
     version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', reason: 'control_kill_rule_deferred', entry_enabled: true,
     capital_mode: 'zero_capital_control',

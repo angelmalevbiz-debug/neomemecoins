@@ -68,10 +68,10 @@ DAY = 24 * HOUR
 # change must change these pins, strategy-lock.json (lab_forward_tests.config_hashes and
 # books) and the hash table in docs/LAB_FORWARD_TESTS.md together; tests check all three.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': 'a79ed77ba5c50947bef9ae71f7013fdc0e301eede0f6ced6698c4776c85c08df',
-    'RND_LAB_A': '35521efaa5c194076a49c9c9a09258f60459b9d596d1672282f5276e91d83be5',
-    'LAB_B_DIP_MKTDIP_GUARD': '54d1ba28458e332b9c0cd1a0b47412912bda32c7d71213fcacc199ee17fb0bde',
-    'RND_LAB_B': 'a4b0c208eded6bfe720caabddb88443ef6f33b9a48729a883d000f12afcaa235',
+    'LAB_A_SURGE_EST_GUARD': '292751d2bfd9a7271a1207af5dd31491874c75dbb928fe32032cf3029c6d847a',
+    'RND_LAB_A': 'ff7b2476cfff907f2d433dcfd42b0a90f4eb15f7bb09bfd2536c912c2b0dab70',
+    'LAB_B_DIP_MKTDIP_GUARD': 'd663ad68e18dfe7d8a5d903983cab8e36e0e8580a6c9fa1db18020f03f2adaa1',
+    'RND_LAB_B': '3ca173cda26c47cd512a688a86620f348f9c70a9a742874ee651af60c8589365',
 }
 
 
@@ -250,15 +250,21 @@ class DefinitionTests(unittest.TestCase):
             self.assertNotEqual(lf.config_hash(lf.LAB_A_ID), PINNED_CONFIG_HASHES[lf.LAB_A_ID])
         with patch.object(lf, 'CASH', dataclasses.replace(lf.CASH, network_fee_reserve_usd=1.0)):
             self.assertNotEqual(lf.config_hash(lf.LAB_B_ID), PINNED_CONFIG_HASHES[lf.LAB_B_ID])
-        # LAB_FORWARD_SIGNAL_CARRY_V1 and LAB_FORWARD_CONTROL_CONTINUITY_V1 are part of every book's test.
+        # LAB_FORWARD_SIGNAL_CARRY_V2 and LAB_FORWARD_CONTROL_CONTINUITY_V1 are part of every book's test.
         with patch.object(lf, 'SIGNAL_CARRY', dataclasses.replace(lf.SIGNAL_CARRY, max_age_ms=30_000)):
             for book_id in lf.BOOK_IDS:
                 self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+        # LAB_FORWARD_SIGNAL_CARRY_V2 (a run's window measured from its first signal) is a new evidence
+        # sample, as the never released V1 was.
+        for version in lf.SIGNAL_CARRY_PREVIOUS_VERSIONS:
+            with patch.object(lf, 'SIGNAL_CARRY', dataclasses.replace(lf.SIGNAL_CARRY, version=version)):
+                for book_id in lf.BOOK_IDS:
+                    self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
         with patch.object(lf, 'CONTROL_CONTINUITY', dataclasses.replace(lf.CONTROL_CONTINUITY, version='PROBE')):
             for book_id in lf.BOOK_IDS:
                 self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
-        # LAB_FORWARD_FILL_BASIS_V3 (every entry decided at its signal run's first signal) is a new
-        # evidence sample, as each earlier, never released version was.
+        # LAB_FORWARD_FILL_BASIS_V4 (every entry decided at its signal run's first signal, a run at most
+        # 60 s long) is a new evidence sample, as each earlier, never released version was.
         for version in lf.FILL_BASIS_PREVIOUS_VERSIONS:
             with patch.object(lf, 'FILL_BASIS', dataclasses.replace(lf.FILL_BASIS, version=version)):
                 for book_id in lf.BOOK_IDS:
@@ -266,11 +272,22 @@ class DefinitionTests(unittest.TestCase):
         with patch.object(lf, 'SIGNAL_CARRY', dataclasses.replace(lf.SIGNAL_CARRY, cooldown_at_signal='held')):
             for book_id in lf.BOOK_IDS:
                 self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+        with patch.object(lf, 'SIGNAL_CARRY', dataclasses.replace(
+                lf.SIGNAL_CARRY, age_basis='the latest matched signal observation of the pool (observed_at)')):
+            for book_id in lf.BOOK_IDS:
+                self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+        self.assertEqual((lf.SIGNAL_CARRY_VERSION, lf.SIGNAL_CARRY_PREVIOUS_VERSIONS),
+                         ('LAB_FORWARD_SIGNAL_CARRY_V2', ('LAB_FORWARD_SIGNAL_CARRY_V1',)))
+        self.assertEqual(lf.FILL_BASIS_PREVIOUS_VERSIONS,
+                         ('LAB_FORWARD_FILL_BASIS_V3', 'LAB_FORWARD_FILL_BASIS_V2', 'LAB_FORWARD_FILL_BASIS_V1'))
+        # A run's window is the research fill window: the harness never fills later after its decision.
+        self.assertEqual(lf.SIGNAL_CARRY.max_age_ms, lf.FILL_BASIS.max_fill_lag_ms)
         for book_id in lf.BOOK_IDS:
             parameters = lf.book_parameters(book_id)
-            self.assertEqual(parameters['fill_basis']['version'], 'LAB_FORWARD_FILL_BASIS_V3')
+            self.assertEqual(parameters['fill_basis']['version'], 'LAB_FORWARD_FILL_BASIS_V4')
             self.assertEqual(parameters['kill_rule']['bases'],
-                             'booked and research_fill (LAB_FORWARD_FILL_BASIS_V3); met on either retires')
+                             'booked and research_fill (LAB_FORWARD_FILL_BASIS_V4); met on either retires')
+            self.assertEqual(parameters['signal_carry']['version'], 'LAB_FORWARD_SIGNAL_CARRY_V2')
             self.assertEqual(parameters['signal_carry']['max_age_ms'], 60_000)
             self.assertEqual(parameters['signal_carry']['carried_blocker'], 'price_crosscheck_pending')
             self.assertEqual(parameters['control_continuity']['version'], lf.CONTROL_CONTINUITY_VERSION)
@@ -330,12 +347,16 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual(section['known_versions'], list(lf.KNOWN_VERSIONS))
         self.assertFalse(section['tape_pin_required'])
         self.assertEqual(section['promotion_gate']['min_control_coverage'], 0.9)
-        # LAB_FORWARD_FILL_BASIS_V3 and the review-cost rule are part of the locked definition.
+        # LAB_FORWARD_FILL_BASIS_V4 and the review-cost rule are part of the locked definition.
         self.assertEqual(section['fill_basis'], dataclasses.asdict(lf.FILL_BASIS))
         self.assertEqual((section['fill_basis_version'], section['fill_basis']['version']),
-                         (lf.FILL_BASIS_VERSION, 'LAB_FORWARD_FILL_BASIS_V3'))
-        self.assertTrue(section['fill_basis_previous_version'].startswith('LAB_FORWARD_FILL_BASIS_V2, never released'))
-        self.assertIn('LAB_FORWARD_FILL_BASIS_V1, never released', section['fill_basis_previous_version'])
+                         (lf.FILL_BASIS_VERSION, 'LAB_FORWARD_FILL_BASIS_V4'))
+        self.assertTrue(section['fill_basis_previous_version'].startswith('LAB_FORWARD_FILL_BASIS_V3, never released'))
+        for version in ('LAB_FORWARD_FILL_BASIS_V2', 'LAB_FORWARD_FILL_BASIS_V1'):
+            self.assertIn(f'{version}, never released', section['fill_basis_previous_version'])
+        self.assertEqual(section['signal_carry']['version'], 'LAB_FORWARD_SIGNAL_CARRY_V2')
+        self.assertTrue(section['signal_carry_previous_version'].startswith(
+            'LAB_FORWARD_SIGNAL_CARRY_V1, never released'))
         self.assertEqual((section['kill_rule']['bases'], section['kill_rule']['bootstrap_min_closes']),
                          (lf.KILL_RULE.bases, lf.KILL_RULE.bootstrap_min_closes))
         self.assertEqual(section['promotion_gate']['max_research_fill_unobserved_leg_share'],
@@ -1224,7 +1245,7 @@ class KillRuleTests(unittest.TestCase):
 # ------------------------------------------------------------------ fill basis
 
 class FillBasisTests(unittest.TestCase):
-    """LAB_FORWARD_FILL_BASIS_V3 legs: the research harness's next-refresh fill (harness_final F1)."""
+    """LAB_FORWARD_FILL_BASIS_V4 legs: the research harness's next-refresh fill (harness_final F1)."""
     MINT, PAIR = full('FillMint'), full('FillPair')
     T0 = 1_800_000_000_000
 
@@ -1324,7 +1345,7 @@ class FillBasisTests(unittest.TestCase):
         same = self.coin(1.00, T0 + 9_000)
         leg, _ = lf.entry_fill_leg(carry.carried_evaluation(lf.RND_A_ID, key, T0 + 9_500, coin=same), same, T0 + 9_500)
         self.assertEqual((leg['status'], leg['decision_at'], leg['first_later_at']), (lf.FILL_PENDING, T0, T0 + 9_000))
-        # A newer matched signal of the same pool continues the run (LAB_FORWARD_FILL_BASIS_V3): the leg
+        # A newer matched signal of the same pool continues the run (LAB_FORWARD_FILL_BASIS_V4): the leg
         # stays decided at the run's first signal and the newer observation, the first differing refresh
         # after it, is the harness's fill (V2 restarted the leg at T0 + 4 s and filled it at S1).
         carry = lf.SignalCarry()
@@ -1427,13 +1448,15 @@ class FillBasisTests(unittest.TestCase):
         carry = lf.SignalCarry()
         carry.hold(book, key, self.dip(T0), T0 + 500, coin=s0)
         carry.hold(book, key, self.dip(T0 + 3_000), T0 + 3_500, coin=s1)
-        # The window restarts at the newer match (60 s after it); the decision stays at the first signal.
-        carried = carry.carried_evaluation(lf.LAB_B_ID, key, T0 + 63_000)
+        # The window does not restart at the newer match (LAB_FORWARD_SIGNAL_CARRY_V2): it ends 60 s after
+        # the run's first signal, where the decision stays.
+        carried = carry.carried_evaluation(lf.LAB_B_ID, key, T0 + 60_000)
         self.assertIsNotNone(carried)
         self.assertEqual((carried['observed_at'], carried['carry']['first_signal_observed_at'],
                           carried['carry']['signals'], carried[lf.CARRIED_FILL_LEG]['decision_at'],
                           carried[lf.CARRIED_FILL_LEG]['first_later_at']), (T0 + 3_000, T0, 2, T0, T0 + 3_000))
-        self.assertIsNone(carry.carried_evaluation(lf.LAB_B_ID, key, T0 + 63_001))
+        self.assertIsNone(carry.carried_evaluation(lf.LAB_B_ID, key, T0 + 60_001))
+        self.assertIsNone(carry.carried_evaluation(lf.LAB_B_ID, key, T0 + 63_000), 'V1 kept it until here')
         # An episode evicted in the same refresh and held again keeps its run (first signal, leg).
         carry = lf.SignalCarry(dataclasses.replace(lf.SIGNAL_CARRY, max_pending_per_book=1))
         carry.hold(book, key, self.dip(T0), T0 + 500, coin=s0)
@@ -1503,7 +1526,7 @@ class FillBasisTests(unittest.TestCase):
 # ------------------------------------------------------------------ signal carry
 
 class SignalCarryTests(unittest.TestCase):
-    """LAB_FORWARD_SIGNAL_CARRY_V1 episodes: bounded, per book, counted per config hash in the ledger."""
+    """LAB_FORWARD_SIGNAL_CARRY_V2 episodes: bounded, per book, counted per config hash in the ledger."""
     T = 1_800_000_000_000
 
     @staticmethod
@@ -1524,14 +1547,18 @@ class SignalCarryTests(unittest.TestCase):
         self.assertTrue(carry.carried_evaluation(lf.RND_B_ID, a, T + 5_000)['signal']['drawn'], 'a copy')
         self.assertFalse(carry.hold(book, a, carried, T + 6_000), 'a carried retry never extends the window')
         self.assertEqual(carry.carried_evaluation(lf.RND_B_ID, a, T + 6_000)['observed_at'], T + 3_000)
-        # The window: 60 s after the latest signal observation.
+        # The window: 60 s after the run's first signal observation (LAB_FORWARD_SIGNAL_CARRY_V2); the
+        # newer signal at T + 3 s does not extend it (V1 kept the episode until T + 63 s).
+        self.assertIsNotNone(carry.carried_evaluation(lf.RND_B_ID, a, T + 60_000))
+        self.assertIsNone(carry.carried_evaluation(lf.RND_B_ID, a, T + 60_001))
+        self.assertTrue(carry.resolve(book, a, 'entered'))
+        self.assertFalse(carry.resolve(book, a, 'entered'), 'an episode ends once')
         carry.hold(book, b, self.evaluation(T + 1_000), T + 2_000)
         self.assertIsNotNone(carry.carried_evaluation(lf.RND_B_ID, b, T + 61_000))
         self.assertIsNone(carry.carried_evaluation(lf.RND_B_ID, b, T + 61_001))
+        self.assertEqual(carry.expire(book, T + 61_000), 0)
         self.assertEqual(carry.expire(book, T + 61_001), 1)
-        self.assertEqual(carry.pending_count(lf.RND_B_ID), 1)
-        self.assertTrue(carry.resolve(book, a, 'entered'))
-        self.assertFalse(carry.resolve(book, a, 'entered'), 'an episode ends once')
+        self.assertEqual(carry.pending_count(lf.RND_B_ID), 0)
         carry.hold(book, b, self.evaluation(T + 70_000), T + 70_500)
         carry.hold(book, c, self.evaluation(T + 70_000), T + 70_500)
         self.assertEqual(carry.clear(book, 'superseded', keep=c), 1)
@@ -1568,6 +1595,66 @@ class SignalCarryTests(unittest.TestCase):
         self.assertIsNone(carry.carried_evaluation(lf.RND_A_ID, ('M0', 'P0'), self.T + 10), 'the oldest is evicted')
         counters = lf.signal_carry_counters(book)
         self.assertEqual((counters['pending_signals'], counters['lost_price_pending']), (3, 1))
+
+    def test_a_run_ends_60_s_after_its_first_signal_and_a_later_match_starts_a_new_run(self):
+        """Review finding (final r5): V1 restarted the window at every newer match (60 s after the LATEST
+        signal) while the research fill stayed decided at the run's FIRST signal, so a persistent dip whose
+        check stayed pending was held, and anchored, for as long as it kept matching; a draw 60 s at most."""
+        carry, book, T = lf.SignalCarry(), {'id': lf.LAB_B_ID}, self.T
+        key = (full('RunMint'), full('RunPair'))
+
+        def coin(index):
+            return pool(key[0], key[1], round(1.0 - 0.01 * index, 6), 400_000.0, T + 9_000 * index)
+
+        def dip(index):
+            return dict(self.evaluation(T + 9_000 * index, lf.LAB_B_ID), signal={'kind': 'dip_in_market_dip'})
+
+        self.assertTrue(carry.hold(book, key, dip(0), T + 500, coin=coin(0)))
+        for index in range(1, 7):                       # +9 s .. +54 s: the same run, still pending
+            now = T + 9_000 * index + 500
+            continued = carry.continued_evaluation(lf.LAB_B_ID, key, dip(index), now, coin=coin(index))
+            self.assertEqual((continued['carry']['first_signal_observed_at'], continued['carry']['rematched']),
+                             (T, True))
+            self.assertFalse(carry.hold(book, key, continued, now, coin=coin(index)))
+        # The window ends 60 s after the first signal, however recent the latest match.
+        carried = carry.carried_evaluation(lf.LAB_B_ID, key, T + 60_000)
+        self.assertEqual((carried['carry']['signal_observed_at'], carried['carry']['signals']), (T + 54_000, 7))
+        self.assertIsNone(carry.carried_evaluation(lf.LAB_B_ID, key, T + 60_001))
+        # A match after the window is not linked to the old run: it is the first signal of its own.
+        late = dip(7)                                   # +63 s
+        self.assertIs(carry.continued_evaluation(lf.LAB_B_ID, key, late, T + 63_500, coin=coin(7)), late)
+        leg, decision = lf.entry_fill_leg(late, coin(7), T + 63_500)
+        self.assertEqual((decision, leg['decision_at'], leg['decision_price']),
+                         (lf.ENTRY_DECISION_ENTRY, T + 63_000, 0.93))
+        # Held again (expire() has not run yet): the old run ends as lost and a new run starts at +63 s.
+        self.assertTrue(carry.hold(book, key, late, T + 63_500, coin=coin(7)))
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['lost_price_pending']), (2, 1))
+        carried = carry.carried_evaluation(lf.LAB_B_ID, key, T + 72_500, coin=coin(8))
+        self.assertEqual((carried['carry']['first_signal_observed_at'], carried['carry']['signals'],
+                          carried['carry']['first_pending_at'], carried[lf.CARRIED_FILL_LEG]['decision_at'],
+                          carried[lf.CARRIED_FILL_LEG]['fill_at']), (T + 63_000, 1, T + 63_500, T + 63_000, T + 72_000))
+        leg, decision = lf.entry_fill_leg(carried, coin(8), T + 72_500)
+        self.assertEqual((decision, leg['decision_at'], leg['fill_price']), (lf.ENTRY_DECISION_SIGNAL, T + 63_000, 0.92))
+        # expire() ends the new run 60 s after its own first signal, lost again.
+        self.assertEqual(carry.expire(book, T + 123_000), 0)
+        self.assertEqual(carry.expire(book, T + 123_001), 1)
+        self.assertEqual(lf.signal_carry_counters(book)['lost_price_pending'], 2)
+        # An evaluation whose run is past its window (say an episode evicted and held again) never revives
+        # that run or its leg: the signal starts a run at its own observation.
+        stale = dict(carried, observed_at=T + 129_000)
+        fresh_carry = lf.SignalCarry()
+        self.assertTrue(fresh_carry.hold(book, key, stale, T + 129_500, coin=coin(0) | {'updatedAt': T + 129_000}))
+        revived = fresh_carry.carried_evaluation(lf.LAB_B_ID, key, T + 130_000)
+        self.assertEqual((revived['carry']['first_signal_observed_at'], revived['carry']['signals'],
+                          revived['carry']['first_pending_at'], revived[lf.CARRIED_FILL_LEG]['decision_at']),
+                         (T + 129_000, 1, T + 129_500, T + 129_000))
+        # Within its window the same evaluation keeps its run (the eviction path).
+        fresh_carry = lf.SignalCarry()
+        fresh_carry.hold(book, key, dict(carried, observed_at=T + 72_000), T + 72_500, coin=coin(8))
+        kept = fresh_carry.carried_evaluation(lf.LAB_B_ID, key, T + 73_000)
+        self.assertEqual((kept['carry']['first_signal_observed_at'], kept[lf.CARRIED_FILL_LEG]['decision_at']),
+                         (T + 63_000, T + 63_000))
 
 
 # ------------------------------------------------------------------ Strategy Lab integration
@@ -1946,7 +2033,7 @@ class LabIntegrationTests(unittest.TestCase):
                                places=6)
         self.assertEqual(trade['lab_config_hash'], PINNED_CONFIG_HASHES[lf.RND_B_ID])
 
-    # ---------------------------------------------- LAB_FORWARD_SIGNAL_CARRY_V1
+    # ---------------------------------------------- LAB_FORWARD_SIGNAL_CARRY_V2
 
     def assert_carried_entry(self, book_id, signal, later):
         """``signal`` waited on the price check; the pool's next observation entered it."""
@@ -1991,7 +2078,7 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertEqual(book['entry_diagnostics']['lab_forward']['signal_rejections'], {'rnd_coin_not_drawn': 1})
         position = self.assert_carried_entry(book_id, coin, later)
         self.assertEqual(position['lab_forward']['signal']['drawn'], True)
-        # LAB_FORWARD_FILL_BASIS_V3: the shadow is decided at the draw, as the harness decides,
+        # LAB_FORWARD_FILL_BASIS_V4: the shadow is decided at the draw, as the harness decides,
         # and fills at the first differing refresh after it (here the entry observation).
         leg = position['research_fill']['entry']
         self.assertEqual(position['research_fill']['entry_decision'], lf.ENTRY_DECISION_SIGNAL)
@@ -2022,7 +2109,7 @@ class LabIntegrationTests(unittest.TestCase):
                          'the crossing is not fresh at the next observation')
         position = self.assert_carried_entry(lf.LAB_A_ID, points[1], later)
         self.assertEqual(position['lab_forward']['signal']['previous_surge'], False)
-        # LAB_FORWARD_FILL_BASIS_V3: decided at the crossing; the entry observation repeats its
+        # LAB_FORWARD_FILL_BASIS_V4: decided at the crossing; the entry observation repeats its
         # print, so the leg waits for the next refresh within 60 s of the crossing.
         leg = position['research_fill']['entry']
         self.assertEqual(position['research_fill']['entry_decision'], lf.ENTRY_DECISION_SIGNAL)
@@ -2161,6 +2248,79 @@ class LabIntegrationTests(unittest.TestCase):
         leg = position['research_fill']['entry']
         self.assertEqual((position['research_fill']['entry_decision'], leg['status'], leg['decision_at'],
                           leg['decision_price']), (lf.ENTRY_DECISION_ENTRY, lf.FILL_PENDING, s0['updatedAt'], 0.89))
+
+    def sliding_dip(self, s0, count):
+        """The held dip pool observed every 9 s from S0, its price sliding 0.01 per refresh (0.89 .. 0.76)."""
+        points = []
+        for index in range(count):
+            price = round(0.89 - 0.01 * index, 6)
+            points.append(dict(s0, updatedAt=s0['updatedAt'] + 9_000 * index, priceUsd=price,
+                               priceNative=price / 120))
+        return points
+
+    def test_a_lab_b_dip_held_past_60_s_starts_a_new_run_anchored_within_the_fill_window(self):
+        """Review finding (final r5): every newer match restarted the carry window (60 s after the LATEST
+        signal) while FILL_BASIS_V3 kept the run's FIRST signal, so a persistent dip held past a pending price
+        check for 117 s entered at 0.76 with a research fill at 0.885 (+9 s), decided 117 s before its entry,
+        where neither the harness (it fills within 60 s of its decision) nor the book traded; its control's
+        draws can never be held that long. A run now ends 60 s after its first signal for every book; a
+        later match starts a new run anchored at itself."""
+        s0, _ = self.held_dip_pool()
+        points = self.sliding_dip(s0, 14)                  # +0 s .. +117 s
+        book = self.books[lf.LAB_B_ID]
+        self.price_pending_for(13)
+        for index, point in enumerate(points[:13]):
+            self.refresh(point, book_ids=(lf.LAB_B_ID,))
+            with self.subTest(held=index):
+                self.assertIsNone(book['position'], book['entry_diagnostics'])
+                self.assertEqual(book['entry_diagnostics']['lab_forward']['signals'], 1, 'the dip still matches')
+                self.assertEqual(book['entry_diagnostics']['blocked_reason'], lf.PRICE_CHECK_PENDING_REASON)
+                counters = lf.signal_carry_counters(book)
+                # +0 .. +54 s: one run; at +63 s (Lab clock +64 s) the first run is past its 60 s window.
+                self.assertEqual((counters['pending_signals'], counters['lost_price_pending']),
+                                 (1, 0) if index < 7 else (2, 1))
+                self.assertEqual(self.carry.pending_count(lf.LAB_B_ID), 1)
+        self.refresh(points[13], book_ids=(lf.LAB_B_ID,))
+        position = book['position']
+        self.assertIsNotNone(position, book['entry_diagnostics'])
+        self.assertEqual(self.calls['price'], 14)
+        self.assertEqual(position['entry_price'], 0.76, 'booked at the entry observation')
+        carry = position['lab_forward']['carry']
+        self.assertEqual((carry['version'], carry['first_signal_observed_at'], carry['signal_observed_at'],
+                          carry['signals'], carry['attempts'], carry['rematched'], carry['max_age_ms']),
+                         (lf.SIGNAL_CARRY_VERSION, points[7]['updatedAt'], points[13]['updatedAt'], 7, 6, True,
+                          60_000))
+        # The research fill of the run that entered: decided at its first signal (+63 s, 0.82) and filled
+        # at the next refresh (+72 s, 0.81), as harness_final fills an order decided there.
+        shadow = position['research_fill']
+        leg = shadow['entry']
+        self.assertEqual((shadow['version'], shadow['entry_decision']), (lf.FILL_BASIS_VERSION, lf.ENTRY_DECISION_SIGNAL))
+        self.assertEqual((leg['status'], leg['decision_at'], leg['decision_price'], leg['fill_at'], leg['fill_price'],
+                          leg['fill_lag_ms']),
+                         (lf.FILL_NEXT_REFRESH, points[7]['updatedAt'], 0.82, points[8]['updatedAt'], 0.81, 9_000))
+        self.assertLessEqual(position['lab_forward']['entry_observed_at'] - leg['decision_at'],
+                             lf.FILL_BASIS.max_fill_lag_ms, 'never decided more than 60 s before its entry')
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['entered'], counters['lost_price_pending'],
+                          counters['lost_price_pending_share']), (2, 1, 1, 0.5))
+        self.assertEqual(self.carry.pending_count(lf.LAB_B_ID), 0)
+
+    def test_its_controls_draw_held_with_the_same_latency_is_lost_60_s_after_the_draw(self):
+        """The RND_LAB_B analogue of the held dip: drawn at S0 only, the check pending for 13 calls."""
+        s0, _ = self.held_dip_pool()
+        points = self.sliding_dip(s0, 14)
+        params = lf.RANDOM[lf.RND_B_ID]
+        for point in points[1:]:
+            self.assertFalse(lf.hashed_coin(point['pairAddress'], point['updatedAt'], params.probability, params.salt))
+        book = self.books[lf.RND_B_ID]
+        self.price_pending_for(13)
+        for point in points:
+            self.refresh(point, book_ids=(lf.RND_B_ID,))
+        self.assertIsNone(book['position'], book['entry_diagnostics'])
+        self.assertEqual(self.calls['price'], 7, 'the draw and its carried retries up to +54 s')
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['entered'], counters['lost_price_pending']), (1, 0, 1))
+        self.assertEqual(self.carry.pending_count(lf.RND_B_ID), 0)
 
     def test_a_signal_inside_its_pool_cooldown_is_not_carried(self):
         """The cooldown is checked after the price check: a draw inside the 300 s pool cooldown whose

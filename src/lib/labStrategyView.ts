@@ -23,7 +23,7 @@ export type StrategyLifecycle = {
     min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
     ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
     vanished_closes?: number; drained_closes?: number; zero_capital_closes?: number;
-    // LAB_FORWARD_FILL_BASIS_V3: net50 re-priced at the research fills (next DexScreener refresh).
+    // LAB_FORWARD_FILL_BASIS_V4: net50 re-priced at the research fills (next DexScreener refresh).
     kill_rule_met_bases?: string[];
     research_fill?: { closed_trades?: number; pending?: number; mean_net50_usd?: number | null;
       ci95_mean_net50_usd?: (number | null)[]; unobserved_leg_share?: number | null };
@@ -36,7 +36,7 @@ export type StrategyLifecycle = {
   // ('zero_capital_control' once its own balance cannot fund the fixed entry).
   capital_mode?: string;
   control_continuity?: { hypothesis?: string; hypothesis_can_enter?: boolean; kill_rule_deferred?: boolean; zero_capital_entries?: boolean };
-  // LAB_FORWARD_SIGNAL_CARRY_V1: signals that waited on the price cross-check.
+  // LAB_FORWARD_SIGNAL_CARRY_V2: signals that waited on the price cross-check.
   signal_carry?: { pending_signals?: number; entered?: number; lost_price_pending?: number };
 };
 
@@ -90,7 +90,7 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   const parts = [`Затворени ${closed}/${minimum} до правилото за спиране`];
   if (typeof mean === 'number' && Number.isFinite(mean)) parts.push(`средно net50 ${usd(mean)}/сделка`);
   if (typeof low === 'number' && typeof high === 'number') parts.push(`CI95 [${usd(low)}, ${usd(high)}]`);
-  // LAB_FORWARD_FILL_BASIS_V3: the same closes re-priced at the research fills (next DexScreener refresh).
+  // LAB_FORWARD_FILL_BASIS_V4: the same closes re-priced at the research fills (next DexScreener refresh).
   const research = evidence?.research_fill;
   if (research && (research.closed_trades ?? 0) > 0) {
     const [researchLow, researchHigh] = research.ci95_mean_net50_usd ?? [];
@@ -122,7 +122,7 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   if (zeroCapital > 0) parts.push(`сделки с нулев капитал ${zeroCapital}`);
   const unpriced = (evidence?.vanished_closes ?? 0) + (evidence?.drained_closes ?? 0);
   if (unpriced > 0) parts.push(`изчезнали/източени pool-ове ${unpriced}`);
-  // LAB_FORWARD_SIGNAL_CARRY_V1: signals lost while the independent price check was still pending.
+  // LAB_FORWARD_SIGNAL_CARRY_V2: signals lost while the independent price check was still pending.
   const lost = lifecycle?.signal_carry?.lost_price_pending ?? 0;
   if (lost > 0) parts.push(`изгубени сигнали при чакаща проверка на цената ${lost}`);
   const gate = lifecycle?.promotion_gate;
@@ -223,7 +223,7 @@ const reasons: Record<string, string> = {
   // LAB_FORWARD_CASH_STATE_V1 / frozen cost model of the forward-test books.
   lab_forward_cash_exhausted: 'Без капитал: балансът не покрива фиксирания вход от $200',
   lab_forward_cost_model_mismatch: 'Моделът на разходите се различава от замразения: входовете са спрени',
-  // LAB_FORWARD_SIGNAL_CARRY_V1: the signal is kept for up to 60 s while the price check is pending.
+  // LAB_FORWARD_SIGNAL_CARRY_V2: the signal is kept for up to 60 s while the price check is pending.
   lab_forward_price_check_pending: 'Сигналът чака независимата проверка на цената (пази се до 60 сек.)',
 };
 

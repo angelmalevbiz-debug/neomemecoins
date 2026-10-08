@@ -99,7 +99,7 @@ FORWARD_MEMORY=lab_forward.ForwardFeedMemory()
 def lab_forward_memory():
     return FORWARD_MEMORY
 
-# LAB_FORWARD_SIGNAL_CARRY_V1: matched forward-test signals whose only blocker is the
+# LAB_FORWARD_SIGNAL_CARRY_V2: matched forward-test signals whose only blocker is the
 # asynchronous price cross-check, retried on later refreshes (in memory, bounded).
 FORWARD_SIGNAL_CARRY=lab_forward.SignalCarry()
 
@@ -283,7 +283,7 @@ def forward_exit_execution(c,pos,qty=None):
     return calibrated_exit_execution(c,num(pos.get('quantity')) if qty is None else qty,
                                      lab_forward.position_calib_bps(pos),drain_aware=True)
 
-# LAB_FORWARD_FILL_BASIS_V3: the booked model, re-run at the research fills of a close.
+# LAB_FORWARD_FILL_BASIS_V4: the booked model, re-run at the research fills of a close.
 def research_fill_entry_execution(c,notional,extra_bps):
     return calibrated_entry_execution(c,notional,extra_bps)
 
@@ -318,7 +318,7 @@ def advance_forward_fill_legs(record,coins,now):
 FORWARD_FILL_FULL_SCAN=set()
 
 def advance_forward_research_fills(prices,now):
-    """LAB_FORWARD_FILL_BASIS_V3: resolve and value the research fills of recent forward closes.
+    """LAB_FORWARD_FILL_BASIS_V4: resolve and value the research fills of recent forward closes.
 
     Observations: the pool in the shared feed, else the exact-pair refresh (which
     this schedules for a closed pool that left the feed). Only shadow fields change.
@@ -787,7 +787,7 @@ def close_position(book,pos,coin,reason):
                                               exit_liquidity_usd=lab_forward.reported_liquidity_usd(coin),
                                               exit_coin=coin,exit_at=trade['closed_at']))
         trade['balance_effect_usd']=0.0 if zero_capital else round(final_pnl,4)
-        # LAB_FORWARD_FILL_BASIS_V3: a VANISHED close has no exit fill, so its shadow may be complete now.
+        # LAB_FORWARD_FILL_BASIS_V4: a VANISHED close has no exit fill, so its shadow may be complete now.
         complete_forward_research_fill(trade)
     book['history'].insert(0,trade); book['position']=None
 
@@ -862,7 +862,7 @@ def update_positions(flows,feed):
         forward=lab_forward.is_forward_position(pos)
         coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
         if forward:
-            # LAB_FORWARD_FILL_BASIS_V3: this loop's observations of the held pool decide where the
+            # LAB_FORWARD_FILL_BASIS_V4: this loop's observations of the held pool decide where the
             # research would have filled the entry (shadow only; booking and exits are unchanged).
             advance_forward_fill_legs(pos,forward_fill_observations(
                 (pos.get('address'),pos.get('pairAddress')),prices,decision_at,(coin,)),decision_at)
@@ -963,7 +963,7 @@ def update_positions(flows,feed):
         if is_rush: pos['peak_net_pct']=peak_net
         if forward: pos['model_pnl_pct']=round(model_live_pct,3)
         if reason: close_position(book,pos,coin,reason)
-    # LAB_FORWARD_FILL_BASIS_V3: research fills of recent forward closes (their exit legs
+    # LAB_FORWARD_FILL_BASIS_V4: research fills of recent forward closes (their exit legs
     # resolve after the close); booked results are never changed.
     advance_forward_research_fills(prices,now_ms())
 def cost_feasibility_summary(rows,cap):
@@ -1012,7 +1012,8 @@ def maybe_open(feed,flows):
         is_forward=strategy['id'] in lab_forward.BOOK_IDS
         forward_carry=lab_forward_signal_carry() if is_forward else None
         if is_forward:
-            # LAB_FORWARD_SIGNAL_CARRY_V1: an episode past its window was lost to a pending price check.
+            # LAB_FORWARD_SIGNAL_CARRY_V2: an episode more than 60 s past its run's first signal
+            # was lost to a pending price check (a newer match never extends the window).
             forward_carry.expire(book,now)
         if not lifecycle.entry_enabled(book):
             if is_forward: forward_carry.clear(book,'book_stopped')
@@ -1138,8 +1139,8 @@ def maybe_open(feed,flows):
         defensive_rejected=0
         forward_diagnostics=lab_forward.new_diagnostics(strategy['id']) if is_forward else None
         forward_evaluations={}
-        # LAB_FORWARD_SIGNAL_CARRY_V1: the last gate each matched forward signal reached,
-        # and the observation it reached it on (LAB_FORWARD_FILL_BASIS_V3: the research-fill
+        # LAB_FORWARD_SIGNAL_CARRY_V2: the last gate each matched forward signal reached,
+        # and the observation it reached it on (LAB_FORWARD_FILL_BASIS_V4: the research-fill
         # entry leg of a signal run is decided at the run's first held observation).
         forward_stage={}
         forward_coins={}
@@ -1155,10 +1156,12 @@ def maybe_open(feed,flows):
                 lab_forward.record_evaluation(forward_diagnostics,evaluation)
                 matched=evaluation['matched']
                 if matched:
-                    # LAB_FORWARD_FILL_BASIS_V3: a fresh match of a pool whose signal is still held
+                    # LAB_FORWARD_FILL_BASIS_V4: a fresh match of a pool whose signal is still held
                     # continues that signal run; the harness entered at the run's first signal,
                     # so the research-fill leg decided there is kept (and advanced by this
-                    # observation) whether the run enters now or is held again.
+                    # observation) whether the run enters now or is held again. A run lives at
+                    # most 60 s after its first signal (LAB_FORWARD_SIGNAL_CARRY_V2), so a match
+                    # after that is the first signal of a new run.
                     continued=forward_carry.continued_evaluation(strategy['id'],forward_key,evaluation,now,
                                                                  coin=coin)
                     if continued is not evaluation:
@@ -1278,7 +1281,7 @@ def maybe_open(feed,flows):
                 validation=cached_jupiter_tiebreak(validation,coin,now=now)
                 if validation.get('status')!='pass':
                     if is_forward and validation.get('status')=='review' and forward_cooldown_remaining_ms(book,coin,now)>0:
-                        # LAB_FORWARD_SIGNAL_CARRY_V1: the cooldown (checked below) blocks this signal
+                        # LAB_FORWARD_SIGNAL_CARRY_V2: the cooldown (checked below) blocks this signal
                         # too, so it is not waiting only on the price check and is not carried. The
                         # research harness skips signal points inside its pool cooldown, so a held
                         # signal would also anchor the research fill (V3) where it never entered.
@@ -1288,7 +1291,7 @@ def maybe_open(feed,flows):
                     if validation.get('status')=='review':
                         price_crosscheck_pending+=1
                         if is_forward:
-                            # LAB_FORWARD_SIGNAL_CARRY_V1: the only blocker so far; carried below.
+                            # LAB_FORWARD_SIGNAL_CARRY_V2: the only blocker so far; carried below.
                             # Forward books never request the RugCheck + Jupiter probe: their random
                             # draws would feed arbitrary pools into the RugCheck, RPC and Jupiter
                             # budget main uses. They use the GeckoTerminal reference (and a tie-break
@@ -1343,7 +1346,7 @@ def maybe_open(feed,flows):
                              coin,features,proposed,validation,brain,risk,candidate_limit,defensive))
             if is_forward: forward_stage[forward_key]='eligible'
         if is_forward:
-            # LAB_FORWARD_SIGNAL_CARRY_V1: a signal whose only blocker was the pending price
+            # LAB_FORWARD_SIGNAL_CARRY_V2: a signal whose only blocker was the pending price
             # cross-check (outside its cooldowns) is kept for a later refresh, a newer match
             # continuing its run; one refused by any other gate ends its episode; an
             # eligible one waits for the commit below.
@@ -1395,7 +1398,7 @@ def maybe_open(feed,flows):
                 # Every signal the defensive layer allowed was in its pool or token cooldown.
                 book['entry_diagnostics']['blocked_reason']='reentry_cooldown'
             elif not eligible and price_crosscheck_pending:
-                # The signal is carried to the next refresh (LAB_FORWARD_SIGNAL_CARRY_V1).
+                # The signal is carried to the next refresh (LAB_FORWARD_SIGNAL_CARRY_V2).
                 book['entry_diagnostics']['blocked_reason']=lab_forward.PRICE_CHECK_PENDING_REASON
         if is_cost_first:
             book['entry_diagnostics'].update({
@@ -1627,7 +1630,7 @@ def maybe_open(feed,flows):
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
         if is_forward:
-            # LAB_FORWARD_SIGNAL_CARRY_V1: this pool's episode entered; the book's other pending
+            # LAB_FORWARD_SIGNAL_CARRY_V2: this pool's episode entered; the book's other pending
             # signals are superseded (one position at a time, as in the research).
             forward_carry.resolve(book,(address,coin['pairAddress']),'entered')
             forward_carry.clear(book,'superseded')

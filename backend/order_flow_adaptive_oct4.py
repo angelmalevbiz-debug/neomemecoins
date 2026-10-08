@@ -20,10 +20,22 @@ from typing import Any
 
 STRATEGY_ID = 'ORDER_FLOW_ADAPTIVE'
 LEARNING_MODE = 'ADAPTIVE_CONTEXT_HOLD'
-# The restored October 4 decision checks keep their historical label; the entry
-# policy V5 is those unchanged checks behind DEFENSIVE_ENTRY_LAYER_V1, a modern
-# overlay that only removes entries (2026-10-08).
+# The restored October 4 decision checks keep their historical label: their
+# rules and thresholds are unchanged. Their inputs are not all unchanged: the
+# 'score' check (coin score >= strict_entry_score) and the entry conviction
+# (market_context's neo_score term) now read the V2 entry score
+# NEO_MARKET_SCORE_V2_LIQ_MC_BAND, which is never above V1 (no +9 for
+# 0.6 <= liq/MC < 1, -10 instead of +9 at liq/MC >= 1), so a pool can fail
+# 'score' or 'conviction' where V4 passed it. The entry policy V5 is those
+# checks on the V2 entry score behind DEFENSIVE_ENTRY_LAYER_V1, a modern overlay;
+# both only remove entries (2026-10-08). Held positions' exit context and hold
+# modes stay on the V1 score (market_monitor.EXIT_CONTEXT_SCORE_VERSION).
 DECISION_FILTER_VERSION = 'ORDER_FLOW_BALANCED_V4'
+ENTRY_SCORE_VERSION = 'NEO_MARKET_SCORE_V2_LIQ_MC_BAND'
+DECISION_INPUTS_NOTE = ('ORDER_FLOW_BALANCED_V4 check rules and thresholds are unchanged, but the score check '
+                        'and the entry conviction read the V2 entry score (NEO_MARKET_SCORE_V2_LIQ_MC_BAND, never '
+                        'above V1), behind DEFENSIVE_ENTRY_LAYER_V1; both only remove entries. The exit context '
+                        'and hold modes of positions read the V1 score.')
 ENTRY_POLICY_VERSION = 'ORDER_FLOW_BALANCED_V5'
 PREVIOUS_ENTRY_POLICY_VERSION = 'ORDER_FLOW_BALANCED_V4'
 RESTORE_VERSION = 'ORDER_FLOW_ADAPTIVE_OCT4_RESTORE_V1'
@@ -334,6 +346,7 @@ def config_snapshot(profile: Profile = PROFILE) -> dict[str, Any]:
         'strategy_id': STRATEGY_ID, 'learning_mode': LEARNING_MODE,
         'entry_policy_version': ENTRY_POLICY_VERSION, 'restore_version': RESTORE_VERSION,
         'decision_filter_version': DECISION_FILTER_VERSION,
+        'entry_score_version': ENTRY_SCORE_VERSION, 'decision_inputs_note': DECISION_INPUTS_NOTE,
         'source_commit': SOURCE_COMMIT, 'profile': profile.as_dict(),
         'entry_flow_window_seconds': ENTRY_FLOW_WINDOW_SECONDS,
         'conviction_flow_windows_seconds': [FAST_FLOW_WINDOW_SECONDS, SLOW_FLOW_WINDOW_SECONDS],

@@ -14,14 +14,14 @@ The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default
 `ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
 With the layer, the `effective_config_hash` values (code defaults, no `NEO_*` overrides,
 pinned exactly by `tests/test_cost_first_engine_profile.py`) are:
-`COST_FIRST_ESTABLISHED_PAPER_V1` `8c2cd6eb8916f0a3b116ecfd0333a217373f2d2a7552c0b9dd131f630e7c70c2`,
-`WINNER_ENSEMBLE_PAPER_V1` `ab77b8b3caac19aca43e987d6d9c7c1952fe55cfb01a23f6bb6618fd9f7773bf`,
-`ORDER_FLOW_ADAPTIVE` `106f91c5f69252c030beaf1242d48d035551f36ae3459d98746201014ac3dcc0`.
+`COST_FIRST_ESTABLISHED_PAPER_V1` `7ac1d917775a8b86359c85f8b5e977127696708b6e90770018de4320f6b84286`,
+`WINNER_ENSEMBLE_PAPER_V1` `6fabde936b8f978aef7117062f849feb15f0d8ae2b04f44dbe8aea49ab0f9918`,
+`ORDER_FLOW_ADAPTIVE` `be874bd4fd4327f83a7b3eb309730a9c04a97f8e208699bc8a4d5a330a7745b7`.
 A new cost-first account's ticker registry is seeded from main's, the Lab's and the
 tape's sidecars and adopts their current coverage; until it has 24 h of coverage, pools
 younger than 14 days are blocked (`rug_ticker_registry_warming`). Check that the
 account's `layer.ticker_registry.coverage.warming` is false before relying on its entry
-frequency (see [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#seeding-ticker_registry_seed_v2)).
+frequency (see [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#seeding-ticker_registry_seed_v3)).
 
 ## What it is
 
@@ -214,7 +214,9 @@ On the account's engine port (`/state`) and through the authenticated dashboard
 (`/user/state`):
 
 - `config.signal_strategy = COST_FIRST_ESTABLISHED_PAPER_V1`,
-  `entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V1`, `exit_policy = cost_first`,
+  `entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V2` (since `DEFENSIVE_ENTRY_LAYER_V1`;
+  `COST_FIRST_ESTABLISHED_ENTRY_V1` appears only on positions and closes opened before the
+  layer), profile `COST_FIRST_ENGINE_PROFILE_V2_DEFENSIVE_ENTRY`, `exit_policy = cost_first`,
   `exit_policy_version = COST_FIRST_NET_EXIT_V1`,
   `exit_impact_emergency_version = EXIT_IMPACT_EMERGENCY_V2`,
   `universe_parameters.max_fee_tier_bps = 50`, `min_liquidity_usd = 250000`,
@@ -223,7 +225,8 @@ On the account's engine port (`/state`) and through the authenticated dashboard
   `paper_only = true`, `effective_config_hash` changed for this account, and
   `account_scope.strategy_matches_request = true`.
 - `entry_diagnostics.rejections` shows universe reasons with metrics in `examples`;
-  `market_cost_feasibility.checked_market_candidates` counts universe candidates.
+  `market_cost_feasibility.checked_market_candidates` counts universe candidates;
+  `entry_diagnostics.defensive_entry.layer.ticker_registry.coverage.warming` is false.
 - Compare `trade_seq`, history length, `demo_balance_usd` and `demo_session_id` with
   the values before the stop; the main engine and every other account still report
   `WINNER_ENSEMBLE_PAPER_V1` (or their own profile) with their previous
@@ -249,8 +252,11 @@ this universe would be its own versioned change.
 Copied from `docs/STRATEGY_VALIDATION.md` (COST_FIRST_ESTABLISHED_V1 block), with the
 engine account added. "Engine account" = the one account running
 `COST_FIRST_ESTABLISHED_PAPER_V1`, counted only on closes stamped
-`entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V1`, from the first close after
-the switch.
+`entry_policy_version = COST_FIRST_ESTABLISHED_ENTRY_V2`, from the first such close
+after the deploy of `DEFENSIVE_ENTRY_LAYER_V1` (or after the switch, if later). The V1
+sample (closes stamped `COST_FIRST_ESTABLISHED_ENTRY_V1`, a universe without the
+structural rug guard) closed at that deploy; it is reported on its own and never pooled
+into the V2 sample (see `docs/STRATEGY_VALIDATION.md`, "Defensive entry layer").
 
 | Gate | Lab books (`COST_FIRST_CONTROL`, `COST_FIRST_SCALED`) | Engine account (`COST_FIRST_ESTABLISHED_PAPER_V1`) |
 | --- | --- | --- |

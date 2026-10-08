@@ -49,8 +49,16 @@ Rules, evaluated in this order (every rule that applies is recorded):
 The ticker check is past-only: ``TickerRegistry`` is fed by the caller with
 every scan's feed and only registrations first seen at or before ``now``
 count. The registry persists as a small bounded JSON sidecar next to the
-account state (atomic replace, entries unseen for 14 days pruned, a corrupt or
-missing file starts empty and never stops the engine).
+account state (atomic replace, entries unseen for 14 days pruned, a missing
+file starts empty and never stops the engine). Sidecar read failures
+(TICKER_REGISTRY_SIDECAR_READ_V1): a sidecar that cannot be read (an I/O error
+after 3 attempts, e.g. a Windows sharing violation) is not corrupt. It is
+never overwritten during the run (``UNREADABLE_NOT_OVERWRITTEN``), it is read
+again at most every 60 s and merged once readable, and until then the registry
+adopts no sibling's coverage (its own memory is unknown, so it keeps warming).
+A sidecar that reads but does not parse is corrupt: it is copied to
+``<sidecar>.corrupt-<ms>`` before the registry starts empty and replaces it
+(``CORRUPT_STARTED_EMPTY``); when that copy fails it is treated as unreadable.
 
 Coverage (TICKER_REGISTRY_V2_COVERAGE): the sidecar keeps ``covered_since``
 (start of the current continuous observation) and ``observed_until`` (the
@@ -70,24 +78,29 @@ Bounds: at most 40,000 entries. The research scan log saw about 2,150 pairs a
 day, so 14 days need about 30,000; when the cap still evicts, the effective
 horizon (the newest evicted sighting) is published in ``status()``.
 
-Seeding (TICKER_REGISTRY_SEED_V2): a registry whose own coverage does not
+Seeding (TICKER_REGISTRY_SEED_V3): a registry whose own coverage does not
 vouch after loading its sidecar (new, empty, legacy V1, last observation more
 than 60 min ago, or current but shorter than 24 h, e.g. services started
 before the first-deploy seed) merges the sidecars of the other PAPER services
 on the host read-only (``seed_paths``: the main engine, the Lab, the tape; a
 personal engine also reads main's through NEO_MAIN_MARKET_STATE_PATH) and
 adopts the earliest ``covered_since`` of a sibling whose coverage is current
-(its own current span is kept when it starts earlier). A ticker
-registry is market memory, not account memory, so a seed only adds sightings
-(it can only block more); a seed file is never written. For the first deploy,
-scripts/build_ticker_registry_seed.py builds main's sidecar offline from a
-copy of the training observations journal.
+(its own current span is kept when it starts earlier). V3 also seeds a
+running registry: at once when a gap restarts its coverage (a tape whose
+polls stalled for over 60 min while main kept scanning) and at most every
+5 min while its coverage is under 24 h (a sibling that vouches later), so a
+service no longer waits 24 h, or for a restart, while a sibling vouches. A
+ticker registry is market memory, not account memory, so a seed only adds
+sightings (it can only block more); a seed file is never written. For the
+first deploy, scripts/build_ticker_registry_seed.py builds main's sidecar
+offline from a copy of the training observations journal.
 """
 from dataclasses import asdict, dataclass
 import json
 import math
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import threading
 import time
@@ -106,7 +119,16 @@ HOUR_MS = 3_600_000
 REGISTRY_RETENTION_DAYS = 14
 REGISTRY_MAX_ENTRIES = 40_000
 REGISTRY_SAVE_INTERVAL_MS = 300_000
-REGISTRY_SEED_VERSION = 'TICKER_REGISTRY_SEED_V2'
+REGISTRY_SEED_VERSION = 'TICKER_REGISTRY_SEED_V3'
+PREVIOUS_REGISTRY_SEED_VERSION = 'TICKER_REGISTRY_SEED_V2'
+# V3: a running registry under 24 h of coverage seeds again at most this often,
+# and at once when a gap restarts its coverage.
+REGISTRY_RESEED_INTERVAL_MS = 300_000
+# Own-sidecar read failures: an I/O error is retried, then the sidecar is kept
+# (never overwritten during the run) and read again at most this often.
+SIDECAR_READ_VERSION = 'TICKER_REGISTRY_SIDECAR_READ_V1'
+SIDECAR_READ_ATTEMPTS = 3
+SIDECAR_REREAD_INTERVAL_MS = 60_000
 # A longer absence of market observations restarts the registry's coverage.
 REGISTRY_MAX_GAP_MS = HOUR_MS
 # A feed observation stamped this far after the scan clock is clock skew, not the future.
@@ -240,7 +262,10 @@ class TickerRegistry:
     bounded. All methods are thread-safe and never raise on persistence
     problems; a failed save is reported in ``status()``. A registry whose own
     coverage after loading its sidecar is not current or shorter than 24 h is
-    seeded from ``seed_paths``.
+    seeded from ``seed_paths``; while running it seeds again when a gap
+    restarts its coverage and at most every ``reseed_interval_ms`` while its
+    coverage is under 24 h. An own sidecar that cannot be read is never
+    overwritten during the run (see ``_load``).
 
     Coverage: ``mark_observed(at)`` records one market observation (``observe``
     calls it with the newest observation time of the feed's discovered market
@@ -253,13 +278,15 @@ class TickerRegistry:
 
     def __init__(self, path=None, *, retention_ms=REGISTRY_RETENTION_DAYS * DAY_MS,
                  max_entries=REGISTRY_MAX_ENTRIES, save_interval_ms=REGISTRY_SAVE_INTERVAL_MS,
-                 prune_interval_ms=60_000, clock=None, seed_paths=(), max_gap_ms=REGISTRY_MAX_GAP_MS):
+                 prune_interval_ms=60_000, clock=None, seed_paths=(), max_gap_ms=REGISTRY_MAX_GAP_MS,
+                 reseed_interval_ms=REGISTRY_RESEED_INTERVAL_MS):
         self.path = Path(path) if path else None
         self.retention_ms = max(DAY_MS, int(retention_ms))
         self.max_entries = max(16, int(max_entries))
         self.save_interval_ms = max(0, int(save_interval_ms))
         self.prune_interval_ms = max(0, int(prune_interval_ms))
         self.max_gap_ms = max(60_000, int(max_gap_ms))
+        self.reseed_interval_ms = max(0, int(reseed_interval_ms))
         self.clock = clock or (lambda: int(time.time() * 1000))
         own = _path_key(self.path) if self.path is not None else None
         seeds = {}
@@ -293,13 +320,22 @@ class TickerRegistry:
         self.seed_status = {}
         self.seeded_entries = 0
         self.coverage_adopted_from = None
+        # Running seeds (TICKER_REGISTRY_SEED_V3): count, last attempt, pending after a gap.
+        self.reseeds = 0
+        self._seeded_at = None
+        self._coverage_restarted = False
+        # Own sidecar that could not be read (or backed up when corrupt): kept, never
+        # overwritten during the run, read again at most every SIDECAR_REREAD_INTERVAL_MS.
+        self._own_sidecar_kept = False
+        self._own_reread_at = None
+        self.own_reread_attempts = 0
+        self.corrupt_backup = None
         if self.path is not None:
             self._load()
         # Seeded unless its own coverage already vouches (current and >= 24 h): a sidecar
         # left by a short earlier run (services started before the first-deploy seed)
         # still adopts a current sibling's longer coverage.
-        if (self.seed_paths and self.coverage_ms(self.clock())
-                < PARAMS.ticker_registry_min_coverage_minutes * 60_000):
+        if self.seed_paths and not self._coverage_vouches(self.clock()):
             self._seed()
 
     # ----------------------------------------------------------- mutation --
@@ -371,6 +407,8 @@ class TickerRegistry:
                 self.held_only_scans += 1
         stamp = _finite(now)
         if stamp is not None:
+            self.maybe_reread_own_sidecar(stamp)
+            self.maybe_reseed(stamp)
             self.prune(stamp)
             self.maybe_save(stamp)
         return added
@@ -387,10 +425,12 @@ class TickerRegistry:
             if self._covered_since is None:
                 self._covered_since = stamp
             elif until is not None and stamp - until > self.max_gap_ms:
-                # Sightings during the gap are unknown: coverage starts again.
+                # Sightings during the gap are unknown: coverage starts again, and a
+                # registry with seed paths seeds at its next observe (maybe_reseed).
                 self._covered_since = stamp
                 self.coverage_resets += 1
                 self._last_gap_ms = stamp - until
+                self._coverage_restarted = True
             self._observed_until = stamp
             self._dirty = True
 
@@ -410,6 +450,41 @@ class TickerRegistry:
         with self._lock:
             since = self._covered_since
         return max(0.0, stamp - since)
+
+    def _coverage_vouches(self, now) -> bool:
+        """True when coverage at ``now`` is current and at least the 24 h of rule 6."""
+        return self.coverage_ms(now) >= PARAMS.ticker_registry_min_coverage_minutes * 60_000
+
+    def maybe_reseed(self, now) -> bool:
+        """Seed a running registry from ``seed_paths`` when its coverage does not vouch (never raises).
+
+        At once after a gap restarted the coverage (``mark_observed``), else
+        at most every ``reseed_interval_ms`` while coverage at ``now`` is under
+        24 h, so a registry whose siblings vouch (or start vouching later) does
+        not wait 24 h or for a restart. Returns True when it seeded.
+        """
+        stamp = _finite(now)
+        if not self.seed_paths or stamp is None:
+            return False
+        with self._lock:
+            restarted = self._coverage_restarted
+            last = self._seeded_at
+        if self._coverage_vouches(stamp):
+            with self._lock:
+                self._coverage_restarted = False
+            return False
+        if (not restarted and last is not None
+                and 0 <= stamp - last < self.reseed_interval_ms):
+            return False
+        with self._lock:
+            self._coverage_restarted = False
+            self.reseeds += 1
+        try:
+            self._seed(stamp)
+        except Exception:
+            # A seed only adds memory; a failed one leaves the registry warming (fail closed).
+            return False
+        return True
 
     def prune(self, now, *, force=False) -> int:
         stamp = _finite(now)
@@ -495,23 +570,45 @@ class TickerRegistry:
                     'persistent': self.path is not None,
                     'sidecar': self.path.name if self.path is not None else None,
                     'load_status': self.load_status, 'load_skipped_rows': self.load_skipped_rows,
+                    'sidecar_read': {'version': SIDECAR_READ_VERSION,
+                                     'kept_not_overwritten': self._own_sidecar_kept,
+                                     'reread_attempts': self.own_reread_attempts,
+                                     'corrupt_backup': self.corrupt_backup},
                     'seed': {'version': REGISTRY_SEED_VERSION, 'sources': dict(self.seed_status),
-                             'entries': self.seeded_entries},
+                             'entries': self.seeded_entries, 'running_reseeds': self.reseeds,
+                             'last_seed_at': self._seeded_at},
                     'saved_at': self._saved_at, 'saves': self.saves, 'save_error': self.save_error}
 
     # -------------------------------------------------------- persistence --
     @staticmethod
-    def _read_sidecar(path, *, shared=False):
-        """('OK', rows, coverage), ('MISSING', [], None) or ('CORRUPT', [], None); never raises.
+    def _read_sidecar(path, *, shared=False, attempts=SIDECAR_READ_ATTEMPTS):
+        """('OK', rows, coverage), 'MISSING', 'UNREADABLE' or 'CORRUPT' (with [], None); never raises.
 
         ``coverage`` is (version, covered_since, observed_until, resets); the
         stamps are None for a legacy sidecar or invalid values. ``shared``
         reads with delete sharing (a sibling service may be replacing it).
+        An I/O error (a Windows sharing violation, a permission error) is
+        retried ``attempts`` times and then reported as 'UNREADABLE': the file
+        may be intact. Only content that reads but does not decode or parse as
+        a ticker registry is 'CORRUPT'.
         """
-        try:
-            if not path.exists():
+        text = None
+        for attempt in range(max(1, int(attempts))):
+            try:
+                if not path.exists():
+                    return 'MISSING', [], None
+                text = read_shared_text(path) if shared else path.read_text(encoding='utf-8')
+                break
+            except FileNotFoundError:
                 return 'MISSING', [], None
-            text = read_shared_text(path) if shared else path.read_text(encoding='utf-8')
+            except ValueError:
+                # Undecodable bytes (UnicodeDecodeError): the content is corrupt.
+                return 'CORRUPT', [], None
+            except Exception:
+                if attempt + 1 >= max(1, int(attempts)):
+                    return 'UNREADABLE', [], None
+                time.sleep(.02 * (attempt + 1))
+        try:
             data = json.loads(text)
             version = data.get('version') if isinstance(data, dict) else None
             if version != REGISTRY_VERSION and version not in LEGACY_REGISTRY_VERSIONS:
@@ -534,6 +631,100 @@ class TickerRegistry:
     def read_sidecar(path):
         """Public read-only form of ``_read_sidecar`` (the offline seed builder)."""
         return TickerRegistry._read_sidecar(Path(path))
+
+    def _merge_own_coverage(self, since, until):
+        """Merge the coverage of this registry's own sidecar read late (caller holds the lock).
+
+        The in-memory span (observations since the start of this run, or a
+        sibling's) and the sidecar's span are one continuous coverage when
+        neither starts more than ``max_gap_ms`` after the other ended; the
+        earliest start is then kept. Otherwise the in-memory span stays.
+        """
+        if since is None or until is None:
+            return
+        mine_since, mine_until = self._covered_since, self._observed_until
+        if mine_since is None or mine_until is None:
+            self._covered_since, self._observed_until = since, until
+            return
+        if mine_since - until <= self.max_gap_ms and since - mine_until <= self.max_gap_ms:
+            self._covered_since = min(mine_since, since)
+            self._observed_until = max(mine_until, until)
+
+    def _backup_corrupt_sidecar(self):
+        """Copy a corrupt own sidecar to '<sidecar>.corrupt-<ms>' (no service reads it); None on failure."""
+        try:
+            stamp = int(_finite(self.clock()) or 0)
+            backup = self.path.with_name(f'{self.path.name}.corrupt-{stamp}')
+            suffix = 0
+            while backup.exists():
+                suffix += 1
+                backup = self.path.with_name(f'{self.path.name}.corrupt-{stamp}-{suffix}')
+            shutil.copyfile(self.path, backup)
+            return backup.name
+        except Exception:
+            return None
+
+    def _start_after_unusable_sidecar(self, status):
+        """'UNREADABLE' or 'CORRUPT' own sidecar: start empty; keep the file unless a corrupt copy is saved."""
+        backup = self._backup_corrupt_sidecar() if status == 'CORRUPT' else None
+        with self._lock:
+            self._entries, self._by_ticker = {}, {}
+            if backup is not None:
+                # A corrupt sidecar is replaced at the next save; its bytes stay in the copy.
+                self.corrupt_backup = backup
+                self.load_status = 'CORRUPT_STARTED_EMPTY'
+                self._own_sidecar_kept = False
+            else:
+                # Possibly intact (an I/O error) or corrupt without a copy: never overwrite it
+                # during this run; read it again later (maybe_reread_own_sidecar).
+                self.load_status = ('UNREADABLE_NOT_OVERWRITTEN' if status == 'UNREADABLE'
+                                    else 'CORRUPT_NOT_OVERWRITTEN')
+                self._own_sidecar_kept = True
+
+    def maybe_reread_own_sidecar(self, now, *, force=False) -> bool:
+        """Read a kept own sidecar again (at most every SIDECAR_REREAD_INTERVAL_MS); never raises.
+
+        Once it reads, its sightings and coverage are merged and saving
+        resumes ('LOADED_AFTER_REREAD'); a corrupt one is copied aside first; a
+        vanished one simply resumes saving. ``force`` skips the interval (the
+        clean-stop flush). Returns True when the sidecar is no longer kept.
+        """
+        stamp = _finite(now)
+        with self._lock:
+            if not self._own_sidecar_kept or self.path is None or stamp is None:
+                return False
+            last = self._own_reread_at
+            if not force and last is not None and 0 <= stamp - last < SIDECAR_REREAD_INTERVAL_MS:
+                return False
+            self._own_reread_at = stamp
+            self.own_reread_attempts += 1
+        status, rows, coverage = self._read_sidecar(self.path)
+        if status == 'UNREADABLE':
+            return False
+        if status == 'CORRUPT':
+            backup = self._backup_corrupt_sidecar()
+            if backup is None:
+                return False
+            with self._lock:
+                self.corrupt_backup = backup
+                self.load_status = 'CORRUPT_STARTED_EMPTY'
+                self._own_sidecar_kept = False
+                self._dirty = True
+            return True
+        with self._lock:
+            if status == 'OK':
+                version, since, until, resets = coverage
+                self.load_skipped_rows = self._merge_rows(rows)
+                self._merge_own_coverage(since, until)
+                self.coverage_resets = max(self.coverage_resets, resets)
+                self.loaded_version = version
+                self.load_status = 'LOADED_AFTER_REREAD'
+            else:
+                self.load_status = 'MISSING_STARTED_EMPTY'
+            self._own_sidecar_kept = False
+            self._dirty = True
+        self.prune(stamp, force=True)
+        return True
 
     def merge_rows(self, rows) -> tuple:
         """Add valid sidecar rows (sightings only, never coverage); returns (new pools, skipped rows)."""
@@ -568,10 +759,10 @@ class TickerRegistry:
         if status == 'MISSING':
             self.load_status = 'MISSING_STARTED_EMPTY'
             return
-        if status == 'CORRUPT':
-            # A corrupt or unreadable sidecar starts empty; the next save replaces it.
-            self.load_status = 'CORRUPT_STARTED_EMPTY'
-            self._entries, self._by_ticker = {}, {}
+        if status in ('CORRUPT', 'UNREADABLE'):
+            # Starts empty. An unreadable sidecar may be intact: it is kept and read again;
+            # a corrupt one is copied to '<sidecar>.corrupt-<ms>' before a save replaces it.
+            self._start_after_unusable_sidecar(status)
             return
         version, since, until, resets = coverage
         with self._lock:
@@ -584,19 +775,24 @@ class TickerRegistry:
             self._dirty = False
         self.prune(self.clock(), force=True)
 
-    def _seed(self):
+    def _seed(self, reference=None):
         """Merge sibling sidecars into a registry whose coverage does not vouch yet (read-only; never raises).
 
         Adopts the earliest ``covered_since`` of the siblings whose own coverage
-        is current at the registry clock (their merged sightings cover it). When
-        the registry's own coverage is current too (a short earlier run), both
-        spans end within the gap of the clock, so their union is continuous and
-        the earliest start of the two is kept.
+        is current at ``reference`` (the registry clock when None; their merged
+        sightings cover it). When the registry's own coverage is current too (a
+        short earlier run, or a running registry after a gap), both spans end
+        within the gap of the reference, so their union is continuous and the
+        earliest start of the two is kept. While the registry's own sidecar is
+        kept unread (``UNREADABLE_NOT_OVERWRITTEN``) sightings are merged but
+        no coverage is adopted: its own memory is unknown (fail closed).
         """
-        reference = _finite(self.clock())
+        reference = _finite(self.clock() if reference is None else reference)
         own_current = self.coverage_current(reference)
         with self._lock:
             own = ((self._covered_since, self._observed_until, None) if own_current else None)
+            self._seeded_at = reference
+            adopt = not self._own_sidecar_kept
         current = []    # (covered_since, observed_until, name) of siblings with current coverage
         for path in self.seed_paths:
             status, rows, coverage = self._read_sidecar(path, shared=True)
@@ -612,7 +808,7 @@ class TickerRegistry:
                     current.append((since, until, path.name))
             self.seed_status[path.name] = 'SEEDED' if status == 'OK' else status
             self.seeded_entries += added
-        if current:
+        if current and adopt:
             earliest = min(current)
             spans = current + ([own] if own is not None else [])
             with self._lock:
@@ -624,8 +820,8 @@ class TickerRegistry:
         if self.seeded_entries:
             with self._lock:
                 self._dirty = True
-        if self.seeded_entries or current:
-            self.prune(self.clock(), force=True)
+        if (self.seeded_entries or current) and reference is not None:
+            self.prune(reference, force=True)
 
     def maybe_save(self, now) -> bool:
         stamp = _finite(now)
@@ -638,18 +834,36 @@ class TickerRegistry:
         return self.save(stamp)
 
     def flush(self) -> bool:
-        """Save now when there are unsaved observations (shutdown path)."""
+        """Save now when there are unsaved observations (shutdown path).
+
+        A kept own sidecar is read once more first; if it still cannot be read
+        it is left untouched (this run's memory is lost, the file's is not).
+        """
+        if self.path is None:
+            return False
+        try:
+            self.maybe_reread_own_sidecar(self.clock(), force=True)
+        except Exception:
+            pass
         with self._lock:
             dirty = self._dirty
-        return self.save() if dirty and self.path is not None else False
+        return self.save() if dirty else False
 
     def save(self, now=None) -> bool:
-        """Atomically replace the sidecar (temp file + fsync + replace); never raises."""
+        """Atomically replace the sidecar (temp file + fsync + replace); never raises.
+
+        Refused while the own sidecar is kept unread (it may hold intact
+        memory this run has not seen); the observations stay dirty and are
+        saved once ``maybe_reread_own_sidecar`` has merged it.
+        """
         if self.path is None:
             return False
         stamp = _finite(now)
         stamp = self.clock() if stamp is None else stamp
         with self._lock:
+            if self._own_sidecar_kept:
+                self.save_error = 'OWN_SIDECAR_KEPT_UNREAD'
+                return False
             rows = sorted([mint, pair, row[0], row[1], row[2]]
                           for (mint, pair), row in self._entries.items())
             coverage = {'covered_since': self._covered_since, 'observed_until': self._observed_until,
@@ -787,14 +1001,29 @@ def config(params: GuardParameters = PARAMS) -> dict:
                                       'held_position_sources': sorted(HELD_POSITION_SOURCES),
                                       'persisted': True},
                          'seed_version': REGISTRY_SEED_VERSION,
+                         'previous_seed_version': PREVIOUS_REGISTRY_SEED_VERSION,
                          'seed_rule': ('a registry whose coverage after loading its sidecar is not current or '
                                        'shorter than 24 h merges the sibling services\' sidecars read-only (main '
                                        'engine, Lab, tape; NEO_MAIN_MARKET_STATE_PATH for personal engines), adopts '
                                        'the earliest coverage of a sibling whose coverage is current (its own '
                                        'current span kept when earlier); seeds only add sightings'),
+                         'running_seed_rule': ('a running registry seeds again at once when a gap over 60 min '
+                                               'restarts its coverage and at most every '
+                                               f'{REGISTRY_RESEED_INTERVAL_MS // 60_000} min while its coverage is '
+                                               'under 24 h'),
+                         'sidecar_read': {'version': SIDECAR_READ_VERSION, 'attempts': SIDECAR_READ_ATTEMPTS,
+                                          'unreadable': ('an I/O error after the attempts keeps the own sidecar: '
+                                                         'never overwritten during the run, read again at most every '
+                                                         f'{SIDECAR_REREAD_INTERVAL_MS // 1000} s, no sibling '
+                                                         'coverage adopted until it is read'),
+                                          'corrupt': ('copied to <sidecar>.corrupt-<ms>, then the registry starts '
+                                                      'empty and replaces it; kept like an unreadable one when the '
+                                                      'copy fails')},
                          'first_deploy_seed': ('scripts/build_ticker_registry_seed.py (offline, training journal '
                                                'copy, market rows mark coverage; --replace-stale replaces only a '
-                                               'sidecar that does not vouch, keeping a copy)')},
+                                               'sidecar that does not vouch, keeping a copy; both only with the '
+                                               'services stopped: it refuses a runtime whose services/processes.json '
+                                               'has no services/stop.request)')},
             'fail_closed': True, 'distinct_from': 'engine_rug_guard.RUG_GUARD_V2 (unchanged)',
             'fake_market_cap_threshold_note': '2% liquidity/market cap is holdout-informed (research froze 1%); conservative, not validated',
             'is_entry_authorization': False, 'profitability_proven': False}

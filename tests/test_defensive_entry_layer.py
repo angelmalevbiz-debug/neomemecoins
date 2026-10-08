@@ -380,12 +380,194 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
                         json.dumps({'version': 'TICKER_REGISTRY_V1', 'entries': 'x'})):
             with self.subTest(content=content[:20]):
                 self.path.write_text(content, encoding='utf-8')
+                for stale in self.path.parent.glob('*.corrupt-*'):
+                    stale.unlink()
                 registry = self.registry()
                 self.assertEqual(registry.load_status, 'CORRUPT_STARTED_EMPTY')
                 self.assertEqual(len(registry), 0)
+                # The corrupt bytes are kept in a copy no service reads before a save replaces them.
+                backup = self.path.with_name(registry.status()['sidecar_read']['corrupt_backup'])
+                self.assertEqual(backup.name, f'{self.path.name}.corrupt-{self.NOW}')
+                self.assertEqual(backup.read_text(encoding='utf-8'), content)
                 registry.observe([self.coin(MINT, PAIR, 'X')], self.NOW)
                 self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['version'],
                                  'TICKER_REGISTRY_V2_COVERAGE')
+
+    def own_sidecar_with_memory(self, *, pools=40, hours=48):
+        """Main's sidecar: ``pools`` sightings and ``hours`` of coverage up to 2 minutes ago."""
+        main = self.registry()
+        for index in range(pools):
+            main.observe_coin(self.coin(f'M{index:03d}' + 'A' * 40, f'P{index:03d}' + 'B' * 40, f'OWN{index}'),
+                              self.NOW - 10 * 60 * MINUTE)
+        cover(main, self.NOW - hours * 60 * MINUTE, self.NOW - 2 * MINUTE)
+        self.assertTrue(main.flush())
+        return self.path.read_bytes()
+
+    def lab_sidecar_current(self, hours=30):
+        """A sibling (the Lab) whose own coverage is current: one sighting, ``hours`` of coverage."""
+        path = Path(self.tmp.name) / 'strategy_lab.ticker_registry.json'
+        lab = guard.TickerRegistry(path, clock=lambda: self.clock)
+        lab.observe_coin(self.coin('L' * 44, 'K' * 44, 'LABT'), self.NOW - 60 * MINUTE)
+        cover(lab, self.NOW - hours * 60 * MINUTE, self.NOW - MINUTE)
+        self.assertTrue(lab.flush())
+        return path
+
+    def test_an_unreadable_own_sidecar_is_never_overwritten_and_merged_once_readable(self):
+        # Review finding: an I/O error (a Windows sharing violation) was treated as corruption,
+        # the intact sidecar was replaced at the first observe and the registry reported the
+        # sibling's coverage. Now it is kept, no coverage is adopted until it is read, and it is
+        # merged when a later read succeeds.
+        own = self.own_sidecar_with_memory()
+        lab_path = self.lab_sidecar_current()
+        original = Path.read_text
+        blocked = {'on': True}
+
+        def flaky(path, *args, **kwargs):
+            if blocked['on'] and Path(path) == self.path:
+                raise PermissionError(32, 'The process cannot access the file')
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', flaky):
+            registry = self.registry(seed_paths=(lab_path,))
+            status = registry.status()
+            self.assertEqual(status['load_status'], 'UNREADABLE_NOT_OVERWRITTEN')
+            self.assertTrue(status['sidecar_read']['kept_not_overwritten'])
+            self.assertEqual(status['seed']['sources'], {'strategy_lab.ticker_registry.json': 'SEEDED'})
+            self.assertEqual(len(registry), 1, 'sibling sightings still merge')
+            self.assertIsNone(status['coverage']['adopted_from'], "no sibling coverage while its own is unknown")
+            self.assertTrue(status['coverage']['warming'])
+            relaunch = {'address': MINT, 'pairAddress': PAIR, 'symbol': 'FRESH', 'liquidityUsd': 400_000,
+                        'marketCap': 4_000_000, 'pairCreatedAt': self.NOW - 3 * DAY}
+            self.assertEqual(guard.check(relaunch, self.NOW, registry)['reasons'], ['rug_ticker_registry_warming'])
+            registry.observe([self.coin('N' * 44, 'O' * 44, 'NEWT')], self.NOW)
+            self.assertEqual(self.path.read_bytes(), own, 'the intact sidecar is never overwritten')
+            self.assertEqual(registry.status()['save_error'], 'OWN_SIDECAR_KEPT_UNREAD')
+            self.assertEqual(registry.status()['sidecar_read']['reread_attempts'], 1)
+            # A clean-stop flush reads it once more and, still unreadable, leaves it untouched.
+            self.assertFalse(registry.flush())
+            self.assertEqual(registry.status()['sidecar_read']['reread_attempts'], 2)
+            self.assertEqual(self.path.read_bytes(), own)
+            # Still unreadable 30 s later: no re-read yet (60 s interval); after 60 s it is tried again.
+            registry.observe([], self.NOW + 30_000)
+            self.assertEqual(registry.status()['sidecar_read']['reread_attempts'], 2)
+            registry.observe([self.coin('N' * 44, 'O' * 44, 'NEWT')], self.NOW + 61_000)
+            self.assertEqual(registry.status()['sidecar_read']['reread_attempts'], 3)
+            self.assertEqual(self.path.read_bytes(), own)
+            # The sharing violation clears: the next re-read merges its memory and coverage.
+            blocked['on'] = False
+            self.clock = self.NOW + 122_000
+            registry.observe([self.coin('N' * 44, 'O' * 44, 'NEWT')], self.NOW + 122_000)
+        status = registry.status()
+        self.assertEqual(status['load_status'], 'LOADED_AFTER_REREAD')
+        self.assertFalse(status['sidecar_read']['kept_not_overwritten'])
+        self.assertEqual(len(registry), 42, 'own 40 + the Lab sighting + the new pool')
+        self.assertEqual(status['coverage']['covered_since'], self.NOW - 48 * 60 * MINUTE)
+        self.assertFalse(status['coverage']['warming'])
+        saved = json.loads(self.path.read_text(encoding='utf-8'))
+        self.assertEqual(len(saved['entries']), 42, 'saved only after the merge, nothing lost')
+        self.assertEqual(saved['covered_since'], self.NOW - 48 * 60 * MINUTE)
+
+    def test_a_transient_read_error_is_retried_and_loads_normally(self):
+        own = self.own_sidecar_with_memory(pools=3)
+        original = Path.read_text
+        failures = {'left': 1}
+
+        def once(path, *args, **kwargs):
+            if Path(path) == self.path and failures['left']:
+                failures['left'] -= 1
+                raise PermissionError(32, 'The process cannot access the file')
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', once):
+            registry = self.registry()
+        self.assertEqual((registry.load_status, len(registry)), ('LOADED', 3))
+        self.assertGreater(registry.coverage_ms(self.NOW), 24 * 60 * MINUTE)
+        self.assertEqual(self.path.read_bytes(), own)
+
+    def test_a_clean_stop_merges_a_kept_sidecar_that_became_readable(self):
+        self.own_sidecar_with_memory(pools=5)
+        original = Path.read_text
+
+        def locked(path, *args, **kwargs):
+            if Path(path) == self.path:
+                raise PermissionError(13, 'Access is denied')
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', locked):
+            registry = self.registry()
+            registry.observe([self.coin('N' * 44, 'O' * 44, 'NEWT')], self.NOW)
+        self.assertEqual(registry.load_status, 'UNREADABLE_NOT_OVERWRITTEN')
+        self.assertTrue(registry.flush(), 'readable again at the stop: merged, then saved')
+        self.assertEqual(registry.load_status, 'LOADED_AFTER_REREAD')
+        self.assertEqual(len(json.loads(self.path.read_text(encoding='utf-8'))['entries']), 6)
+
+    def test_a_corrupt_sidecar_whose_copy_fails_is_kept_until_it_can_be_copied(self):
+        self.path.write_text('{corrupt', encoding='utf-8')
+        with patch.object(guard.shutil, 'copyfile', side_effect=OSError('disk')):
+            registry = self.registry()
+            self.assertEqual(registry.load_status, 'CORRUPT_NOT_OVERWRITTEN')
+            registry.observe([self.coin(MINT, PAIR, 'X')], self.NOW)
+            self.assertEqual(self.path.read_text(encoding='utf-8'), '{corrupt')
+        registry.observe([self.coin(MINT, PAIR, 'X')], self.NOW + 61_000)
+        status = registry.status()
+        self.assertEqual(status['load_status'], 'CORRUPT_STARTED_EMPTY')
+        self.assertEqual(self.path.with_name(status['sidecar_read']['corrupt_backup']).read_text(encoding='utf-8'),
+                         '{corrupt')
+        self.assertEqual(json.loads(self.path.read_text(encoding='utf-8'))['entries'][0][2], 'x')
+
+    def test_a_running_registry_seeds_again_when_a_gap_restarts_its_coverage(self):
+        # Review finding: a tape whose polls stalled for over 60 min while main kept scanning
+        # restarted its coverage and withheld every seat of a pool under 14 days for 24 h,
+        # although main's registry vouched; only a tape restart cleared it.
+        main_sidecar = Path(self.tmp.name) / 'state.ticker_registry.json'
+        tape_sidecar = Path(self.tmp.name) / 'live_tape.ticker_registry.json'
+        self.clock = self.NOW
+        scheduler = TapePoolScheduler(registry_path=tape_sidecar, registry_seed_paths=(main_sidecar,))
+        registry = scheduler.defense.registry
+        cover(registry, self.NOW - 30 * 60 * MINUTE, self.NOW - 70 * MINUTE)     # stalled for 70 min
+        main = guard.TickerRegistry(main_sidecar, clock=lambda: self.clock)
+        main.observe_coin(self.coin(OTHER_MINT, OTHER_PAIR, 'DOTF'), self.NOW - 20 * 60 * MINUTE)
+        cover(main, self.NOW - 30 * 60 * MINUTE, self.NOW - MINUTE)
+        self.assertTrue(main.flush())
+        pool = established(self.NOW, address='C' * 44, pairAddress='H' * 44, symbol='CALM',
+                           pairCreatedAt=self.NOW - 3 * DAY, dexId='pumpswap')
+        relaunch = established(self.NOW, address='J' * 44, pairAddress='K' * 44, symbol='DOTF',
+                               pairCreatedAt=self.NOW - 2 * DAY, dexId='pumpswap')
+        selected, report = scheduler.select({'feed': [pool, relaunch]}, now=self.NOW, max_tracked=2)
+        status = registry.status()
+        self.assertEqual(status['seed']['running_reseeds'], 1)
+        coverage = registry.coverage_status(self.NOW)       # the scheduler's registry runs on the wall clock
+        self.assertEqual((coverage['resets'], coverage['adopted_from']), (1, 'state.ticker_registry.json'))
+        self.assertEqual(coverage['covered_since'], self.NOW - 30 * 60 * MINUTE)
+        self.assertFalse(coverage['warming'])
+        self.assertNotIn('rug_ticker_registry_warming', report['defensive_entry']['rejections'])
+        self.assertEqual(report['defensive_entry']['rejections'].get('rug_ticker_reuse'), 1,
+                         "main's sightings arrived with the seed")
+        self.assertIn('CALM', [row['symbol'] for row in selected])
+
+    def test_a_warming_running_registry_seeds_at_most_every_5_minutes(self):
+        # Started before any sibling vouched; the Lab's sidecar starts vouching later.
+        lab_path = Path(self.tmp.name) / 'strategy_lab.ticker_registry.json'
+        registry = self.registry(seed_paths=(lab_path,))
+        self.assertEqual(registry.status()['seed']['sources'], {'strategy_lab.ticker_registry.json': 'MISSING'})
+        feed = [dict(self.coin(MINT, PAIR, 'MAIN'), updatedAt=self.NOW)]
+        registry.observe(feed, self.NOW)
+        self.assertTrue(registry.status()['coverage']['warming'])
+        self.lab_sidecar_current()
+        later = self.NOW + 2 * MINUTE
+        registry.observe([dict(feed[0], updatedAt=later)], later)
+        self.assertEqual(registry.status()['seed']['running_reseeds'], 0, 'not before 5 minutes')
+        self.assertTrue(registry.status()['coverage']['warming'])
+        later = self.NOW + 5 * MINUTE
+        registry.observe([dict(feed[0], updatedAt=later)], later)
+        status = registry.status()
+        self.assertEqual(status['seed']['running_reseeds'], 1)
+        self.assertEqual(status['seed']['sources'], {'strategy_lab.ticker_registry.json': 'SEEDED'})
+        self.assertEqual(status['coverage']['adopted_from'], 'strategy_lab.ticker_registry.json')
+        self.assertFalse(status['coverage']['warming'])
+        # A registry that vouches never seeds again.
+        registry.observe([dict(feed[0], updatedAt=later + 10 * MINUTE)], later + 10 * MINUTE)
+        self.assertEqual(registry.status()['seed']['running_reseeds'], 1)
 
     def test_invalid_rows_are_skipped_and_stale_rows_pruned_on_load(self):
         rows = [[MINT, PAIR, 'good', self.NOW - DAY, self.NOW - DAY],
@@ -434,10 +616,14 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         self.assertEqual(registry.status()['saves'], 2)
 
     def test_engine_sidecar_lives_next_to_the_account_state_and_survives_restart(self):
+        # The engine's registry runs on the wall clock (structural_rug_guard.time) and prunes
+        # on load, so the sighting is stamped by that clock (a fixed future stamp would be
+        # pruned once the wall clock passes it by 14 days, review finding).
+        now = int(guard.time.time() * 1000)
         state_path = Path(self.tmp.name) / 'engine' / 'state.json'
         with patch.object(m, 'STATE_PATH', state_path):
             monitor = m.Monitor()
-            monitor.observe_entry_defense([established(self.NOW)], self.NOW)
+            monitor.observe_entry_defense([established(now)], now)
             monitor.stop()
             sidecar = state_path.with_name('state.ticker_registry.json')
             self.assertTrue(sidecar.exists())
@@ -539,10 +725,12 @@ class TickerRegistryPersistenceTests(unittest.TestCase):
         corrupt.write_text('{oops', encoding='utf-8')
         other = guard.TickerRegistry(Path(self.tmp.name) / 'other.json', clock=lambda: self.clock,
                                      seed_paths=(Path(self.tmp.name) / 'missing.json', corrupt))
-        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V2', 'entries': 0,
+        self.assertEqual(other.status()['seed'], {'version': 'TICKER_REGISTRY_SEED_V3', 'entries': 0,
                                                  'sources': {'missing.json': 'MISSING',
-                                                             'corrupt.ticker_registry.json': 'CORRUPT'}})
+                                                             'corrupt.ticker_registry.json': 'CORRUPT'},
+                                                 'running_reseeds': 0, 'last_seed_at': self.clock})
         self.assertEqual(len(other), 0)
+        self.assertEqual(corrupt.read_text(encoding='utf-8'), '{oops', 'a corrupt seed is never copied or written')
 
     def test_a_short_current_sidecar_left_before_the_seed_still_adopts_a_sibling(self):
         # The services ran 40 min before the first-deploy seed, then were stopped and main's
@@ -979,7 +1167,10 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(self.journal.read_bytes(), before, 'the journal is read only')
         self.assertEqual((summary['rows'], summary['invalid_rows'], summary['entries']), (len(stamps) + 4, 3, 6))
-        self.assertEqual(summary['version'], 'TICKER_REGISTRY_SEED_V2')
+        self.assertEqual(summary['version'], 'TICKER_REGISTRY_SEED_V3')
+        self.assertEqual(summary['services_stopped_check'], 'NO_UNSTOPPED_SERVICES_MANIFEST')
+        self.assertIn('entry_diagnostics.defensive_entry.layer.ticker_registry.load_status == LOADED',
+                      summary['verify_after_start'])
         self.assertEqual(summary['coverage']['covered_since'], self.T0)
         self.assertEqual(summary['coverage']['coverage_hours'], 26.0)
         last = stamps[-1]
@@ -1005,6 +1196,60 @@ class TickerRegistrySeedBuilderTests(unittest.TestCase):
         self.assertEqual(summary['coverage']['covered_since'], self.T0 + 4 * 60 * MINUTE)
         self.assertEqual(summary['coverage']['resets'], 1)
         self.assertTrue(summary['coverage']['warming'])
+
+    def test_the_tool_refuses_a_runtime_whose_services_were_not_stopped(self):
+        # Review finding: --replace-stale under running services wrote the seed, and the running
+        # main overwrote it at its next periodic save. A runtime directory whose
+        # services/processes.json exists without services/stop.request (Stop writes it, Start
+        # removes it) is refused, for the first run and --replace-stale alike.
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]
+        self.write_journal(stamps)
+        last = stamps[-1]
+        now = last + 20 * MINUTE
+        runtime = Path(self.tmp.name) / 'runtime' / 'accounts'
+        services = runtime / 'services'
+        services.mkdir(parents=True)
+        (services / 'processes.json').write_text('{"mode": "PAPER", "processes": []}', encoding='utf-8')
+        self.out = runtime / 'state.ticker_registry.json'
+        self.assertEqual(self.tool.running_services_root(self.out), runtime)
+        with self.assertRaises(SystemExit):
+            self.run_tool(clock=lambda: now)
+        self.assertFalse(self.out.exists(), 'nothing written while the services may run')
+        old = self.old_sidecar(covered_since=last - 30 * MINUTE, observed_until=last + 10 * MINUTE)
+        with self.assertRaises(SystemExit):
+            self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual(self.out.read_bytes(), old)
+        self.assertEqual(list(runtime.glob('*.replaced-*')), [])
+        # A personal engine's sidecar below the runtime is refused too.
+        personal = runtime / 'users' / 'u1' / 'state.ticker_registry.json'
+        self.assertEqual(self.tool.running_services_root(personal), runtime)
+        # After Stop (stop.request written) the same recovery runs.
+        (services / 'stop.request').write_text('2026-10-08T00:00:00Z', encoding='utf-8')
+        self.assertIsNone(self.tool.running_services_root(self.out))
+        code, summary = self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual((code, summary['written']), (0, True))
+        self.assertFalse(summary['coverage_at_now']['warming'])
+
+    def test_replace_stale_never_replaces_a_sidecar_it_cannot_read(self):
+        stamps = [self.T0 + index * 10 * MINUTE for index in range(26 * 6 + 1)]
+        self.write_journal(stamps)
+        last = stamps[-1]
+        now = last + 20 * MINUTE
+        old = self.old_sidecar(covered_since=last - 30 * MINUTE, observed_until=last + 10 * MINUTE)
+        original = Path.read_text
+
+        def locked(path, *args, **kwargs):
+            if Path(path) == self.out:
+                raise PermissionError(32, 'The process cannot access the file')
+            return original(path, *args, **kwargs)
+
+        with patch.object(Path, 'read_text', locked):
+            verdict = self.tool.existing_sidecar(self.out, now)
+            self.assertEqual((verdict['status'], verdict['replaceable']), ('UNREADABLE', False))
+            with self.assertRaises(SystemExit):
+                self.run_tool('--replace-stale', clock=lambda: now)
+        self.assertEqual(self.out.read_bytes(), old)
+        self.assertEqual(list(Path(self.tmp.name).glob('*.replaced-*')), [])
 
 
 # ------------------------------------------------------------------ heat veto
@@ -2356,27 +2601,32 @@ class TapeSchedulerPathTests(unittest.TestCase):
         self.assertEqual(live_tape._POOL_SCHEDULER.defense.registry.path, live_tape.scheduler_registry_path())
         self.assertEqual(live_tape.scheduler_registry_path().name, f'{live_tape.OUT.stem}.ticker_registry.json')
         self.assertEqual(live_tape.scheduler_registry_path().parent, live_tape.OUT.parent)
+        # The tape's registry runs on the wall clock (structural_rug_guard.time) and prunes on
+        # load, so every stamp is relative to that clock (a fixed future stamp is pruned 14 days
+        # after the wall clock passes it, review finding).
+        now = int(guard.time.time() * 1000)
         with tempfile.TemporaryDirectory() as tmp:
             path = live_tape.scheduler_registry_path(Path(tmp) / 'live_tape.json')
             self.assertEqual(path, Path(tmp) / 'live_tape.ticker_registry.json')
             first = TapePoolScheduler(registry_path=path)
-            original = self.coin('Wose', symbol='WOSE', pairCreatedAt=self.NOW - 10 * DAY)
-            first.select({'feed': [original]}, now=self.NOW, max_tracked=2)
+            original = self.coin('Wose', symbol='WOSE', pairCreatedAt=now - 10 * DAY, updatedAt=now)
+            first.select({'feed': [original]}, now=now, max_tracked=2)
             self.assertTrue(path.exists(), 'saved on the first observation')
             # A restarted tape process remembers the ticker: a relaunch under another mint
             # is a reuse and gets no seat.
             restarted = TapePoolScheduler(registry_path=path)
             self.assertEqual(restarted.defense.registry.status()['load_status'], 'LOADED')
             self.assertEqual(len(restarted.defense.registry), 1)
-            relaunch = self.coin('Xyse', symbol='WOSE', pairCreatedAt=self.NOW - 2 * DAY)
-            selected, report = restarted.select({'feed': [relaunch]}, now=self.NOW + MINUTE, max_tracked=2)
+            relaunch = self.coin('Xyse', symbol='WOSE', pairCreatedAt=now - 2 * DAY, updatedAt=now + MINUTE)
+            selected, report = restarted.select({'feed': [relaunch]}, now=now + MINUTE, max_tracked=2)
             self.assertEqual(selected, [])
             self.assertEqual(report['defensive_entry']['rejections'], {'rug_ticker_reuse': 1})
             # A sighting inside the 5-minute save interval is written by the clean-stop flush.
             registry = restarted.defense.registry
             saves = registry.status()['saves']
-            restarted.select({'feed': [self.coin('Neww', symbol='NEWT', pairCreatedAt=self.NOW - 3 * DAY)]},
-                             now=self.NOW + 2 * MINUTE, max_tracked=2)
+            restarted.select({'feed': [self.coin('Neww', symbol='NEWT', pairCreatedAt=now - 3 * DAY,
+                                                 updatedAt=now + 2 * MINUTE)]},
+                             now=now + 2 * MINUTE, max_tracked=2)
             self.assertEqual(registry.status()['saves'], saves, 'not saved inside the interval')
             self.assertEqual(len(guard.TickerRegistry(path)), 2)
             with patch.object(live_tape, '_POOL_SCHEDULER', restarted):
@@ -2484,6 +2734,51 @@ class VersionAndReplayTests(unittest.TestCase):
                 self.assertFalse(replay.monitor.defensive_entry_decision(established(1), 1)['allowed'])
                 result = replay.replay([])
             self.assertEqual(result['entry_defense']['label'], 'COUNTERFACTUAL_LAYER_ON_REPLAYED_ROWS_ONLY')
+
+    def test_recorded_policy_refuses_rows_recorded_under_the_layer(self):
+        # Review finding: the default replay labelled every journal as predating the layer and
+        # skipped it, so a journal recorded after the deploy would admit entries the live engine
+        # refused. Engines running the layer stamp coin.scoreVersion (make_coin); a journal
+        # with such a row is refused in recorded_policy and needs a labelled counterfactual.
+        import main_replay
+        from main_replay import MainReplay, RecordedPolicyRefused
+        pre = {'observed_at': 10, 'available_at': 10, 'coin': established(10)}
+        post = {'observed_at': 20, 'available_at': 20,
+                'coin': established(20, scoreVersion=m.SCORE_VERSION, scoreV1=95)}
+        self.assertEqual(main_replay.rows_recorded_under_layer([pre, post]), {'rows': 1, 'earliest_at': 20})
+        self.assertEqual(main_replay.rows_recorded_under_layer([pre]), {'rows': 0, 'earliest_at': None})
+        # make_coin stamps the marker on every observation the engine records.
+        pair = {'pairAddress': PAIR, 'dexId': 'pumpswap', 'baseToken': {'symbol': 'TROLL', 'name': 'x'},
+                'priceUsd': '0.04', 'liquidity': {'usd': 3_000_000}, 'marketCap': 31_000_000,
+                'pairCreatedAt': 1, 'priceChange': {}, 'txns': {}, 'volume': {}}
+        self.assertEqual(m.make_coin(MINT, pair, {})[main_replay.LAYER_ERA_COIN_FIELD], m.SCORE_VERSION)
+        with tempfile.TemporaryDirectory() as tmp:
+            with MainReplay(Path(tmp) / 'recorded') as replay:
+                with self.assertRaises(RecordedPolicyRefused) as refused:
+                    replay.replay([pre, post])
+                self.assertIn('without_layer', str(refused.exception))
+                self.assertEqual(replay.replayed, 0, 'refused before any row is ingested')
+            with MainReplay(Path(tmp) / 'without', entry_defense='without_layer') as replay:
+                decision = replay.monitor.defensive_entry_decision(established(1), 1)
+                self.assertTrue(decision['allowed'])
+                self.assertEqual(decision['mode'], 'COUNTERFACTUAL_WITHOUT_DEFENSIVE_ENTRY_LAYER_V1')
+                result = replay.replay([post])
+            defense = result['entry_defense']
+            self.assertEqual((defense['mode'], defense['applied'], defense['label']),
+                             ('without_layer', False, 'COUNTERFACTUAL_WITHOUT_DEFENSIVE_ENTRY_LAYER_V1'))
+            self.assertEqual(defense['rows_recorded_under_layer'], {'rows': 1, 'earliest_at': 20})
+            with MainReplay(Path(tmp) / 'pre') as replay:
+                result = replay.replay([pre])
+            self.assertEqual(result['entry_defense']['label'], 'REPLAY_RECORDED_POLICY_PREDATES_DEFENSIVE_ENTRY_LAYER_V1')
+            self.assertEqual(result['entry_defense']['cutover_check'],
+                             'RECORDED_POLICY_REFUSES_ROWS_RECORDED_UNDER_THE_LAYER_V1')
+
+    def test_order_flow_adaptive_publishes_that_its_v4_checks_read_the_v2_entry_score(self):
+        snapshot = oct4.config_snapshot()
+        self.assertEqual(snapshot['decision_filter_version'], 'ORDER_FLOW_BALANCED_V4')
+        self.assertEqual(snapshot['entry_score_version'], m.SCORE_VERSION)
+        self.assertIn('read the V2 entry score', snapshot['decision_inputs_note'])
+        self.assertIn('exit context', snapshot['decision_inputs_note'])
 
 
 class AccountIsolationTests(unittest.TestCase):

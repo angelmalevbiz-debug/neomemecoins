@@ -63,10 +63,10 @@ DAY = 24 * HOUR
 # Frozen config hashes (sha256 of each book's canonical parameter JSON). A parameter
 # change must change these pins, strategy-lock.json and docs/STRATEGY_VALIDATION.md together.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': 'a183e57ca5f7a3e9002d7d5dd7e8a92c533396b0551647540e3a1a417c5516e0',
-    'RND_LAB_A': 'abe2cc2caf5a4515ec3a7e0a2c095ea98e48023dd3b596b4c2d54ad7cbb6ed74',
-    'LAB_B_DIP_MKTDIP_GUARD': 'b49f09dac0b802fdbfc4c9608c2533ea0064a2ed957d8d23f45676852832ea31',
-    'RND_LAB_B': '7637d5b3206a4fe9de2ba393c1102fd8c2ea5263951abdac287fa84b723343a1',
+    'LAB_A_SURGE_EST_GUARD': '883e08b8379fe319e7c5d783eb821d35938911f2c29c500665f5dd499bc6cc34',
+    'RND_LAB_A': '8be0ce70a1bc1247b326063f912f7ec917da70258e34ad63b686846b7614d5c1',
+    'LAB_B_DIP_MKTDIP_GUARD': '08e20572c482bd44e2d2092e600e81579a6bbcac3890906deba99752ed85cfd8',
+    'RND_LAB_B': '76ef3c3083bede7b02ce301d010f17179e12c51e10fce9059bc94eb5030872c9',
 }
 
 
@@ -207,6 +207,19 @@ class DefinitionTests(unittest.TestCase):
             self.assertNotEqual(lf.config_hash(lf.LAB_A_ID), PINNED_CONFIG_HASHES[lf.LAB_A_ID])
         with patch.object(lf, 'CASH', dataclasses.replace(lf.CASH, network_fee_reserve_usd=1.0)):
             self.assertNotEqual(lf.config_hash(lf.LAB_B_ID), PINNED_CONFIG_HASHES[lf.LAB_B_ID])
+        # LAB_FORWARD_SIGNAL_CARRY_V1 and LAB_FORWARD_CONTROL_CONTINUITY_V1 are part of every book's test.
+        with patch.object(lf, 'SIGNAL_CARRY', dataclasses.replace(lf.SIGNAL_CARRY, max_age_ms=30_000)):
+            for book_id in lf.BOOK_IDS:
+                self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+        with patch.object(lf, 'CONTROL_CONTINUITY', dataclasses.replace(lf.CONTROL_CONTINUITY, version='PROBE')):
+            for book_id in lf.BOOK_IDS:
+                self.assertNotEqual(lf.config_hash(book_id), PINNED_CONFIG_HASHES[book_id])
+        for book_id in lf.BOOK_IDS:
+            parameters = lf.book_parameters(book_id)
+            self.assertEqual(parameters['signal_carry']['max_age_ms'], 60_000)
+            self.assertEqual(parameters['signal_carry']['carried_blocker'], 'price_crosscheck_pending')
+            self.assertEqual(parameters['control_continuity']['version'], lf.CONTROL_CONTINUITY_VERSION)
+            self.assertEqual(parameters['size']['start_balance_usd'], 500.0)
 
     def test_the_hashed_cost_model_is_the_labs_resolved_model(self):
         self.assertEqual(lf.cost_model_mismatches(**lab.forward_cost_model()), [])
@@ -233,6 +246,9 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual(section['cost_model'], lf._hashable(dataclasses.asdict(lf.COST_MODEL)))
         self.assertEqual(section['close_policy'], dataclasses.asdict(lf.CLOSE_POLICY))
         self.assertEqual(section['cash_state'], dataclasses.asdict(lf.CASH))
+        self.assertEqual(section['control_continuity'], dataclasses.asdict(lf.CONTROL_CONTINUITY))
+        self.assertEqual(section['signal_carry'], dataclasses.asdict(lf.SIGNAL_CARRY))
+        self.assertEqual(section['known_versions'], list(lf.KNOWN_VERSIONS))
         self.assertFalse(section['tape_pin_required'])
         self.assertEqual(section['promotion_gate']['min_control_coverage'], 0.9)
         seats = lock['tape_seat_policy']
@@ -712,10 +728,21 @@ class KillRuleTests(unittest.TestCase):
         self.review(weak)
         self.assertFalse(weak[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']['all_evaluable_pass'])
 
+    def stop_hypothesis(self, books, hypothesis_id, *, at=None):
+        """A hypothesis already retired by its kill rule (persisted marker): its control loses continuity."""
+        books[hypothesis_id]['strategy_lifecycle'] = {
+            'version': lf.KILL_RULE_VERSION, 'status': 'retired', 'entry_enabled': False,
+            'reason': 'pre_registered_kill_rule', 'retired_at': at or self.NOW - DAY, 'evidence': {}}
+
     def test_cash_exhausted_book_is_marked_not_active(self):
-        """$500 at a fixed $200: about $300 of loss headroom, often < 50 closes (LAB_FORWARD_CASH_STATE_V1)."""
+        """$500 at a fixed $200: about $300 of loss headroom, often < 50 closes (LAB_FORWARD_CASH_STATE_V1).
+
+        A control is only cash_exhausted once its hypothesis can no longer enter
+        (LAB_FORWARD_CONTROL_CONTINUITY_V1); before that it keeps measuring at zero capital.
+        """
         books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 40))
         books[lf.RND_A_ID]['balance'] = 160.0
+        self.stop_hypothesis(books, lf.LAB_A_ID)
         report = self.review(books)
         marker = books[lf.RND_A_ID]['strategy_lifecycle']
         self.assertEqual((marker['version'], marker['status'], marker['reason'], marker['entry_enabled']),
@@ -741,9 +768,112 @@ class KillRuleTests(unittest.TestCase):
         # When the kill rule is met it takes precedence (and persists).
         books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 55))
         books[lf.RND_A_ID]['balance'] = 60.0
+        self.stop_hypothesis(books, lf.LAB_A_ID)
         self.review(books)
         self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'retired')
         self.assertTrue(books[lf.RND_A_ID]['strategy_lifecycle']['cash']['exhausted'])
+        # A hypothesis out of cash is cash_exhausted itself (continuity is for controls only).
+        books = self.books(LAB_B_DIP_MKTDIP_GUARD=closes(lf.LAB_B_ID, [-9.0] * 35))
+        books[lf.LAB_B_ID]['balance'] = 185.0
+        report = self.review(books)
+        self.assertEqual(books[lf.LAB_B_ID]['strategy_lifecycle']['status'], 'cash_exhausted')
+        self.assertNotIn('control_continuity', books[lf.LAB_B_ID]['strategy_lifecycle'])
+        self.assertIn(lf.LAB_B_ID, report['lab_forward_cash_exhausted_ids'])
+
+    def test_a_control_keeps_entering_while_its_hypothesis_can(self):
+        """LAB_FORWARD_CONTROL_CONTINUITY_V1: neither the control's kill rule nor its cash ends the comparison."""
+        # Kill rule met (55 closes at -$8): deferred while LAB_A can enter, published as met.
+        books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 55))
+        report = self.review(books)
+        marker = books[lf.RND_A_ID]['strategy_lifecycle']
+        self.assertTrue(marker['evidence']['kill_rule_met'])
+        self.assertEqual((marker['status'], marker['reason'], marker['entry_enabled'], marker['capital_mode']),
+                         ('active', 'control_kill_rule_deferred', True, lf.FUNDED))
+        self.assertEqual(marker['control_continuity'], {
+            'version': lf.CONTROL_CONTINUITY_VERSION, 'hypothesis': lf.LAB_A_ID, 'hypothesis_can_enter': True,
+            'kill_rule_deferred': True, 'zero_capital_entries': False})
+        self.assertTrue(lifecycle.entry_enabled(books[lf.RND_A_ID]))
+        self.assertEqual(report['lab_forward_kill_rule_deferred_ids'], [lf.RND_A_ID])
+        self.assertIn(lf.RND_A_ID, report['active_registered_strategy_ids'])
+        self.assertNotIn(lf.RND_A_ID, report['retired_strategy_ids'])
+        self.assertEqual(report['lab_forward_kill_rule']['control_continuity_version'], lf.CONTROL_CONTINUITY_VERSION)
+        # The same evidence retires a hypothesis: continuity is never applied to a hypothesis.
+        books = self.books(LAB_A_SURGE_EST_GUARD=closes(lf.LAB_A_ID, [-8.0] * 55))
+        self.review(books)
+        self.assertEqual(books[lf.LAB_A_ID]['strategy_lifecycle']['status'], 'retired')
+        # Out of cash with fewer than 50 closes: zero-capital entries while LAB_B can enter.
+        books = self.books(RND_LAB_B=closes(lf.RND_B_ID, [-9.0] * 35))
+        books[lf.RND_B_ID]['balance'] = 185.0
+        report = self.review(books)
+        marker = books[lf.RND_B_ID]['strategy_lifecycle']
+        self.assertEqual((marker['status'], marker['reason'], marker['capital_mode']),
+                         ('active', 'kill_rule_min_closes_not_reached', lf.ZERO_CAPITAL))
+        self.assertTrue(marker['control_continuity']['zero_capital_entries'])
+        self.assertTrue(marker['cash']['exhausted'])
+        self.assertEqual(report['lab_forward_zero_capital_control_ids'], [lf.RND_B_ID])
+        self.assertEqual(report['lab_forward_cash_exhausted_ids'], [])
+        self.assertTrue(lf.zero_capital_entry_allowed(lf.RND_B_ID, books))
+        self.assertTrue(lf.zero_capital_entry_allowed(lf.RND_B_ID, books, set(lf.BOOK_IDS)))
+        self.assertFalse(lf.zero_capital_entry_allowed(lf.RND_B_ID, books, {lf.RND_B_ID}),
+                         'a hypothesis that is no longer registered cannot keep its control running')
+        self.assertFalse(lf.zero_capital_entry_allowed(lf.LAB_B_ID, books), 'never for a hypothesis')
+        self.assertEqual(lf.entry_window_end(books[lf.RND_B_ID]), (None, None))
+        # Once the hypothesis stops (out of cash), the control's own rules apply again.
+        books[lf.LAB_B_ID]['balance'] = 120.0
+        books[lf.LAB_B_ID]['history'] = closes(lf.LAB_B_ID, [-12.0] * 30)
+        report = self.review(books)
+        self.assertEqual(books[lf.LAB_B_ID]['strategy_lifecycle']['status'], 'cash_exhausted')
+        self.assertEqual(books[lf.RND_B_ID]['strategy_lifecycle']['status'], 'cash_exhausted')
+        self.assertFalse(lf.zero_capital_entry_allowed(lf.RND_B_ID, books))
+        self.assertEqual(sorted(report['lab_forward_cash_exhausted_ids']), [lf.LAB_B_ID, lf.RND_B_ID])
+        # A deferred control is retired as soon as its hypothesis is retired.
+        books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 55))
+        self.stop_hypothesis(books, lf.LAB_A_ID)
+        report = self.review(books)
+        self.assertEqual((books[lf.RND_A_ID]['strategy_lifecycle']['status'],
+                          books[lf.RND_A_ID]['strategy_lifecycle']['reason']), ('retired', 'pre_registered_kill_rule'))
+        self.assertIn(lf.RND_A_ID, report['retired_strategy_ids'])
+        # Balances and histories are never touched by the review.
+        books = self.books(RND_LAB_B=closes(lf.RND_B_ID, [-9.0] * 35))
+        books[lf.RND_B_ID]['balance'] = 185.0
+        before = copy.deepcopy({key: books[lf.RND_B_ID][key] for key in ('balance', 'history', 'position')})
+        self.review(books)
+        self.assertEqual({key: books[lf.RND_B_ID][key] for key in ('balance', 'history', 'position')}, before)
+
+    def test_a_new_config_hash_starts_a_new_sample_not_a_new_ledger(self):
+        """A parameter, cost-model or funding change is a new evidence sample in the same ledger.
+
+        Closes of another hash never count, but the book keeps its balance and a
+        kill-rule retirement persists across hashes; a new test needs new book ids.
+        """
+        old_hash = '0' * 64
+        books = self.books(RND_LAB_B=closes(lf.RND_B_ID, [-9.0] * 60, config_hash=old_hash))
+        books[lf.RND_B_ID]['balance'] = 180.0
+        books[lf.RND_B_ID]['strategy_lifecycle'] = {
+            'version': lf.KILL_RULE_VERSION, 'status': 'retired', 'entry_enabled': False,
+            'reason': 'pre_registered_kill_rule', 'retired_at': self.NOW - DAY,
+            'evidence': {'config_hash': old_hash, 'closed_trades': 60, 'kill_rule_met': True}}
+        self.review(books)
+        marker = books[lf.RND_B_ID]['strategy_lifecycle']
+        self.assertEqual(marker['status'], 'retired', 'a retirement under another hash persists')
+        self.assertEqual(marker['evidence']['config_hash'], old_hash)
+        self.assertEqual(marker['current_evidence']['config_hash'], lf.CONFIG_HASHES[lf.RND_B_ID])
+        self.assertEqual(marker['current_evidence']['closed_trades'], 0)
+        self.assertFalse(lifecycle.entry_enabled(books[lf.RND_B_ID]))
+        self.assertEqual(books[lf.RND_B_ID]['balance'], 180.0)
+        # The Lab loads an existing book's ledger as stored, whatever START_BALANCE_USD says now.
+        stored = {'books': {lf.RND_A_ID: {**lab.empty_book(next(s for s in lab.STRATEGIES if s['id'] == lf.RND_A_ID)),
+                                          'starting_balance': 500.0, 'balance': 180.0}}}
+        lab.STATE_PATH.write_text(json.dumps(stored), encoding='utf-8')
+        try:
+            with patch.dict(lab.STRATEGY_START_BALANCES, {lf.RND_A_ID: 2_000.0}), \
+                    patch.object(lab, 'now_ms', return_value=self.NOW):
+                state = lab.load_state()
+        finally:
+            lab.STATE_PATH.unlink()
+        self.assertEqual((state['books'][lf.RND_A_ID]['starting_balance'], state['books'][lf.RND_A_ID]['balance']),
+                         (500.0, 180.0))
+        self.assertEqual(state['books'][lf.LAB_A_ID]['starting_balance'], lf.START_BALANCE_USD)
 
     def test_gate_compares_only_the_period_in_which_the_control_could_enter(self):
         start = 1_800_000_000_000
@@ -757,6 +887,20 @@ class KillRuleTests(unittest.TestCase):
             row['closed_at'] = row['opened_at'] + 10 * MINUTE
         books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
         books[lf.RND_A_ID]['balance'] = 160.0                       # then out of cash
+        # LAB_FORWARD_CONTROL_CONTINUITY_V1: while LAB_A can enter, the control keeps entering
+        # at zero capital, so the window is the hypothesis's whole period.
+        self.review(books)
+        self.assertEqual((books[lf.RND_A_ID]['strategy_lifecycle']['status'],
+                          books[lf.RND_A_ID]['strategy_lifecycle']['capital_mode']), ('active', lf.ZERO_CAPITAL))
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        self.assertEqual(gate['control_window']['control_entry_end_reason'], None)
+        self.assertEqual(gate['criteria']['control_coverage']['value'], 1.0)
+        self.assertTrue(gate['criteria']['control_coverage']['pass'])
+        self.assertEqual(gate['control_cash_state']['balance_usd'], 160.0)
+        # Without continuity (a hypothesis stopped by an earlier marker) the control's cash ends it.
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
+        books[lf.RND_A_ID]['balance'] = 160.0
+        self.stop_hypothesis(books, lf.LAB_A_ID, at=self.NOW)
         self.review(books)
         self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'cash_exhausted')
         gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
@@ -816,6 +960,76 @@ class KillRuleTests(unittest.TestCase):
         self.assertAlmostEqual(marker['promotion_gate']['criteria']['vanished_or_unpriced_share']['value'], 0.1)
 
 
+# ------------------------------------------------------------------ signal carry
+
+class SignalCarryTests(unittest.TestCase):
+    """LAB_FORWARD_SIGNAL_CARRY_V1 episodes: bounded, per book, counted per config hash in the ledger."""
+    T = 1_800_000_000_000
+
+    @staticmethod
+    def evaluation(stamp, book_id=lf.RND_B_ID):
+        return {'book_id': book_id, 'observed_at': stamp, 'universe_rejections': [], 'signal_rejections': [],
+                'matched': True, 'signal': {'kind': 'random', 'drawn': True}}
+
+    def test_episodes_window_outcomes_and_counters(self):
+        carry, book, T = lf.SignalCarry(), {'id': lf.RND_B_ID, 'history': []}, self.T
+        a, b, c = ('M1', 'P1'), ('M2', 'P2'), ('M3', 'P3')
+        self.assertTrue(carry.hold(book, a, self.evaluation(T), T + 1_000))
+        self.assertFalse(carry.hold(book, a, self.evaluation(T + 3_000), T + 4_000), 'the same episode, refreshed')
+        carried = carry.carried_evaluation(lf.RND_B_ID, a, T + 5_000)
+        self.assertEqual(carried['observed_at'], T + 3_000)
+        self.assertEqual((carried['carry']['signal_observed_at'], carried['carry']['first_signal_observed_at'],
+                          carried['carry']['signals'], carried['carry']['attempts']), (T + 3_000, T, 2, 2))
+        carried['signal']['drawn'] = 'mutated'
+        self.assertTrue(carry.carried_evaluation(lf.RND_B_ID, a, T + 5_000)['signal']['drawn'], 'a copy')
+        self.assertFalse(carry.hold(book, a, carried, T + 6_000), 'a carried retry never extends the window')
+        self.assertEqual(carry.carried_evaluation(lf.RND_B_ID, a, T + 6_000)['observed_at'], T + 3_000)
+        # The window: 60 s after the latest signal observation.
+        carry.hold(book, b, self.evaluation(T + 1_000), T + 2_000)
+        self.assertIsNotNone(carry.carried_evaluation(lf.RND_B_ID, b, T + 61_000))
+        self.assertIsNone(carry.carried_evaluation(lf.RND_B_ID, b, T + 61_001))
+        self.assertEqual(carry.expire(book, T + 61_001), 1)
+        self.assertEqual(carry.pending_count(lf.RND_B_ID), 1)
+        self.assertTrue(carry.resolve(book, a, 'entered'))
+        self.assertFalse(carry.resolve(book, a, 'entered'), 'an episode ends once')
+        carry.hold(book, b, self.evaluation(T + 70_000), T + 70_500)
+        carry.hold(book, c, self.evaluation(T + 70_000), T + 70_500)
+        self.assertEqual(carry.clear(book, 'superseded', keep=c), 1)
+        self.assertTrue(carry.resolve(book, c, 'dropped_by_gate', 'modeled_roundtrip_cost_limit'))
+        carry.hold(book, a, self.evaluation(T + 80_000), T + 80_500)
+        self.assertEqual(carry.clear(book, 'book_stopped'), 1)
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual({name: counters[name] for name in lf.CARRY_COUNTERS},
+                         {'pending_signals': 5, 'entered': 1, 'lost_price_pending': 1, 'superseded': 1,
+                          'book_stopped': 1})
+        self.assertEqual(counters['dropped_by_gate'], {'modeled_roundtrip_cost_limit': 1})
+        self.assertEqual((counters['ended'], counters['lost_price_pending_share']), (5, 0.2))
+        self.assertEqual(counters['config_hash'], lf.CONFIG_HASHES[lf.RND_B_ID])
+        # Stored in the ledger per config hash: another hash's counters are never reported.
+        store = book['lab_forward_signal_carry']
+        self.assertEqual(list(store['by_config_hash']), [lf.CONFIG_HASHES[lf.RND_B_ID]])
+        store['by_config_hash']['0' * 64] = {'pending_signals': 99, 'lost_price_pending': 99}
+        self.assertEqual(lf.signal_carry_counters(book)['pending_signals'], 5)
+        self.assertEqual(lf.signal_carry_counters({'id': lf.LAB_A_ID})['pending_signals'], 0)
+        # Other books' episodes are separate; unknown books are ignored.
+        other = {'id': lf.LAB_A_ID}
+        carry.hold(other, a, self.evaluation(T, lf.LAB_A_ID), T + 1_000)
+        self.assertEqual((carry.pending_count(lf.LAB_A_ID), carry.pending_count(lf.RND_B_ID)), (1, 0))
+        self.assertFalse(carry.hold({'id': 'TREND'}, a, self.evaluation(T), T))
+        self.assertEqual(carry.status()['pending'], {lf.LAB_A_ID: 1})
+        self.assertFalse(carry.status()['persistent'])
+
+    def test_pending_signals_are_bounded(self):
+        carry = lf.SignalCarry(dataclasses.replace(lf.SIGNAL_CARRY, max_pending_per_book=2))
+        book = {'id': lf.RND_A_ID}
+        for index in range(3):
+            carry.hold(book, (f'M{index}', f'P{index}'), self.evaluation(self.T + index, lf.RND_A_ID), self.T + 10)
+        self.assertEqual(carry.pending_count(lf.RND_A_ID), 2)
+        self.assertIsNone(carry.carried_evaluation(lf.RND_A_ID, ('M0', 'P0'), self.T + 10), 'the oldest is evicted')
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['lost_price_pending']), (3, 1))
+
+
 # ------------------------------------------------------------------ Strategy Lab integration
 
 class LabIntegrationTests(unittest.TestCase):
@@ -825,9 +1039,21 @@ class LabIntegrationTests(unittest.TestCase):
         self.clock = [0]
         self.calls = {'rugcheck': 0, 'price': 0}
         self.memory = lf.ForwardFeedMemory()
+        self.carry = lf.SignalCarry()
+        # Price cross-check script: None passes every call; else a callable(coin) -> status.
+        self.price_script = None
 
         def price(coin):
             self.calls['price'] += 1
+            status = self.price_script(coin) if self.price_script else 'pass'
+            if status == 'review':
+                # A cold GeckoTerminal reference: the fetch is queued and Jupiter would be needed.
+                return {'status': 'review', 'reason': 'price_crosscheck_pending_needs_jupiter',
+                        'observed_price': coin['priceUsd'], 'reference_price': None,
+                        'mint': coin['address'], 'pair': coin['pairAddress']}
+            if status == 'blocked':
+                return {'status': 'blocked', 'reason': 'price_source_disagreement',
+                        'mint': coin['address'], 'pair': coin['pairAddress']}
             return {'status': 'pass', 'mint': coin['address'], 'pair': coin['pairAddress']}
 
         def rugcheck(coin):
@@ -841,6 +1067,7 @@ class LabIntegrationTests(unittest.TestCase):
         self.unpriced = {}
         for p in (patch.object(lab, 'STATE', {'started_at': 42, 'books': self.books}),
                   patch.object(lab, 'FORWARD_MEMORY', self.memory),
+                  patch.object(lab, 'FORWARD_SIGNAL_CARRY', self.carry),
                   patch.object(lab, 'FORWARD_UNPRICED_SINCE', self.unpriced),
                   patch.object(lab, 'now_ms', side_effect=lambda: self.clock[0]),
                   patch.object(lab.price_integrity, 'check', side_effect=price),
@@ -962,8 +1189,8 @@ class LabIntegrationTests(unittest.TestCase):
         lab.update_positions({}, [mark])
         self.assertEqual(book['history'][0]['exit_reason'], 'ABSOLUTE_MAX_HOLD_60')
 
-    def open_control(self, book_id):
-        """A random-control entry through maybe_open, at a fixture observation where its coin fires."""
+    def control_coin(self, book_id):
+        """A pool observation of the control's universe at a fixture stamp where its coin fires."""
         params = lf.RANDOM[book_id]
         draw = next(d for d in FIXTURES['random_draws'] if d['salt'] == params.salt and d['firing_t'])
         stamp = draw['firing_t'][0]
@@ -972,9 +1199,26 @@ class LabIntegrationTests(unittest.TestCase):
                     priceChange={'m5': 0.5, 'h1': 1.0, 'h24': 2.0},
                     txns={'m5': {'buys': 20, 'sells': 18}, 'h1': {'buys': 200, 'sells': 190}})
         self.assertTrue(lf.hashed_coin(draw['pair'], stamp, params.probability, params.salt))
-        self.use_layer(stamp)
+        return coin
+
+    def open_control(self, book_id):
+        """A random-control entry through maybe_open, at a fixture observation where its coin fires."""
+        coin = self.control_coin(book_id)
+        self.use_layer(coin['updatedAt'])
         self.refresh(coin, book_ids=(book_id,))
         return coin
+
+    def price_pending_for(self, calls):
+        """The next ``calls`` price cross-checks are pending (cold reference), then they pass."""
+        left = [calls]
+
+        def script(coin):
+            if left[0] > 0:
+                left[0] -= 1
+                return 'review'
+            return 'pass'
+
+        self.price_script = script
 
     def assert_control_position(self, book_id, coin):
         book = self.books[book_id]
@@ -1039,6 +1283,221 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, 'TAKE_PROFIT_20_NET')['net50_usd'],
                                places=6)
         self.assertEqual(trade['lab_config_hash'], PINNED_CONFIG_HASHES[lf.RND_B_ID])
+
+    # ---------------------------------------------- LAB_FORWARD_SIGNAL_CARRY_V1
+
+    def assert_carried_entry(self, book_id, signal, later):
+        """``signal`` waited on the price check; the pool's next observation entered it."""
+        book = self.books[book_id]
+        position = book['position']
+        self.assertIsNotNone(position, book['entry_diagnostics'])
+        self.assertEqual(position['lab_forward']['observed_at'], signal['updatedAt'])
+        self.assertEqual(position['lab_forward']['entry_observed_at'], later['updatedAt'])
+        carry = position['lab_forward']['carry']
+        self.assertEqual((carry['version'], carry['signal_observed_at'], carry['attempts'], carry['max_age_ms']),
+                         (lf.SIGNAL_CARRY_VERSION, signal['updatedAt'], 1, 60_000))
+        self.assertEqual(position['entry_price'], later['priceUsd'], 'it enters at the current observation')
+        self.assertEqual(position['lab_config_hash'], PINNED_CONFIG_HASHES[book_id])
+        diagnostics = book['entry_diagnostics']['lab_forward']
+        self.assertEqual((diagnostics['signals'], diagnostics['carried_signals_retried']), (0, 1))
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['entered'], counters['lost_price_pending'],
+                          counters['dropped_by_gate'], counters['superseded']), (1, 1, 0, {}, 0))
+        self.assertEqual(diagnostics['signal_carry']['entered'], 1)
+        self.assertEqual(diagnostics['signal_carry']['pending_now'], 0)
+        return position
+
+    def carried_control_entry(self, book_id):
+        coin = self.control_coin(book_id)
+        params = lf.RANDOM[book_id]
+        later = dict(coin, updatedAt=coin['updatedAt'] + 2_200, priceUsd=coin['priceUsd'] * 1.001,
+                     priceNative=coin['priceNative'] * 1.001)
+        self.assertFalse(lf.hashed_coin(coin['pairAddress'], later['updatedAt'], params.probability, params.salt),
+                         'the next observation does not draw: without the carry the signal was lost')
+        self.use_layer(coin['updatedAt'])
+        self.price_pending_for(1)
+        self.refresh(coin, book_ids=(book_id,))
+        book = self.books[book_id]
+        self.assertIsNone(book['position'])
+        diagnostics = book['entry_diagnostics']
+        self.assertEqual((diagnostics['blocked_reason'], diagnostics['price_crosscheck_pending']),
+                         (lf.PRICE_CHECK_PENDING_REASON, 1))
+        self.assertEqual(diagnostics['lab_forward']['price_crosscheck_pending_signals'], 1)
+        self.assertEqual((diagnostics['lab_forward']['signal_carry']['pending_now'],
+                          diagnostics['lab_forward']['signal_carry']['pending_signals']), (1, 1))
+        self.refresh(later, book_ids=(book_id,))
+        self.assertEqual(book['entry_diagnostics']['lab_forward']['signal_rejections'], {'rnd_coin_not_drawn': 1})
+        position = self.assert_carried_entry(book_id, coin, later)
+        self.assertEqual(position['lab_forward']['signal']['drawn'], True)
+        return position
+
+    def test_a_random_draw_a_waiting_on_the_price_check_enters_at_the_next_observation(self):
+        self.carried_control_entry(lf.RND_A_ID)
+
+    def test_a_random_draw_b_waiting_on_the_price_check_enters_at_the_next_observation(self):
+        self.carried_control_entry(lf.RND_B_ID)
+
+    def test_a_lab_a_fresh_crossing_waiting_on_the_price_check_enters_at_the_next_observation(self):
+        crossing = next(c for c in FIXTURES['lab_a_crossings'] if c['name'].startswith('neet'))
+        points = [feed_coin(point) for point in crossing['points']]
+        self.use_layer(points[0]['updatedAt'])
+        self.refresh(points[0])
+        self.price_pending_for(1)
+        self.refresh(points[1])
+        book = self.books[lf.LAB_A_ID]
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'], lf.PRICE_CHECK_PENDING_REASON)
+        later = dict(points[1], updatedAt=points[1]['updatedAt'] + 3_000)
+        self.refresh(later)
+        self.assertEqual(book['entry_diagnostics']['lab_forward']['signal_rejections'], {'lab_a_surge_not_fresh': 1},
+                         'the crossing is not fresh at the next observation')
+        position = self.assert_carried_entry(lf.LAB_A_ID, points[1], later)
+        self.assertEqual(position['lab_forward']['signal']['previous_surge'], False)
+
+    def test_a_carried_signal_is_lost_after_60_s_or_dropped_by_another_gate(self):
+        coin = self.control_coin(lf.RND_B_ID)
+        stamp = coin['updatedAt']
+        self.use_layer(stamp)
+        self.price_script = lambda c: 'review'
+        self.refresh(coin, book_ids=(lf.RND_B_ID,))
+        self.refresh(dict(coin, updatedAt=stamp + 30_000), book_ids=(lf.RND_B_ID,))
+        book = self.books[lf.RND_B_ID]
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['lab_forward']['carried_signals_retried'], 1)
+        self.assertEqual(self.carry.pending_count(lf.RND_B_ID), 1)
+        # 60 s after the signal observation the episode is lost to the still-pending check.
+        self.refresh(dict(coin, updatedAt=stamp + 61_000), book_ids=(lf.RND_B_ID,), lag_ms=0)
+        self.assertIsNone(book['position'])
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual((counters['pending_signals'], counters['lost_price_pending'], counters['entered']), (1, 1, 0))
+        self.assertEqual(counters['lost_price_pending_share'], 1.0)
+        self.assertEqual(self.carry.pending_count(lf.RND_B_ID), 0)
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'], 'no_market_signal')
+        # Published cumulatively in the lifecycle marker and in its hypothesis's gate.
+        with patch.object(lab, 'now_ms', return_value=self.clock[0]):
+            lab.review_strategy_lifecycle(self.books)
+        self.assertEqual(book['strategy_lifecycle']['signal_carry']['lost_price_pending'], 1)
+        gate = self.books[lf.LAB_B_ID]['strategy_lifecycle']['promotion_gate']
+        self.assertEqual(gate['signal_carry']['control']['lost_price_pending'], 1)
+        self.assertEqual(gate['signal_carry']['book']['pending_signals'], 0)
+        # A carried retry refused by another gate (here a price disagreement) ends the episode.
+        later = dict(coin, updatedAt=stamp + 200_000)
+        signal = {'book_id': lf.RND_B_ID, 'observed_at': later['updatedAt'] - 3_000, 'universe_rejections': [],
+                  'signal_rejections': [], 'matched': True, 'signal': {'kind': 'random', 'drawn': True}}
+        self.carry.hold(book, (coin['address'], coin['pairAddress']), signal, later['updatedAt'] - 2_000)
+        self.price_script = lambda c: 'blocked'
+        self.refresh(later, book_ids=(lf.RND_B_ID,))
+        self.assertIsNone(book['position'])
+        counters = lf.signal_carry_counters(book)
+        self.assertEqual(counters['dropped_by_gate'], {'price_verification': 1})
+        self.assertEqual(self.carry.pending_count(lf.RND_B_ID), 0)
+        params = lf.RANDOM[lf.RND_B_ID]
+        for offset in (30_000, 61_000, 200_000):
+            self.assertFalse(lf.hashed_coin(coin['pairAddress'], stamp + offset, params.probability, params.salt))
+
+    # ---------------------------------------------- LAB_FORWARD_CONTROL_CONTINUITY_V1
+
+    def test_a_control_out_of_cash_enters_at_zero_capital_while_its_hypothesis_can(self):
+        book = self.books[lf.RND_A_ID]
+        book['balance'] = 150.0
+        coin = self.control_coin(lf.RND_A_ID)
+        self.use_layer(coin['updatedAt'])
+        # Its hypothesis is registered and can enter (the control coin is no LAB_A surge).
+        self.refresh(coin, book_ids=(lf.RND_A_ID, lf.LAB_A_ID))
+        self.assertIsNone(self.books[lf.LAB_A_ID]['position'])
+        position = self.assert_control_position(lf.RND_A_ID, coin)
+        self.assertEqual(position['capital_mode'], lf.ZERO_CAPITAL)
+        self.assertEqual(book['entry_diagnostics']['lab_forward']['capital_mode'], lf.ZERO_CAPITAL)
+        self.assertEqual(lab.stats(book)['equity'], 150.0, 'a zero-capital position never moves equity')
+        mark = dict(coin, priceUsd=coin['priceUsd'] * 0.94, priceNative=coin['priceNative'] * 0.94,
+                    updatedAt=coin['updatedAt'] + 90_000)
+        self.clock[0] = mark['updatedAt'] + 200
+        lab.update_positions({}, [mark])
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'STOP_LOSS_5_NET')
+        self.assertEqual((trade['capital_mode'], trade['balance_effect_usd'], trade['balance_after']),
+                         (lf.ZERO_CAPITAL, 0.0, 150.0))
+        self.assertLess(trade['pnl_usd'], -10.0)
+        self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, 'STOP_LOSS_5_NET')['net50_usd'],
+                               places=6)
+        self.assertEqual(book['balance'], 150.0)
+        stats = lab.stats(book)
+        self.assertEqual((stats['zero_capital_trades'], stats['realized_pnl'], stats['trades']), (1, -350.0, 1))
+        self.assertAlmostEqual(stats['zero_capital_pnl_usd'], round(trade['pnl_usd'], 2), places=2)
+        self.assertEqual(lf.evidence(book, lf.RND_A_ID, self.clock[0])['zero_capital_closes'], 1)
+        self.assertEqual(lf.cash_state(book)['zero_capital_closes'], 1)
+        # A funded control close moves the balance as before (capital_mode 'funded').
+        funded = self.books[lf.RND_B_ID]
+        funded_coin = self.open_control(lf.RND_B_ID)
+        self.assertEqual(funded['position']['capital_mode'], lf.FUNDED)
+        self.clock[0] = funded_coin['updatedAt'] + 61 * MINUTE
+        lab.update_positions({}, [dict(funded_coin, updatedAt=self.clock[0] - 500)])
+        self.assertEqual(funded['history'][0]['capital_mode'], lf.FUNDED)
+        self.assertAlmostEqual(funded['balance'], 500.0 + funded['history'][0]['pnl_usd'], places=3)
+        self.assertAlmostEqual(funded['history'][0]['balance_effect_usd'], funded['history'][0]['pnl_usd'], places=3)
+        # Once its hypothesis is retired, the control is out of cash again.
+        self.books[lf.LAB_A_ID]['strategy_lifecycle'] = {
+            'version': lf.KILL_RULE_VERSION, 'status': 'retired', 'entry_enabled': False,
+            'reason': 'pre_registered_kill_rule', 'retired_at': self.clock[0], 'evidence': {}}
+        self.refresh(dict(coin, updatedAt=coin['updatedAt'] + 20 * MINUTE), book_ids=(lf.RND_A_ID, lf.LAB_A_ID))
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'], lf.CASH_EXHAUSTED_REASON)
+        self.assertEqual(book['strategy_lifecycle']['status'], 'cash_exhausted')
+        self.assertEqual(self.books[lf.LAB_A_ID]['entry_diagnostics']['blocked_reason'], lf.RETIRED_REASON)
+
+    # ---------------------------------------------- positions keep their recorded exits
+
+    def test_an_open_position_keeps_its_recorded_exits_and_booking(self):
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        entry_price = book['position']['entry_price']
+        # A later release: LAB_FORWARD_TESTS_V2 with a -6% LAB_A stop; V1 stays a known version.
+        newer = dataclasses.replace(lf.EXITS_A, label='LAB_A_6_10_60', stop_loss_net_pct=6.0)
+        with patch.object(lf, 'VERSION', 'LAB_FORWARD_TESTS_V2'), \
+                patch.object(lf, 'KNOWN_VERSIONS', ('LAB_FORWARD_TESTS_V1', 'LAB_FORWARD_TESTS_V2')), \
+                patch.dict(lf.EXITS, {lf.LAB_A_ID: newer}):
+            mark = dict(points[1], priceUsd=entry_price * 0.955, updatedAt=points[1]['updatedAt'] + 60_000)
+            self.clock[0] = mark['updatedAt'] + 500
+            lab.update_positions({}, [mark])
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertLess(trade['model_pnl_pct'], -5.0)
+        self.assertGreater(trade['model_pnl_pct'], -6.0)
+        self.assertEqual(trade['exit_reason'], 'STOP_LOSS_5_NET', 'the stored -5% stop, not the newer -6%')
+        self.assertEqual((trade['lab_forward_version'], trade['lab_config_hash']),
+                         ('LAB_FORWARD_TESTS_V1', PINNED_CONFIG_HASHES[lf.LAB_A_ID]))
+        self.assertEqual(trade['close_kind'], 'marked')
+        self.assertGreater(trade['calibration_cost_usd'], 0)
+        self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, 'STOP_LOSS_5_NET')['net50_usd'],
+                               places=6)
+        # A position opened with other (stored) exits keeps them: a -15% stop and a 90 min hold.
+        self.refresh(dict(points[0], updatedAt=mark['updatedAt'] + 400_000))
+        self.refresh(dict(points[1], updatedAt=mark['updatedAt'] + 405_000))
+        position = book['position']
+        self.assertIsNotNone(position, book['entry_diagnostics'])
+        position['exit_parameters'].update(label='OLDER_15_20_90', stop_loss_net_pct=15.0, take_profit_net_pct=20.0,
+                                           max_hold_minutes=90.0)
+        mark = dict(points[1], priceUsd=position['entry_price'] * 0.95, updatedAt=position['opened_at'] + 65 * MINUTE)
+        self.clock[0] = mark['updatedAt'] + 100
+        lab.update_positions({}, [mark])
+        self.assertIsNotNone(book['position'], 'neither the -5% stop nor the 60 min hold of the current config')
+        stale = {**book['position'], 'quote_status': 'stale'}
+        self.assertFalse(lf.unpriced_past_max_hold(stale, position['opened_at'] + 75 * MINUTE))
+        self.assertTrue(lf.unpriced_past_max_hold(stale, position['opened_at'] + 90 * MINUTE))
+        self.assertFalse(lf.vanish_due(stale, position['opened_at'] + 95 * MINUTE, position['opened_at'], True))
+        self.assertTrue(lf.vanish_due(stale, position['opened_at'] + 100 * MINUTE, position['opened_at'], True))
+        mark = dict(mark, updatedAt=position['opened_at'] + 90 * MINUTE)
+        self.clock[0] = mark['updatedAt'] + 100
+        lab.update_positions({}, [mark])
+        self.assertEqual(book['history'][0]['exit_reason'], 'ABSOLUTE_MAX_HOLD_90')
+        # Malformed stored exits fall back to the book's current ones; other books are not forward.
+        self.assertEqual(lf.position_exits({'strategy_id': lf.LAB_A_ID, 'exit_parameters': {'stop_loss_net_pct': 'x'}}),
+                         lf.EXITS_A)
+        self.assertEqual(lf.position_exits({'strategy_id': lf.LAB_B_ID}), lf.EXITS_B)
+        self.assertIn('LAB_FORWARD_TESTS_V1', lf.KNOWN_VERSIONS)
+        self.assertFalse(lf.is_forward_position({'strategy_id': lf.LAB_A_ID, 'lab_forward_version': 'OTHER'}))
+        self.assertFalse(lf.is_forward_position({'strategy_id': 'TREND', 'lab_forward_version': lf.VERSION}))
 
     def test_a_drained_pool_is_booked_at_zero_not_at_the_capped_impact(self):
         """LP pull: liquidity 0 at an unchanged price. The shared capped model alone would book about -21%."""

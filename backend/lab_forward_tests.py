@@ -72,11 +72,37 @@ trade again; its marker says 'cash_exhausted' instead of 'active', and the
 gate's control comparison is limited to the period in which the control could
 still enter (control_coverage).
 
+Control continuity (LAB_FORWARD_CONTROL_CONTINUITY_V1): a random control exists
+for the gate's same-period comparison, so while its hypothesis can still enter
+the control keeps entering. Its kill rule is evaluated and published but only
+retires it once the hypothesis has stopped, and a control that can no longer
+fund its fixed entry keeps entering at the fixed $200 as a zero-capital
+measurement (capital_mode 'zero_capital_control': same signal, gates, exits,
+costs and records; the close never moves the balance).
+
+Signal carry (LAB_FORWARD_SIGNAL_CARRY_V1): a matched signal whose only blocker
+is the asynchronous price cross-check (price_crosscheck_pending) is retried on
+later refreshes for up to 60 s after its observation (the research fill window)
+against the pool's current observation, with every other gate re-run. Without
+it a single-observation signal (a LAB_A fresh crossing, every random draw) was
+lost whenever the price reference was cold, while LAB_B's persistent dip was
+not. Episodes are counted per book and config hash: entered, lost to a still
+pending price check, dropped by another gate, superseded.
+
+Positions keep the exits they were opened with: exit triggers, the vanish clock
+and the unpriced-past-max-hold count read the position's own exit_parameters,
+and any released LAB_FORWARD_TESTS version (KNOWN_VERSIONS) is still booked as
+a forward position.
+
 The config hash includes the resolved Lab cost-model knobs (NEO_LAB_* env), so
-a changed cost model is a new test whose closes never pool with the old ones.
+a changed cost model starts a new evidence sample whose closes never pool with
+the old ones. It does not start a new ledger: the same book keeps its balance,
+its cash state and a kill-rule retirement. A new test with fresh funding needs
+new, versioned book ids.
 """
 from collections import OrderedDict, deque
 from dataclasses import asdict, dataclass
+import copy
 import hashlib
 import json
 import math
@@ -98,6 +124,11 @@ MEMORY_VERSION = 'LAB_FORWARD_FEED_MEMORY_V1'
 REGIME_VERSION = 'LAB_B_MARKET_REGIME_MED15_V1'
 CLOSE_POLICY_VERSION = 'LAB_FORWARD_CLOSE_POLICY_V1'
 CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
+CONTROL_CONTINUITY_VERSION = 'LAB_FORWARD_CONTROL_CONTINUITY_V1'
+SIGNAL_CARRY_VERSION = 'LAB_FORWARD_SIGNAL_CARRY_V1'
+# Every released LAB_FORWARD_TESTS version whose open positions this module still
+# books and exits (with their own stored exit parameters). Add, never remove.
+KNOWN_VERSIONS = (VERSION,)
 CALIB_VERSION = 'CALIB_V1_2026-10-08'
 NET50_VERSION = 'NET50_CALIB_V1'
 # strategy_lab.EXECUTION_MODEL_VERSION (restated here to avoid a circular import; a test pins equality).
@@ -131,6 +162,9 @@ NOTIONAL_USD = 200.0
 # $0.10 covers it up to $1,000/SOL. Below this balance, with no open position,
 # the book can never enter again (LAB_FORWARD_CASH_STATE_V1).
 ENTRY_NETWORK_FEE_RESERVE_USD = 0.10
+# LAB_FORWARD_CONTROL_CONTINUITY_V1 capital modes of a position (and its close).
+FUNDED = 'funded'
+ZERO_CAPITAL = 'zero_capital_control'
 PORTFOLIO_GROUP = 'TEST'
 AUTOMATIC_PROMOTION = False
 # These books never read tape flow (no flow gate at entry, no flow exit; marks
@@ -316,6 +350,47 @@ class CashParameters:
     reason: str = 'balance_below_fixed_notional'
 
 
+@dataclass(frozen=True)
+class ControlContinuityParameters:
+    """LAB_FORWARD_CONTROL_CONTINUITY_V1: a random control keeps entering while its hypothesis can.
+
+    The gate compares the hypothesis with its control over the same period, so
+    neither the control's own kill rule nor its cash may end that period early.
+    """
+    version: str = CONTROL_CONTINUITY_VERSION
+    applies_to: str = 'random controls only'
+    while_hypothesis: str = 'entry-enabled: not retired by its kill rule and not cash_exhausted'
+    kill_rule: str = ('evaluated and published; retires the control only once its hypothesis can no '
+                      'longer enter (status active, reason control_kill_rule_deferred, kill_rule_met true)')
+    cash: str = ('below the cash minimum the control enters the fixed notional as a zero-capital '
+                 'measurement: same signal, gates, exits, costs and close records; its closes never '
+                 'move the balance (balance_effect_usd 0)')
+    capital_mode: str = ZERO_CAPITAL
+    evidence: str = 'kill-rule evidence and the gate count funded and zero-capital closes alike'
+
+
+@dataclass(frozen=True)
+class SignalCarryParameters:
+    """LAB_FORWARD_SIGNAL_CARRY_V1: a signal held back only by the pending price cross-check is retried.
+
+    The research filled an order decided at one observation at the next price
+    refresh within 60 s (harness_final MAX_FILL_LAG_MS). The Lab's independent
+    price cross-check is asynchronous, so a signal that exists at one observation
+    only (a LAB_A fresh crossing, a random draw) was lost whenever the reference
+    was cold. A carried signal re-runs every other gate on the pool's current
+    observation and enters at that observation's price.
+    """
+    version: str = SIGNAL_CARRY_VERSION
+    carried_blocker: str = 'price_crosscheck_pending'
+    max_age_ms: int = 60_000
+    age_basis: str = "the latest matched signal observation of the pool (observed_at)"
+    retry_basis: str = ("the pool's current feed observation; universe, structural guard and loss memory "
+                        '(decision and commit), network price, price cross-check with exact identity, '
+                        'cooldowns, cost cap, cash and retirement are re-run')
+    max_pending_per_book: int = 32
+    applies_to: str = 'all four books (each hypothesis and its control see the same latency)'
+
+
 def _whole(value) -> str:
     return str(int(value)) if float(value).is_integer() else str(value)
 
@@ -340,6 +415,8 @@ COST_MODEL = CostModelParameters(
     network_fee_sol=lab_costs.NETWORK_FEE_SOL, max_price_impact_pct=lab_costs.MAX_PRICE_IMPACT_PCT)
 CLOSE_POLICY = ClosePolicyParameters()
 CASH = CashParameters()
+CONTROL_CONTINUITY = ControlContinuityParameters()
+SIGNAL_CARRY = SignalCarryParameters()
 
 UNIVERSES = {LAB_A_ID: UNIVERSE_A, RND_A_ID: UNIVERSE_A, LAB_B_ID: UNIVERSE_B, RND_B_ID: UNIVERSE_B}
 EXITS = {LAB_A_ID: EXITS_A, RND_A_ID: EXITS_A, LAB_B_ID: EXITS_B, RND_B_ID: EXITS_B}
@@ -356,6 +433,8 @@ SIGNAL_REASONS = ('lab_a_no_surge', 'lab_a_no_previous_observation', 'lab_a_surg
 RETIRED_REASON = 'lab_forward_kill_rule_retired'
 CASH_EXHAUSTED_REASON = 'lab_forward_cash_exhausted'
 COST_MODEL_MISMATCH_REASON = 'lab_forward_cost_model_mismatch'
+# LAB_FORWARD_SIGNAL_CARRY_V1: every remaining signal waits on the price cross-check (carried).
+PRICE_CHECK_PENDING_REASON = 'lab_forward_price_check_pending'
 
 
 def cost_model_mismatches(**resolved) -> list:
@@ -390,11 +469,14 @@ def book_parameters(book_id) -> dict:
         'universe': {**asdict(UNIVERSES[book_id]),
                      'rug_screen': f'{structural_rug_guard.VERSION} via the defensive entry layer'},
         'signal': signal,
+        'signal_carry': asdict(SIGNAL_CARRY),
         'exits': asdict(EXITS[book_id]),
         'close_policy': asdict(CLOSE_POLICY),
         'size': {'notional_usd': NOTIONAL_USD, 'rule': 'FIXED_NOTIONAL_NO_BACKOFF',
                  'start_balance_usd': START_BALANCE_USD, 'max_open_positions': 1,
                  'cash_state': asdict(CASH)},
+        # The hypothesis-control protocol: both books of a pair carry it.
+        'control_continuity': asdict(CONTROL_CONTINUITY),
         'admission_cost_cap_pct': admission_cost_cap_pct(book_id),
         'costs': {'execution_model': EXECUTION_MODEL, 'model': _hashable(asdict(COST_MODEL)),
                   'calibration': asdict(CALIB)},
@@ -430,8 +512,18 @@ def is_forward_book(book_id) -> bool:
 
 
 def is_forward_position(position) -> bool:
-    return (isinstance(position, dict) and position.get('lab_forward_version') == VERSION
+    """A position of one of these books stamped by any released version (KNOWN_VERSIONS).
+
+    Not only the current VERSION: a later version must keep booking and exiting
+    the open positions of an earlier one with their own recorded parameters.
+    """
+    return (isinstance(position, dict) and position.get('lab_forward_version') in KNOWN_VERSIONS
             and position.get('strategy_id') in BOOK_IDS)
+
+
+def is_zero_capital_position(position) -> bool:
+    """LAB_FORWARD_CONTROL_CONTINUITY_V1: a control position whose close never moves the balance."""
+    return is_forward_position(position) and position.get('capital_mode') == ZERO_CAPITAL
 
 
 def tape_pin_required(position) -> bool:
@@ -865,9 +957,39 @@ def net50(booked_pnl_usd, notional_usd, reason, params: Net50Parameters = NET50)
             'net50_version': NET50_VERSION}
 
 
-def exit_reason(book_id, model_net_pct, hold_minutes):
-    """Research exit order on the uncalibrated model net: stop, take-profit, max hold."""
-    exits = EXITS[book_id]
+def position_exits(position):
+    """The exits a forward position was opened with: its stored ``exit_parameters``.
+
+    The book's current EXITS only when the stored ones are missing or malformed,
+    so a later parameter or version change never moves the exits of a position
+    that is already open. None for a position of another book.
+    """
+    if not isinstance(position, dict) or position.get('strategy_id') not in BOOK_IDS:
+        return None
+    fallback = EXITS.get(position.get('strategy_id'))
+    stored = position.get('exit_parameters')
+    if not isinstance(stored, dict):
+        return fallback
+    stop, take, hold = (_finite(stored.get(name))
+                        for name in ('stop_loss_net_pct', 'take_profit_net_pct', 'max_hold_minutes'))
+    if stop is None or take is None or hold is None or min(stop, take, hold) <= 0:
+        return fallback
+    cooldown = _finite(stored.get('pool_cooldown_seconds'))
+    label = stored.get('label')
+    return ExitParameters(
+        label=label if isinstance(label, str) and label else (fallback.label if fallback else 'STORED'),
+        stop_loss_net_pct=stop, take_profit_net_pct=take, max_hold_minutes=hold,
+        pool_cooldown_seconds=int(cooldown) if cooldown is not None and cooldown >= 0 else 300,
+        trigger_basis=str(stored.get('trigger_basis') or ExitParameters.trigger_basis))
+
+
+def exit_reason(position, model_net_pct, hold_minutes):
+    """Research exit order on the uncalibrated model net: stop, take-profit, max hold.
+
+    ``position`` is the open position (its own stored exits apply) or a book id
+    (that book's current exits).
+    """
+    exits = position_exits(position) if isinstance(position, dict) else EXITS[position]
     if model_net_pct <= -exits.stop_loss_net_pct:
         return exits.stop_reason
     if model_net_pct >= exits.take_profit_net_pct:
@@ -962,7 +1084,7 @@ def vanish_due(position, now, unpriced_since, alive, params: ClosePolicyParamete
     if current is None or opened is None or last is None or since is None:
         return False
     grace_ms = params.vanish_grace_minutes * 60_000
-    return (current - opened >= EXITS[position['strategy_id']].max_hold_minutes * 60_000 + grace_ms
+    return (current - opened >= position_exits(position).max_hold_minutes * 60_000 + grace_ms
             and current - last >= grace_ms
             and current - since >= params.vanish_confirm_seconds * 1000)
 
@@ -1004,7 +1126,7 @@ def unpriced_past_max_hold(position, now) -> bool:
     if current is None or opened is None:
         return False
     return (position.get('quote_status') in {'stale', 'unavailable'}
-            and current - opened >= EXITS[position['strategy_id']].max_hold_minutes * 60_000)
+            and current - opened >= position_exits(position).max_hold_minutes * 60_000)
 
 
 # ------------------------------------------------------------------ cash state
@@ -1016,24 +1138,38 @@ def cash_state(book, params: CashParameters = CASH) -> dict:
     holding = isinstance(book.get('position'), dict) and bool(book.get('position'))
     exhausted = bool(not holding and balance is not None and balance < params.min_entry_balance_usd)
     rows = [row for row in (book.get('history') or ()) if isinstance(row, dict)]
+    zero_capital = [row for row in rows if row.get('capital_mode') == ZERO_CAPITAL]
+    # Only funded closes move the balance (zero-capital control closes never do).
+    funded_closed = [value for value in (_finite(row.get('closed_at')) for row in rows
+                                         if row.get('capital_mode') != ZERO_CAPITAL) if value is not None]
     closed = [value for value in (_finite(row.get('closed_at')) for row in rows) if value is not None]
     opened = [value for value in (_finite(row.get('opened_at')) for row in rows) if value is not None]
-    if holding and _finite(book['position'].get('opened_at')) is not None:
-        opened.append(_finite(book['position'].get('opened_at')))
+    zero_opened = [value for value in (_finite(row.get('opened_at')) for row in zero_capital) if value is not None]
+    position = book.get('position') if holding else None
+    if position and _finite(position.get('opened_at')) is not None:
+        opened.append(_finite(position.get('opened_at')))
+        if position.get('capital_mode') == ZERO_CAPITAL:
+            zero_opened.append(_finite(position.get('opened_at')))
     return {'version': params.version, 'exhausted': exhausted,
             'balance_usd': None if balance is None else round(balance, 4),
             'min_entry_balance_usd': params.min_entry_balance_usd, 'notional_usd': params.notional_usd,
-            # Balance only moves on a close, so the latest close is when the book ran out.
-            'exhausted_at': int(max(closed)) if exhausted and closed else None,
+            # Balance only moves on a funded close, so the latest one is when the book ran out.
+            'exhausted_at': int(max(funded_closed)) if exhausted and funded_closed else None,
             'last_entry_at': int(max(opened)) if opened else None,
-            'closes_in_ledger': len(closed)}
+            'closes_in_ledger': len(closed),
+            # LAB_FORWARD_CONTROL_CONTINUITY_V1 measurement beyond the funded balance.
+            'zero_capital_closes': len(zero_capital),
+            'zero_capital_pnl_usd': round(math.fsum(_finite(row.get('pnl_usd')) or 0.0 for row in zero_capital), 4),
+            'last_zero_capital_entry_at': int(max(zero_opened)) if zero_opened else None}
 
 
 def entry_window_end(book):
     """(reason, time) at which the book stopped being able to enter, or (None, None) while it still can.
 
-    'retired' (kill rule, at ``retired_at``) or 'cash_exhausted' (at its last close),
-    whichever came first; a time of None means it never could in this ledger.
+    'retired' (kill rule, at ``retired_at``) or 'cash_exhausted' (at its last funded
+    close, or its last zero-capital entry if later), whichever came first; a time of
+    None means it never could in this ledger. A control whose marker allows
+    zero-capital entries (LAB_FORWARD_CONTROL_CONTINUITY_V1) can still enter.
     """
     book = book if isinstance(book, dict) else {}
     ends = []
@@ -1044,24 +1180,231 @@ def entry_window_end(book):
             at = _finite((marker.get('evidence') or {}).get('last_closed_at'))
         ends.append(('retired', at))
     cash = cash_state(book)
-    if cash['exhausted']:
-        ends.append(('cash_exhausted', _finite(cash['exhausted_at'])))
+    if cash['exhausted'] and not (marker.get('status') == 'active' and marker.get('capital_mode') == ZERO_CAPITAL):
+        at = _finite(cash['exhausted_at'])
+        last_zero = _finite(cash['last_zero_capital_entry_at'])
+        if last_zero is not None and (at is None or last_zero > at):
+            at = last_zero
+        ends.append(('cash_exhausted', at))
     if not ends:
         return None, None
     return min(ends, key=lambda item: -math.inf if item[1] is None else item[1])
 
 
+# ------------------------------------------------------------------ control continuity
+
+def hypothesis_can_enter(books, control_id, registered_ids=None) -> bool:
+    """LAB_FORWARD_CONTROL_CONTINUITY_V1: whether the control's hypothesis is still entry-enabled.
+
+    Registered (when ``registered_ids`` is given), not retired (its persisted
+    marker) and not out of cash (its marker or its ledger now). False for a
+    hypothesis book and when the hypothesis is missing.
+    """
+    hypothesis_id = HYPOTHESIS_OF.get(control_id)
+    hypothesis = books.get(hypothesis_id) if hypothesis_id and isinstance(books, dict) else None
+    if not isinstance(hypothesis, dict) or (registered_ids is not None and hypothesis_id not in registered_ids):
+        return False
+    marker = hypothesis.get('strategy_lifecycle')
+    marker = marker if isinstance(marker, dict) else {}
+    if marker.get('status') in {'retired', CASH.status}:
+        return False
+    return not cash_state(hypothesis)['exhausted']
+
+
+def zero_capital_entry_allowed(book_id, books, registered_ids=None) -> bool:
+    """A control below its cash minimum may enter as a zero-capital measurement while its hypothesis can."""
+    return book_id in HYPOTHESIS_OF and hypothesis_can_enter(books, book_id, registered_ids)
+
+
+# ------------------------------------------------------------------ signal carry (pending price cross-check)
+
+CARRY_COUNTERS = ('pending_signals', 'entered', 'lost_price_pending', 'superseded', 'book_stopped')
+
+
+def _new_carry_counters() -> dict:
+    return {**{name: 0 for name in CARRY_COUNTERS}, 'dropped_by_gate': {}}
+
+
+def signal_carry_counters(book, book_id=None) -> dict:
+    """Cumulative LAB_FORWARD_SIGNAL_CARRY_V1 counters of the book's current config hash (a copy).
+
+    pending_signals: episodes in which a matched signal of a pool waited only on the
+    price cross-check; each ends as entered, lost_price_pending (the 60 s window
+    passed with the check still pending), dropped_by_gate (another gate refused
+    the retry), superseded (the book entered another pool) or book_stopped.
+    """
+    book = book if isinstance(book, dict) else {}
+    book_id = book_id or book.get('id')
+    store = book.get('lab_forward_signal_carry')
+    by_hash = store.get('by_config_hash') if isinstance(store, dict) else None
+    stored = by_hash.get(CONFIG_HASHES.get(book_id)) if isinstance(by_hash, dict) else None
+    out = _new_carry_counters()
+    if isinstance(stored, dict):
+        for name in CARRY_COUNTERS:
+            value = stored.get(name)
+            out[name] = value if isinstance(value, int) and not isinstance(value, bool) and value >= 0 else 0
+        dropped = stored.get('dropped_by_gate')
+        if isinstance(dropped, dict):
+            out['dropped_by_gate'] = {str(key): value for key, value in dropped.items()
+                                      if isinstance(value, int) and not isinstance(value, bool) and value >= 0}
+    ended = (out['entered'] + out['lost_price_pending'] + out['superseded'] + out['book_stopped']
+             + sum(out['dropped_by_gate'].values()))
+    out.update({'version': SIGNAL_CARRY_VERSION, 'config_hash': CONFIG_HASHES.get(book_id),
+                'ended': ended,
+                'lost_price_pending_share': (round(out['lost_price_pending'] / ended, 6) if ended else None)})
+    return out
+
+
+class SignalCarry:
+    """LAB_FORWARD_SIGNAL_CARRY_V1 pending signals of this Lab process (in memory, bounded, thread-safe).
+
+    One episode per (book, mint, pool): created when a matched signal's only
+    blocker is price_crosscheck_pending, refreshed by a newer matched signal of
+    the same pool, and retried on later refreshes until it enters, another gate
+    refuses it, the book enters elsewhere or stops, or it is older than
+    ``max_age_ms`` after its latest signal observation. Outcomes are counted in
+    the book's ledger per config hash (``lab_forward_signal_carry``); pending
+    episodes are not persisted (a restart drops them uncounted).
+    """
+
+    def __init__(self, params: SignalCarryParameters = SIGNAL_CARRY):
+        self.params = params
+        self._pending = {}
+        self._lock = threading.Lock()
+
+    @staticmethod
+    def _counters(book) -> dict:
+        """The book's mutable counters for its current config hash (created on first use, never reset)."""
+        store = book.get('lab_forward_signal_carry')
+        if not isinstance(store, dict) or not isinstance(store.get('by_config_hash'), dict):
+            store = {'version': SIGNAL_CARRY_VERSION, 'by_config_hash': {}}
+            book['lab_forward_signal_carry'] = store
+        counters = store['by_config_hash'].get(CONFIG_HASHES[book['id']])
+        if not isinstance(counters, dict):
+            counters = _new_carry_counters()
+            store['by_config_hash'][CONFIG_HASHES[book['id']]] = counters
+        for name in CARRY_COUNTERS:
+            if not isinstance(counters.get(name), int) or isinstance(counters.get(name), bool):
+                counters[name] = 0
+        if not isinstance(counters.get('dropped_by_gate'), dict):
+            counters['dropped_by_gate'] = {}
+        return counters
+
+    def _expired(self, entry, now) -> bool:
+        current = _finite(now)
+        return current is None or current - entry['observed_at'] > self.params.max_age_ms
+
+    def expire(self, book, now) -> int:
+        """End the book's episodes past the window; they were lost to a still-pending price check."""
+        book_id = book.get('id')
+        with self._lock:
+            entries = self._pending.get(book_id) or {}
+            stale = [key for key, entry in entries.items() if self._expired(entry, now)]
+            for key in stale:
+                del entries[key]
+        if stale:
+            self._counters(book)['lost_price_pending'] += len(stale)
+        return len(stale)
+
+    def carried_evaluation(self, book_id, key, now):
+        """The pool's live carried signal as an evaluation with its 'carry' record, or None."""
+        with self._lock:
+            entry = (self._pending.get(book_id) or {}).get(key)
+            if entry is None or self._expired(entry, now):
+                return None
+            evaluation = copy.deepcopy(entry['evaluation'])
+            carry = {'version': SIGNAL_CARRY_VERSION, 'signal_observed_at': int(entry['observed_at']),
+                     'first_signal_observed_at': int(entry['first_observed_at']),
+                     'first_pending_at': int(entry['first_pending_at']), 'attempts': entry['attempts'],
+                     'signals': entry['signals'], 'max_age_ms': self.params.max_age_ms}
+        evaluation['carry'] = carry
+        return evaluation
+
+    def hold(self, book, key, evaluation, now) -> bool:
+        """A matched signal of this pool waits only on the price cross-check: start or refresh its episode."""
+        book_id = book.get('id')
+        stamp = _finite((evaluation or {}).get('observed_at'))
+        current = _finite(now)
+        if book_id not in BOOK_IDS or stamp is None or current is None:
+            return False
+        created = evicted = 0
+        with self._lock:
+            entries = self._pending.setdefault(book_id, OrderedDict())
+            entry = entries.get(key)
+            if entry is None:
+                fresh = {name: value for name, value in evaluation.items() if name != 'carry'}
+                entry = {'evaluation': copy.deepcopy(fresh), 'observed_at': stamp, 'first_observed_at': stamp,
+                         'first_pending_at': current, 'attempts': 0, 'signals': 1}
+                entries[key] = entry
+                created = 1
+                while len(entries) > self.params.max_pending_per_book:
+                    entries.popitem(last=False)
+                    evicted += 1
+            elif 'carry' not in evaluation and stamp > entry['observed_at']:
+                # A newer matched observation of the same pool: the window restarts from it.
+                entry.update(evaluation=copy.deepcopy(evaluation), observed_at=stamp, signals=entry['signals'] + 1)
+            entry['attempts'] += 1
+        counters = self._counters(book)
+        counters['pending_signals'] += created
+        counters['lost_price_pending'] += evicted
+        return bool(created)
+
+    def resolve(self, book, key, outcome, reason=None) -> bool:
+        """End the pool's episode: 'entered', 'dropped_by_gate' (with the gate), 'superseded' or 'book_stopped'."""
+        with self._lock:
+            entry = (self._pending.get(book.get('id')) or {}).pop(key, None)
+        if entry is None:
+            return False
+        counters = self._counters(book)
+        if outcome == 'dropped_by_gate':
+            gate = str(reason or 'other_gate')
+            counters['dropped_by_gate'][gate] = counters['dropped_by_gate'].get(gate, 0) + 1
+        else:
+            counters[outcome] = counters.get(outcome, 0) + 1
+        return True
+
+    def clear(self, book, outcome, *, keep=None) -> int:
+        """End every episode of the book (except ``keep``) with one outcome."""
+        with self._lock:
+            keys = [key for key in (self._pending.get(book.get('id')) or {}) if key != keep]
+        return sum(self.resolve(book, key, outcome) for key in keys)
+
+    def pending_count(self, book_id) -> int:
+        with self._lock:
+            return len(self._pending.get(book_id) or {})
+
+    def status(self) -> dict:
+        with self._lock:
+            pending = {book_id: len(entries) for book_id, entries in self._pending.items() if entries}
+        return {'version': SIGNAL_CARRY_VERSION, 'pending': pending, 'persistent': False,
+                **asdict(self.params)}
+
+
 def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defensive_flags,
-                    entry_coin=None, entry_at=None) -> dict:
-    """Fields every forward-test position carries (and every close inherits)."""
+                    entry_coin=None, entry_at=None, capital_mode=FUNDED) -> dict:
+    """Fields every forward-test position carries (and every close inherits).
+
+    ``evaluation`` is the matched signal; a signal carried past a pending price
+    cross-check (LAB_FORWARD_SIGNAL_CARRY_V1) also has its 'carry' record, and the
+    entry observation is the pool's current one (``entry_coin``).
+    """
+    lab_forward = {'version': VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
+                   'role': 'random_control' if book_id in HYPOTHESIS_OF else 'hypothesis',
+                   'hypothesis': HYPOTHESIS_OF.get(book_id, book_id),
+                   'observed_at': evaluation.get('observed_at'), 'signal': evaluation.get('signal'),
+                   'entry_observed_at': (int(observation_ms(entry_coin, entry_at))
+                                         if isinstance(entry_coin, dict) and observation_ms(entry_coin, entry_at)
+                                         is not None else None),
+                   'signal_carry_version': SIGNAL_CARRY_VERSION}
+    if isinstance(evaluation.get('carry'), dict):
+        lab_forward['carry'] = dict(evaluation['carry'])
     return {
         'lab_forward_version': VERSION, 'lab_config_hash': CONFIG_HASHES[book_id],
         'close_policy_version': CLOSE_POLICY_VERSION,
+        # LAB_FORWARD_CONTROL_CONTINUITY_V1: 'funded', or a control's zero-capital measurement.
+        'capital_mode': capital_mode,
         'last_mark': mark_snapshot(entry_coin, entry_at) if isinstance(entry_coin, dict) else None,
-        'lab_forward': {'version': VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
-                        'role': 'random_control' if book_id in HYPOTHESIS_OF else 'hypothesis',
-                        'hypothesis': HYPOTHESIS_OF.get(book_id, book_id),
-                        'observed_at': evaluation.get('observed_at'), 'signal': evaluation.get('signal')},
+        'lab_forward': lab_forward,
         'heat_veto_mode': HEAT_MODE, 'heat_log_only_flags': list(defensive_flags or ()),
         'calib_bps_per_leg': round(calib['total_bps'], 6), 'cost_calibration': calib,
         'model_quantity': model_entry['quantity'],
@@ -1098,8 +1441,10 @@ def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_
                                 else round(model_pnl / notional * 100, 6)),
               'calibration_cost_usd': None if calibration is None else round(calibration, 6),
               'drain_valuation_cost_usd': None if drain_cost is None else round(drain_cost, 6),
-              'lab_forward_version': VERSION,
+              # The version and hash the position was opened under (not the current module's).
+              'lab_forward_version': position.get('lab_forward_version') or VERSION,
               'lab_config_hash': position.get('lab_config_hash'),
+              'capital_mode': ZERO_CAPITAL if position.get('capital_mode') == ZERO_CAPITAL else FUNDED,
               'heat_log_only_flags': list(position.get('heat_log_only_flags') or ()),
               'close_policy_version': CLOSE_POLICY_VERSION, 'close_kind': kind,
               'exit_liquidity_usd': _finite(exit_liquidity_usd)}
@@ -1212,6 +1557,8 @@ def evidence(book, book_id, now) -> dict:
             'wins': sum(value > 0 for value in values),
             # LAB_FORWARD_CLOSE_POLICY_V1: these closes are in the sample above, valued conservatively.
             'vanished_closes': kinds.count('vanished'), 'drained_closes': kinds.count('drained'),
+            # LAB_FORWARD_CONTROL_CONTINUITY_V1: closes of a control past its funded balance.
+            'zero_capital_closes': sum(row.get('capital_mode') == ZERO_CAPITAL for row in rows),
             'open_unpriced_past_max_hold': unpriced_past_max_hold(book.get('position'), now),
             'net50_total_usd': _round(math.fsum(values)) if count else None,
             'mean_net50_usd': _round(mean), 'mean_net50_pct': _round(math.fsum(pct) / len(pct)) if pct else None,
@@ -1364,6 +1711,12 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
             'book_closed_trades_same_period': len(same_rows), 'book_mean_net50_usd_same_period': _round(same_mean),
             'control_window': {key: value for key, value in window.items() if key != 'coverage'},
             'book_cash_state': cash_state(book),
+            'control_cash_state': cash_state(control_book) if isinstance(control_book, dict) else None,
+            # LAB_FORWARD_SIGNAL_CARRY_V1: signal episodes each book lost to a still-pending price
+            # cross-check; a large difference between the two would bias the comparison.
+            'signal_carry': {'book': signal_carry_counters(book, book_id),
+                             'control': (signal_carry_counters(control_book, control_id)
+                                         if isinstance(control_book, dict) else None)},
             'book_max_drawdown_pct_booked': _round(_max_drawdown_pct(rows, START_BALANCE_USD), 4),
             'criteria': criteria,
             'all_evaluable_pass': bool(evaluable) and all(evaluable),
@@ -1377,45 +1730,64 @@ def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
 
     A retirement only stops new entries: balance, history and the exits of an
     open position are untouched. It persists like the shared lifecycle marker
-    (never re-enabled automatically, even if later closes improve). A book that
-    is not retired but cannot fund its fixed entry (LAB_FORWARD_CASH_STATE_V1)
-    gets status 'cash_exhausted' instead of 'active'.
+    (never re-enabled automatically, even if later closes improve, and across
+    config hashes). A book that is not retired but cannot fund its fixed entry
+    (LAB_FORWARD_CASH_STATE_V1) gets status 'cash_exhausted' instead of 'active'.
+
+    LAB_FORWARD_CONTROL_CONTINUITY_V1: the hypotheses are reviewed first; while a
+    control's hypothesis can still enter, the control's met kill rule is
+    published but deferred (reason 'control_kill_rule_deferred') and a control
+    out of cash stays active in zero-capital mode, so the gate's same-period
+    comparison covers the hypothesis's whole period.
     """
     review = dict(review or {})
     retired = list(review.get('retired_strategy_ids') or [])
     draining = list(review.get('retired_open_position_ids') or [])
     active = list(review.get('active_registered_strategy_ids') or [])
     exhausted = []
+    zero_capital = []
+    deferred = []
     reviewed = []
-    for book_id in BOOK_IDS:
+    # Hypotheses first: each control reads its hypothesis's marker of this same review.
+    for book_id in (*HYPOTHESIS_IDS, *(book for book in BOOK_IDS if book not in HYPOTHESIS_IDS)):
         book = books.get(book_id) if isinstance(books, dict) else None
         if book_id not in registered_ids or not isinstance(book, dict):
             continue
         current = evidence(book, book_id, now)
         cash = cash_state(book)
+        carry = signal_carry_counters(book, book_id)
+        continuity = book_id in HYPOTHESIS_OF and hypothesis_can_enter(books, book_id, registered_ids)
         previous = book.get('strategy_lifecycle') or {}
         if isinstance(previous, dict) and previous.get('status') == 'retired':
             # Any retirement persists with its original evidence; only a reviewed change re-enables.
             marker = {**previous, 'entry_enabled': False, 'position_management_enabled': True,
-                      'current_evidence': current, 'cash': cash}
-        elif current['kill_rule_met']:
+                      'current_evidence': current, 'cash': cash, 'signal_carry': carry}
+        elif current['kill_rule_met'] and not continuity:
             marker = {'version': KILL_RULE_VERSION, 'status': 'retired', 'entry_enabled': False,
                       'position_management_enabled': True, 'reason': 'pre_registered_kill_rule',
-                      'evidence': current, 'cash': cash, 'retired_at': now}
-        elif cash['exhausted']:
+                      'evidence': current, 'cash': cash, 'retired_at': now, 'signal_carry': carry}
+        elif cash['exhausted'] and not continuity:
             # LAB_FORWARD_CASH_STATE_V1: the fixed $200 entry can no longer be funded, so the
             # book cannot trade again; it is not 'active' and its kill rule may never evaluate.
             marker = {'version': KILL_RULE_VERSION, 'status': CASH.status, 'entry_enabled': False,
                       'position_management_enabled': True, 'reason': CASH.reason,
                       'kill_rule_evaluable': current['closed_trades'] >= KILL_RULE.min_closes,
-                      'evidence': current, 'cash': cash, 'cash_state_version': CASH_STATE_VERSION}
+                      'evidence': current, 'cash': cash, 'cash_state_version': CASH_STATE_VERSION,
+                      'signal_carry': carry}
         else:
+            reason = ('control_kill_rule_deferred' if current['kill_rule_met']
+                      else 'kill_rule_min_closes_not_reached' if current['closed_trades'] < KILL_RULE.min_closes
+                      else 'kill_rule_threshold_not_met')
             marker = {'version': KILL_RULE_VERSION, 'status': 'active', 'entry_enabled': True,
-                      'position_management_enabled': True,
-                      'reason': ('kill_rule_min_closes_not_reached'
-                                 if current['closed_trades'] < KILL_RULE.min_closes
-                                 else 'kill_rule_threshold_not_met'),
-                      'evidence': current, 'cash': cash}
+                      'position_management_enabled': True, 'reason': reason,
+                      'evidence': current, 'cash': cash, 'signal_carry': carry,
+                      'capital_mode': ZERO_CAPITAL if cash['exhausted'] else FUNDED}
+            if book_id in HYPOTHESIS_OF:
+                marker['control_continuity'] = {
+                    'version': CONTROL_CONTINUITY_VERSION, 'hypothesis': HYPOTHESIS_OF[book_id],
+                    'hypothesis_can_enter': continuity,
+                    'kill_rule_deferred': bool(current['kill_rule_met']),
+                    'zero_capital_entries': bool(cash['exhausted'])}
         book['strategy_lifecycle'] = marker
         reviewed.append(book_id)
         if marker['status'] == 'retired':
@@ -1426,6 +1798,10 @@ def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
             exhausted.append(book_id)
         else:
             active.append(book_id)
+            if marker.get('capital_mode') == ZERO_CAPITAL:
+                zero_capital.append(book_id)
+            if marker.get('reason') == 'control_kill_rule_deferred':
+                deferred.append(book_id)
     # Gates last, so each one reads its control's marker of this same review.
     for book_id in reviewed:
         if book_id in CONTROL_OF:
@@ -1435,9 +1811,12 @@ def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
                    'retired_open_position_ids': sorted(set(draining)),
                    'active_registered_strategy_ids': sorted(set(active)),
                    'lab_forward_cash_exhausted_ids': sorted(set(exhausted)),
+                   'lab_forward_zero_capital_control_ids': sorted(set(zero_capital)),
+                   'lab_forward_kill_rule_deferred_ids': sorted(set(deferred)),
                    'lab_forward_kill_rule': {'version': KILL_RULE_VERSION, 'book_ids': list(BOOK_IDS),
                                              'replaces_shared_lifecycle_heuristic': True,
                                              'cash_state_version': CASH_STATE_VERSION,
+                                             'control_continuity_version': CONTROL_CONTINUITY_VERSION,
                                              **asdict(KILL_RULE)}})
     return review
 
@@ -1450,6 +1829,9 @@ def new_diagnostics(book_id) -> dict:
             'universe_candidates': 0, 'universe_rejections': {}, 'signal_rejections': {},
             'signals': 0, 'heat_mode': HEAT_MODE, 'admission_cost_cap_pct': admission_cost_cap_pct(book_id),
             'notional_usd': NOTIONAL_USD, 'exits': asdict(EXITS[book_id]),
+            # LAB_FORWARD_SIGNAL_CARRY_V1 in this refresh: carried signals retried on the pool's
+            # current observation; 'signal_carry' (cumulative, per config hash) is added by the Lab.
+            'carried_signals_retried': 0, 'price_crosscheck_pending_signals': 0,
             'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': False}
 
 
@@ -1490,6 +1872,8 @@ def config() -> dict:
             'kill_rule_version': KILL_RULE_VERSION, 'promotion_gate_version': PROMOTION_GATE_VERSION,
             'promotion_gate': asdict(GATE), 'memory_version': MEMORY_VERSION, 'regime_version': REGIME_VERSION,
             'close_policy': asdict(CLOSE_POLICY), 'cash_state': asdict(CASH),
+            'control_continuity': asdict(CONTROL_CONTINUITY), 'signal_carry': asdict(SIGNAL_CARRY),
+            'known_versions': list(KNOWN_VERSIONS),
             'cost_model': _hashable(asdict(COST_MODEL)), 'tape_pin_required': TAPE_PIN_REQUIRED,
             'universe_reasons': list(UNIVERSE_REASONS), 'signal_reasons': list(SIGNAL_REASONS),
             'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': False,

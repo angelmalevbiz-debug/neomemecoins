@@ -18,12 +18,18 @@ export type StrategyLifecycle = {
     // LAB_FORWARD_KILL_RULE_V1 evidence (net50 basis, frozen config only).
     min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
     ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
-    vanished_closes?: number; drained_closes?: number;
+    vanished_closes?: number; drained_closes?: number; zero_capital_closes?: number;
   };
   // LAB_FORWARD_CASH_STATE_V1: status 'cash_exhausted' when the fixed $200 entry cannot be funded.
-  cash?: { exhausted?: boolean; balance_usd?: number | null; min_entry_balance_usd?: number };
+  cash?: { exhausted?: boolean; balance_usd?: number | null; min_entry_balance_usd?: number; zero_capital_closes?: number };
   kill_rule_evaluable?: boolean;
   promotion_gate?: LabForwardGate;
+  // LAB_FORWARD_CONTROL_CONTINUITY_V1: a control keeps entering while its hypothesis can
+  // ('zero_capital_control' once its own balance cannot fund the fixed entry).
+  capital_mode?: string;
+  control_continuity?: { hypothesis?: string; hypothesis_can_enter?: boolean; kill_rule_deferred?: boolean; zero_capital_entries?: boolean };
+  // LAB_FORWARD_SIGNAL_CARRY_V1: signals that waited on the price cross-check.
+  signal_carry?: { pending_signals?: number; entered?: number; lost_price_pending?: number };
 };
 
 // LAB_FORWARD_TESTS_V1: pre-registered research hypotheses and their random controls.
@@ -45,6 +51,16 @@ export function labForwardNote(id: string) {
 // LAB_FORWARD_CASH_STATE_V1: the book cannot fund its fixed entry and holds nothing.
 export const isForwardCashExhausted = (book: { id: string; strategy_lifecycle?: StrategyLifecycle }) =>
   isForwardTestBook(book) && book.strategy_lifecycle?.status === 'cash_exhausted';
+
+// LAB_FORWARD_CONTROL_CONTINUITY_V1: a control out of cash that keeps measuring for its hypothesis.
+export const ZERO_CAPITAL_CONTROL = 'zero_capital_control';
+export const isForwardZeroCapital = (book: { id: string; strategy_lifecycle?: StrategyLifecycle }) =>
+  isForwardTestBook(book) && book.strategy_lifecycle?.status === 'active'
+  && book.strategy_lifecycle?.capital_mode === ZERO_CAPITAL_CONTROL;
+
+export function forwardCapitalNote(mode?: string) {
+  return mode === ZERO_CAPITAL_CONTROL ? 'нулев капитал: не променя баланса' : null;
+}
 
 // LAB_FORWARD_CLOSE_POLICY_V1 close kinds.
 export function forwardCloseNote(kind?: string) {
@@ -71,8 +87,20 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
     const balance = lifecycle.cash?.balance_usd;
     parts.push(`без капитал${typeof balance === 'number' ? ` (${usd(balance)})` : ''}: фиксираният вход $200 не може да се финансира${lifecycle.kill_rule_evaluable ? '' : ', правилото за спиране не може да се оцени'}`);
   }
+  // LAB_FORWARD_CONTROL_CONTINUITY_V1: the control keeps measuring while its hypothesis can enter.
+  if (lifecycle?.status === 'active' && lifecycle.reason === 'control_kill_rule_deferred') {
+    parts.push('правилото за спиране е изпълнено, но контролата продължава, докато хипотезата може да влиза');
+  }
+  if (lifecycle?.status === 'active' && lifecycle.capital_mode === ZERO_CAPITAL_CONTROL) {
+    parts.push('балансът не покрива $200: контролата продължава с нулев капитал (тези сделки не променят баланса)');
+  }
+  const zeroCapital = evidence?.zero_capital_closes ?? 0;
+  if (zeroCapital > 0) parts.push(`сделки с нулев капитал ${zeroCapital}`);
   const unpriced = (evidence?.vanished_closes ?? 0) + (evidence?.drained_closes ?? 0);
   if (unpriced > 0) parts.push(`изчезнали/източени pool-ове ${unpriced}`);
+  // LAB_FORWARD_SIGNAL_CARRY_V1: signals lost while the independent price check was still pending.
+  const lost = lifecycle?.signal_carry?.lost_price_pending ?? 0;
+  if (lost > 0) parts.push(`изгубени сигнали при чакаща проверка на цената ${lost}`);
   const gate = lifecycle?.promotion_gate;
   const coverage = gate?.criteria?.control_coverage;
   if (gate && coverage?.pass === false && typeof coverage.value === 'number') {
@@ -161,6 +189,8 @@ const reasons: Record<string, string> = {
   // LAB_FORWARD_CASH_STATE_V1 / frozen cost model of the forward-test books.
   lab_forward_cash_exhausted: 'Без капитал: балансът не покрива фиксирания вход от $200',
   lab_forward_cost_model_mismatch: 'Моделът на разходите се различава от замразения: входовете са спрени',
+  // LAB_FORWARD_SIGNAL_CARRY_V1: the signal is kept for up to 60 s while the price check is pending.
+  lab_forward_price_check_pending: 'Сигналът чака независимата проверка на цената (пази се до 60 сек.)',
 };
 
 export type CostFeasibility = {

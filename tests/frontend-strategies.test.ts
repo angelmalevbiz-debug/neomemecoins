@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabEntryStatus from '../src/components/LabEntryStatus';
-import { forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { forwardCapitalNote, forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, isForwardZeroCapital, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -293,4 +293,31 @@ test('LAB_FORWARD_CASH_STATE_V1 and CLOSE_POLICY_V1: a stalled book is not shown
   const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(source, /isForwardCashExhausted\(book\)/);
   assert.match(source, /forwardCloseNote\(trade\.close_kind\)/);
+});
+
+test('LAB_FORWARD_CONTROL_CONTINUITY_V1 and SIGNAL_CARRY_V1: a control keeps measuring for its hypothesis, lost signals are named', () => {
+  const control = { ...book('RND_LAB_B', 185, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', reason: 'control_kill_rule_deferred', entry_enabled: true,
+    capital_mode: 'zero_capital_control',
+    control_continuity: { hypothesis: 'LAB_B_DIP_MKTDIP_GUARD', hypothesis_can_enter: true, kill_rule_deferred: true, zero_capital_entries: true },
+    cash: { exhausted: true, balance_usd: 185, min_entry_balance_usd: 200.1 },
+    signal_carry: { pending_signals: 6, entered: 4, lost_price_pending: 2 },
+    evidence: { closed_trades: 55, min_closes: 50, mean_net50_usd: -9, kill_rule_met: true, zero_capital_closes: 20 } } };
+  assert.equal(isForwardZeroCapital(control), true);
+  assert.equal(isForwardCashExhausted(control), false, 'not shown as unable to trade');
+  assert.equal(isForwardZeroCapital(book('TREND', 100, 500)), false);
+  const summary = labForwardSummary(control) ?? '';
+  assert.match(summary, /контролата продължава, докато хипотезата може да влиза/);
+  assert.match(summary, /продължава с нулев капитал/);
+  assert.match(summary, /сделки с нулев капитал 20/);
+  assert.match(summary, /изгубени сигнали при чакаща проверка на цената 2/);
+  assert.equal(partitionLabStrategies([control]).research.length, 1, 'an active control is not archived');
+  assert.equal(forwardCapitalNote('zero_capital_control'), 'нулев капитал: не променя баланса');
+  assert.equal(forwardCapitalNote('funded'), null);
+  assert.equal(labEntryView({ ...book('RND_LAB_A', 500, 500), entry_diagnostics: { signal_candidates: 1,
+    blocked_reason: 'lab_forward_price_check_pending' } }).status,
+    'Сигналът чака независимата проверка на цената (пази се до 60 сек.)');
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /isForwardZeroCapital\(book\)/);
+  assert.match(source, /forwardCapitalNote\(trade\.capital_mode\)/);
 });

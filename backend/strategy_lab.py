@@ -99,6 +99,13 @@ FORWARD_MEMORY=lab_forward.ForwardFeedMemory()
 def lab_forward_memory():
     return FORWARD_MEMORY
 
+# LAB_FORWARD_SIGNAL_CARRY_V1: matched forward-test signals whose only blocker is the
+# asynchronous price cross-check, retried on later refreshes (in memory, bounded).
+FORWARD_SIGNAL_CARRY=lab_forward.SignalCarry()
+
+def lab_forward_signal_carry():
+    return FORWARD_SIGNAL_CARRY
+
 def forward_cost_model():
     """This process's resolved Lab cost model, compared with the one in the forward books' config hash."""
     return {'execution_model':EXECUTION_MODEL_VERSION,'generic_dex_fee_bps':GENERIC_DEX_FEE_BPS,
@@ -675,7 +682,11 @@ def close_position(book,pos,coin,reason):
     total_pnl=partial_pnl+final_pnl
     original_notional=num(pos.get('notional_usd'))
     pct=total_pnl/max(original_notional,1e-18)*100
-    book['balance']=round(num(book['balance'])+final_pnl,8)
+    # LAB_FORWARD_CONTROL_CONTINUITY_V1: a control's zero-capital measurement records its
+    # P&L like any close but never moves the balance (it was entered past the funding).
+    zero_capital=lab_forward.is_zero_capital_position(pos)
+    if not zero_capital:
+        book['balance']=round(num(book['balance'])+final_pnl,8)
     trade={**pos,'exit_price':market_price,'execution_exit_price':round(quote['fill_price'],12),
            'closed_at':now_ms(),'exit_reason':reason,'final_leg_pnl_usd':round(final_pnl,4),
            'pnl_usd':round(total_pnl,4),'pnl_pct':round(pct,3),'balance_after':round(book['balance'],4),
@@ -693,6 +704,7 @@ def close_position(book,pos,coin,reason):
                                               reason=reason,capped_net_proceeds_usd=capped['net_proceeds_usd'],
                                               booked_net_proceeds_usd=quote['net_proceeds_usd'],
                                               exit_liquidity_usd=lab_forward.reported_liquidity_usd(coin)))
+        trade['balance_effect_usd']=0.0 if zero_capital else round(final_pnl,4)
     book['history'].insert(0,trade); book['position']=None
 
 def realize_partial(book,pos,coin,fraction,label):
@@ -823,7 +835,8 @@ def update_positions(flows,feed):
         current_liq=num(coin.get('liquidityUsd'),num((coin.get('liquidity') or {}).get('usd'),math.nan))
         cost_first_exits=cost_first.EXITS.get(pos.get('strategy_id',book.get('id')))
         if forward:
-            reason=lab_forward.exit_reason(pos['strategy_id'],model_live_pct,hold)
+            # The exits this position was opened with (its stored exit_parameters).
+            reason=lab_forward.exit_reason(pos,model_live_pct,hold)
         elif cost_first_exits is not None:
             reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)
         elif total_live_pct<=-STOP_LOSS:
@@ -902,7 +915,12 @@ def maybe_open(feed,flows):
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
         is_forward=strategy['id'] in lab_forward.BOOK_IDS
+        forward_carry=lab_forward_signal_carry() if is_forward else None
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V1: an episode past its window was lost to a pending price check.
+            forward_carry.expire(book,now)
         if not lifecycle.entry_enabled(book):
+            if is_forward: forward_carry.clear(book,'book_stopped')
             book['entry_diagnostics']={
                 'at':now,'blocked_reason':(lab_forward.RETIRED_REASON if is_forward
                                            else 'strategy_retired_observed_losses'),
@@ -940,6 +958,9 @@ def maybe_open(feed,flows):
         # Admission cap: the Lab's one rule, 0.5 x net stop (<= 2.75%). A forward-test book
         # applies it to its own pre-registered stop and buys a fixed $200, never a smaller size.
         admission_cap=lab_forward.admission_cost_cap_pct(strategy['id']) if is_forward else cost_cap
+        # The balance an entry must fit (the book's own, except a zero-capital control entry).
+        funding_balance=balance
+        capital_mode=lab_forward.FUNDED
         if is_forward:
             entry_limit=min(lab_forward.NOTIONAL_USD,max(0.0,balance))
             min_notional=lab_forward.NOTIONAL_USD
@@ -947,15 +968,25 @@ def maybe_open(feed,flows):
             # model differs from the hashed one (closes would pool across two cost models).
             mismatched=lab_forward.cost_model_mismatches(**forward_cost_model())
             if mismatched:
+                forward_carry.clear(book,'book_stopped')
                 book['entry_diagnostics']={
                     'at':now,'blocked_reason':lab_forward.COST_MODEL_MISMATCH_REASON,
                     'cost_model_mismatched_fields':mismatched,'balance_usd':round(balance,4),
                     'entry_policy_version':lab_forward.ENTRY_POLICY_VERSION,
                 }
                 continue
-            if balance<lab_forward.CASH.min_entry_balance_usd:
+            if (balance<lab_forward.CASH.min_entry_balance_usd
+                    and lab_forward.zero_capital_entry_allowed(strategy['id'],STATE['books'],
+                                                               {s['id'] for s in STRATEGIES})):
+                # LAB_FORWARD_CONTROL_CONTINUITY_V1: a control keeps measuring while its hypothesis
+                # can enter; the fixed $200 is a zero-capital entry whose close never moves the balance.
+                capital_mode=lab_forward.ZERO_CAPITAL
+                funding_balance=lab_forward.CASH.min_entry_balance_usd
+                entry_limit=lab_forward.NOTIONAL_USD
+            elif balance<lab_forward.CASH.min_entry_balance_usd:
                 # LAB_FORWARD_CASH_STATE_V1: the fixed $200 entry plus its network fee cannot be
                 # funded; with no open position this book can never trade again.
+                forward_carry.clear(book,'book_stopped')
                 book['entry_diagnostics']={
                     'at':now,'matched_candidates':0,'cost_rejected':0,
                     'cooldown_rejected':0,'affordable_candidates':0,
@@ -1012,6 +1043,8 @@ def maybe_open(feed,flows):
         defensive_rejected=0
         forward_diagnostics=lab_forward.new_diagnostics(strategy['id']) if is_forward else None
         forward_evaluations={}
+        # LAB_FORWARD_SIGNAL_CARRY_V1: the last gate each matched forward signal reached.
+        forward_stage={}
         for coin,features in candidates:
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
@@ -1019,11 +1052,22 @@ def maybe_open(feed,flows):
                 # Research universe (PumpSwap/SOL, liquidity, fee tier) and the book's
                 # signal at this observation; STRUCTURAL_RUG_GUARD_V1 and the loss memory
                 # follow in the defensive layer, price identity and the cost cap below.
+                forward_key=(coin['address'],coin['pairAddress'])
                 evaluation=lab_forward.evaluate(strategy['id'],coin,now,forward_memory,defense.history)
                 lab_forward.record_evaluation(forward_diagnostics,evaluation)
                 matched=evaluation['matched']
+                if not matched and not evaluation['universe_rejections']:
+                    # A signal of this pool that waited only on the price cross-check is retried
+                    # on its current observation, through every gate below.
+                    carried=forward_carry.carried_evaluation(strategy['id'],forward_key,now)
+                    if carried is not None:
+                        evaluation,matched=carried,True
+                        forward_diagnostics['carried_signals_retried']+=1
                 if matched:
-                    forward_evaluations[(coin['address'],coin['pairAddress'])]=evaluation
+                    forward_evaluations[forward_key]=evaluation
+                    forward_stage[forward_key]='defensive_entry'
+                elif evaluation['universe_rejections']:
+                    forward_carry.resolve(book,forward_key,'dropped_by_gate',evaluation['universe_rejections'][0])
             elif is_cost_first:
                 # Physical cost universe plus STRUCTURAL_RUG_GUARD_V1. Confirmed
                 # flow, fresh safety, price identity and the Lab cost cap are
@@ -1055,6 +1099,7 @@ def maybe_open(feed,flows):
             entry_defense.record(defensive_summary,defensive,coin,example_limit=2)
             if not defensive['allowed']:
                 defensive_rejected+=1
+                if is_forward: forward_stage[forward_key]=(defensive.get('reasons') or ['defensive_entry'])[0]
                 continue
             # Transparent planning estimate for every book. It never grants
             # admission, replaces a price check, or assumes a future gain.
@@ -1070,6 +1115,7 @@ def maybe_open(feed,flows):
                 features={**features,'funded_candidate_branches':branches}
                 for branch in branches:
                     promoted_candidate_branches[branch]=promoted_candidate_branches.get(branch,0)+1
+            if is_forward: forward_stage[forward_key]='network_price_unknown'
             if sol_usd_from_coin(coin)<=0:
                 blocked_network+=1
                 continue
@@ -1116,6 +1162,7 @@ def maybe_open(feed,flows):
                 if candidate_limit<min_notional:
                     candidate_risk_rejected+=1
                     continue
+            if is_forward: forward_stage[forward_key]='price_verification'
             validation=price_integrity.check(coin)
             if validation.get('status')=='review':
                 validation=cached_jupiter_tiebreak(validation,coin,now=now)
@@ -1123,6 +1170,8 @@ def maybe_open(feed,flows):
                     if validation.get('status')=='review':
                         price_crosscheck_pending+=1
                         schedule_jupiter_price_probe(coin)
+                        # LAB_FORWARD_SIGNAL_CARRY_V1: the only blocker so far; carried below.
+                        if is_forward: forward_stage[forward_key]='price_crosscheck_pending'
                     else:
                         blocked_price+=1
                     continue
@@ -1141,12 +1190,14 @@ def maybe_open(feed,flows):
             if is_forward:
                 # Research cooldown: 300 s after the book's last close on this pool.
                 cooldown_ms=max(cooldown_ms,lab_forward.pool_cooldown_remaining_ms(book,coin,now))
+                forward_stage[forward_key]='reentry_cooldown'
             if cooldown_ms>0:
                 blocked_cooldown+=1
                 continue
             checked+=1
+            if is_forward: forward_stage[forward_key]='modeled_roundtrip_cost_limit'
             proposed=activity.affordable_entry(
-                coin,balance,candidate_limit,entry_execution,exit_execution,
+                coin,funding_balance,candidate_limit,entry_execution,exit_execution,
                 minimum_notional=min_notional,
                 max_entry_cost_pct=admission_cap,
             )
@@ -1166,6 +1217,17 @@ def maybe_open(feed,flows):
                     continue
             eligible.append((proposed['initial_pnl_pct'],num(features.get('score')),
                              coin,features,proposed,validation,brain,risk,candidate_limit,defensive))
+            if is_forward: forward_stage[forward_key]='eligible'
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V1: a signal whose only blocker was the pending price
+            # cross-check is kept for a later refresh; one refused by any other gate ends
+            # its episode; an eligible one waits for the commit below.
+            for forward_key,stage in forward_stage.items():
+                if stage=='price_crosscheck_pending':
+                    forward_carry.hold(book,forward_key,forward_evaluations[forward_key],now)
+                    forward_diagnostics['price_crosscheck_pending_signals']+=1
+                elif stage!='eligible':
+                    forward_carry.resolve(book,forward_key,'dropped_by_gate',stage)
         book['entry_diagnostics']={
             'at':now,'signal_candidates':signal_candidates,
             'defensive_rejected':defensive_rejected,'defensive_entry':defensive_summary,
@@ -1191,12 +1253,19 @@ def maybe_open(feed,flows):
         if is_forward:
             if strategy['id']==lab_forward.LAB_B_ID:
                 forward_diagnostics['regime']=forward_regime
+            forward_diagnostics.update({
+                'capital_mode':capital_mode,
+                'signal_carry':{**lab_forward.signal_carry_counters(book,strategy['id']),
+                                'pending_now':forward_carry.pending_count(strategy['id'])}})
             book['entry_diagnostics']['lab_forward']=forward_diagnostics
             if signal_candidates==0:
                 book['entry_diagnostics']['blocked_reason']='no_market_signal'
             elif not eligible and blocked_cooldown and blocked_cooldown+defensive_rejected==signal_candidates:
                 # Every signal the defensive layer allowed was in its pool or token cooldown.
                 book['entry_diagnostics']['blocked_reason']='reentry_cooldown'
+            elif not eligible and price_crosscheck_pending:
+                # The signal is carried to the next refresh (LAB_FORWARD_SIGNAL_CARRY_V1).
+                book['entry_diagnostics']['blocked_reason']=lab_forward.PRICE_CHECK_PENDING_REASON
         if is_cost_first:
             book['entry_diagnostics'].update({
                 'cost_first':{
@@ -1317,6 +1386,8 @@ def maybe_open(feed,flows):
             defensive_summary['commit_recheck_blocked']=int(defensive_summary.get('commit_recheck_blocked') or 0)+1
             book['entry_diagnostics']['blocked_reason']=(final_defensive['reasons'] or ['defensive_entry'])[0]
             book['entry_diagnostics']['commit_recheck_rejected']=1
+            if is_forward:
+                forward_carry.resolve(book,(coin['address'],coin['pairAddress']),'dropped_by_gate','commit_recheck')
             continue
         defensive=final_defensive
         if brain:
@@ -1419,10 +1490,19 @@ def maybe_open(feed,flows):
                 **lab_forward.position_record(
                     strategy['id'],evaluation=forward_evaluations.get((address,coin['pairAddress'])) or {},
                     calib=calib,model_entry=opening,model_mark=proposed['initial_pnl_pct'],
-                    defensive_flags=defensive.get('log_only_flags'),entry_coin=coin,entry_at=stamp),
+                    defensive_flags=defensive.get('log_only_flags'),entry_coin=coin,entry_at=stamp,
+                    capital_mode=capital_mode),
             })
         book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
+        if is_forward:
+            # LAB_FORWARD_SIGNAL_CARRY_V1: this pool's episode entered; the book's other pending
+            # signals are superseded (one position at a time, as in the research).
+            forward_carry.resolve(book,(address,coin['pairAddress']),'entered')
+            forward_carry.clear(book,'superseded')
+            book['entry_diagnostics']['lab_forward']['signal_carry']={
+                **lab_forward.signal_carry_counters(book,strategy['id']),
+                'pending_now':forward_carry.pending_count(strategy['id'])}
 
 
 ACTIVE_POLICY_VERSIONS=frozenset({activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION,
@@ -1434,7 +1514,9 @@ def stats(book):
     gp=sum(max(0,num(t.get('pnl_usd'))) for t in h); gl=-sum(min(0,num(t.get('pnl_usd'))) for t in h)
     unreal=0.0
     p=book.get('position')
-    if p: unreal=num(p.get('open_pnl_usd'))
+    # A zero-capital control position (LAB_FORWARD_CONTROL_CONTINUITY_V1) never moves equity.
+    if p and not lab_forward.is_zero_capital_position(p): unreal=num(p.get('open_pnl_usd'))
+    zero_capital=[t for t in h if t.get('capital_mode')==lab_forward.ZERO_CAPITAL]
     marked_at=num((p or {}).get('mark_received_at'),num((p or {}).get('updated_at')))
     mark_age_ms=max(0,now_ms()-int(marked_at)) if p else 0
     valuation_stale=bool(p and (mark_age_ms>POSITION_STALE_AFTER_MS or p.get('quote_status') in {'stale','unavailable'}))
@@ -1452,7 +1534,10 @@ def stats(book):
             'active_policy_trades':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS for t in h),
             'active_policy_wins':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS and num(t.get('pnl_usd'))>0 for t in h),
             'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION for t in h),
-            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h)}
+            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h),
+            # Closes counted in trades/wins but not in the balance (control measurement past its funding).
+            'zero_capital_trades':len(zero_capital),
+            'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}
 
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
@@ -1485,7 +1570,8 @@ def persist(status='online',error=None):
     STATE['activity_config']['cost_first_established']=cost_first.config()
     STATE['activity_config']['defensive_entry']=entry_defense.config()
     STATE['activity_config']['lab_forward_tests']=lab_forward.config()
-    STATE['activity_config']['lab_forward_tests_state']=FORWARD_MEMORY.status()
+    STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),
+                                                         'signal_carry':FORWARD_SIGNAL_CARRY.status()}
     if DEFENSE is not None:
         STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
         if status=='stopped':

@@ -47,15 +47,38 @@ clock read AFTER the replay: when it has lapsed or is under 24 h the tool
 still writes the sidecar (its sightings count) but exits 2, and every
 registry then warms for 24 h unless a sibling vouches.
 
-Usage, from the live checkout root, only after ``.\\scripts\\start_local_paper.ps1
--Action Stop`` has completed (it prints "All owned PAPER services stopped and
-flushed."). Run it in place on the live journal; do not copy it. The tool opens
-the journal read-only ('rb') and never writes it, and nothing appends to it
-while the services are stopped, so a copy (tens of GB) only costs disk and
-minutes of the 60-minute coverage window:
+Usage (docs/PAPER_RUNBOOK.md, first deploy), from the live checkout root, on
+the live journal in place; do not copy it: the tool opens the journal
+read-only ('rb', with read/write sharing) and never writes it, and a copy (tens
+of GB) only costs disk and minutes of the 60-minute coverage window. Two modes:
+
+- Seed before Stop (first deploy only; recommended), while no
+  ``.runtime\\accounts\\state.ticker_registry.json`` exists (the pre-release
+  services have no ticker registry and never write it): with the services
+  running (main keeps appending), run the release checkout's copy of this tool
+  with ``--out`` in a scratch folder outside ``.runtime``, copy the sidecar
+  into ``.runtime\\accounts`` after Stop and start within the printed window.
+  The replay is then not part of the outage:
+    .venv\\Scripts\\python.exe <release checkout>\\scripts\\build_ticker_registry_seed.py
+        --journal .runtime\\accounts\\training\\observations.jsonl
+        --out <scratch folder outside .runtime>\\state.ticker_registry.json
+- Seed after Stop, in place: when that sidecar already exists and for every
+  ``--replace-stale`` rerun, only after ``.\\scripts\\start_local_paper.ps1
+  -Action Stop`` has completed (it prints "All owned PAPER services stopped
+  and flushed."); nothing appends to the journal while the services are
+  stopped, and the replay runs inside the outage:
     .venv\\Scripts\\python.exe scripts\\build_ticker_registry_seed.py
         --journal .runtime\\accounts\\training\\observations.jsonl
         --out .runtime\\accounts\\state.ticker_registry.json
+
+A later deploy needs no seed, and after an outage over 60 minutes no seed can
+help: when main scans again within 60 minutes of its last scan before Stop the
+sidecars carry the coverage (the tool refuses a sidecar that still vouches);
+after a longer outage the journal holds the same gap (nothing journals while
+the services are stopped), so the replay's coverage ends at the last scan
+before Stop, the tool exits 2 and every registry warms for 24 h. A seed helps
+on a later deploy only when the sidecars themselves are lost and the outage
+stays under 60 minutes.
 
 The services must be stopped whenever a seed is written into the runtime
 folder, the first one and ``--replace-stale`` alike: a running main keeps its
@@ -67,15 +90,9 @@ output's folder or any parent) whose ``services/processes.json`` exists
 without ``services/stop.request`` (Stop writes that marker, Start removes it).
 The marker proves that Stop ran, not that every process exited: when Stop
 reported that services are still flushing, wait until ``-Action Status`` shows
-none running first.
-
-First deploy only, while no ``state.ticker_registry.json`` exists (the
-pre-release services have no ticker registry and never write it): the replay
-may run before Stop, so that it is not part of the outage. Run the release
-checkout's copy of this tool with ``--out`` in a scratch folder outside
-``.runtime`` (the journal is opened 'rb' with read/write sharing, so main keeps
-appending), then copy the sidecar into ``.runtime\\accounts`` after Stop and
-start within the printed window (docs/PAPER_RUNBOOK.md, first deploy).
+none running first. A scratch folder outside ``.runtime`` has no services
+manifest, so the before-Stop seed of the first deploy is written there while
+the services run and reaches ``.runtime\\accounts`` only by the copy after Stop.
 
 The output must not exist. An earlier attempt (services started before the
 seed, a rolled-back deploy, a failed first try) can leave a sidecar that does

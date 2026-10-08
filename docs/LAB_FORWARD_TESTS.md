@@ -46,10 +46,10 @@ The frozen hashes, with the Lab's default cost model:
 
 | Book | `lab_config_hash` |
 |---|---|
-| `LAB_A_SURGE_EST_GUARD` | `1845c6c6c90225380dcffd47fdffbadf8db35ea25e4bd6eba35752621bf29d72` |
-| `RND_LAB_A` | `003d015ee0d96bf8dc8470761bb1c2efc10b2a4c3c95711f219d0084a35a955c` |
-| `LAB_B_DIP_MKTDIP_GUARD` | `8ff5871bb43888aca5cf8e23861e4c7b0c7cca1d5c6bc320a4fdf63d5d92ccae` |
-| `RND_LAB_B` | `ad0a8683e4d4e350b0654790a0dc349ecb32bbbe3781511377efcbf2b3d3c591` |
+| `LAB_A_SURGE_EST_GUARD` | `a79ed77ba5c50947bef9ae71f7013fdc0e301eede0f6ced6698c4776c85c08df` |
+| `RND_LAB_A` | `35521efaa5c194076a49c9c9a09258f60459b9d596d1672282f5276e91d83be5` |
+| `LAB_B_DIP_MKTDIP_GUARD` | `54d1ba28458e332b9c0cd1a0b47412912bda32c7d71213fcacc199ee17fb0bde` |
+| `RND_LAB_B` | `a4b0c208eded6bfe720caabddb88443ef6f33b9a48729a883d000f12afcaa235` |
 
 The same four values are pinned in `tests/test_lab_forward_tests.py` and in
 `strategy-lock.json` (`lab_forward_tests.config_hashes`); a test checks that this table,
@@ -57,9 +57,10 @@ the lock and the module agree.
 
 The canonical parameters of every book include the signal carry
 (`LAB_FORWARD_SIGNAL_CARRY_V1`, including that these books never request the Lab's
-Jupiter price probe), the hypothesis-control protocol
+Jupiter price probe, hold no signal inside its cooldown and continue a held signal run on
+a newer match), the hypothesis-control protocol
 (`LAB_FORWARD_CONTROL_CONTINUITY_V1`), the research-fill basis
-(`LAB_FORWARD_FILL_BASIS_V2`, with the kill rule's two bases and its bootstrap minimum)
+(`LAB_FORWARD_FILL_BASIS_V3`, with the kill rule's two bases and its bootstrap minimum)
 and the close policy (`LAB_FORWARD_CLOSE_POLICY_V1`, including
 `LAB_FORWARD_MARK_LIQUIDITY_V2`), described below. No close exists under the earlier
 hashes: the PR had not run when they changed.
@@ -145,7 +146,20 @@ subset, not uniform entries in the universe.
 The carry treats all four books alike:
 
 - A matched signal whose **only** blocker is the pending price cross-check starts an
-  episode for (book, pool). A newer matched observation of the same pool refreshes it.
+  episode for (book, pool). An episode is one uninterrupted signal run.
+- A signal inside its pool or token cooldown is not held. The Lab checks the cooldowns
+  after the price check, so such a signal is blocked by the cooldown too, not only by
+  the check: it counts as `cooldown_rejected` (`reentry_cooldown`), as it would once the
+  check passed. The research harness skips signal points inside its 300 s pool cooldown
+  (`i < next_ok`) and never enters them; before this rule (never released) such a draw
+  was held and entered once the cooldown ended, and its research fill was decided at a
+  point the harness skipped.
+- A newer matched observation of the same pool continues the run: it refreshes the
+  episode's signal and window, and when it passes every gate it enters as that run
+  (`lab_forward.carry.rematched` true, `entry_diagnostics.lab_forward.rematched_carried_signals`).
+  A persistent LAB_B dip whose check was pending usually enters this way, a random draw
+  or a LAB_A crossing through a carried retry; both keep the run's first signal as
+  their research-fill decision (see Fill basis).
 - On each later refresh, the carried signal is retried on the pool's **current**
   observation, while it is at most 60 s older than its latest signal observation (the
   research harness filled an order at the next price refresh within 60 s,
@@ -160,10 +174,12 @@ The carry treats all four books alike:
   entered another pool: one position at a time) or `book_stopped`. At most 32 episodes
   are pending per book; an evicted one counts as lost.
 
-A carried entry records `lab_forward.observed_at` (the signal observation),
-`lab_forward.entry_observed_at` and `lab_forward.carry` (signal times, attempts, window).
-Its research-fill entry leg is decided at the signal observation, not at the entry
-observation (`research_fill.entry_decision = carried_signal_observation`; see Fill basis).
+An entry of a held run records `lab_forward.observed_at` (its latest matched signal
+observation: the carried signal's, or the entry observation itself when it matched
+again), `lab_forward.entry_observed_at` and `lab_forward.carry` (`first_signal_observed_at`,
+`signal_observed_at`, `signals`, `rematched`, attempts, window). Its research-fill entry
+leg is decided at the run's first signal observation, not at the entry observation
+(`research_fill.entry_decision = first_signal_observation`; see Fill basis).
 The cumulative counters are stored in the book's ledger per config hash
 (`lab_forward_signal_carry.by_config_hash`). They are published in
 `entry_diagnostics.lab_forward.signal_carry` (with `pending_now`), in the
@@ -373,7 +389,7 @@ The research's feed-gap rule (a pool absent for more than 10 min that returns is
 at the lower of the pre-gap and return prices) is not replicated. Here a returning pool
 resumes, and its exits are decided on the returning mark.
 
-### Fill basis (LAB_FORWARD_FILL_BASIS_V2)
+### Fill basis (LAB_FORWARD_FILL_BASIS_V3)
 
 **Booked fills are not the research's fills.** A forward entry is booked at the entry
 observation's DexScreener print (the price the signal saw, or for a carried signal the
@@ -401,21 +417,30 @@ The booking is kept (positions, exits, balances and `net50_usd` are unchanged). 
 forward position and close also carries a research-fill **shadow**, `research_fill`, with
 one leg per side:
 
-- **Entry leg.** Decided where the harness decided, at the matched signal observation the
-  entry acts on (`decision_at`, `decision_price`, and a snapshot of the model inputs:
-  price, native price, liquidity, market cap, quote). For most entries that is the entry
-  observation itself (`research_fill.entry_decision = entry_observation`). A signal
-  carried past a pending price check (`LAB_FORWARD_SIGNAL_CARRY_V1`) enters at a later
-  observation; its leg is decided at the signal observation, kept by the carry and
-  advanced with every observation of the pool the carry retried on, then with the entry
-  observation (`carried_signal_observation`). This is the harness's `fill_index(s, i)` at
-  the signal point `i`: if the price refreshed between the signal and the entry, the
-  research fill is that refresh, usually the entry print itself. Under V1 (never
-  released, no close under it) the leg was decided at the entry observation, so such an
-  entry was shadow-filled one refresh after the harness's fill and the research-fill
-  basis counted the carry's latency twice; that affected single-observation signals
-  (LAB_A, RND_LAB_A, RND_LAB_B) much more than LAB_B, whose persistent dip re-matches on
-  a fresh observation.
+- **Entry leg.** Decided where the harness decided. `harness_final._run_pair` enters at
+  the **first** signal point `i` of a run (outside its cooldown) and fills it at
+  `fill_index(s, i)`, so the leg is decided at the first signal observation of the
+  uninterrupted signal run the entry acts on (`decision_at`, `decision_price`, and a
+  snapshot of the model inputs: price, native price, liquidity, market cap, quote).
+  - An entry that passed every gate at its first matched observation has no run: its leg
+    is decided at the entry observation (`research_fill.entry_decision = entry_observation`).
+  - A signal held past a pending price check (`LAB_FORWARD_SIGNAL_CARRY_V1`) starts a run.
+    Its leg is decided at that first signal observation and kept by the carry episode;
+    every later observation of the pool the book evaluates advances it, whether it is a
+    carried retry (a random draw or a LAB_A crossing that no longer matches) or a newer
+    match (a persistent LAB_B dip), and the entry observation advances it last
+    (`first_signal_observation`). If the price refreshed between the first signal and
+    the entry, the research fill is that refresh, usually the entry print itself.
+  - The rule is the same for every hypothesis and its control. V2 (never released, no
+    close under it) restarted the leg at every newer matched observation, and an entry
+    whose observation matched again was decided there. A LAB_B dip held at S0 that
+    matched again and entered at S1 was therefore shadow-filled at S2 or later, while a
+    RND_LAB_B draw with the same timing was carried and filled at S1, where the harness
+    fills both: the research-fill basis, which can retire a book on its own and which
+    the gate requires, was not like for like (`FillBasisTests` and
+    `test_a_held_lab_b_dip_and_its_controls_draw_are_shadow_filled_at_the_same_first_signal`
+    pin both books in that timing). V1 (never released) decided every entry at its entry
+    observation and counted the carry's latency twice.
 - **Exit leg.** Decided at the mark that triggered the close.
 - **Fill.** The first later observation of the exact pool, within 60 s
   (`max_fill_lag_ms`, the harness's `MAX_FILL_LAG_MS`), whose `priceUsd` differs from the
@@ -497,7 +522,7 @@ After at least 50 such closes, the book is retired when both of these hold:
 - the upper bound of the 95% CI of mean net50 $/trade < 0.
 
 It is evaluated on the booked net50 and on the research-fill net50
-(`LAB_FORWARD_FILL_BASIS_V2`), each on the closes that have it; met on either basis
+(`LAB_FORWARD_FILL_BASIS_V3`), each on the closes that have it; met on either basis
 retires the book. A close whose research-fill shadow is still pending is not evidence on
 that basis yet.
 
@@ -678,7 +703,7 @@ versioned change.
 **Caveat for any reading of the gate.** Both bases are DexScreener prints with modeled
 costs, not executable quotes: the booked basis fills at the entry print and the
 triggering mark, the research-fill basis at the next refresh after the signal and the
-trigger ([Fill basis](#fill-basis-lab_forward_fill_basis_v2)). A hypothesis that passes only on
+trigger ([Fill basis](#fill-basis-lab_forward_fill_basis_v3)). A hypothesis that passes only on
 the booked basis has not passed.
 
 ## Restarts
@@ -698,6 +723,13 @@ mark is looked for for 60 s before it can close as vanished. Its persisted
 
 Pending signal-carry episodes are in memory only; a restart drops them uncounted. The
 episode counters are persisted in the ledger.
+
+A stop cannot drain these books: the Lab has no control that pauses their entries. An
+open forward position is not marked while the services are stopped; after the restart it
+is marked again with its recorded exits and closes at its first fresh mark if a trigger
+was crossed or its max hold passed during the stop. [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md)
+bounds the wait for flat books before a stop or a rollback (at most 75 minutes) and says
+how to record the positions left open for the owner.
 
 Research-fill legs are persisted on the position and the close. A leg still pending at a
 restart keeps what it recorded (its first later observation); the new process scans the

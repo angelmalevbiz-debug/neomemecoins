@@ -63,7 +63,7 @@ type LabTrade = {
   close_kind?: string;
   // LAB_FORWARD_CONTROL_CONTINUITY_V1: 'zero_capital_control' closes never move the balance.
   capital_mode?: string;
-  // LAB_FORWARD_FILL_BASIS_V2: net50 re-priced at the research fills (next DexScreener refresh).
+  // LAB_FORWARD_FILL_BASIS_V3: net50 re-priced at the research fills (next DexScreener refresh).
   net50_research_fill_usd?: number | null;
 };
 type LabPosition = {

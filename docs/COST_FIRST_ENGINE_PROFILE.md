@@ -14,9 +14,9 @@ The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default
 `ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
 With the layer, the `effective_config_hash` values (code defaults, no `NEO_*` overrides,
 pinned exactly by `tests/test_cost_first_engine_profile.py`) are:
-`COST_FIRST_ESTABLISHED_PAPER_V1` `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba`,
-`WINNER_ENSEMBLE_PAPER_V1` `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9`,
-`ORDER_FLOW_ADAPTIVE` `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890`.
+`COST_FIRST_ESTABLISHED_PAPER_V1` `4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10`,
+`WINNER_ENSEMBLE_PAPER_V1` `580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7`,
+`ORDER_FLOW_ADAPTIVE` `fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba`.
 A new cost-first account's ticker registry is seeded from main's, the Lab's and the
 tape's sidecars and adopts their current coverage; until it has 24 h of coverage, pools
 younger than 14 days are blocked (`rug_ticker_registry_warming`). Check that the

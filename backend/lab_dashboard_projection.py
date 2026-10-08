@@ -38,7 +38,7 @@ FORWARD_HISTORY_FIELDS = (
     'exit_liquidity_usd',
     # LAB_FORWARD_CONTROL_CONTINUITY_V1: a zero-capital close moves no balance.
     'capital_mode', 'balance_effect_usd',
-    # LAB_FORWARD_FILL_BASIS_V2: net50 re-priced at the research fills.
+    # LAB_FORWARD_FILL_BASIS_V3: net50 re-priced at the research fills.
     'fill_basis_version', 'net50_research_fill_usd', 'net50_research_fill_pct',
 )
 

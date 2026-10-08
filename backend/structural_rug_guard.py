@@ -108,8 +108,14 @@ tape see only main's trimmed published feed; under V3 they never picked up
 main's later sightings while they vouched. A ticker registry is market
 memory, not account memory, so a seed only adds sightings (it can only block
 more); a seed file is never written. For the first deploy,
-scripts/build_ticker_registry_seed.py builds main's sidecar offline from a
-copy of the training observations journal.
+scripts/build_ticker_registry_seed.py builds main's sidecar offline from the
+training observations journal, read in place and read-only: before Stop into
+a scratch folder outside .runtime (first deploy only, while no
+state.ticker_registry.json exists) and copied in after Stop, or in place
+after Stop; a seed reaches the runtime folder only with the services stopped
+(docs/PAPER_RUNBOOK.md, first deploy). No seed bridges an outage of more than
+60 min: the journal holds the same gap, so coverage restarts and the
+registries warm for 24 h.
 """
 from dataclasses import asdict, dataclass
 import json
@@ -1277,11 +1283,17 @@ def config(params: GuardParameters = PARAMS) -> dict:
                                           'corrupt': ('copied to <sidecar>.corrupt-<ms>, then the registry starts '
                                                       'empty and replaces it; kept like an unreadable one when the '
                                                       'copy fails')},
-                         'first_deploy_seed': ('scripts/build_ticker_registry_seed.py (offline, training journal '
-                                               'copy, market rows mark coverage; --replace-stale replaces only a '
-                                               'sidecar that does not vouch, keeping a copy; both only with the '
-                                               'services stopped: it refuses a runtime whose services/processes.json '
-                                               'has no services/stop.request)')},
+                         'first_deploy_seed': ('scripts/build_ticker_registry_seed.py (offline, read-only on the '
+                                               'training journal, read in place; market rows mark coverage; '
+                                               '--replace-stale replaces only a sidecar that does not vouch, keeping '
+                                               'a copy; a seed reaches the runtime folder only with the services '
+                                               'stopped: the tool refuses a runtime whose services/processes.json has '
+                                               'no services/stop.request; on the first deploy only, while no '
+                                               'state.ticker_registry.json exists, it may be built before Stop into a '
+                                               'folder outside .runtime and copied in after Stop; it vouches only '
+                                               'when the journal holds 24 h of market coverage ending within 60 min '
+                                               'of the end of its run, so no seed bridges an outage over 60 min; '
+                                               'procedure: docs/PAPER_RUNBOOK.md, first deploy)')},
             'fail_closed': True, 'distinct_from': 'engine_rug_guard.RUG_GUARD_V2 (unchanged)',
             'fake_market_cap_threshold_note': '2% liquidity/market cap is holdout-informed (research froze 1%); conservative, not validated',
             'is_entry_authorization': False, 'profitability_proven': False}

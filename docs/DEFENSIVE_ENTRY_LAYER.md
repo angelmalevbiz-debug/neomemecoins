@@ -666,9 +666,9 @@ value in `tests/test_cost_first_engine_profile.py`:
 
 | Strategy | `effective_config_hash` |
 | --- | --- |
-| `WINNER_ENSEMBLE_PAPER_V1` (default) | `274d8f1060c8c44a15f3177135142f4698fa9aadc7dfd4007f672215e58f40b9` |
-| `ORDER_FLOW_ADAPTIVE` | `8567ceb170290e07023ddaa3f7ef2aafe0a1f9840df47687c3d951c276c39890` |
-| `COST_FIRST_ESTABLISHED_PAPER_V1` | `baf0c66a608df32a2164f3ddc5f26b705bbc3feb2a6481aa3bc5e46759478aba` |
+| `WINNER_ENSEMBLE_PAPER_V1` (default) | `580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7` |
+| `ORDER_FLOW_ADAPTIVE` | `fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba` |
+| `COST_FIRST_ESTABLISHED_PAPER_V1` | `4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10` |
 
 The Lab's retirement review (`LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE`):
 

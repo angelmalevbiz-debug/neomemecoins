@@ -8,6 +8,7 @@ safety and marks are patched; no test calls an external API or touches a real
 ledger. Nothing here measures or claims profitability.
 """
 import copy
+import dataclasses
 import hashlib
 import json
 import os
@@ -34,6 +35,7 @@ import lab_strategy_lifecycle as lifecycle
 import paper_market_feasibility as feasibility
 import strategy_lab as lab
 import structural_rug_guard as guard
+import tape_pool_scheduler
 
 _MODULE_PATCHES = []
 
@@ -61,10 +63,10 @@ DAY = 24 * HOUR
 # Frozen config hashes (sha256 of each book's canonical parameter JSON). A parameter
 # change must change these pins, strategy-lock.json and docs/STRATEGY_VALIDATION.md together.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': 'c97d2b4fd03c6df6376b0173a3b39c015928e7ccb1419bbee167b3b938c43644',
-    'RND_LAB_A': 'a0a7f03f75fc3f66d33ec201e1461c177878cdd411194f82b751c513f7faba02',
-    'LAB_B_DIP_MKTDIP_GUARD': '8f6e09cb1f3aef7ba9eec3425de019ce25614ff59bee77e9b884d3f134d87f39',
-    'RND_LAB_B': 'fdf97559ac929c7a2b30a53358256f3912e9085bdb1bff6453b4c7eecaaf5ab1',
+    'LAB_A_SURGE_EST_GUARD': 'a183e57ca5f7a3e9002d7d5dd7e8a92c533396b0551647540e3a1a417c5516e0',
+    'RND_LAB_A': 'abe2cc2caf5a4515ec3a7e0a2c095ea98e48023dd3b596b4c2d54ad7cbb6ed74',
+    'LAB_B_DIP_MKTDIP_GUARD': 'b49f09dac0b802fdbfc4c9608c2533ea0064a2ed957d8d23f45676852832ea31',
+    'RND_LAB_B': '7637d5b3206a4fe9de2ba393c1102fd8c2ea5263951abdac287fa84b723343a1',
 }
 
 
@@ -192,6 +194,29 @@ class DefinitionTests(unittest.TestCase):
             self.assertNotEqual(lf.config_hash(lf.RND_B_ID), PINNED_CONFIG_HASHES[lf.RND_B_ID])
         with patch.object(heat_veto, 'VERSION', 'HEAT_VETO_PROBE'):
             self.assertNotEqual(lf.config_hash(lf.LAB_B_ID), PINNED_CONFIG_HASHES[lf.LAB_B_ID])
+        # The env-resolved Lab cost model is part of the frozen config: a changed knob is a new test.
+        for field, value in (('base_slippage_bps', 15.0), ('latency_buffer_bps', 12.0),
+                             ('network_fee_sol', 0.0002), ('max_price_impact_pct', 25.0),
+                             ('generic_dex_fee_bps', 35.0)):
+            with self.subTest(cost_model=field), \
+                    patch.object(lf, 'COST_MODEL', dataclasses.replace(lf.COST_MODEL, **{field: value})):
+                self.assertNotEqual(lf.config_hash(lf.RND_A_ID), PINNED_CONFIG_HASHES[lf.RND_A_ID])
+        with patch.object(lf, 'COST_MODEL', dataclasses.replace(lf.COST_MODEL, base_slippage_bps=float('nan'))):
+            self.assertEqual(lf.book_parameters(lf.LAB_A_ID)['costs']['model']['base_slippage_bps'], 'nan')
+        with patch.object(lf, 'CLOSE_POLICY', dataclasses.replace(lf.CLOSE_POLICY, vanish_haircut_pct=5.0)):
+            self.assertNotEqual(lf.config_hash(lf.LAB_A_ID), PINNED_CONFIG_HASHES[lf.LAB_A_ID])
+        with patch.object(lf, 'CASH', dataclasses.replace(lf.CASH, network_fee_reserve_usd=1.0)):
+            self.assertNotEqual(lf.config_hash(lf.LAB_B_ID), PINNED_CONFIG_HASHES[lf.LAB_B_ID])
+
+    def test_the_hashed_cost_model_is_the_labs_resolved_model(self):
+        self.assertEqual(lf.cost_model_mismatches(**lab.forward_cost_model()), [])
+        self.assertEqual(dataclasses.asdict(lf.COST_MODEL), lab.forward_cost_model())
+        self.assertEqual((lf.COST_MODEL.base_slippage_bps, lf.COST_MODEL.latency_buffer_bps,
+                          lf.COST_MODEL.network_fee_sol, lf.COST_MODEL.max_price_impact_pct,
+                          lf.COST_MODEL.generic_dex_fee_bps), (10.0, 10.0, 0.0001, 20.0, 30.0))
+        with patch.object(lab, 'LATENCY_BUFFER_BPS', 25.0):
+            self.assertEqual(lf.cost_model_mismatches(**lab.forward_cost_model()), ['latency_buffer_bps'])
+        self.assertEqual(lf.cost_model_mismatches(base_slippage_bps=float('nan')), ['base_slippage_bps'])
 
     def test_the_strategy_lock_records_the_books(self):
         lock = json.loads((Path(__file__).resolve().parents[1] / 'strategy-lock.json').read_text(encoding='utf-8'))
@@ -203,6 +228,18 @@ class DefinitionTests(unittest.TestCase):
         self.assertEqual(section['research_prereg_sha256'], lf.RESEARCH_PREREG_SHA256)
         self.assertIn('backend/lab_forward_tests.py', lock['support_files_sha256'])
         self.assertTrue(lock['defensive_entry']['heat_veto']['log_only_books_registered'])
+        for book_id, row in section['books'].items():
+            self.assertEqual(row['config_hash'], PINNED_CONFIG_HASHES[book_id])
+        self.assertEqual(section['cost_model'], lf._hashable(dataclasses.asdict(lf.COST_MODEL)))
+        self.assertEqual(section['close_policy'], dataclasses.asdict(lf.CLOSE_POLICY))
+        self.assertEqual(section['cash_state'], dataclasses.asdict(lf.CASH))
+        self.assertFalse(section['tape_pin_required'])
+        self.assertEqual(section['promotion_gate']['min_control_coverage'], 0.9)
+        seats = lock['tape_seat_policy']
+        self.assertEqual((seats['version'], seats['previous_version']),
+                         (tape_pool_scheduler.POLICY_VERSION, tape_pool_scheduler.PREVIOUS_POLICY_VERSION))
+        self.assertFalse(seats['flow_free_lab_positions_pinned'])
+        self.assertEqual(lock['tape_decoder']['seat_shedding_policy_version'], tape_pool_scheduler.POLICY_VERSION)
 
 
 # ------------------------------------------------------------------ LAB_A signal
@@ -518,6 +555,38 @@ class CostTests(unittest.TestCase):
                                gross * (1 - plain['dex_fee_bps'] / 1e4) - plain['network_fee_usd'], places=9)
         self.assertLess(out['net_proceeds_usd'], plain['net_proceeds_usd'])
 
+    def test_drain_aware_exit_is_the_shared_model_until_the_sale_is_large(self):
+        """LAB_FORWARD_CLOSE_POLICY_V1: x / (1 + x) above the 20% cap; liquidity 0 is worth 0."""
+        coin = pool(full('Mint'), full('Pair'), 0.01, 300_000.0, 1, marketCap=10_000_000.0, priceNative=0.01 / 120)
+        qty = lab.entry_execution(coin, 200.0)['quantity']
+        capped = lab.calibrated_exit_execution(coin, qty, 27.5)
+        self.assertEqual(lab.calibrated_exit_execution(coin, qty, 27.5, drain_aware=True)['net_proceeds_usd'],
+                         capped['net_proceeds_usd'], 'a $200 sale into $300k is the unchanged shared model')
+        for liquidity in (1_600.0, 1_000.0, 400.0, 50.0):
+            with self.subTest(liquidity=liquidity):
+                thin = dict(coin, liquidityUsd=liquidity)
+                shared = lab.exit_execution(thin, qty)
+                drained = lab.calibrated_exit_execution(thin, qty, 0.0, drain_aware=True)
+                x = 2 * shared['market_value_usd'] / liquidity
+                self.assertAlmostEqual(drained['impact_pct'], max(shared['impact_pct'], 100 * x / (1 + x)), places=9)
+                self.assertLessEqual(drained['net_proceeds_usd'], shared['net_proceeds_usd'])
+        # x = 0.25 (a sale of 12.5% of liquidity) is the last point where both agree.
+        edge = dict(coin, liquidityUsd=2 * lab.exit_execution(coin, qty)['market_value_usd'] / 0.25)
+        self.assertAlmostEqual(lab.calibrated_exit_execution(edge, qty, 0.0, drain_aware=True)['impact_pct'],
+                               lab.exit_execution(edge, qty)['impact_pct'], places=9)
+        drained = lab.calibrated_exit_execution(dict(coin, liquidityUsd=0.0), qty, 27.5, drain_aware=True)
+        self.assertEqual((drained['impact_pct'], drained['net_proceeds_usd']), (100.0, 0.0))
+        self.assertAlmostEqual(lab.exit_execution(dict(coin, liquidityUsd=0.0), qty)['impact_pct'], 20.0,
+                               msg='the shared model alone books a drained pool at about -21%')
+        # The DexScreener pair object's own liquidity dict wins; a dict without usd is unknown.
+        self.assertEqual(lf.reported_liquidity_usd({'liquidityUsd': 0.0, 'liquidity': {'usd': 5_000}}), 5_000)
+        self.assertIsNone(lf.reported_liquidity_usd({'liquidityUsd': 0.0, 'liquidity': {}}))
+        self.assertEqual(lf.reported_liquidity_usd({'liquidityUsd': 0.0}), 0.0)
+        unknown = dict(coin, liquidity={})
+        unknown.pop('liquidityUsd')
+        self.assertEqual(lab.calibrated_exit_execution(unknown, qty, 0.0, drain_aware=True)['impact_pct'],
+                         lab.exit_execution(unknown, qty)['impact_pct'])
+
 
 # ------------------------------------------------------------------ kill rule and promotion gate
 
@@ -626,8 +695,9 @@ class KillRuleTests(unittest.TestCase):
         gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
         criteria = gate['criteria']
         for name in ('closed_trades', 'pairs', 'days', 'utc_hours_covered', 'mean_net50_usd', 'ci95_low_net50_usd',
-                     'beats_same_period_control_usd', 'top_pair_share', 'mean_without_best_pair_usd',
-                     'best_day_share_of_pnl', 'entries_on_rug_flagged_pools', 'vanished_or_unpriced_share'):
+                     'control_coverage', 'beats_same_period_control_usd', 'top_pair_share',
+                     'mean_without_best_pair_usd', 'best_day_share_of_pnl', 'entries_on_rug_flagged_pools',
+                     'vanished_or_unpriced_share'):
             with self.subTest(criterion=name):
                 self.assertTrue(criteria[name]['pass'], criteria[name])
         self.assertTrue(gate['all_evaluable_pass'])
@@ -641,6 +711,109 @@ class KillRuleTests(unittest.TestCase):
         weak = self.books(LAB_A_SURGE_EST_GUARD=rows[:40], RND_LAB_A=control)
         self.review(weak)
         self.assertFalse(weak[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']['all_evaluable_pass'])
+
+    def test_cash_exhausted_book_is_marked_not_active(self):
+        """$500 at a fixed $200: about $300 of loss headroom, often < 50 closes (LAB_FORWARD_CASH_STATE_V1)."""
+        books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 40))
+        books[lf.RND_A_ID]['balance'] = 160.0
+        report = self.review(books)
+        marker = books[lf.RND_A_ID]['strategy_lifecycle']
+        self.assertEqual((marker['version'], marker['status'], marker['reason'], marker['entry_enabled']),
+                         (lf.KILL_RULE_VERSION, 'cash_exhausted', 'balance_below_fixed_notional', False))
+        self.assertFalse(marker['kill_rule_evaluable'])
+        self.assertEqual(marker['evidence']['closed_trades'], 40)
+        self.assertEqual(marker['cash_state_version'], lf.CASH_STATE_VERSION)
+        newest = max(row['closed_at'] for row in books[lf.RND_A_ID]['history'])
+        self.assertEqual((marker['cash']['exhausted'], marker['cash']['exhausted_at'], marker['cash']['balance_usd']),
+                         (True, newest, 160.0))
+        self.assertEqual(marker['cash']['min_entry_balance_usd'], 200.1)
+        self.assertIn(lf.RND_A_ID, report['lab_forward_cash_exhausted_ids'])
+        self.assertNotIn(lf.RND_A_ID, report['active_registered_strategy_ids'])
+        self.assertNotIn(lf.RND_A_ID, report['retired_strategy_ids'])
+        # Never touches the ledger; an open position can still refund the book, so it is active.
+        books[lf.RND_A_ID]['position'] = {'trade_no': 41, 'strategy_id': lf.RND_A_ID, 'opened_at': newest + 1}
+        self.review(books)
+        self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'active')
+        self.assertEqual(books[lf.RND_A_ID]['balance'], 160.0)
+        books[lf.RND_A_ID].update(position=None, balance=200.1)
+        self.review(books)
+        self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'active')
+        # When the kill rule is met it takes precedence (and persists).
+        books = self.books(RND_LAB_A=closes(lf.RND_A_ID, [-8.0] * 55))
+        books[lf.RND_A_ID]['balance'] = 60.0
+        self.review(books)
+        self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'retired')
+        self.assertTrue(books[lf.RND_A_ID]['strategy_lifecycle']['cash']['exhausted'])
+
+    def test_gate_compares_only_the_period_in_which_the_control_could_enter(self):
+        start = 1_800_000_000_000
+        rows = closes(lf.LAB_A_ID, [6.0, 4.0, 5.0, -2.0] * 40, pairs=30)
+        for index, row in enumerate(sorted(rows, key=lambda r: r['trade_no'])):
+            row['opened_at'] = start + index * 40 * MINUTE          # 160 closes over 4.4 days
+            row['closed_at'] = row['opened_at'] + 10 * MINUTE
+        control = closes(lf.RND_A_ID, [-6.0, -9.0, 1.0, -2.0] * 10, pairs=30)
+        for index, row in enumerate(sorted(control, key=lambda r: r['trade_no'])):
+            row['opened_at'] = start + index * 30 * MINUTE          # 40 closes in the first 20 h
+            row['closed_at'] = row['opened_at'] + 10 * MINUTE
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
+        books[lf.RND_A_ID]['balance'] = 160.0                       # then out of cash
+        self.review(books)
+        self.assertEqual(books[lf.RND_A_ID]['strategy_lifecycle']['status'], 'cash_exhausted')
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        window = gate['control_window']
+        control_end = start + 39 * 30 * MINUTE + 10 * MINUTE
+        self.assertEqual((window['control_entry_end_reason'], window['control_entry_end_at'], window['end']),
+                         ('cash_exhausted', control_end, control_end))
+        self.assertEqual(window['control_status'], 'cash_exhausted')
+        coverage = gate['criteria']['control_coverage']
+        self.assertFalse(coverage['pass'])
+        self.assertLess(coverage['value'], 0.25)
+        self.assertEqual(gate['book_closed_trades_same_period'],
+                         sum(1 for row in rows if row['opened_at'] <= control_end))
+        self.assertEqual(gate['control_closed_trades_same_period'], 40)
+        self.assertFalse(gate['all_evaluable_pass'])
+        # A control retired by its own kill rule ends the window at its retirement.
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows, RND_LAB_A=control)
+        books[lf.RND_A_ID]['strategy_lifecycle'] = {'version': lf.KILL_RULE_VERSION, 'status': 'retired',
+                                                     'entry_enabled': False, 'retired_at': start + 2 * DAY,
+                                                     'evidence': {}}
+        self.review(books)
+        window = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']['control_window']
+        self.assertEqual((window['control_entry_end_reason'], window['end']), ('retired', start + 2 * DAY))
+        self.assertAlmostEqual(window['time_share'], 2 * DAY / (159 * 40 * MINUTE + 10 * MINUTE), places=5)
+        # No control book at all: not evaluable as a pass.
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows)
+        del books[lf.RND_A_ID]
+        with patch.object(lab, 'now_ms', return_value=self.NOW):
+            lf.apply_kill_rules(books, {}, registered_ids=set(lf.BOOK_IDS), now=self.NOW)
+        gate = books[lf.LAB_A_ID]['strategy_lifecycle']['promotion_gate']
+        self.assertEqual(gate['control_window']['control_entry_end_reason'], 'control_book_missing')
+        self.assertFalse(gate['criteria']['control_coverage']['pass'])
+        self.assertFalse(gate['criteria']['beats_same_period_control_usd']['pass'])
+
+    def test_vanished_and_drained_closes_count_against_the_gate(self):
+        rows = closes(lf.LAB_A_ID, [6.0, 4.0, 5.0, -2.0] * 40, pairs=30)
+        for row in rows[:10]:
+            row['close_kind'] = 'vanished'
+        for row in rows[10:16]:
+            row['close_kind'] = 'drained'
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows)
+        self.review(books)
+        marker = books[lf.LAB_A_ID]['strategy_lifecycle']
+        self.assertEqual((marker['evidence']['vanished_closes'], marker['evidence']['drained_closes']), (10, 6))
+        share = marker['promotion_gate']['criteria']['vanished_or_unpriced_share']
+        self.assertAlmostEqual(share['value'], 16 / 160, places=6)
+        self.assertFalse(share['pass'])
+        # An open position past its max hold without a mark is a pending vanished close.
+        rows = closes(lf.LAB_A_ID, [6.0] * 9)
+        books = self.books(LAB_A_SURGE_EST_GUARD=rows)
+        books[lf.LAB_A_ID]['position'] = {'trade_no': 10, 'strategy_id': lf.LAB_A_ID,
+                                          'lab_forward_version': lf.VERSION, 'quote_status': 'stale',
+                                          'opened_at': self.NOW - 65 * MINUTE}
+        self.review(books)
+        marker = books[lf.LAB_A_ID]['strategy_lifecycle']
+        self.assertTrue(marker['evidence']['open_unpriced_past_max_hold'])
+        self.assertAlmostEqual(marker['promotion_gate']['criteria']['vanished_or_unpriced_share']['value'], 0.1)
 
 
 # ------------------------------------------------------------------ Strategy Lab integration
@@ -665,8 +838,10 @@ class LabIntegrationTests(unittest.TestCase):
             coin = prices.get((position.get('address'), position.get('pairAddress')))
             return dict(coin, mark_received_at=coin['updatedAt'], mark_source='SHARED_LIVE_FEED_EXACT_POOL') if coin else None
 
+        self.unpriced = {}
         for p in (patch.object(lab, 'STATE', {'started_at': 42, 'books': self.books}),
                   patch.object(lab, 'FORWARD_MEMORY', self.memory),
+                  patch.object(lab, 'FORWARD_UNPRICED_SINCE', self.unpriced),
                   patch.object(lab, 'now_ms', side_effect=lambda: self.clock[0]),
                   patch.object(lab.price_integrity, 'check', side_effect=price),
                   patch.object(lab.rug_guard, 'check', side_effect=rugcheck),
@@ -787,6 +962,173 @@ class LabIntegrationTests(unittest.TestCase):
         lab.update_positions({}, [mark])
         self.assertEqual(book['history'][0]['exit_reason'], 'ABSOLUTE_MAX_HOLD_60')
 
+    def open_control(self, book_id):
+        """A random-control entry through maybe_open, at a fixture observation where its coin fires."""
+        params = lf.RANDOM[book_id]
+        draw = next(d for d in FIXTURES['random_draws'] if d['salt'] == params.salt and d['firing_t'])
+        stamp = draw['firing_t'][0]
+        coin = pool(full('RndMint'), draw['pair'], 0.01, 1_000_000.0, stamp, marketCap=30_000_000.0,
+                    priceNative=0.01 / 120, pairCreatedAt=stamp - 40 * DAY, symbol='RNDC', name='control fixture',
+                    priceChange={'m5': 0.5, 'h1': 1.0, 'h24': 2.0},
+                    txns={'m5': {'buys': 20, 'sells': 18}, 'h1': {'buys': 200, 'sells': 190}})
+        self.assertTrue(lf.hashed_coin(draw['pair'], stamp, params.probability, params.salt))
+        self.use_layer(stamp)
+        self.refresh(coin, book_ids=(book_id,))
+        return coin
+
+    def assert_control_position(self, book_id, coin):
+        book = self.books[book_id]
+        position = book['position']
+        self.assertIsNotNone(position, book['entry_diagnostics'])
+        self.assertEqual(position['strategy_id'], book_id)
+        self.assertEqual(position['entry_policy_version'], lf.VERSION)
+        self.assertEqual(position['lab_config_hash'], PINNED_CONFIG_HASHES[book_id])
+        self.assertEqual(position['lab_forward']['role'], 'random_control')
+        self.assertEqual(position['lab_forward']['hypothesis'], lf.HYPOTHESIS_OF[book_id])
+        self.assertEqual(position['lab_forward']['config_hash'], PINNED_CONFIG_HASHES[book_id])
+        self.assertEqual(position['lab_forward']['observed_at'], coin['updatedAt'])
+        params = lf.RANDOM[book_id]
+        self.assertEqual(position['lab_forward']['signal'], {'kind': 'random', 'probability': params.probability,
+                                                             'salt': params.salt, 'drawn': True})
+        self.assertEqual(position['notional_usd'], 200.0)
+        self.assertEqual(position['stop_loss_net_pct'], lf.EXITS[book_id].stop_loss_net_pct)
+        self.assertEqual(position['exit_policy_label'], lf.EXITS[book_id].label)
+        # 30 bps tier on $1M: CALIB_V1 22 bps + 5.525 bps engine fixed costs per leg.
+        self.assertAlmostEqual(position['calib_bps_per_leg'], 27.525, places=6)
+        self.assertGreater(position['model_quantity'], position['quantity'])
+        self.assertAlmostEqual(position['model_quantity'], lab.entry_execution(coin, 200.0)['quantity'], places=6)
+        self.assertIn('heat_history_warming', position['heat_log_only_flags'])
+        self.assertEqual(position['heat_veto_mode'], 'log_only')
+        self.assertEqual(position['close_policy_version'], lf.CLOSE_POLICY_VERSION)
+        self.assertEqual(position['last_mark']['priceUsd'], coin['priceUsd'])
+        self.assertFalse(position['promotion_eligible'])
+        self.assertEqual(book['entry_diagnostics']['lab_forward']['signals'], 1)
+        return position
+
+    def test_random_control_a_opens_through_the_lab_entry_path_and_closes_with_net50(self):
+        coin = self.open_control(lf.RND_A_ID)
+        position = self.assert_control_position(lf.RND_A_ID, coin)
+        self.assertEqual(position['entry_cost_cap_pct'], 2.5)
+        mark = dict(coin, priceUsd=coin['priceUsd'] * 0.94, priceNative=coin['priceNative'] * 0.94,
+                    updatedAt=coin['updatedAt'] + 90_000)
+        self.clock[0] = mark['updatedAt'] + 200
+        lab.update_positions({}, [mark])
+        book = self.books[lf.RND_A_ID]
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'STOP_LOSS_5_NET')
+        self.assertEqual((trade['lab_forward_version'], trade['lab_config_hash']),
+                         (lf.VERSION, PINNED_CONFIG_HASHES[lf.RND_A_ID]))
+        self.assertEqual((trade['close_kind'], trade['drain_valuation_cost_usd']), ('marked', 0.0))
+        self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, 'STOP_LOSS_5_NET')['net50_usd'],
+                               places=6)
+        self.assertEqual(trade['lab_forward']['role'], 'random_control')
+        self.assertAlmostEqual(book['balance'], 500.0 + trade['pnl_usd'], places=3)
+
+    def test_random_control_b_opens_through_the_lab_entry_path_and_closes_with_net50(self):
+        coin = self.open_control(lf.RND_B_ID)
+        position = self.assert_control_position(lf.RND_B_ID, coin)
+        self.assertEqual(position['entry_cost_cap_pct'], 2.75)
+        mark = dict(coin, priceUsd=coin['priceUsd'] * 1.25, priceNative=coin['priceNative'] * 1.25,
+                    updatedAt=coin['updatedAt'] + 120_000)
+        self.clock[0] = mark['updatedAt'] + 200
+        lab.update_positions({}, [mark])
+        trade = self.books[lf.RND_B_ID]['history'][0]
+        self.assertEqual(trade['exit_reason'], 'TAKE_PROFIT_20_NET')
+        self.assertEqual(trade['net50_exit_extra_bps'], 0.0)
+        self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, 'TAKE_PROFIT_20_NET')['net50_usd'],
+                               places=6)
+        self.assertEqual(trade['lab_config_hash'], PINNED_CONFIG_HASHES[lf.RND_B_ID])
+
+    def test_a_drained_pool_is_booked_at_zero_not_at_the_capped_impact(self):
+        """LP pull: liquidity 0 at an unchanged price. The shared capped model alone would book about -21%."""
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        mark = dict(points[1], liquidityUsd=0.0, updatedAt=points[1]['updatedAt'] + 60_000)
+        self.clock[0] = mark['updatedAt'] + 500
+        lab.update_positions({}, [mark])
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'STOP_LOSS_5_NET', 'the model trigger is unchanged')
+        self.assertEqual((trade['close_kind'], trade['exit_liquidity_usd']), ('drained', 0.0))
+        self.assertAlmostEqual(trade['pnl_pct'], -100.0, delta=0.05)
+        self.assertLess(trade['model_pnl_pct'], -20.0)
+        self.assertGreater(trade['model_pnl_pct'], -23.0)
+        self.assertGreater(trade['drain_valuation_cost_usd'], 150.0)
+        self.assertGreater(trade['calibration_cost_usd'], 0.0)
+        self.assertLess(trade['calibration_cost_usd'], 2.0)
+        self.assertAlmostEqual(trade['model_pnl_usd'] - trade['pnl_usd'],
+                               trade['calibration_cost_usd'] + trade['drain_valuation_cost_usd'], places=3)
+        self.assertAlmostEqual(trade['net50_pct'], -100.0, delta=0.05)
+        self.assertEqual(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['drained_closes'], 1)
+
+    def test_a_pool_without_marks_closes_as_vanished_after_max_hold_plus_grace(self):
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        position = book['position']
+        opened, last_price = position['opened_at'], position['last_mark']['priceUsd']
+        alive = pool(full('OtherMint'), full('OtherPair'), 1.0, 100_000.0, 0)
+        unpriced = self.unpriced
+
+        def poll(minutes, *, feed_alive=True):
+            self.clock[0] = int(opened + minutes * MINUTE)
+            lab.update_positions({}, [dict(alive, updatedAt=self.clock[0] - 1_000)] if feed_alive else [])
+
+        poll(30)
+        self.assertIsNotNone(book['position'])
+        self.assertEqual(book['position']['quote_status'], 'stale')
+        poll(69.9)
+        self.assertIsNotNone(book['position'], 'never before max hold + 10 min')
+        self.assertTrue(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['open_unpriced_past_max_hold'])
+        poll(75, feed_alive=False)
+        self.assertIsNotNone(book['position'], 'a dead shared feed is an outage, not a vanished pool')
+        unpriced.clear()                                     # a Lab restart forgets the no-mark clock
+        poll(76)
+        poll(76.9)
+        self.assertIsNotNone(book['position'], 'after a restart the exact-pair refresh is retried for 60 s first')
+        poll(77.05)
+        self.assertIsNone(book['position'])
+        trade = book['history'][0]
+        self.assertEqual(trade['exit_reason'], 'VANISHED_NO_FRESH_MARK')
+        self.assertEqual((trade['close_kind'], trade['quote_status'], trade['vanish_haircut_pct']),
+                         ('vanished', 'vanished', 10.0))
+        self.assertAlmostEqual(trade['exit_price'], last_price * 0.9, places=12)
+        self.assertEqual(trade['last_mark_at'], opened)
+        self.assertLess(trade['pnl_pct'], -10.0)
+        self.assertGreater(trade['pnl_pct'], -11.5)
+        self.assertEqual(trade['net50_exit_extra_bps'], 0.0)
+        self.assertAlmostEqual(trade['net50_usd'], lf.net50(trade['pnl_usd'], 200.0, trade['exit_reason'])['net50_usd'],
+                               places=6)
+        self.assertEqual(unpriced, {})
+        self.assertEqual(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['vanished_closes'], 1)
+
+    def test_a_book_that_cannot_fund_its_fixed_entry_reports_cash_exhausted(self):
+        crossing = next(c for c in FIXTURES['lab_a_crossings'] if c['name'].startswith('neet'))
+        points = [feed_coin(point) for point in crossing['points']]
+        self.use_layer(points[0]['updatedAt'])
+        book = self.books[lf.LAB_A_ID]
+        book['balance'] = 200.05
+        self.refresh(points[0])
+        self.refresh(points[1])
+        self.assertIsNone(book['position'])
+        diagnostics = book['entry_diagnostics']
+        self.assertEqual(diagnostics['blocked_reason'], 'lab_forward_cash_exhausted')
+        self.assertEqual(diagnostics['min_entry_balance_usd'], 200.1)
+        self.assertEqual(book['strategy_lifecycle']['status'], 'cash_exhausted')
+        self.assertEqual(book['balance'], 200.05)
+
+    def test_a_changed_lab_cost_model_fails_forward_entries_closed(self):
+        crossing = next(c for c in FIXTURES['lab_a_crossings'] if c['name'].startswith('neet'))
+        points = [feed_coin(point) for point in crossing['points']]
+        self.use_layer(points[0]['updatedAt'])
+        with patch.object(lab, 'BASE_SLIPPAGE_BPS', 12.0):
+            self.refresh(points[0])
+            self.refresh(points[1])
+        book = self.books[lf.LAB_A_ID]
+        self.assertIsNone(book['position'])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'], 'lab_forward_cost_model_mismatch')
+        self.assertEqual(book['entry_diagnostics']['cost_model_mismatched_fields'], ['base_slippage_bps'])
+
     def test_cost_cap_refuses_an_expensive_research_dip_and_never_shrinks_the_size(self):
         dip, coins = regime_inputs()
         decision = feed_coin(dip['decision'])
@@ -895,9 +1237,65 @@ class LabIntegrationTests(unittest.TestCase):
         self.assertEqual(published['entry_diagnostics']['lab_forward']['config_hash'], PINNED_CONFIG_HASHES[lf.LAB_A_ID])
         self.assertIn('promotion_gate', published['strategy_lifecycle'])
         projected = lab_dashboard_projection.compact_strategy_lab({'books': {'X': {
-            'history': [{'net50_usd': -3.2, 'net50_pct': -1.6, 'lab_config_hash': 'h', 'model_pnl_usd': -1.0}]}}})
+            'history': [{'net50_usd': -3.2, 'net50_pct': -1.6, 'lab_config_hash': 'h', 'model_pnl_usd': -1.0,
+                         'close_kind': 'drained', 'drain_valuation_cost_usd': 150.0}]}}})
         self.assertEqual(projected['books']['X']['history'][0]['net50_usd'], -3.2)
         self.assertEqual(projected['books']['X']['history'][0]['lab_config_hash'], 'h')
+        self.assertEqual(projected['books']['X']['history'][0]['close_kind'], 'drained')
+        self.assertEqual(projected['books']['X']['history'][0]['drain_valuation_cost_usd'], 150.0)
+        config = lab.STATE['activity_config']['lab_forward_tests']
+        self.assertEqual(config['close_policy']['version'], lf.CLOSE_POLICY_VERSION)
+        self.assertEqual(config['cash_state']['version'], lf.CASH_STATE_VERSION)
+        self.assertFalse(config['tape_pin_required'])
+
+
+# ------------------------------------------------------------------ tape seats
+
+class TapeSeatTests(unittest.TestCase):
+    """tape_pool_scheduler V6: forward-test positions never read flow, so they take no tape seat."""
+    NOW = 1_800_000_000_000
+
+    def lab_state(self, *, forward=True, other=True):
+        books = {}
+        if forward:
+            for index, book_id in enumerate(lf.BOOK_IDS):
+                books[book_id] = {'id': book_id, 'position': {
+                    'strategy_id': book_id, 'lab_forward_version': lf.VERSION,
+                    'lab_config_hash': lf.CONFIG_HASHES[book_id], 'address': full(f'Fw{index}M'),
+                    'pairAddress': full(f'Fw{index}P'), 'dexId': 'pumpswap', 'quoteTokenAddress': SOL,
+                    'symbol': f'FW{index}', 'opened_at': self.NOW - MINUTE}}
+        if other:
+            books['TREND'] = {'id': 'TREND', 'position': {
+                'strategy_id': 'TREND', 'address': full('TrndM'), 'pairAddress': full('TrndP'),
+                'dexId': 'pumpswap', 'quoteTokenAddress': SOL, 'symbol': 'TRND', 'opened_at': self.NOW - MINUTE}}
+        # The tape reads main's /state, which carries the compact Lab projection.
+        return {'feed': [], 'strategy_lab': lab_dashboard_projection.compact_strategy_lab({'books': books})}
+
+    def test_forward_positions_leave_entry_capacity_unchanged(self):
+        scheduler = tape_pool_scheduler.TapePoolScheduler
+        _, baseline = scheduler().select(self.lab_state(forward=False), now=self.NOW, max_tracked=4)
+        selected, report = scheduler().select(self.lab_state(), now=self.NOW, max_tracked=4)
+        self.assertEqual((baseline['pinned_exit_pools'], baseline['entry_capacity']), (1, 3))
+        self.assertEqual((report['pinned_exit_pools'], report['entry_capacity']), (1, 3))
+        self.assertEqual([coin['pairAddress'] for coin in selected], [full('TrndP')])
+        self.assertEqual(report['unpinned_flow_free_lab_positions'], 4)
+        self.assertEqual(report['lab_pin_rule'], tape_pool_scheduler.LAB_PIN_RULE)
+        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        # A pool main also holds keeps its pin (main's exit reads flow).
+        state = self.lab_state(other=False)
+        held = state['strategy_lab']['books'][lf.LAB_A_ID]['position']
+        state['positions'] = [{'address': held['address'], 'pairAddress': held['pairAddress'], 'dexId': 'pumpswap'}]
+        _, shared = scheduler().select(state, now=self.NOW, max_tracked=4)
+        self.assertEqual((shared['pinned_exit_pools'], shared['entry_capacity']), (1, 3))
+        # Any other Lab position (including one stamped with another forward version) is pinned as before.
+        state = self.lab_state(other=False)
+        state['strategy_lab']['books'][lf.RND_B_ID]['position']['lab_forward_version'] = 'LAB_FORWARD_TESTS_V0'
+        _, stamped = scheduler().select(state, now=self.NOW, max_tracked=4)
+        self.assertEqual((stamped['pinned_exit_pools'], stamped['entry_capacity']), (1, 3))
+        self.assertFalse(lf.tape_pin_required({'strategy_id': lf.LAB_A_ID, 'lab_forward_version': lf.VERSION}))
+        self.assertTrue(lf.tape_pin_required({'strategy_id': 'TREND'}))
+        self.assertTrue(lf.tape_pin_required({'strategy_id': 'TREND', 'lab_forward_version': lf.VERSION}))
 
 
 if __name__ == '__main__':

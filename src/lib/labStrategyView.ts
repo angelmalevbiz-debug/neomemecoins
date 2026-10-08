@@ -3,6 +3,8 @@ export type LabForwardGate = {
   automatic_promotion?: boolean;
   not_evaluated?: string[];
   criteria?: Record<string, { value?: number | null; threshold?: string; pass?: boolean | null }>;
+  // The 'same period' of the control comparison: until the control could no longer enter.
+  control_window?: { control_entry_end_reason?: string | null; trade_share?: number | null; time_share?: number | null };
 };
 
 export type StrategyLifecycle = {
@@ -16,7 +18,11 @@ export type StrategyLifecycle = {
     // LAB_FORWARD_KILL_RULE_V1 evidence (net50 basis, frozen config only).
     min_closes?: number; mean_net50_usd?: number | null; ci95_mean_net50_usd?: (number | null)[];
     ci_method?: string | null; kill_rule_met?: boolean; pairs?: number;
+    vanished_closes?: number; drained_closes?: number;
   };
+  // LAB_FORWARD_CASH_STATE_V1: status 'cash_exhausted' when the fixed $200 entry cannot be funded.
+  cash?: { exhausted?: boolean; balance_usd?: number | null; min_entry_balance_usd?: number };
+  kill_rule_evaluable?: boolean;
   promotion_gate?: LabForwardGate;
 };
 
@@ -36,6 +42,17 @@ export function labForwardNote(id: string) {
   return forwardNotes[id] ?? null;
 }
 
+// LAB_FORWARD_CASH_STATE_V1: the book cannot fund its fixed entry and holds nothing.
+export const isForwardCashExhausted = (book: { id: string; strategy_lifecycle?: StrategyLifecycle }) =>
+  isForwardTestBook(book) && book.strategy_lifecycle?.status === 'cash_exhausted';
+
+// LAB_FORWARD_CLOSE_POLICY_V1 close kinds.
+export function forwardCloseNote(kind?: string) {
+  if (kind === 'vanished') return 'изчезнал pool: оценен на последната цена −10%';
+  if (kind === 'drained') return 'източен pool (ликвидност 0): оценен на 0';
+  return null;
+}
+
 const usd = (value: number) => `${value < 0 ? '−' : ''}$${Math.abs(value).toFixed(2)}`;
 
 export function labForwardSummary(book: { id: string; strategy_lifecycle?: StrategyLifecycle }) {
@@ -50,10 +67,20 @@ export function labForwardSummary(book: { id: string; strategy_lifecycle?: Strat
   if (typeof mean === 'number' && Number.isFinite(mean)) parts.push(`средно net50 ${usd(mean)}/сделка`);
   if (typeof low === 'number' && typeof high === 'number') parts.push(`CI95 [${usd(low)}, ${usd(high)}]`);
   if (lifecycle?.status === 'retired') parts.push('спряна: средно net50 < 0 и горна граница на CI95 < 0');
+  if (lifecycle?.status === 'cash_exhausted') {
+    const balance = lifecycle.cash?.balance_usd;
+    parts.push(`без капитал${typeof balance === 'number' ? ` (${usd(balance)})` : ''}: фиксираният вход $200 не може да се финансира${lifecycle.kill_rule_evaluable ? '' : ', правилото за спиране не може да се оцени'}`);
+  }
+  const unpriced = (evidence?.vanished_closes ?? 0) + (evidence?.drained_closes ?? 0);
+  if (unpriced > 0) parts.push(`изчезнали/източени pool-ове ${unpriced}`);
   const gate = lifecycle?.promotion_gate;
+  const coverage = gate?.criteria?.control_coverage;
+  if (gate && coverage?.pass === false && typeof coverage.value === 'number') {
+    parts.push(`контролата е можела да влиза само в ${(coverage.value * 100).toFixed(0)}% от периода (${gate.control_window?.control_entry_end_reason ?? 'няма контрола'})`);
+  }
   if (gate) parts.push(gate.all_evaluable_pass
     ? 'гейтът за промоция е изпълнен: само за преглед от собственика, без автоматична промоция'
-    : 'гейтът за промоция не е изпълнен (≥ 150 сделки, ≥ 25 pool-а, ≥ 3 дни, CI95 > 0, по-добра от контролата)');
+    : 'гейтът за промоция не е изпълнен (≥ 150 сделки, ≥ 25 pool-а, ≥ 3 дни, CI95 > 0, по-добра от контролата в същия период)');
   return parts.join(' · ');
 }
 
@@ -131,6 +158,9 @@ const reasons: Record<string, string> = {
   defensive_entry_error: 'Грешка в защитната проверка: входът е блокиран',
   // LAB_FORWARD_TESTS_V1: the pre-registered kill rule stopped new entries of this forward-test book.
   lab_forward_kill_rule_retired: 'Спряна по предварително регистрираното правило (≥ 50 сделки, net50 < 0, CI95 < 0)',
+  // LAB_FORWARD_CASH_STATE_V1 / frozen cost model of the forward-test books.
+  lab_forward_cash_exhausted: 'Без капитал: балансът не покрива фиксирания вход от $200',
+  lab_forward_cost_model_mismatch: 'Моделът на разходите се различава от замразения: входовете са спрени',
 };
 
 export type CostFeasibility = {

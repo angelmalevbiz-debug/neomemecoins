@@ -247,6 +247,24 @@ cap; personal-only pools beyond the cap lose exact-pool coverage; each
 personal `/state` read transfers that engine's full snapshot (bounded by the
 refresh period).
 
+## No pins for flow-free Lab books (policy `STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS`)
+
+V5 (`DEFENSIVE_ENTRY_LAYER_V1`, see DEFENSIVE_ENTRY_LAYER.md) added the
+structural and heat screens at seats. V6 keeps every V3–V5 rule and changes one
+thing: a Lab position whose book never reads tape flow takes no exit pin.
+
+Today these are the four `LAB_FORWARD_TESTS_V1` books (`lab_forward_tests.tape_pin_required`,
+recognized by `strategy_id` and `lab_forward_version` in the compact Lab
+projection). They have no flow gate at entry and no flow exit, and their marks come
+from the shared feed or the DexScreener exact-pair refresh. Pinning them only removed
+entry seats (`entry_capacity = max_tracked - pins`, and pins are never capped). With
+`NEO_TAPE_MAX_PAIRS=4` and random controls that are in the market most of the time,
+they could have held every seat.
+
+A pool that main or a personal engine also holds is still pinned by that holder, and
+every other Lab book is pinned as before. `entry_scheduling` publishes
+`unpinned_flow_free_lab_positions` and `lab_pin_rule`.
+
 ## How it will be evaluated (24 h shadow comparison, before any validation)
 
 1. Count shadow events per pool and per hour from the journal's

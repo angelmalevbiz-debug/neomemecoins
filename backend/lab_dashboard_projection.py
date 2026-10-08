@@ -42,7 +42,8 @@ def compact_strategy_lab(data):
                               # LAB_FORWARD_TESTS_V1: frozen config identity, log-only heat flags,
                               # the uncalibrated model mark and the CALIB_V1 extra per leg.
                               'lab_forward_version', 'lab_config_hash', 'heat_log_only_flags',
-                              'model_pnl_pct', 'calib_bps_per_leg', 'booked_entry_roundtrip_pnl_pct')
+                              'model_pnl_pct', 'calib_bps_per_leg', 'booked_entry_roundtrip_pnl_pct',
+                              'close_policy_version')
             }
         else:
             position = None
@@ -67,7 +68,10 @@ def compact_strategy_lab(data):
                               # stress), the model result and the frozen config identity.
                               'net50_usd', 'net50_pct', 'model_pnl_usd', 'model_pnl_pct',
                               'calibration_cost_usd', 'lab_forward_version', 'lab_config_hash',
-                              'heat_log_only_flags')
+                              'heat_log_only_flags',
+                              # LAB_FORWARD_CLOSE_POLICY_V1: marked, drained or vanished.
+                              'close_policy_version', 'close_kind', 'drain_valuation_cost_usd',
+                              'exit_liquidity_usd')
             })
         books[key] = {
             'id': raw.get('id', key),

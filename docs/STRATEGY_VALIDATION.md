@@ -101,28 +101,45 @@ Rules fixed before the run:
 - **Frozen configuration.** Every position and close records `lab_config_hash` (sha256 of
   the book's canonical parameter JSON, pinned in the tests and in `strategy-lock.json`)
   and `LAB_FORWARD_TESTS_V1`. A changed parameter is a new test: its closes never pool
-  with an earlier hash. Nothing is retuned on the forward sample.
+  with an earlier hash. The hash includes the resolved Lab cost model (the `NEO_LAB_*`
+  cost knobs), and the Lab refuses forward entries when its own cost model differs from
+  the hashed one. Nothing is retuned on the forward sample.
 - **Basis.** Booked P&L is the Lab's shared spot model plus CALIB_V1 per leg. Every close
   also records `net50` = booked net − 50 bps per leg − 200 bps more on stop exits − 100 bps
   on trailing exits. The kill rule and the gate below use net50.
+- **Drained and vanished pools (`LAB_FORWARD_CLOSE_POLICY_V1`).** A drained pool is
+  booked with a constant-product exit, so liquidity 0 is worth 0, not the shared model's
+  capped −21%. A pool with no usable mark beyond max hold + 10 min closes at its last mark
+  minus 10%. Both are ordinary closes in the kill-rule and gate samples, counted as
+  `drained_closes` / `vanished_closes`.
 - **Kill rule (`LAB_FORWARD_KILL_RULE_V1`, each of the four books).** After ≥ 50 closes of
   the frozen config, the book is retired when mean net50 < 0 and the upper bound of the
   pair-bootstrap CI95 of mean net50 $/trade is < 0 (2,000 resamples, fixed seed; a
   per-trade normal approximation under 3 pools). Retirement stops new entries only;
   balance, history and open exits are untouched, and it is never undone automatically.
   These books are not subject to the shared 12-close lifecycle heuristic.
+- **Cash state (`LAB_FORWARD_CASH_STATE_V1`).** A $500 book at a fixed $200 entry has
+  about $300 of loss headroom. A book that cannot fund its next entry (balance below
+  $200.10, no open position) is marked `cash_exhausted`, not `active`; its kill rule may
+  never evaluate. At the research's control expectancy (about −$9 to −$12 net50 per
+  trade) this is the expected path for both random controls within about 25–35 closes.
+  Funding the books for the full gate sample is an owner decision and a new config hash.
 - **Promotion gate (never automatic).** `strategy_lifecycle.promotion_gate` reports it
   for LAB_A and LAB_B for the owner's review. A hypothesis is a promotion candidate only
   when **all** of these hold on trades entered after the Lab start:
   - n ≥ 150 closed trades over ≥ 25 pairs and ≥ 3 days covering every UTC hour;
   - mean net50 > 0 and the pair-bootstrap CI95 lower bound of mean $/trade > 0;
-  - it beats the same-period random control by more than the control's CI half-width;
+  - the random control could still enter (not retired, not out of cash) for ≥ 90% of the
+    hypothesis's trades and time window (`control_coverage`);
+  - inside that same period, it beats the random control by more than the control's CI
+    half-width;
   - top pair share ≤ 0.20, it stays positive with the best pair removed, and no single day
     supplies more than 50% of the P&L;
   - a 3-slot $1000 book has a max drawdown ≤ 20% (an offline replay; the Lab books hold
     one position);
   - zero entries on pools flagged by the structural rug guard;
-  - vanished or unpriced closes < 10% of trades.
+  - vanished, drained or unpriced closes (plus an open position past max hold without a
+    mark) < 10% of trades.
 
   Passing makes a book eligible for review only. Promotion to any engine account is a
   separate, reviewed and versioned change; the books stay TEST.

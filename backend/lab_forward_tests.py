@@ -57,6 +57,23 @@ exits are never touched) when mean net50 < 0 and the upper bound of the
 pair-bootstrap 95% CI of mean net50 $/trade (2,000 resamples, fixed seed;
 per-trade normal approximation under 3 pairs) is < 0. Promotion is never
 automatic; the promotion gate is computed for the owner's review only.
+
+Close policy (LAB_FORWARD_CLOSE_POLICY_V1), forward books only: the booked
+exit leg values a drained pool as the research does (constant-product impact
+x / (1 + x), x = 2 x value / liquidity, never below the shared model's capped
+impact; a reported liquidity of 0 is worth 0), and a position whose exact pool
+has given no usable mark beyond max hold plus 10 min closes as VANISHED at
+its last mark minus the research's 10% haircut. Both kinds are counted in the
+kill-rule evidence and the gate's vanished-or-unpriced share.
+
+Cash state (LAB_FORWARD_CASH_STATE_V1): a book whose balance cannot fund the
+fixed $200 entry (plus a network-fee reserve) and holds no position cannot
+trade again; its marker says 'cash_exhausted' instead of 'active', and the
+gate's control comparison is limited to the period in which the control could
+still enter (control_coverage).
+
+The config hash includes the resolved Lab cost-model knobs (NEO_LAB_* env), so
+a changed cost model is a new test whose closes never pool with the old ones.
 """
 from collections import OrderedDict, deque
 from dataclasses import asdict, dataclass
@@ -68,6 +85,7 @@ import threading
 
 import heat_veto
 import lab_activity as activity
+import lab_paired_costs as lab_costs
 import paper_market_feasibility as feasibility
 import pool_loss_memory
 import structural_rug_guard
@@ -78,6 +96,8 @@ KILL_RULE_VERSION = 'LAB_FORWARD_KILL_RULE_V1'
 PROMOTION_GATE_VERSION = 'LAB_FORWARD_PROMOTION_GATE_V1'
 MEMORY_VERSION = 'LAB_FORWARD_FEED_MEMORY_V1'
 REGIME_VERSION = 'LAB_B_MARKET_REGIME_MED15_V1'
+CLOSE_POLICY_VERSION = 'LAB_FORWARD_CLOSE_POLICY_V1'
+CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
 CALIB_VERSION = 'CALIB_V1_2026-10-08'
 NET50_VERSION = 'NET50_CALIB_V1'
 # strategy_lab.EXECUTION_MODEL_VERSION (restated here to avoid a circular import; a test pins equality).
@@ -107,8 +127,16 @@ HEAT_LOG_ONLY_BOOK_IDS = frozenset(BOOK_IDS)
 HEAT_MODE = 'log_only'
 START_BALANCE_USD = 500.0
 NOTIONAL_USD = 200.0
+# The entry's network fee (0.0001 SOL) must be funded on top of the fixed $200;
+# $0.10 covers it up to $1,000/SOL. Below this balance, with no open position,
+# the book can never enter again (LAB_FORWARD_CASH_STATE_V1).
+ENTRY_NETWORK_FEE_RESERVE_USD = 0.10
 PORTFOLIO_GROUP = 'TEST'
 AUTOMATIC_PROMOTION = False
+# These books never read tape flow (no flow gate at entry, no flow exit; marks
+# come from the shared feed or the DexScreener exact-pair refresh), so their
+# positions do not take a tape exit pin (tape_pool_scheduler V6).
+TAPE_PIN_REQUIRED = False
 
 
 # ------------------------------------------------------------------ frozen parameters
@@ -234,6 +262,9 @@ class GateParameters:
     max_top_pair_share: float = 0.20
     max_best_day_share: float = 0.50
     max_vanished_or_unpriced_share: float = 0.10
+    # The control must have been able to enter (not retired, not out of cash) for at
+    # least this share of the hypothesis's evaluated trades and of its time window.
+    min_control_coverage: float = 0.90
 
 
 @dataclass(frozen=True)
@@ -242,6 +273,47 @@ class MemoryParameters:
     max_pairs: int = heat_veto.HISTORY_PARAMS.max_pairs
     max_liquidity_samples_per_pair: int = 720
     regime_cache_minutes: int = 30
+
+
+@dataclass(frozen=True)
+class CostModelParameters:
+    """The Lab spot model's resolved knobs (NEO_LAB_* env; strategy_lab and its frozen copy lab_paired_costs).
+
+    Part of every book's config hash: closes booked under another cost model are
+    another test. strategy_lab refuses forward entries when its own resolved values
+    differ from these (fail closed, 'lab_forward_cost_model_mismatch').
+    """
+    execution_model: str
+    generic_dex_fee_bps: float
+    base_slippage_bps: float
+    latency_buffer_bps: float
+    network_fee_sol: float
+    max_price_impact_pct: float
+
+
+@dataclass(frozen=True)
+class ClosePolicyParameters:
+    """LAB_FORWARD_CLOSE_POLICY_V1: drained and vanished pools, forward books only (research harness_final F3/F6)."""
+    version: str = CLOSE_POLICY_VERSION
+    exit_impact: str = ('booked exit impact = max(shared capped impact, x / (1 + x)), x = 2 x value / reported '
+                        'liquidity; 100% when the reported liquidity is <= 0 (research rug/realistic_exit.py)')
+    exit_impact_applies_to: str = 'booked marks and closes; exit triggers keep the uncalibrated shared model'
+    vanish_grace_minutes: float = 10.0          # research FEED_GAP_MS
+    vanish_haircut_pct: float = 10.0            # research VANISH_HAIRCUT_PCT
+    vanish_confirm_seconds: int = 60            # continuous no-mark time in this Lab process
+    feed_alive_max_age_ms: int = 60_000         # the shared feed must still be priced
+    vanish_reason: str = 'VANISHED_NO_FRESH_MARK'
+
+
+@dataclass(frozen=True)
+class CashParameters:
+    """LAB_FORWARD_CASH_STATE_V1: a book that cannot fund its fixed entry and holds nothing is out of cash."""
+    version: str = CASH_STATE_VERSION
+    notional_usd: float = NOTIONAL_USD
+    network_fee_reserve_usd: float = ENTRY_NETWORK_FEE_RESERVE_USD
+    min_entry_balance_usd: float = NOTIONAL_USD + ENTRY_NETWORK_FEE_RESERVE_USD
+    status: str = 'cash_exhausted'
+    reason: str = 'balance_below_fixed_notional'
 
 
 def _whole(value) -> str:
@@ -262,6 +334,12 @@ NET50 = Net50Parameters()
 KILL_RULE = KillRuleParameters()
 GATE = GateParameters()
 MEMORY_PARAMS = MemoryParameters()
+COST_MODEL = CostModelParameters(
+    execution_model=EXECUTION_MODEL, generic_dex_fee_bps=lab_costs.GENERIC_DEX_FEE_BPS,
+    base_slippage_bps=lab_costs.BASE_SLIPPAGE_BPS, latency_buffer_bps=lab_costs.LATENCY_BUFFER_BPS,
+    network_fee_sol=lab_costs.NETWORK_FEE_SOL, max_price_impact_pct=lab_costs.MAX_PRICE_IMPACT_PCT)
+CLOSE_POLICY = ClosePolicyParameters()
+CASH = CashParameters()
 
 UNIVERSES = {LAB_A_ID: UNIVERSE_A, RND_A_ID: UNIVERSE_A, LAB_B_ID: UNIVERSE_B, RND_B_ID: UNIVERSE_B}
 EXITS = {LAB_A_ID: EXITS_A, RND_A_ID: EXITS_A, LAB_B_ID: EXITS_B, RND_B_ID: EXITS_B}
@@ -276,6 +354,14 @@ SIGNAL_REASONS = ('lab_a_no_surge', 'lab_a_no_previous_observation', 'lab_a_surg
                   'lab_b_no_reference', 'lab_b_no_dip', 'lab_b_liquidity_fell', 'lab_b_change_24h',
                   'lab_b_regime_unavailable', 'lab_b_market_not_dipping', 'rnd_coin_not_drawn')
 RETIRED_REASON = 'lab_forward_kill_rule_retired'
+CASH_EXHAUSTED_REASON = 'lab_forward_cash_exhausted'
+COST_MODEL_MISMATCH_REASON = 'lab_forward_cost_model_mismatch'
+
+
+def cost_model_mismatches(**resolved) -> list:
+    """Names of the Lab's resolved cost-model values that differ from the hashed COST_MODEL."""
+    frozen = asdict(COST_MODEL)
+    return sorted(name for name, value in resolved.items() if name not in frozen or frozen[name] != value)
 
 
 def admission_cost_cap_pct(book_id) -> float:
@@ -305,10 +391,13 @@ def book_parameters(book_id) -> dict:
                      'rug_screen': f'{structural_rug_guard.VERSION} via the defensive entry layer'},
         'signal': signal,
         'exits': asdict(EXITS[book_id]),
+        'close_policy': asdict(CLOSE_POLICY),
         'size': {'notional_usd': NOTIONAL_USD, 'rule': 'FIXED_NOTIONAL_NO_BACKOFF',
-                 'start_balance_usd': START_BALANCE_USD, 'max_open_positions': 1},
+                 'start_balance_usd': START_BALANCE_USD, 'max_open_positions': 1,
+                 'cash_state': asdict(CASH)},
         'admission_cost_cap_pct': admission_cost_cap_pct(book_id),
-        'costs': {'execution_model': EXECUTION_MODEL, 'calibration': asdict(CALIB)},
+        'costs': {'execution_model': EXECUTION_MODEL, 'model': _hashable(asdict(COST_MODEL)),
+                  'calibration': asdict(CALIB)},
         'net50': asdict(NET50),
         'heat_veto': {'version': heat_veto.VERSION, 'mode': HEAT_MODE},
         'structural_rug_guard': structural_rug_guard.VERSION,
@@ -316,6 +405,12 @@ def book_parameters(book_id) -> dict:
         'kill_rule': asdict(KILL_RULE),
         'automatic_promotion': AUTOMATIC_PROMOTION,
     }
+
+
+def _hashable(values) -> dict:
+    """A non-finite env value is hashed by its repr (and then fails the Lab's cost-model check)."""
+    return {key: (repr(value) if isinstance(value, float) and not math.isfinite(value) else value)
+            for key, value in values.items()}
 
 
 def canonical_json(value) -> str:
@@ -337,6 +432,14 @@ def is_forward_book(book_id) -> bool:
 def is_forward_position(position) -> bool:
     return (isinstance(position, dict) and position.get('lab_forward_version') == VERSION
             and position.get('strategy_id') in BOOK_IDS)
+
+
+def tape_pin_required(position) -> bool:
+    """Whether a Lab position needs a tape exit pin: False for these books (they never read flow).
+
+    Reads only fields the compact Lab projection keeps (strategy_id, lab_forward_version).
+    """
+    return TAPE_PIN_REQUIRED if is_forward_position(position) else True
 
 
 # ------------------------------------------------------------------ small helpers
@@ -782,10 +885,179 @@ def position_calib_bps(position) -> float:
     return value if value is not None and value > 0 else 0.0
 
 
-def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defensive_flags) -> dict:
+# ------------------------------------------------------------------ close policy (drained and vanished pools)
+
+def reported_liquidity_usd(coin):
+    """Pool liquidity as the mark reports it: a number (0 = drained) or None when it carries none.
+
+    A DexScreener pair object's own ``liquidity`` dict wins (a dict without ``usd``
+    is unknown); otherwise the feed's normalized ``liquidityUsd``. In the scan
+    feed a PumpSwap liquidity of exactly 0 was always terminal (research F6).
+    """
+    if not isinstance(coin, dict):
+        return None
+    raw = coin.get('liquidity')
+    if isinstance(raw, dict):
+        return _finite(raw.get('usd'))
+    return _finite(coin.get('liquidityUsd'))
+
+
+def drain_aware_impact_pct(value_usd, liquidity, shared_impact_pct) -> float:
+    """Booked exit impact (%): constant-product x / (1 + x) where it exceeds the shared capped impact.
+
+    x = 2 x value / liquidity, as in the shared model; identical to it while
+    x <= 0.25 (a sale of at most 12.5% of the reported liquidity). A reported
+    liquidity <= 0 leaves nothing to sell into (100%); unknown liquidity keeps
+    the shared impact. Research basis: rug/realistic_exit.py and harness F6.
+    """
+    shared = _finite(shared_impact_pct)
+    shared = 0.0 if shared is None else shared
+    liquidity = _finite(liquidity)
+    if liquidity is None:
+        return shared
+    if liquidity <= 0:
+        return 100.0
+    x = 2.0 * max(0.0, _finite(value_usd) or 0.0) / liquidity
+    return max(shared, 100.0 * x / (1.0 + x))
+
+
+def mark_snapshot(coin, observed_at, previous=None) -> dict:
+    """What a later VANISHED valuation needs from the last usable mark of the exact pool."""
+    previous = previous if isinstance(previous, dict) else {}
+    liquidity = reported_liquidity_usd(coin)
+    return {'priceUsd': _finite(coin.get('priceUsd')), 'priceNative': _finite(coin.get('priceNative')),
+            'marketCap': _finite(coin.get('marketCap')), 'fdv': _finite(coin.get('fdv')),
+            'dexId': coin.get('dexId'), 'quoteTokenAddress': feasibility.quote_token_address(coin),
+            'liquidityUsd': liquidity if liquidity is not None else previous.get('liquidityUsd'),
+            'observed_at': _finite(observed_at)}
+
+
+def feed_alive(feed, now, params: ClosePolicyParameters = CLOSE_POLICY) -> bool:
+    """The shared feed still carries a priced observation at most ``feed_alive_max_age_ms`` old."""
+    current = _finite(now)
+    if current is None:
+        return False
+    for coin in feed or ():
+        if not isinstance(coin, dict) or not (_finite(coin.get('priceUsd')) or 0) > 0:
+            continue
+        stamp = _finite(coin.get('updatedAt'))
+        if stamp is not None and -5_000 <= current - stamp <= params.feed_alive_max_age_ms:
+            return True
+    return False
+
+
+def vanish_due(position, now, unpriced_since, alive, params: ClosePolicyParameters = CLOSE_POLICY) -> bool:
+    """A forward position whose exact pool gave no usable mark beyond max hold + grace closes as VANISHED.
+
+    All of: held >= max hold + grace; the last usable mark is >= grace old; this
+    Lab process has looked for a mark without success for >= the confirm window
+    (so a restart first retries the exact-pair refresh); the shared feed is alive.
+    """
+    if not is_forward_position(position) or not alive:
+        return False
+    current, opened = _finite(now), _finite(position.get('opened_at'))
+    last = _finite(position.get('mark_received_at'))
+    last = opened if last is None else last
+    since = _finite(unpriced_since)
+    if current is None or opened is None or last is None or since is None:
+        return False
+    grace_ms = params.vanish_grace_minutes * 60_000
+    return (current - opened >= EXITS[position['strategy_id']].max_hold_minutes * 60_000 + grace_ms
+            and current - last >= grace_ms
+            and current - since >= params.vanish_confirm_seconds * 1000)
+
+
+def vanished_coin(position, params: ClosePolicyParameters = CLOSE_POLICY):
+    """The exact pool at its last usable mark minus the research VANISH haircut (None if unknown)."""
+    snapshot = position.get('last_mark') if isinstance(position, dict) else None
+    if not isinstance(snapshot, dict):
+        return None
+    price, native = _finite(snapshot.get('priceUsd')), _finite(snapshot.get('priceNative'))
+    if price is None or price <= 0 or native is None or native <= 0:
+        return None
+    keep = 1 - params.vanish_haircut_pct / 100
+    coin = {'address': position.get('address'), 'pairAddress': position.get('pairAddress'),
+            'dexId': snapshot.get('dexId'), 'quoteTokenAddress': snapshot.get('quoteTokenAddress'),
+            'priceUsd': price * keep, 'priceNative': native * keep,
+            'marketCap': snapshot.get('marketCap'), 'fdv': snapshot.get('fdv'),
+            'updatedAt': snapshot.get('observed_at'), 'mark_received_at': snapshot.get('observed_at'),
+            'mark_source': 'LAB_FORWARD_VANISHED_LAST_MARK'}
+    if snapshot.get('liquidityUsd') is not None:
+        coin['liquidityUsd'] = snapshot['liquidityUsd']
+    return coin
+
+
+def close_kind(reason, exit_liquidity_usd, params: ClosePolicyParameters = CLOSE_POLICY) -> str:
+    if reason == params.vanish_reason:
+        return 'vanished'
+    liquidity = _finite(exit_liquidity_usd)
+    if liquidity is not None and liquidity <= 0:
+        return 'drained'
+    return 'marked'
+
+
+def unpriced_past_max_hold(position, now) -> bool:
+    """An open forward position past its max hold that has no usable mark (not yet closed as VANISHED)."""
+    if not is_forward_position(position):
+        return False
+    current, opened = _finite(now), _finite(position.get('opened_at'))
+    if current is None or opened is None:
+        return False
+    return (position.get('quote_status') in {'stale', 'unavailable'}
+            and current - opened >= EXITS[position['strategy_id']].max_hold_minutes * 60_000)
+
+
+# ------------------------------------------------------------------ cash state
+
+def cash_state(book, params: CashParameters = CASH) -> dict:
+    """LAB_FORWARD_CASH_STATE_V1: whether the book can still fund its fixed entry."""
+    book = book if isinstance(book, dict) else {}
+    balance = _finite(book.get('balance'))
+    holding = isinstance(book.get('position'), dict) and bool(book.get('position'))
+    exhausted = bool(not holding and balance is not None and balance < params.min_entry_balance_usd)
+    rows = [row for row in (book.get('history') or ()) if isinstance(row, dict)]
+    closed = [value for value in (_finite(row.get('closed_at')) for row in rows) if value is not None]
+    opened = [value for value in (_finite(row.get('opened_at')) for row in rows) if value is not None]
+    if holding and _finite(book['position'].get('opened_at')) is not None:
+        opened.append(_finite(book['position'].get('opened_at')))
+    return {'version': params.version, 'exhausted': exhausted,
+            'balance_usd': None if balance is None else round(balance, 4),
+            'min_entry_balance_usd': params.min_entry_balance_usd, 'notional_usd': params.notional_usd,
+            # Balance only moves on a close, so the latest close is when the book ran out.
+            'exhausted_at': int(max(closed)) if exhausted and closed else None,
+            'last_entry_at': int(max(opened)) if opened else None,
+            'closes_in_ledger': len(closed)}
+
+
+def entry_window_end(book):
+    """(reason, time) at which the book stopped being able to enter, or (None, None) while it still can.
+
+    'retired' (kill rule, at ``retired_at``) or 'cash_exhausted' (at its last close),
+    whichever came first; a time of None means it never could in this ledger.
+    """
+    book = book if isinstance(book, dict) else {}
+    ends = []
+    marker = book.get('strategy_lifecycle') if isinstance(book.get('strategy_lifecycle'), dict) else {}
+    if marker.get('status') == 'retired':
+        at = _finite(marker.get('retired_at'))
+        if at is None:
+            at = _finite((marker.get('evidence') or {}).get('last_closed_at'))
+        ends.append(('retired', at))
+    cash = cash_state(book)
+    if cash['exhausted']:
+        ends.append(('cash_exhausted', _finite(cash['exhausted_at'])))
+    if not ends:
+        return None, None
+    return min(ends, key=lambda item: -math.inf if item[1] is None else item[1])
+
+
+def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defensive_flags,
+                    entry_coin=None, entry_at=None) -> dict:
     """Fields every forward-test position carries (and every close inherits)."""
     return {
         'lab_forward_version': VERSION, 'lab_config_hash': CONFIG_HASHES[book_id],
+        'close_policy_version': CLOSE_POLICY_VERSION,
+        'last_mark': mark_snapshot(entry_coin, entry_at) if isinstance(entry_coin, dict) else None,
         'lab_forward': {'version': VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
                         'role': 'random_control' if book_id in HYPOTHESIS_OF else 'hypothesis',
                         'hypothesis': HYPOTHESIS_OF.get(book_id, book_id),
@@ -799,22 +1071,41 @@ def position_record(book_id, *, evaluation, calib, model_entry, model_mark, defe
     }
 
 
-def close_record(position, trade, *, model_net_proceeds_usd, reason) -> dict:
-    """Fields added to a forward-test close: model P&L, calibration cost and net50."""
+def close_record(position, trade, *, model_net_proceeds_usd, reason, capped_net_proceeds_usd=None,
+                 booked_net_proceeds_usd=None, exit_liquidity_usd=None) -> dict:
+    """Fields added to a forward-test close: model P&L, calibration and drain costs, net50 and close kind.
+
+    ``capped_net_proceeds_usd`` is the booked (calibrated) exit with the shared
+    capped impact; the difference to the booked exit is the drain valuation of
+    LAB_FORWARD_CLOSE_POLICY_V1 (0 unless the sale exceeds 12.5% of liquidity).
+    """
     notional = _finite(position.get('notional_usd'))
     # The model leg's cost basis equals the booked one: calibration changes prices, not capital.
     basis = (notional or 0.0) + (_finite(position.get('entry_network_fee_usd')) or 0.0)
     model_proceeds = _finite(model_net_proceeds_usd)
     model_pnl = None if model_proceeds is None else model_proceeds - basis
     booked = _finite(trade.get('pnl_usd'))
+    capped, booked_proceeds = _finite(capped_net_proceeds_usd), _finite(booked_net_proceeds_usd)
+    drain_cost = None
+    if capped is not None and booked_proceeds is not None:
+        drain_cost = max(0.0, capped - booked_proceeds)
+    calibration = None
+    if model_pnl is not None and booked is not None:
+        calibration = model_pnl - booked - (drain_cost or 0.0)
+    kind = close_kind(reason, exit_liquidity_usd)
     record = {'model_pnl_usd': None if model_pnl is None else round(model_pnl, 6),
               'model_pnl_pct': (None if model_pnl is None or not notional
                                 else round(model_pnl / notional * 100, 6)),
-              'calibration_cost_usd': (None if model_pnl is None or booked is None
-                                       else round(model_pnl - booked, 6)),
+              'calibration_cost_usd': None if calibration is None else round(calibration, 6),
+              'drain_valuation_cost_usd': None if drain_cost is None else round(drain_cost, 6),
               'lab_forward_version': VERSION,
               'lab_config_hash': position.get('lab_config_hash'),
-              'heat_log_only_flags': list(position.get('heat_log_only_flags') or ())}
+              'heat_log_only_flags': list(position.get('heat_log_only_flags') or ()),
+              'close_policy_version': CLOSE_POLICY_VERSION, 'close_kind': kind,
+              'exit_liquidity_usd': _finite(exit_liquidity_usd)}
+    if kind == 'vanished':
+        record.update({'quote_status': 'vanished', 'vanish_haircut_pct': CLOSE_POLICY.vanish_haircut_pct,
+                       'last_mark_at': _finite(position.get('mark_received_at'))})
     record.update(net50(booked, notional, reason))
     return record
 
@@ -915,9 +1206,13 @@ def evidence(book, book_id, now) -> dict:
                   and ci['high'] is not None and ci['high'] < KILL_RULE.max_ci95_upper_usd_exclusive)
     pct = [_finite(row.get('net50_pct')) for row in rows]
     pct = [value for value in pct if value is not None]
+    kinds = [row.get('close_kind') for row in rows]
     return {'version': KILL_RULE_VERSION, 'book_id': book_id, 'config_hash': CONFIG_HASHES[book_id],
             'closed_trades': count, 'pairs': len(pairs),
             'wins': sum(value > 0 for value in values),
+            # LAB_FORWARD_CLOSE_POLICY_V1: these closes are in the sample above, valued conservatively.
+            'vanished_closes': kinds.count('vanished'), 'drained_closes': kinds.count('drained'),
+            'open_unpriced_past_max_hold': unpriced_past_max_hold(book.get('position'), now),
             'net50_total_usd': _round(math.fsum(values)) if count else None,
             'mean_net50_usd': _round(mean), 'mean_net50_pct': _round(math.fsum(pct) / len(pct)) if pct else None,
             'ci95_mean_net50_usd': [_round(ci['low']), _round(ci['high'])], 'ci_method': ci['method'],
@@ -938,6 +1233,43 @@ def _max_drawdown_pct(rows, start):
         if peak > 0:
             worst = max(worst, (peak - balance) / peak * 100)
     return worst
+
+
+def control_window(book_id, rows, control_book) -> dict:
+    """The period in which the hypothesis and its random control could both enter (the gate's 'same period').
+
+    start: the hypothesis's first evaluated entry; end: the earlier of its last
+    evaluated close and the moment the control stopped being able to enter
+    (retired by its kill rule, or out of cash). coverage = the smaller of the
+    share of the hypothesis's evaluated trades opened inside the window and the
+    share of its time span inside it; None without trades or without a control.
+    """
+    opened = [value for value in (_finite(row.get('opened_at')) for row in rows) if value is not None]
+    closed = [value for value in (_finite(row.get('closed_at')) for row in rows) if value is not None]
+    out = {'start': None, 'end': None, 'hypothesis_end': None, 'control_book_id': CONTROL_OF[book_id],
+           'control_status': None, 'control_entry_end_reason': None, 'control_entry_end_at': None,
+           'trade_share': None, 'time_share': None, 'coverage': None}
+    if not isinstance(control_book, dict):
+        out['control_entry_end_reason'] = 'control_book_missing'
+        return out
+    reason, at = entry_window_end(control_book)
+    marker = control_book.get('strategy_lifecycle') if isinstance(control_book.get('strategy_lifecycle'), dict) else {}
+    out.update({'control_status': marker.get('status'), 'control_entry_end_reason': reason,
+                'control_entry_end_at': None if at is None else int(at)})
+    if not opened or not closed:
+        return out
+    start, hypothesis_end = min(opened), max(closed)
+    end = hypothesis_end if reason is None else (None if at is None else min(hypothesis_end, at))
+    if end is not None and end < start:
+        end = None          # the control could no longer enter when the hypothesis began
+    inside = sum(1 for value in opened if end is not None and start <= value <= end)
+    span = hypothesis_end - start
+    trade_share = inside / len(opened)
+    time_share = 0.0 if end is None else (1.0 if span <= 0 else max(0.0, end - start) / span)
+    out.update({'start': int(start), 'end': None if end is None else int(end), 'hypothesis_end': int(hypothesis_end),
+                'trade_share': round(trade_share, 6), 'time_share': round(time_share, 6),
+                'coverage': min(trade_share, time_share)})
+    return out
 
 
 def promotion_gate(book, book_id, control_book, now) -> dict:
@@ -965,20 +1297,32 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
     put('mean_net50_usd', _round(mean), '> 0', bool(mean is not None and mean > 0))
     ci = _cached_ci(book_id, rows) if count else {'low': None, 'high': None}
     put('ci95_low_net50_usd', _round(ci['low']), '> 0', bool(ci['low'] is not None and ci['low'] > 0))
-    control_rows = []
-    if control_book is not None and opened:
-        control_id = CONTROL_OF[book_id]
-        start = min(opened)
-        end = max(_finite(row.get('closed_at')) for row in rows)
-        control_rows = [row for row in _evaluated_closes(control_book, control_id, now)
-                        if start <= (_finite(row.get('opened_at')) or -1) <= end]
+    # Same period = from the hypothesis's first entry to the earlier of its last close and
+    # the moment the control could no longer enter (retired or out of cash). Both books
+    # are compared on trades opened inside that window only.
+    control_id = CONTROL_OF[book_id]
+    window = control_window(book_id, rows, control_book)
+    def in_window(row):
+        opened_at = _finite(row.get('opened_at'))
+        return (window['end'] is not None and opened_at is not None
+                and window['start'] <= opened_at <= window['end'])
+
+    same_rows = [row for row in rows if in_window(row)]
+    control_rows = ([row for row in _evaluated_closes(control_book, control_id, now) if in_window(row)]
+                    if isinstance(control_book, dict) else [])
+    coverage = window['coverage']
+    put('control_coverage', _round(coverage),
+        f'>= {GATE.min_control_coverage} (control entry-enabled and funded)',
+        bool(coverage is not None and coverage >= GATE.min_control_coverage))
+    same_values = [_finite(row['net50_usd']) for row in same_rows]
+    same_mean = math.fsum(same_values) / len(same_values) if same_values else None
     control_values = [_finite(row['net50_usd']) for row in control_rows]
     control_mean = math.fsum(control_values) / len(control_values) if control_values else None
-    control_ci = (_cached_ci(f'{CONTROL_OF[book_id]}@{book_id}', control_rows) if control_rows
+    control_ci = (_cached_ci(f'{control_id}@{book_id}', control_rows) if control_rows
                   else {'low': None, 'high': None})
     half_width = (None if control_ci['low'] is None or control_ci['high'] is None
                   else (control_ci['high'] - control_ci['low']) / 2)
-    margin = None if mean is None or control_mean is None else mean - control_mean
+    margin = None if same_mean is None or control_mean is None else same_mean - control_mean
     put('beats_same_period_control_usd', _round(margin),
         f'> control CI half-width ({_round(half_width)})',
         bool(margin is not None and half_width is not None and margin > half_width))
@@ -1005,13 +1349,21 @@ def promotion_gate(book, book_id, control_book, now) -> dict:
     rug_entries = sum(1 for row in rows
                       if ((row.get('defensive_entry') or {}).get('structural_rug_guard') or {}).get('blocked'))
     put('entries_on_rug_flagged_pools', rug_entries, '= 0', rug_entries == 0)
-    unpriced = sum(1 for row in rows if row.get('quote_status') in {'stale', 'unavailable'})
-    share = unpriced / count if count else None
+    # Vanished (no mark beyond max hold + grace) and drained (liquidity 0 at exit) closes,
+    # closes on a stale or unavailable quote, and an open position past its max hold
+    # that still has no mark (it counts as a pending vanished close).
+    unpriced = sum(1 for row in rows if row.get('close_kind') in {'vanished', 'drained'}
+                   or row.get('quote_status') in {'stale', 'unavailable', 'vanished'})
+    pending = int(unpriced_past_max_hold(book.get('position'), now))
+    share = (unpriced + pending) / (count + pending) if count + pending else None
     put('vanished_or_unpriced_share', _round(share), f'< {GATE.max_vanished_or_unpriced_share}',
         bool(share is not None and share < GATE.max_vanished_or_unpriced_share))
     evaluable = [item['pass'] for item in criteria.values() if item['pass'] is not None]
     return {'version': PROMOTION_GATE_VERSION, 'book_id': book_id, 'control_book_id': CONTROL_OF[book_id],
             'control_closed_trades_same_period': len(control_rows), 'control_mean_net50_usd': _round(control_mean),
+            'book_closed_trades_same_period': len(same_rows), 'book_mean_net50_usd_same_period': _round(same_mean),
+            'control_window': {key: value for key, value in window.items() if key != 'coverage'},
+            'book_cash_state': cash_state(book),
             'book_max_drawdown_pct_booked': _round(_max_drawdown_pct(rows, START_BALANCE_USD), 4),
             'criteria': criteria,
             'all_evaluable_pass': bool(evaluable) and all(evaluable),
@@ -1025,47 +1377,67 @@ def apply_kill_rules(books, review, *, registered_ids, now) -> dict:
 
     A retirement only stops new entries: balance, history and the exits of an
     open position are untouched. It persists like the shared lifecycle marker
-    (never re-enabled automatically, even if later closes improve).
+    (never re-enabled automatically, even if later closes improve). A book that
+    is not retired but cannot fund its fixed entry (LAB_FORWARD_CASH_STATE_V1)
+    gets status 'cash_exhausted' instead of 'active'.
     """
     review = dict(review or {})
     retired = list(review.get('retired_strategy_ids') or [])
     draining = list(review.get('retired_open_position_ids') or [])
     active = list(review.get('active_registered_strategy_ids') or [])
+    exhausted = []
+    reviewed = []
     for book_id in BOOK_IDS:
         book = books.get(book_id) if isinstance(books, dict) else None
         if book_id not in registered_ids or not isinstance(book, dict):
             continue
         current = evidence(book, book_id, now)
+        cash = cash_state(book)
         previous = book.get('strategy_lifecycle') or {}
         if isinstance(previous, dict) and previous.get('status') == 'retired':
             # Any retirement persists with its original evidence; only a reviewed change re-enables.
             marker = {**previous, 'entry_enabled': False, 'position_management_enabled': True,
-                      'current_evidence': current}
+                      'current_evidence': current, 'cash': cash}
+        elif current['kill_rule_met']:
+            marker = {'version': KILL_RULE_VERSION, 'status': 'retired', 'entry_enabled': False,
+                      'position_management_enabled': True, 'reason': 'pre_registered_kill_rule',
+                      'evidence': current, 'cash': cash, 'retired_at': now}
+        elif cash['exhausted']:
+            # LAB_FORWARD_CASH_STATE_V1: the fixed $200 entry can no longer be funded, so the
+            # book cannot trade again; it is not 'active' and its kill rule may never evaluate.
+            marker = {'version': KILL_RULE_VERSION, 'status': CASH.status, 'entry_enabled': False,
+                      'position_management_enabled': True, 'reason': CASH.reason,
+                      'kill_rule_evaluable': current['closed_trades'] >= KILL_RULE.min_closes,
+                      'evidence': current, 'cash': cash, 'cash_state_version': CASH_STATE_VERSION}
         else:
-            met = current['kill_rule_met']
-            marker = {'version': KILL_RULE_VERSION, 'status': 'retired' if met else 'active',
-                      'entry_enabled': not met, 'position_management_enabled': True,
-                      'reason': ('pre_registered_kill_rule' if met
-                                 else 'kill_rule_min_closes_not_reached'
+            marker = {'version': KILL_RULE_VERSION, 'status': 'active', 'entry_enabled': True,
+                      'position_management_enabled': True,
+                      'reason': ('kill_rule_min_closes_not_reached'
                                  if current['closed_trades'] < KILL_RULE.min_closes
                                  else 'kill_rule_threshold_not_met'),
-                      'evidence': current}
-            if met:
-                marker['retired_at'] = now
-        if book_id in CONTROL_OF:
-            marker['promotion_gate'] = promotion_gate(book, book_id, books.get(CONTROL_OF[book_id]), now)
+                      'evidence': current, 'cash': cash}
         book['strategy_lifecycle'] = marker
+        reviewed.append(book_id)
         if marker['status'] == 'retired':
             retired.append(book_id)
             if book.get('position'):
                 draining.append(book_id)
+        elif marker['status'] == CASH.status:
+            exhausted.append(book_id)
         else:
             active.append(book_id)
+    # Gates last, so each one reads its control's marker of this same review.
+    for book_id in reviewed:
+        if book_id in CONTROL_OF:
+            books[book_id]['strategy_lifecycle']['promotion_gate'] = promotion_gate(
+                books[book_id], book_id, books.get(CONTROL_OF[book_id]), now)
     review.update({'retired_strategy_ids': sorted(set(retired)),
                    'retired_open_position_ids': sorted(set(draining)),
                    'active_registered_strategy_ids': sorted(set(active)),
+                   'lab_forward_cash_exhausted_ids': sorted(set(exhausted)),
                    'lab_forward_kill_rule': {'version': KILL_RULE_VERSION, 'book_ids': list(BOOK_IDS),
                                              'replaces_shared_lifecycle_heuristic': True,
+                                             'cash_state_version': CASH_STATE_VERSION,
                                              **asdict(KILL_RULE)}})
     return review
 
@@ -1117,6 +1489,8 @@ def config() -> dict:
             'heat_log_only_book_ids': sorted(HEAT_LOG_ONLY_BOOK_IDS),
             'kill_rule_version': KILL_RULE_VERSION, 'promotion_gate_version': PROMOTION_GATE_VERSION,
             'promotion_gate': asdict(GATE), 'memory_version': MEMORY_VERSION, 'regime_version': REGIME_VERSION,
+            'close_policy': asdict(CLOSE_POLICY), 'cash_state': asdict(CASH),
+            'cost_model': _hashable(asdict(COST_MODEL)), 'tape_pin_required': TAPE_PIN_REQUIRED,
             'universe_reasons': list(UNIVERSE_REASONS), 'signal_reasons': list(SIGNAL_REASONS),
             'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': False,
             'evidence_status': 'PRE_REGISTERED_HYPOTHESES_NEGATIVE_ABSOLUTE_RESEARCH_RESULT'}

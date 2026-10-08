@@ -4,7 +4,7 @@ import test from 'node:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabEntryStatus from '../src/components/LabEntryStatus';
-import { isArchivedStrategy, isForwardTestBook, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
+import { forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, labEntryStatus, labEntryView, labForwardNote, labForwardSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus } from '../src/lib/labStrategyView';
 
 const book = (id: string, balance: number, starting = 250, group = 'TEST') => ({
   id, balance, starting_balance: starting, portfolio_group: group,
@@ -261,4 +261,36 @@ test('LAB_FORWARD_TESTS_V1: the four forward-test books are described, report th
   const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(source, /labForwardSummary\(book\)/);
   assert.match(source, /trade\.net50_usd != null/);
+});
+
+test('LAB_FORWARD_CASH_STATE_V1 and CLOSE_POLICY_V1: a stalled book is not shown as active, control coverage and drains are named', () => {
+  const stalled = { ...book('RND_LAB_A', 160, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'cash_exhausted', reason: 'balance_below_fixed_notional',
+    entry_enabled: false, kill_rule_evaluable: false, cash: { exhausted: true, balance_usd: 160, min_entry_balance_usd: 200.1 },
+    evidence: { closed_trades: 40, min_closes: 50, mean_net50_usd: -8, vanished_closes: 1, drained_closes: 2 } } };
+  assert.equal(isForwardCashExhausted(stalled), true);
+  assert.equal(isForwardCashExhausted(book('TREND', 100, 500)), false);
+  const summary = labForwardSummary(stalled) ?? '';
+  assert.match(summary, /без капитал \(\$160\.00\)/);
+  assert.match(summary, /правилото за спиране не може да се оцени/);
+  assert.match(summary, /изчезнали\/източени pool-ове 3/);
+  assert.doesNotMatch(summary, /спряна: средно net50/);
+  // Not archived: its history stays among the research books, with the reason named.
+  assert.equal(partitionLabStrategies([stalled]).research.length, 1);
+  assert.equal(labEntryView({ ...stalled, entry_diagnostics: { blocked_reason: 'lab_forward_cash_exhausted' } }).status,
+    'Без капитал: балансът не покрива фиксирания вход от $200');
+  assert.match(labEntryStatus({ ...book('LAB_A_SURGE_EST_GUARD', 500, 500), entry_diagnostics: {
+    blocked_reason: 'lab_forward_cost_model_mismatch' } }), /замразения/);
+  const hypothesis = { ...book('LAB_A_SURGE_EST_GUARD', 520, 500), strategy_lifecycle: {
+    version: 'LAB_FORWARD_KILL_RULE_V1', status: 'active', evidence: { closed_trades: 160, min_closes: 50 },
+    promotion_gate: { all_evaluable_pass: false, automatic_promotion: false,
+      control_window: { control_entry_end_reason: 'cash_exhausted' },
+      criteria: { control_coverage: { value: 0.19, threshold: '>= 0.9', pass: false } } } } };
+  assert.match(labForwardSummary(hypothesis) ?? '', /контролата е можела да влиза само в 19% от периода \(cash_exhausted\)/);
+  assert.equal(forwardCloseNote('vanished'), 'изчезнал pool: оценен на последната цена −10%');
+  assert.equal(forwardCloseNote('drained'), 'източен pool (ликвидност 0): оценен на 0');
+  assert.equal(forwardCloseNote('marked'), null);
+  const source = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  assert.match(source, /isForwardCashExhausted\(book\)/);
+  assert.match(source, /forwardCloseNote\(trade\.close_kind\)/);
 });

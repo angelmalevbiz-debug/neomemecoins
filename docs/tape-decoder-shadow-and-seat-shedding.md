@@ -167,23 +167,60 @@ What changed (`backend/tape_pool_scheduler.py`, `backend/live_tape.py`):
    The recorder reads the account registry `NEO_USER_STATE_PATH` read-only
    (missing: no personal pins; unreadable: the file is skipped and the last
    good port list, if any, stays in use) and, for each listed `engine_port`
-   (1024-65535, deduplicated, at most `NEO_TAPE_PERSONAL_ENGINE_LIMIT`, default
-   16), GETs `http://127.0.0.1:<port>/state` with a
+   (1024-65535, deduplicated), GETs `http://127.0.0.1:<port>/state` with a
    `NEO_TAPE_PERSONAL_STATE_TIMEOUT_SECONDS` timeout (default 0.75 s, capped
-   at 2 s). Each port and the registry are read at most once per
-   `NEO_TAPE_PERSONAL_STATE_CACHE_MS` (default 5 s), including after a
-   failure. A failed engine keeps its last successful positions for
-   `NEO_TAPE_PERSONAL_STATE_RETAIN_MS` (default 30 s), then contributes
-   nothing. Pins still take precedence over entry seats and are never shed.
+   at 2 s).
+   - **Off the poll's critical path.** These reads run only on a daemon
+     refresher thread (started by `live_tape.main()`, its own HTTP session),
+     one pass every `NEO_TAPE_PERSONAL_STATE_CACHE_MS` (default 5 s). The pass
+     publishes a lock-protected snapshot; the tape poll only copies the latest
+     snapshot and never performs or waits on a personal read. On Windows a
+     loopback connect to a dead port waits the full timeout (0.76 s measured),
+     and the gateway never removes `engine_port` from the registry, so with 8
+     dead ports an in-poll read cost 6.1 s per poll (polls 6.3 s apart instead
+     of 2 s) and broke the 12 s confirmed-flow freshness for every engine.
+   - **Backoff.** A port whose read fails is retried after 5 s, doubling per
+     further failure up to `NEO_TAPE_PERSONAL_BACKOFF_MAX_MS` (default 60 s);
+     a success resets it to the 5 s period.
+   - **Read limit and rotation.** One pass reads at most
+     `NEO_TAPE_PERSONAL_ENGINE_LIMIT` (default 16) due ports. Due ports over
+     the limit are rotated across passes: ports with known open positions
+     first, then the least recently attempted. **Operator alert:** more listed
+     engines than the limit publishes `PERSONAL_ENGINES_OVER_READ_LIMIT` in
+     `personal_engines.operator_alerts`; each engine is then read less often
+     than every 5 s.
+   - **Stale but pinned.** A failed engine keeps its last successful positions
+     until a successful read shows them closed or its port leaves the
+     registry (exit safety). Once its last success is
+     `NEO_TAPE_PERSONAL_STATE_STALE_MS` (default 60 s) old the rows are
+     published as stale (`engines_stale`, `stale_positions`,
+     `PERSONAL_ENGINE_POSITIONS_STALE`); a snapshot older than that (stuck
+     refresher) is published with `snapshot_stale: true` and still pins.
+   - **Personal pin cap.** Pools held only by personal engines are pinned
+     after every main and Lab pin, at most `NEO_TAPE_PERSONAL_PIN_LIMIT`
+     (default `NEO_TAPE_MAX_PAIRS`) of them, in a deterministic order: fresh
+     before stale, then oldest `opened_at` first (missing last), then pool
+     address. Main's and Lab's pins (including pools a personal engine also
+     holds) are never capped, so once personal-only pools exceed the limit
+     the selection size, entry seats and main's share of the per-poll body
+     budget stop changing. Over-limit pools are counted in
+     `personal_pins_over_limit` and listed (pool ids, up to 64) in
+     `personal_pins_over_limit_pairs`; they are not observed.
+   Pins still take precedence over entry seats and are never shed.
 
-Published in `live_tape_status.entry_scheduling` (no account identifiers):
-`selected_cost_first_pools`, `unselected_cost_first_pools`, a `cost_first`
-block (universe version, planning notional, candidate/selected/unselected
-counts, members also estimated feasible, rejection reasons, up to 6 examples
-with fee tier, liquidity and modeled fee + impact, `is_entry_authorization:
-false`), `pinned_personal_pools`, `pinned_personal_only_pools` and
-`personal_engines` (registry status, engines listed/reachable/retained/
-unavailable/over limit, fetches this poll, open positions, cache, timeout).
+Published in `live_tape_status.entry_scheduling` (forwarded to every user's
+`/state`, no account identifiers): `selected_cost_first_pools`,
+`unselected_cost_first_pools`, a `cost_first` block (universe version,
+planning notional, candidate/selected/unselected counts, members also
+estimated feasible, rejection reasons, up to 6 examples with fee tier,
+liquidity and modeled fee + impact, `is_entry_authorization: false`) and
+`pinned_personal_pools` (pinned pool ids also appear in `selected_pairs`;
+they are public chain data). Personal-engine aggregates are operator-only:
+the tape file's top-level `personal_engines` status (not forwarded by
+`market_monitor`) carries registry status, engines listed/reachable/failing/
+never reached/backing off/stale/over the read limit, reads in the last pass,
+open and stale positions, snapshot age, refresher state, operator alerts,
+`pinned_personal_only_pools`, `personal_pins_over_limit` and the pin limit.
 
 Proof that nothing else moved: on 300 random seeds x 40 polls without a
 cost-first pool or personal position the V4 scheduler returns the same pools,
@@ -202,10 +239,13 @@ evidence of edge; the COST_FIRST books are still judged only under
 `docs/STRATEGY_VALIDATION.md` on future, untouched observations.
 
 Limits: cost-first seats displace exploration of over-budget matched pools
-when seats are scarce; a personal engine slower than the timeout for longer
-than the retention period loses its pins until it answers again; each personal
-`/state` read transfers that engine's full snapshot (bounded by the cache
-period).
+when seats are scarce; a personal engine's newly opened position is pinned
+only after the next successful read (5 s period, longer under backoff or
+over the read limit); pins of an engine that stopped answering stay (stale)
+until it answers or its port leaves the registry, bounded by the personal pin
+cap; personal-only pools beyond the cap lose exact-pool coverage; each
+personal `/state` read transfers that engine's full snapshot (bounded by the
+refresh period).
 
 ## How it will be evaluated (24 h shadow comparison, before any validation)
 

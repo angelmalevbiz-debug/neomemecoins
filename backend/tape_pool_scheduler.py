@@ -20,12 +20,17 @@ They share the existing seat budget and leases; nothing here admits them.
 
 Personal-engine pins (V4): open positions of every PAPER engine listed in the
 account registry (NEO_USER_STATE_PATH, read-only) are pinned by exact
-(mint, pool) exactly like the main engine's positions, so their exits keep
-exact-pool flow coverage. Each engine's /state is read on 127.0.0.1 with a
-short timeout, at most once per cache period per port; failures are ignored.
+(mint, pool) like the main engine's positions, so their exits keep exact-pool
+flow coverage. Each engine's /state is read on 127.0.0.1 by a background
+refresher, never on the tape poll; the poll only reads the latest snapshot.
+Pools held only by personal engines are capped (NEO_TAPE_PERSONAL_PIN_LIMIT)
+after main's and Lab's pins, which are never capped.
 """
 import json
+import math
 import os
+import threading
+import time
 from pathlib import Path
 
 import lab_activity
@@ -58,13 +63,30 @@ COST_FIRST_EXAMPLE_LIMIT = 6
 GROUP_FEASIBLE, GROUP_COST_FIRST, GROUP_OVER_BUDGET, GROUP_EXPLORATION = 0, 1, 2, 3
 # Personal PAPER engines (gateway-spawned, ports from the account registry).
 DEFAULT_USER_STATE_PATH = '/var/lib/neo-market/user_accounts.json'
+# Refresh period of the background refresher and of each healthy port.
 PERSONAL_STATE_CACHE_MS = max(1000, int(os.getenv('NEO_TAPE_PERSONAL_STATE_CACHE_MS', '5000')))
 PERSONAL_STATE_TIMEOUT_SECONDS = min(2.0, max(0.1, float(
     os.getenv('NEO_TAPE_PERSONAL_STATE_TIMEOUT_SECONDS', '0.75'))))
-# The last successful position list of an engine that is briefly unreachable
-# (busy under CPU pressure) is kept this long, then dropped.
-PERSONAL_STATE_RETAIN_MS = max(0, int(os.getenv('NEO_TAPE_PERSONAL_STATE_RETAIN_MS', '30000')))
+# A port whose read failed is retried after cache_ms, doubling per further
+# failure up to this ceiling. The gateway never removes a stopped engine's
+# port from the registry, so dead ports accumulate; backoff bounds their cost.
+PERSONAL_BACKOFF_MAX_MS = max(1000, int(os.getenv('NEO_TAPE_PERSONAL_BACKOFF_MAX_MS', '60000')))
+# A last successful read older than this is published as stale. Its positions
+# stay pinned (exit safety) until a successful read shows them closed or the
+# port leaves the registry.
+PERSONAL_STATE_STALE_MS = max(1000, int(os.getenv('NEO_TAPE_PERSONAL_STATE_STALE_MS', '60000')))
+# Reads per refresh pass. Due ports over this limit are rotated across passes
+# (ports with known open positions first) and raise an operator alert.
 PERSONAL_ENGINE_LIMIT = max(0, int(os.getenv('NEO_TAPE_PERSONAL_ENGINE_LIMIT', '16')))
+# Pools held only by personal engines that may take a seat, after main's and
+# Lab's pins (never capped). Default: the tape's own pool budget.
+PERSONAL_PIN_LIMIT = max(0, int(os.getenv('NEO_TAPE_PERSONAL_PIN_LIMIT',
+                                          os.getenv('NEO_TAPE_MAX_PAIRS', '12'))))
+# Marker added to a shallow copy of a stale engine's position rows; read only
+# by the pin ordering (it never reaches a coin row).
+PERSONAL_STALE_MARK = 'tape_personal_engine_stale'
+PERSONAL_PIN_ORDER = 'FRESH_BEFORE_STALE_THEN_OLDEST_OPENED_AT_THEN_POOL'
+OVER_READ_LIMIT_ALERT = 'PERSONAL_ENGINES_OVER_READ_LIMIT'
 
 
 def _identity(coin):
@@ -91,13 +113,24 @@ def _held_coin(position, market):
     return identity, coin
 
 
-def _held_coins(state, market, extra_positions=()):
+def _opened_at(position):
+    try:
+        value = float(position.get('opened_at'))
+    except (TypeError, ValueError, OverflowError):
+        return math.inf
+    return value if math.isfinite(value) else math.inf
+
+
+def _held_coins(state, market, extra_positions=(), extra_limit=None):
     """Main and Lab held pools, then other engines' held pools not already pinned.
 
-    Main/Lab rows keep their exact previous order and values. A pool held by a
-    personal engine as well as by main or another engine is pinned once.
-    Returns the held coins, the identities held by the extra engines and the
-    subset of those not already held by main or Lab.
+    Main/Lab rows keep their exact previous order and values and are never
+    capped. A pool held by a personal engine as well as by main or another
+    engine is pinned once. Supported pools held only by personal engines
+    follow, in PERSONAL_PIN_ORDER, at most ``extra_limit`` of them (None: no
+    cap); the rest are reported, not pinned. Returns the held coins, the
+    identities held by the extra engines that are pinned or shared with main,
+    the admitted personal-only identities and an operator report.
     """
     positions = list(state.get('positions') or [])
     books = (state.get('strategy_lab') or {}).get('books') or {}
@@ -110,13 +143,37 @@ def _held_coins(state, market, extra_positions=()):
         if identity:
             held[identity] = coin
     base = set(held)
-    extra = set()
+    personal = {}
     for position in extra_positions or ():
         identity, coin = _held_coin(position, market)
-        if identity:
-            extra.add(identity)
-            held.setdefault(identity, coin)
-    return list(held.values()), extra, extra - base
+        if not identity:
+            continue
+        order = (bool(position.get(PERSONAL_STALE_MARK)), _opened_at(position))
+        if identity not in personal:
+            personal[identity] = [coin, order]
+        elif order < personal[identity][1]:
+            # The first row's values stay; the pool is ordered by its best
+            # (freshest, then oldest opened) holder.
+            personal[identity][1] = order
+    shared = {identity for identity in personal if identity in base}
+    only = sorted((identity for identity in personal if identity not in base),
+                  key=lambda identity: (personal[identity][1], identity[1], identity[0]))
+    supported_only = [identity for identity in only if _supported(personal[identity][0])]
+    limit = len(supported_only) if extra_limit is None else max(0, int(extra_limit))
+    admitted = supported_only[:limit]
+    over_limit = supported_only[limit:]
+    excluded = set(over_limit)
+    for identity in only:
+        if identity not in excluded:
+            held[identity] = personal[identity][0]
+    admitted_set = set(admitted)
+    report = {'personal_pin_limit': None if extra_limit is None else limit,
+              'personal_pin_order': PERSONAL_PIN_ORDER,
+              'personal_only_pools_held': len(supported_only),
+              'personal_pins_over_limit': len(over_limit),
+              'personal_pins_over_limit_pairs': [identity[1] for identity in over_limit][:SHED_LIST_LIMIT],
+              'stale_personal_only_pins': sum(personal[identity][1][0] for identity in admitted)}
+    return list(held.values()), shared | admitted_set, admitted_set, report
 
 
 def _registry_ports(path):
@@ -146,30 +203,50 @@ def _registry_ports(path):
     return sorted(ports), 'OK'
 
 
+def _wall_ms():
+    return int(time.time() * 1000)
+
+
 class PersonalEnginePositions:
     """Open positions of the per-user PAPER engines listed in the account registry.
 
     Read-only. ``fetch(port, timeout_seconds)`` returns that engine's /state
     document (injected; the live recorder supplies an HTTP GET on 127.0.0.1).
-    Each port is fetched at most once per ``cache_ms`` whether the attempt
-    succeeded or not, so a poll never hammers a failing engine. A failed engine
-    keeps its last successful positions for ``retain_ms`` (exit coverage across
-    a busy moment), then contributes nothing. These positions only pin
+
+    The HTTP reads never run on the tape poll: ``start()`` launches a daemon
+    thread that calls ``refresh()`` every ``cache_ms`` and publishes a
+    lock-protected snapshot; the poll calls ``latest()``, which only copies
+    that snapshot. Per refresh pass at most ``engine_limit`` ports are read;
+    due ports over the limit are rotated (ports with known open positions
+    first, then the least recently attempted). A failed port is retried after
+    ``cache_ms`` doubling per further failure up to ``backoff_max_ms``. A
+    failed engine keeps its last successful positions until a successful read
+    shows them closed or its port leaves the registry; once its last success
+    is ``stale_ms`` old those rows are published as stale (and ordered after
+    fresh rows for the personal pin cap). These positions only pin
     observation seats; they never open, size or close anything.
     """
 
     def __init__(self, fetch, *, registry_path=None, cache_ms=PERSONAL_STATE_CACHE_MS,
                  timeout_seconds=PERSONAL_STATE_TIMEOUT_SECONDS,
-                 retain_ms=PERSONAL_STATE_RETAIN_MS, engine_limit=PERSONAL_ENGINE_LIMIT):
+                 stale_ms=PERSONAL_STATE_STALE_MS, backoff_max_ms=PERSONAL_BACKOFF_MAX_MS,
+                 engine_limit=PERSONAL_ENGINE_LIMIT, clock=_wall_ms):
         self.fetch = fetch
         self.registry_path = registry_path
         self.cache_ms = max(1000, int(cache_ms))
         self.timeout_seconds = min(2.0, max(0.1, float(timeout_seconds)))
-        self.retain_ms = max(0, int(retain_ms))
+        self.stale_ms = max(1000, int(stale_ms))
+        self.backoff_max_ms = max(self.cache_ms, int(backoff_max_ms))
         self.engine_limit = max(0, int(engine_limit))
+        self.clock = clock
         self.registry_checked_at = None
         self.registry = ([], 'NOT_READ')
+        # Mutated only by refresh() (the refresher thread in production).
         self.engines = {}
+        self._lock = threading.Lock()
+        self._snapshot = None
+        self._thread = None
+        self._stop = threading.Event()
 
     def _path(self):
         return Path(self.registry_path or os.getenv('NEO_USER_STATE_PATH', DEFAULT_USER_STATE_PATH))
@@ -178,7 +255,24 @@ class PersonalEnginePositions:
     def _within(checked_at, now, period):
         return checked_at is not None and 0 <= now - checked_at < period
 
-    def collect(self, now):
+    def backoff_ms(self, failures):
+        """Retry delay after ``failures`` consecutive failed reads of one port."""
+        if failures <= 0:
+            return self.cache_ms
+        return min(self.backoff_max_ms, self.cache_ms * 2 ** min(failures - 1, 16))
+
+    def _due(self, record, now):
+        next_at = record['next_at']
+        # A clock that stepped backwards cannot park a port beyond the ceiling.
+        return next_at is None or now >= next_at or next_at - now > self.backoff_max_ms
+
+    def refresh(self, now=None):
+        """One bounded refresh pass with blocking reads; publishes a new snapshot.
+
+        Runs on the refresher thread (or directly in tests and tools), never on
+        the tape poll. Returns ``latest(now)``.
+        """
+        now = self.clock() if now is None else now
         if not self._within(self.registry_checked_at, now, self.cache_ms):
             ports, status = _registry_ports(self._path())
             if status == 'UNREADABLE' and self.registry[1] in ('OK', 'UNREADABLE_USING_LAST_GOOD'):
@@ -188,49 +282,124 @@ class PersonalEnginePositions:
             self.registry = (ports, status)
             self.registry_checked_at = now
         listed, registry_status = self.registry
-        ports = listed[:self.engine_limit]
-        self.engines = {port: record for port, record in self.engines.items() if port in ports}
-        fetched = unavailable = retained = 0
+        self.engines = {port: self.engines.get(port) or
+                        {'attempted_at': None, 'ok_at': None, 'next_at': None,
+                         'failures': 0, 'positions': [], 'last_ok': False}
+                        for port in listed}
+        due = sorted((port for port in listed if self._due(self.engines[port], now)),
+                     key=lambda port: (not self.engines[port]['positions'],
+                                       -1 if self.engines[port]['attempted_at'] is None
+                                       else self.engines[port]['attempted_at'], port))
+        chosen = due[:self.engine_limit]
+        for port in chosen:
+            record = self.engines[port]
+            record['attempted_at'] = now
+            try:
+                state = self.fetch(port, self.timeout_seconds)
+                rows = state.get('positions') if isinstance(state, dict) else None
+                if not isinstance(rows, list):
+                    raise ValueError('engine state without a positions list')
+                record.update(positions=[row for row in rows if isinstance(row, dict)],
+                              ok_at=now, last_ok=True, failures=0, next_at=now + self.cache_ms)
+            except Exception:
+                # An unreachable or malformed engine never stops the refresher;
+                # its last successful positions stay pinned.
+                record['failures'] += 1
+                record['last_ok'] = False
+                record['next_at'] = now + self.backoff_ms(record['failures'])
+        snapshot = {'refreshed_at': now, 'registry_status': registry_status,
+                    'engines_listed': len(listed), 'reads_this_refresh': len(chosen),
+                    'due_over_read_limit': len(due) - len(chosen),
+                    'engines': {port: dict(record) for port, record in self.engines.items()}}
+        with self._lock:
+            self._snapshot = snapshot
+        return self.latest(now)
+
+    def latest(self, now):
+        """The newest published snapshot as (positions, operator report). No I/O."""
+        with self._lock:
+            snapshot = self._snapshot
+            thread = self._thread
+        running = thread is not None and thread.is_alive()
+        config = {'refresh_ms': self.cache_ms, 'timeout_seconds': self.timeout_seconds,
+                  'stale_ms': self.stale_ms, 'backoff_ms': [self.cache_ms, self.backoff_max_ms],
+                  'engine_read_limit_per_refresh': self.engine_limit,
+                  'refresher': 'RUNNING' if running else 'NOT_RUNNING',
+                  'reads_on_tape_poll': False, 'host': '127.0.0.1', 'read_only': True}
+        if snapshot is None:
+            return [], {**config, 'registry_status': 'NOT_REFRESHED', 'snapshot_age_ms': None,
+                        'snapshot_stale': True, 'engines_listed': 0, 'open_positions': 0,
+                        'operator_alerts': ['PERSONAL_SNAPSHOT_NOT_REFRESHED']}
         positions = []
-        for port in ports:
-            record = self.engines.setdefault(port, {'checked_at': None, 'ok_at': None,
-                                                    'positions': [], 'last_ok': False})
-            if not self._within(record['checked_at'], now, self.cache_ms):
-                record['checked_at'] = now
-                fetched += 1
-                try:
-                    state = self.fetch(port, self.timeout_seconds)
-                    rows = state.get('positions') if isinstance(state, dict) else None
-                    if not isinstance(rows, list):
-                        raise ValueError('engine state without a positions list')
-                    record.update(positions=[row for row in rows if isinstance(row, dict)],
-                                  ok_at=now, last_ok=True)
-                except Exception:
-                    # An unreachable or malformed engine never stops the tape.
-                    record['last_ok'] = False
-            if record['last_ok']:
-                positions += record['positions']
-            elif self._within(record['ok_at'], now, self.retain_ms + 1):
-                retained += 1
-                positions += record['positions']
-            else:
-                unavailable += 1
-                record['positions'] = []
+        reachable = failing = never = stale_engines = stale_positions = backing_off = 0
+        for record in snapshot['engines'].values():
+            reachable += int(record['last_ok'])
+            backing_off += int(record['failures'] > 0)
+            if record['ok_at'] is None:
+                never += 1
+                continue
+            failing += int(not record['last_ok'])
+            rows = record['positions']
+            if now - record['ok_at'] >= self.stale_ms:
+                stale_engines += 1
+                stale_positions += len(rows)
+                rows = [dict(row, **{PERSONAL_STALE_MARK: True}) for row in rows]
+            positions += rows
+        age = now - snapshot['refreshed_at']
+        snapshot_stale = age >= self.stale_ms
+        alerts = []
+        if snapshot['engines_listed'] > self.engine_limit:
+            alerts.append(OVER_READ_LIMIT_ALERT)
+        if snapshot_stale:
+            alerts.append('PERSONAL_SNAPSHOT_STALE')
+        if stale_engines:
+            alerts.append('PERSONAL_ENGINE_POSITIONS_STALE')
         return positions, {
-            'registry_status': registry_status, 'engines_listed': len(listed),
-            'engine_limit': self.engine_limit,
-            'engines_over_limit': max(0, len(listed) - len(ports)),
-            'engines_reachable': sum(bool(self.engines[port]['last_ok']) for port in ports),
-            'engines_stale_retained': retained, 'engines_unavailable': unavailable,
-            'fetches_this_poll': fetched, 'open_positions': len(positions),
-            'cache_ms': self.cache_ms, 'timeout_seconds': self.timeout_seconds,
-            'retain_ms': self.retain_ms, 'host': '127.0.0.1', 'read_only': True}
+            **config, 'registry_status': snapshot['registry_status'],
+            'snapshot_age_ms': age, 'snapshot_stale': snapshot_stale,
+            'engines_listed': snapshot['engines_listed'],
+            'engines_over_read_limit': max(0, snapshot['engines_listed'] - self.engine_limit),
+            'due_over_read_limit_last_refresh': snapshot['due_over_read_limit'],
+            'reads_last_refresh': snapshot['reads_this_refresh'],
+            'engines_reachable': reachable, 'engines_failing_positions_kept': failing,
+            'engines_never_reached': never, 'engines_backing_off': backing_off,
+            'engines_stale': stale_engines, 'open_positions': len(positions),
+            'stale_positions': stale_positions, 'operator_alerts': alerts}
+
+    def _run(self):
+        while not self._stop.is_set():
+            try:
+                self.refresh(self.clock())
+            except Exception:
+                # A bug in one pass must not end the refresher; the previous
+                # snapshot stays published (and turns stale if this repeats).
+                pass
+            self._stop.wait(self.cache_ms / 1000)
+
+    def start(self):
+        """Start the daemon refresher once; returns whether a thread was started."""
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return False
+            self._stop.clear()
+            self._thread = threading.Thread(target=self._run, name='tape-personal-engines',
+                                            daemon=True)
+            self._thread.start()
+            return True
+
+    def stop(self, timeout=None):
+        self._stop.set()
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout)
 
 
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
-                 shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS):
+                 shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS,
+                 personal_pin_limit=PERSONAL_PIN_LIMIT):
         self.lease_ms = max(30_000, int(lease_ms))
+        self.personal_pin_limit = max(0, int(personal_pin_limit))
         self.leases = {}
         self.last_selected = {}
         self.shed_min_bodies = max(1, int(shed_min_bodies))
@@ -273,7 +442,11 @@ class TapePoolScheduler:
         """Choose observed pools: exit pins first, then bounded entry seats.
 
         ``personal_positions`` are open positions of other PAPER engines (see
-        PersonalEnginePositions); they are pinned exactly like main's own.
+        PersonalEnginePositions). A pool also held by main or Lab is pinned
+        with main's pins; pools held only by personal engines are pinned after
+        them, at most ``personal_pin_limit`` in PERSONAL_PIN_ORDER. Fields
+        under ``personal_pins_operator`` belong in the operator-only tape
+        status; the caller removes them before publishing entry_scheduling.
         """
         market = {}
         for coin in state.get('feed') or []:
@@ -284,7 +457,8 @@ class TapePoolScheduler:
                              feasibility.number(coin.get('updatedAt')) >
                              feasibility.number(market[identity].get('updatedAt'))):
                 market[identity] = coin
-        held, personal_held, personal_only = _held_coins(state, market, personal_positions)
+        held, personal_held, personal_only, personal_report = _held_coins(
+            state, market, personal_positions, self.personal_pin_limit)
         pins = [coin for coin in held if _supported(coin)]
         pinned = {_identity(coin) for coin in pins}
         unsupported_pins = [coin for coin in held if not _supported(coin)]
@@ -450,10 +624,13 @@ class TapePoolScheduler:
                        'unselected_cost_first_pools': len(cost_first_rows) - cost_first_selected,
                        # Exact (mint, pool) pins held by personal PAPER engines;
                        # a pool also held by main or Lab is counted here and
-                       # once in pinned_exit_pools.
+                       # once in pinned_exit_pools. Pool ids are public chain
+                       # data; personal aggregates stay operator-only.
                        'pinned_personal_pools': len(personal_pins),
-                       'pinned_personal_only_pools': sum(_identity(coin) in personal_only
-                                                         for coin in personal_pins),
+                       'personal_pins_operator': {
+                           **personal_report,
+                           'pinned_personal_only_pools': sum(_identity(coin) in personal_only
+                                                             for coin in personal_pins)},
                        'cost_first': {
                            'universe_version': cost_first.UNIVERSE_VERSION,
                            'seat_group': 'BELOW_ESTIMATED_FEASIBLE_ABOVE_OVER_BUDGET_OR_UNKNOWN',

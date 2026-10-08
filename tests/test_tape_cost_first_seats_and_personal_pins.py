@@ -10,16 +10,21 @@ adds two observation-only changes:
    same leases; only an estimated feasible candidate pre-empts a lease.
 2. Open positions of every personal PAPER engine in the account registry are
    pinned by exact (mint, pool) like main's. The registry is read-only; each
-   engine's /state is fetched at most once per cache period, failures are
-   ignored, a briefly unreachable engine keeps its last positions for a
-   bounded time.
+   engine's /state is read by a background refresher (never on the tape
+   poll), failed ports back off, an unreachable engine keeps its last
+   positions (published as stale) until they are seen closed, and pools held
+   only by personal engines are capped after main's and Lab's pins.
 
-Nothing here admits, sizes or exits a trade. No network: every fetch is
-injected.
+Nothing here admits, sizes or exits a trade. Every engine fetch is injected,
+except one test that reads a closed loopback port on the refresher thread.
 """
+import importlib.util
 import json
 import os
+import socket
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -231,7 +236,7 @@ class RegistryFixture(unittest.TestCase):
 
 class PersonalEngineSourceTests(RegistryFixture):
     def test_missing_registry_is_skipped_without_any_fetch(self):
-        positions, report = self.source().collect(NOW)
+        positions, report = self.source().refresh(NOW)
         self.assertEqual(positions, [])
         self.assertEqual(report['registry_status'], 'MISSING')
         self.assertEqual(self.calls, [])
@@ -239,7 +244,7 @@ class PersonalEngineSourceTests(RegistryFixture):
     def test_unreadable_registry_is_skipped_without_any_fetch(self):
         for text in ('{not json', '[]', '{"accounts": []}'):
             self.registry.write_text(text, encoding='utf-8')
-            positions, report = self.source().collect(NOW)
+            positions, report = self.source().refresh(NOW)
             self.assertEqual((positions, report['registry_status']), ([], 'UNREADABLE'))
         self.assertEqual(self.calls, [])
 
@@ -247,20 +252,20 @@ class PersonalEngineSourceTests(RegistryFixture):
         self.write_registry({'a': {'engine_port': 18800}})
         self.engines[18800] = {'positions': [pin('a1')]}
         source = self.source(cache_ms=1_000)
-        source.collect(NOW)
+        source.refresh(NOW)
         self.registry.write_text('{"accounts": {"a": {"engine_port": 188', encoding='utf-8')  # mid-write
-        positions, report = source.collect(NOW + 1_000)
+        positions, report = source.refresh(NOW + 1_000)
         self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
         self.assertEqual(report['registry_status'], 'UNREADABLE_USING_LAST_GOOD')
         self.registry.unlink()
-        positions, report = source.collect(NOW + 2_000)
+        positions, report = source.refresh(NOW + 2_000)
         self.assertEqual((positions, report['registry_status']), ([], 'MISSING'))
 
     def test_registry_is_only_read(self):
         self.write_registry({'user-a': {'engine_port': 18800, 'balance': 990.0}})
         before = (self.registry.read_bytes(), self.registry.stat().st_mtime_ns)
         self.engines[18800] = {'positions': []}
-        self.source().collect(NOW)
+        self.source().refresh(NOW)
         self.assertEqual((self.registry.read_bytes(), self.registry.stat().st_mtime_ns), before)
 
     def test_invalid_and_duplicate_ports_are_skipped_and_limit_applies(self):
@@ -271,9 +276,11 @@ class PersonalEngineSourceTests(RegistryFixture):
                              'j': {'engine_port': [18803]}})
         for port in (18800, 18801, 18802):
             self.engines[port] = {'positions': []}
-        _, report = self.source(engine_limit=2).collect(NOW)
+        _, report = self.source(engine_limit=2).refresh(NOW)
         self.assertEqual(sorted(port for port, _ in self.calls), [18800, 18801])
-        self.assertEqual((report['engines_listed'], report['engines_over_limit']), (3, 1))
+        self.assertEqual((report['engines_listed'], report['engines_over_read_limit'],
+                          report['due_over_read_limit_last_refresh']), (3, 1, 1))
+        self.assertIn(scheduler_module.OVER_READ_LIMIT_ALERT, report['operator_alerts'])
 
     def test_unreachable_engine_is_ignored_and_others_are_pinned(self):
         self.write_registry({'a': {'engine_port': 18800}, 'b': {'engine_port': 18801},
@@ -281,9 +288,9 @@ class PersonalEngineSourceTests(RegistryFixture):
         self.engines[18800] = {'positions': [pin('a1')]}
         self.engines[18801] = TimeoutError('busy')
         self.engines[18802] = {'no_positions': True}  # malformed state
-        positions, report = self.source().collect(NOW)
+        positions, report = self.source().refresh(NOW)
         self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
-        self.assertEqual((report['engines_reachable'], report['engines_unavailable']), (1, 2))
+        self.assertEqual((report['engines_reachable'], report['engines_never_reached']), (1, 2))
         self.assertTrue(all(timeout <= 2.0 for _, timeout in self.calls))
 
     def test_each_port_is_fetched_at_most_once_per_cache_period_even_after_failure(self):
@@ -291,44 +298,51 @@ class PersonalEngineSourceTests(RegistryFixture):
         self.engines[18800] = {'positions': [pin('a1')]}
         source = self.source(cache_ms=5_000)
         for offset in (0, 1_000, 2_000, 4_999):
-            positions, report = source.collect(NOW + offset)
+            positions, report = source.refresh(NOW + offset)
             self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
         self.assertEqual(sorted(self.calls), [(18800, source.timeout_seconds), (18801, source.timeout_seconds)])
-        self.assertEqual(report['fetches_this_poll'], 0)
-        source.collect(NOW + 5_000)
+        self.assertEqual(report['reads_last_refresh'], 0)
+        source.refresh(NOW + 5_000)
         self.assertEqual(len(self.calls), 4)
 
-    def test_last_positions_are_retained_for_a_bounded_time_after_a_failure(self):
+    def test_failed_engine_keeps_its_positions_as_stale_until_seen_closed(self):
         self.write_registry({'a': {'engine_port': 18800}})
         self.engines[18800] = {'positions': [pin('a1')]}
-        source = self.source(cache_ms=1_000, retain_ms=10_000)
-        source.collect(NOW)
+        source = self.source(cache_ms=1_000, stale_ms=10_000, backoff_max_ms=2_000)
+        source.refresh(NOW)
         self.engines[18800] = ConnectionResetError('restarting')
-        positions, report = source.collect(NOW + 5_000)
+        positions, report = source.refresh(NOW + 5_000)
         self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
-        self.assertEqual(report['engines_stale_retained'], 1)
-        positions, report = source.collect(NOW + 10_001)
-        self.assertEqual((positions, report['engines_unavailable']), ([], 1))
+        self.assertNotIn(scheduler_module.PERSONAL_STALE_MARK, positions[0])
+        self.assertEqual((report['engines_failing_positions_kept'], report['engines_stale']), (1, 0))
+        # Past the stale age the pin is kept (exit safety) and published as stale.
+        positions, report = source.refresh(NOW + 60_000)
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertTrue(positions[0][scheduler_module.PERSONAL_STALE_MARK])
+        self.assertEqual((report['engines_stale'], report['stale_positions']), (1, 1))
+        self.assertIn('PERSONAL_ENGINE_POSITIONS_STALE', report['operator_alerts'])
+        # The stale mark is added to a copy; the engine's own row is unchanged.
+        self.assertNotIn(scheduler_module.PERSONAL_STALE_MARK, source.engines[18800]['positions'][0])
         self.engines[18800] = {'positions': []}
-        positions, report = source.collect(NOW + 12_000)
-        self.assertEqual((positions, report['engines_reachable']), ([], 1))
+        positions, report = source.refresh(NOW + 120_000)
+        self.assertEqual((positions, report['engines_reachable'], report['engines_stale']), ([], 1, 0))
 
     def test_closed_position_is_dropped_on_the_next_successful_read(self):
         self.write_registry({'a': {'engine_port': 18800}})
         self.engines[18800] = {'positions': [pin('a1')]}
         source = self.source(cache_ms=1_000)
-        source.collect(NOW)
+        source.refresh(NOW)
         self.engines[18800] = {'positions': []}
-        positions, _ = source.collect(NOW + 1_000)
+        positions, _ = source.refresh(NOW + 1_000)
         self.assertEqual(positions, [])
 
     def test_removed_account_stops_being_polled_after_the_registry_refresh(self):
         self.write_registry({'a': {'engine_port': 18800}})
         self.engines[18800] = {'positions': [pin('a1')]}
         source = self.source(cache_ms=1_000)
-        source.collect(NOW)
+        source.refresh(NOW)
         self.write_registry({})
-        positions, report = source.collect(NOW + 1_000)
+        positions, report = source.refresh(NOW + 1_000)
         self.assertEqual((positions, report['engines_listed']), ([], 0))
         self.assertEqual(len(self.calls), 1)
 
@@ -336,10 +350,150 @@ class PersonalEngineSourceTests(RegistryFixture):
         self.write_registry({'00000000-aaaa-bbbb-cccc-123456789abc': {'engine_port': 18800,
                                                                       'email': 'x@example.invalid'}})
         self.engines[18800] = {'positions': []}
-        _, report = self.source().collect(NOW)
+        _, report = self.source().refresh(NOW)
         text = json.dumps(report)
         self.assertNotIn('00000000', text)
         self.assertNotIn('example.invalid', text)
+
+
+class PersonalRefresherOffThePollTests(RegistryFixture):
+    """The tape poll never waits on a personal engine (review finding, PR #19)."""
+
+    def test_failed_port_backoff_doubles_to_the_ceiling_and_resets_on_success(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        source = self.source(cache_ms=5_000, backoff_max_ms=60_000)
+        self.assertEqual([source.backoff_ms(n) for n in range(1, 7)],
+                         [5_000, 10_000, 20_000, 40_000, 60_000, 60_000])
+        attempts = []
+        for second in range(0, 300):
+            before = len(self.calls)
+            source.refresh(NOW + second * 1_000)
+            if len(self.calls) > before:
+                attempts.append(second)
+        gaps = [later - earlier for earlier, later in zip(attempts, attempts[1:])]
+        self.assertEqual(gaps[:6], [5, 10, 20, 40, 60, 60])
+        self.assertTrue(all(gap == 60 for gap in gaps[4:]))
+        self.engines[18800] = {'positions': [pin('a1')]}
+        second = attempts[-1] + 60
+        positions, _ = source.refresh(NOW + second * 1_000)
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual(source.engines[18800]['next_at'], NOW + second * 1_000 + 5_000)
+
+    def test_eight_dead_ports_cost_at_most_their_backoff_not_every_refresh(self):
+        self.write_registry({str(port): {'engine_port': port} for port in range(18800, 18808)})
+        source = self.source(cache_ms=5_000, backoff_max_ms=60_000)
+        for second in range(0, 600, 5):
+            source.refresh(NOW + second * 1_000)
+        # 8 ports x (5, 10, 20, 40 s, then every 60 s) over 10 minutes.
+        self.assertLessEqual(len(self.calls), 8 * 14)
+        self.assertEqual(source.latest(NOW + 600_000)[1]['engines_backing_off'], 8)
+
+    def test_over_limit_ports_rotate_and_ports_with_open_positions_go_first(self):
+        ports = list(range(18800, 18806))
+        self.write_registry({str(port): {'engine_port': port} for port in ports})
+        for port in ports:
+            self.engines[port] = {'positions': []}
+        self.engines[18805] = {'positions': [pin('held')]}
+        source = self.source(cache_ms=1_000, engine_limit=2)
+        seen = []
+        for step in range(3):
+            before = len(self.calls)
+            source.refresh(NOW + step * 1_000)
+            seen.append(sorted(port for port, _ in self.calls[before:]))
+        self.assertEqual(seen[0], [18800, 18801])
+        self.assertEqual(seen[1], [18802, 18803])
+        # Never-read ports come first; afterwards 18805, now known to hold an
+        # open position, is preferred over the least recently read ports.
+        self.assertEqual(seen[2], [18804, 18805])
+        before = len(self.calls)
+        source.refresh(NOW + 3_000)
+        self.assertIn(18805, [port for port, _ in self.calls[before:]])
+        self.assertEqual(sorted(set(port for port, _ in self.calls)), ports)
+
+    def test_latest_never_fetches(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source()
+        positions, report = source.latest(NOW)
+        self.assertEqual((positions, report['registry_status'], self.calls), ([], 'NOT_REFRESHED', []))
+        source.refresh(NOW)
+        calls = len(self.calls)
+        for offset in range(0, 100_000, 1_000):
+            source.latest(NOW + offset)
+        self.assertEqual(len(self.calls), calls)
+        self.assertTrue(source.latest(NOW + 60_000)[1]['snapshot_stale'])
+        self.assertEqual(len(source.latest(NOW + 60_000)[0]), 1)  # pins kept while stale
+
+    def test_snapshot_updates_asynchronously_on_the_refresher_thread(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=1_000)
+        self.addCleanup(source.stop, 5)
+        self.assertTrue(source.start())
+        self.assertFalse(source.start())  # idempotent
+        deadline = time.monotonic() + 5
+        while not source.latest(scheduler_module._wall_ms())[0] and time.monotonic() < deadline:
+            time.sleep(.01)
+        positions, report = source.latest(scheduler_module._wall_ms())
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual((report['refresher'], report['reads_on_tape_poll']), ('RUNNING', False))
+        self.assertNotEqual(threading.current_thread().ident,
+                            source._thread.ident)
+
+    def test_sleeping_engine_does_not_delay_feed_snapshot(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def slow_fetch(port, timeout_seconds):
+            release.wait(10)
+            return {'positions': [pin('slow')]}
+
+        source = PersonalEnginePositions(slow_fetch, registry_path=self.registry, cache_ms=1_000)
+        self.addCleanup(source.stop, 15)
+        self.addCleanup(release.set)
+        source.start()
+        main = {'feed': [feasible_coin('feasible')], 'positions': [pin('main')]}
+        with patch.object(tape.SESSION, 'get', return_value=FeedSnapshotWiringTests.Response(main)), \
+                patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
+                patch.object(tape, '_PERSONAL_ENGINES', source), \
+                patch.object(tape, 'shared_quote_reference', return_value=None), \
+                patch.object(tape, 'MAX_TRACKED', 2):
+            time.sleep(.05)  # the refresher is now blocked inside slow_fetch
+            started = time.perf_counter()
+            rows = tape.feed_snapshot()
+            elapsed = time.perf_counter() - started
+        self.assertLess(elapsed, .1)
+        self.assertEqual([row['pair'] for row in rows], ['main-pair', 'feasible-pair'])
+
+    def test_closed_loopback_port_does_not_delay_feed_snapshot(self):
+        probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        probe.bind(('127.0.0.1', 0))
+        port = probe.getsockname()[1]
+        probe.close()  # nothing listens here now
+        self.write_registry({'dead': {'engine_port': port}})
+        source = PersonalEnginePositions(tape.personal_engine_state, registry_path=self.registry,
+                                         cache_ms=1_000, timeout_seconds=.75)
+        self.addCleanup(source.stop, 5)
+        source.start()
+        main = {'feed': [feasible_coin('feasible')], 'positions': [pin('main')]}
+        durations = []
+        with patch.object(tape.SESSION, 'get', return_value=FeedSnapshotWiringTests.Response(main)), \
+                patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
+                patch.object(tape, '_PERSONAL_ENGINES', source), \
+                patch.object(tape, 'shared_quote_reference', return_value=None), \
+                patch.object(tape, 'MAX_TRACKED', 2):
+            for _ in range(20):
+                started = time.perf_counter()
+                tape.feed_snapshot()
+                durations.append(time.perf_counter() - started)
+                time.sleep(.05)
+        self.assertLess(max(durations), .1)
+        deadline = time.monotonic() + 5
+        while (source.latest(scheduler_module._wall_ms())[1].get('engines_never_reached') != 1
+               and time.monotonic() < deadline):
+            time.sleep(.02)
+        self.assertEqual(source.latest(scheduler_module._wall_ms())[1]['engines_never_reached'], 1)
 
 
 class PersonalPinSchedulingTests(unittest.TestCase):
@@ -350,7 +504,8 @@ class PersonalPinSchedulingTests(unittest.TestCase):
             state, now=NOW, max_tracked=2, personal_positions=[pin('user')])
         self.assertEqual([row['pairAddress'] for row in selected], ['main-pair', 'user-pair'])
         self.assertEqual((report['pinned_exit_pools'], report['pinned_personal_pools'],
-                          report['pinned_personal_only_pools'], report['entry_capacity']), (2, 1, 1, 0))
+                          report['personal_pins_operator']['pinned_personal_only_pools'],
+                          report['entry_capacity']), (2, 1, 1, 0))
         self.assertEqual(report['selected_pairs'], ['main-pair', 'user-pair'])
 
     def test_duplicate_pools_across_engines_and_main_take_one_seat(self):
@@ -364,7 +519,7 @@ class PersonalPinSchedulingTests(unittest.TestCase):
         self.assertEqual(pairs, ['shared-pair', 'other-pair', 'user-pair', 'cheap-pair'])
         self.assertEqual(len(pairs), len(set(pairs)))
         self.assertEqual((report['pinned_exit_pools'], report['pinned_personal_pools'],
-                          report['pinned_personal_only_pools']), (3, 3, 1))
+                          report['personal_pins_operator']['pinned_personal_only_pools']), (3, 3, 1))
 
     def test_main_pin_values_are_unchanged_when_a_personal_engine_holds_the_same_pool(self):
         main = {'address': 'm-mint', 'pairAddress': 'm-pair', 'dexId': 'pumpswap', 'symbol': 'MAIN'}
@@ -373,12 +528,74 @@ class PersonalPinSchedulingTests(unittest.TestCase):
                                                  personal_positions=[personal])
         self.assertEqual(selected[0]['symbol'], 'MAIN')
 
-    def test_personal_pins_beyond_the_budget_are_all_kept(self):
+    def test_personal_pins_beyond_the_seat_budget_are_kept_up_to_the_pin_limit(self):
         personal = [pin(f'user{index}') for index in range(6)]
-        selected, report = TapePoolScheduler().select({'feed': [cost_first_coin('cheap')]}, now=NOW,
-                                                      max_tracked=4, personal_positions=personal)
+        selected, report = TapePoolScheduler(personal_pin_limit=12).select(
+            {'feed': [cost_first_coin('cheap')]}, now=NOW, max_tracked=4, personal_positions=personal)
         self.assertEqual(len(selected), 6)
         self.assertEqual(report['entry_capacity'], 0)
+        self.assertEqual(report['personal_pins_operator']['personal_pins_over_limit'], 0)
+
+    def test_default_personal_pin_limit_is_the_tape_pool_budget(self):
+        def load(environment):
+            spec = importlib.util.spec_from_file_location('tape_pool_scheduler_env_copy',
+                                                          scheduler_module.__file__)
+            module = importlib.util.module_from_spec(spec)
+            with patch.dict(os.environ, environment):
+                os.environ.pop('NEO_TAPE_PERSONAL_PIN_LIMIT', None)
+                os.environ.update(environment)
+                spec.loader.exec_module(module)
+            return module
+
+        self.assertEqual(load({'NEO_TAPE_MAX_PAIRS': '7'}).PERSONAL_PIN_LIMIT, 7)
+        self.assertEqual(load({'NEO_TAPE_MAX_PAIRS': '7', 'NEO_TAPE_PERSONAL_PIN_LIMIT': '3'})
+                         .PERSONAL_PIN_LIMIT, 3)
+        self.assertEqual(TapePoolScheduler().personal_pin_limit, scheduler_module.PERSONAL_PIN_LIMIT)
+
+    def test_main_pins_keep_their_share_while_personal_only_pins_grow_beyond_the_limit(self):
+        main_positions = [pin('main0'), pin('main1')]
+        lab = {'book': {'position': pin('lab0')}}
+        state = {'feed': [feasible_coin('feasible'), cost_first_coin('cheap')],
+                 'positions': main_positions, 'strategy_lab': {'books': lab}}
+        shapes = []
+        for count in (3, 4, 10, 40):
+            personal = [dict(pin(f'user{index:02d}'), opened_at=NOW - index) for index in range(count)]
+            personal.append(dict(pin('main1'), opened_at=0))  # shared with main: uncapped
+            selected, report = TapePoolScheduler(personal_pin_limit=4).select(
+                state, now=NOW, max_tracked=8, personal_positions=personal)
+            pairs = [row['pairAddress'] for row in selected]
+            self.assertEqual(pairs[:3], ['main0-pair', 'main1-pair', 'lab0-pair'])
+            operator = report['personal_pins_operator']
+            self.assertEqual(operator['personal_pins_over_limit'], max(0, count - 4))
+            self.assertEqual(operator['pinned_personal_only_pools'], min(count, 4))
+            shapes.append((len(pairs), report['pinned_exit_pools'], report['entry_capacity']))
+            if count >= 4:
+                # Oldest open personal-only positions first, deterministically.
+                expected = [f'user{index:02d}-pair' for index in range(count - 1, count - 5, -1)]
+                self.assertEqual(pairs[3:7], expected)
+        # Beyond the limit the selection, the pin count and the entry seats no
+        # longer change, so main's pins keep their share of the body budget.
+        self.assertEqual(shapes[1:], [(8, 7, 1)] * 3)
+        self.assertEqual(shapes[0], (8, 6, 2))
+
+    def test_fresh_personal_pins_precede_stale_ones_under_the_limit(self):
+        stale = dict(pin('stale'), opened_at=1, **{scheduler_module.PERSONAL_STALE_MARK: True})
+        fresh = [dict(pin(f'fresh{index}'), opened_at=100 + index) for index in range(2)]
+        missing_time = pin('untimed')
+        selected, report = TapePoolScheduler(personal_pin_limit=3).select(
+            {}, now=NOW, max_tracked=4, personal_positions=[stale, missing_time] + fresh)
+        self.assertEqual([row['pairAddress'] for row in selected],
+                         ['fresh0-pair', 'fresh1-pair', 'untimed-pair'])
+        self.assertEqual(report['personal_pins_operator']['personal_pins_over_limit_pairs'], ['stale-pair'])
+        self.assertNotIn(scheduler_module.PERSONAL_STALE_MARK, selected[0])
+
+    def test_zero_pin_limit_keeps_main_and_shared_personal_pins(self):
+        selected, report = TapePoolScheduler(personal_pin_limit=0).select(
+            {'positions': [pin('main')]}, now=NOW, max_tracked=4,
+            personal_positions=[pin('main'), pin('user')])
+        self.assertEqual([row['pairAddress'] for row in selected], ['main-pair'])
+        self.assertEqual((report['pinned_personal_pools'],
+                          report['personal_pins_operator']['personal_pins_over_limit']), (1, 1))
 
     def test_unsupported_personal_pool_is_reported_not_pinned(self):
         selected, report = TapePoolScheduler().select(
@@ -400,7 +617,9 @@ class PersonalPinSchedulingTests(unittest.TestCase):
 
     def test_without_personal_positions_reports_zero(self):
         _, report = TapePoolScheduler().select({'feed': []}, now=NOW, max_tracked=4)
-        self.assertEqual((report['pinned_personal_pools'], report['pinned_personal_only_pools']), (0, 0))
+        self.assertEqual((report['pinned_personal_pools'],
+                          report['personal_pins_operator']['pinned_personal_only_pools'],
+                          report['personal_pins_operator']['personal_pins_over_limit']), (0, 0, 0))
 
 
 class FeedSnapshotWiringTests(RegistryFixture):
@@ -419,22 +638,54 @@ class FeedSnapshotWiringTests(RegistryFixture):
         self.engines[18900] = {'positions': [pin('user')]}
         self.engines[18901] = OSError('down')
         main = {'feed': [cost_first_coin('cheap'), over_budget_coin('costly')], 'positions': [pin('main')]}
+        source = self.source()
+        source.refresh(NOW)  # the refresher's pass; feed_snapshot only reads it
+        calls = len(self.calls)
         with patch.object(tape.SESSION, 'get', return_value=self.Response(main)) as get, \
                 patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
-                patch.object(tape, '_PERSONAL_ENGINES', self.source()), \
+                patch.object(tape, '_PERSONAL_ENGINES', source), \
                 patch.object(tape, 'shared_quote_reference', return_value=None), \
                 patch.object(tape, 'MAX_TRACKED', 3), \
                 patch.object(tape, 'now_ms', return_value=NOW):
             rows = tape.feed_snapshot()
-        self.assertEqual(get.call_count, 1)  # only main /state; personal reads use the injected fetch
+        self.assertEqual(get.call_count, 1)  # only main /state
+        self.assertEqual(len(self.calls), calls)  # no personal read on the poll
         self.assertEqual([row['pair'] for row in rows], ['main-pair', 'user-pair', 'cheap-pair'])
         scheduling = tape.STATUS['entry_scheduling']
         self.assertEqual(scheduling['pinned_personal_pools'], 1)
         self.assertEqual(scheduling['selected_cost_first_pools'], 1)
-        self.assertEqual(scheduling['personal_engines']['registry_status'], 'OK')
-        self.assertEqual((scheduling['personal_engines']['engines_reachable'],
-                          scheduling['personal_engines']['engines_unavailable']), (1, 1))
-        self.assertTrue(scheduling['personal_engines']['read_only'])
+        operator = tape.STATUS['personal_engines']
+        self.assertEqual(operator['registry_status'], 'OK')
+        self.assertEqual((operator['engines_reachable'], operator['engines_never_reached']), (1, 1))
+        self.assertEqual((operator['pinned_personal_only_pools'], operator['personal_pins_over_limit']), (1, 0))
+        self.assertTrue(operator['read_only'])
+
+    def test_entry_scheduling_carries_no_personal_engine_aggregates(self):
+        self.write_registry({'a': {'engine_port': 18900}})
+        self.engines[18900] = {'positions': [pin('user')]}
+        source = self.source()
+        source.refresh(NOW)
+        main = {'feed': [], 'positions': []}
+        with patch.object(tape.SESSION, 'get', return_value=self.Response(main)), \
+                patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
+                patch.object(tape, '_PERSONAL_ENGINES', source), \
+                patch.object(tape, 'shared_quote_reference', return_value=None), \
+                patch.object(tape, 'MAX_TRACKED', 2), \
+                patch.object(tape, 'now_ms', return_value=NOW):
+            tape.feed_snapshot()
+        scheduling = tape.STATUS['entry_scheduling']
+        self.assertEqual(scheduling['pinned_personal_pools'], 1)
+        text = json.dumps(scheduling)
+        for field in ('personal_engines', 'personal_pins_operator', 'engines_listed',
+                      'engines_reachable', 'open_positions', 'pinned_personal_only_pools',
+                      'personal_pins_over_limit'):
+            self.assertNotIn(field, text)
+        # market_monitor forwards entry_scheduling to every user's /state but not
+        # the tape file's top-level personal_engines status.
+        monitor = (Path(__file__).resolve().parents[1] / 'backend' / 'market_monitor.py').read_text(encoding='utf-8')
+        forwarded = monitor[monitor.index("'live_tape_status'"):].split('\n', 1)[0]
+        self.assertIn("'entry_scheduling'", forwarded)
+        self.assertNotIn('personal_engines', forwarded)
 
     def test_feed_snapshot_with_missing_registry_behaves_as_before(self):
         main = {'feed': [feasible_coin('feasible')], 'positions': [pin('main')]}
@@ -446,18 +697,39 @@ class FeedSnapshotWiringTests(RegistryFixture):
                 patch.object(tape, 'now_ms', return_value=NOW):
             rows = tape.feed_snapshot()
         self.assertEqual([row['pair'] for row in rows], ['main-pair', 'feasible-pair'])
-        self.assertEqual(tape.STATUS['entry_scheduling']['personal_engines']['registry_status'], 'MISSING')
+        self.assertEqual(tape.STATUS['personal_engines']['registry_status'], 'NOT_REFRESHED')
         self.assertEqual(self.calls, [])
 
     def test_default_fetch_reads_only_loopback_state_with_the_given_timeout(self):
-        with patch.object(tape.SESSION, 'get', return_value=self.Response({'positions': []})) as get:
+        with patch.object(tape.PERSONAL_SESSION, 'get', return_value=self.Response({'positions': []})) as get, \
+                patch.object(tape.SESSION, 'get') as poll_get:
             self.assertEqual(tape.personal_engine_state(18950, .75), {'positions': []})
-        get.assert_called_once_with('http://127.0.0.1:18950/state', timeout=.75)
+        get.assert_called_once_with('http://127.0.0.1:18950/state', timeout=.75, allow_redirects=False)
+        poll_get.assert_not_called()
+
+    def test_main_starts_the_refresher_before_the_first_poll(self):
+        order = []
+
+        class Stop(Exception):
+            pass
+
+        def first_poll():
+            order.append('poll')
+            raise Stop
+
+        source = self.source()
+        with patch.object(tape, '_PERSONAL_ENGINES', source), \
+                patch.object(source, 'start', side_effect=lambda: order.append('start')), \
+                patch.object(tape, 'poll_once', side_effect=first_poll), \
+                patch.object(tape, 'failure_summary', side_effect=Stop):
+            with self.assertRaises(Stop):
+                tape.main()
+        self.assertEqual(order, ['start', 'poll'])
 
     def test_default_source_reads_the_registry_named_by_the_environment(self):
         self.write_registry({})
         with patch.dict(os.environ, {'NEO_USER_STATE_PATH': str(self.registry)}):
-            _, report = PersonalEnginePositions(self.fetch).collect(NOW)
+            _, report = PersonalEnginePositions(self.fetch).refresh(NOW)
         self.assertEqual((report['registry_status'], report['engines_listed']), ('OK', 0))
 
 

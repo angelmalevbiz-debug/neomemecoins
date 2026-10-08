@@ -3,9 +3,11 @@
 This decides what to observe, never whether to trade. Actual flow completeness,
 safety checks and executable quotes retain their existing admission authority.
 
-Seat shedding: a pool whose fetched transaction bodies yielded no engine-usable
-swap after a bounded number of bodies cannot become admissible while it keeps
+Seat shedding: a pool whose fetched transaction bodies yielded no decoded swap
+after a bounded number of bodies cannot become admissible while it keeps
 failing to decode, so it releases its entry/exploration seat for a cooldown.
+A swap whose only defect is a missing or estimated SOL/USD reference counts as
+decoded, so an FX-reference outage cannot shed every candidate at once.
 Pinned exit pools are never shed. Shedding changes what is observed at zero
 RPC cost; it never admits, sizes or exits anything.
 """
@@ -22,7 +24,10 @@ LEASE_MS = 60_000
 POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V3_YIELD_SHED'
 SHED_MIN_BODIES = max(1, int(os.getenv('NEO_TAPE_SHED_MIN_BODIES', '40')))
 SHED_COOLDOWN_MS = max(60_000, int(os.getenv('NEO_TAPE_SHED_COOLDOWN_MS', '1800000')))
-SHED_REASON = 'ZERO_USABLE_SWAPS_AFTER_BODIES'
+SHED_REASON = 'ZERO_DECODED_SWAPS_AFTER_BODIES'
+# Must match live_tape.YIELD_WINDOW_MS: a retry floor older than the recorder's
+# in-memory window is equivalent to no floor and can be forgotten.
+YIELD_WINDOW_MS = max(60_000, int(os.getenv('NEO_TAPE_YIELD_WINDOW_MS', '7200000')))
 SHED_LIST_LIMIT = 64
 
 
@@ -60,12 +65,13 @@ def _held_coins(state, market):
 
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
-                 shed_cooldown_ms=SHED_COOLDOWN_MS):
+                 shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS):
         self.lease_ms = max(30_000, int(lease_ms))
         self.leases = {}
         self.last_selected = {}
         self.shed_min_bodies = max(1, int(shed_min_bodies))
         self.shed_cooldown_ms = max(60_000, int(shed_cooldown_ms))
+        self.yield_window_ms = max(60_000, int(yield_window_ms))
         self.shed = {}
         self.yield_since = {}
 
@@ -84,11 +90,14 @@ class TapePoolScheduler:
         stats = decode_yield(identity[1], self.yield_since.get(identity, 0))
         bodies = int(feasibility.number(stats.get('bodies')))
         usable = int(feasibility.number(stats.get('usable_swaps')))
-        if bodies < self.shed_min_bodies or usable > 0:
+        # Decoded swaps include FX-reference-flagged events; a yield source
+        # without that field falls back to the stricter usable count.
+        decoded = int(feasibility.number(stats.get('decoded_swaps', usable)))
+        if bodies < self.shed_min_bodies or decoded > 0 or usable > 0:
             return None
         record = {'symbol': coin.get('symbol'), 'address': identity[0],
                   'pairAddress': identity[1], 'reason': SHED_REASON,
-                  'bodies': bodies, 'usable_swaps': usable,
+                  'bodies': bodies, 'decoded_swaps': decoded, 'usable_swaps': usable,
                   'shadow_swaps': int(feasibility.number(stats.get('shadow_swaps'))),
                   'first_body_at': stats.get('first_body_at'),
                   'last_body_at': stats.get('last_body_at'),
@@ -115,12 +124,20 @@ class TapePoolScheduler:
         main_cost_cap = feasibility.number((state.get('config') or {}).get(
             'strict_max_roundtrip_cost_pct'), 1.5)
         # Expired shed records of pools that left the feed or are now held
-        # (pinned, therefore never shed) are forgotten; an expired record of a
+        # (pinned, therefore never shed) are dropped; an expired record of a
         # feed candidate is converted into a fresh bounded attempt below.
-        self.shed = {identity: record for identity, record in self.shed.items()
-                     if now < record['retry_at'] or (identity in market and identity not in pinned)}
+        # Either way the retry floor survives while it still excludes bodies
+        # from the recorder's window, so a pool returning after its cooldown
+        # is judged on bodies fetched after retry_at, not the shed evidence.
+        kept = {}
+        for identity, record in self.shed.items():
+            if now < record['retry_at'] or (identity in market and identity not in pinned):
+                kept[identity] = record
+            else:
+                self.yield_since[identity] = record['retry_at']
+        self.shed = kept
         self.yield_since = {identity: since for identity, since in self.yield_since.items()
-                            if identity in market}
+                            if identity in market or now - since < self.yield_window_ms}
         shed_now = []
         for identity, coin in market.items():
             if not _supported(coin) or identity in pinned:
@@ -214,7 +231,9 @@ class TapePoolScheduler:
                        'supported_candidate_pools': len(candidates),
                        'shed_policy': {'reason': SHED_REASON, 'min_bodies': self.shed_min_bodies,
                                        'cooldown_ms': self.shed_cooldown_ms,
-                                       'counts_engine_usable_swaps_only': True,
+                                       'sheds_on_zero_decoded_swaps': True,
+                                       'decoded_allows_flags': ['QUOTE_ASSET_USD_REFERENCE_ESTIMATE',
+                                                                'QUOTE_USD_UNKNOWN'],
                                        'pinned_exit_pools_exempt': True,
                                        'yield_source': 'RECORDER_IN_MEMORY' if decode_yield is not None else 'UNAVAILABLE'},
                        'shed_pool_count': len(self.shed),

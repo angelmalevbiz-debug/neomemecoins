@@ -66,6 +66,17 @@ the default path body (base leg equals the vault delta).
   `market_monitor.live_flow` / `strategy_lab.flow_map` exclude the event and
   report DEGRADED flow through their existing quality-flag handling. No
   engine file changed.
+- Events carrying `DECODER_PATH_UNVALIDATED` are journaled in a separate
+  `shadow_events` table (same columns as `events`, created by the recorder's
+  existing `CREATE TABLE IF NOT EXISTS` schema path on start; existing rows
+  are untouched). They are never projected into `live_tape_status.events`
+  and never counted against `NEO_TAPE_MAX_EVENTS` (1600) in the 5-minute
+  projection window: measured on the journal copy, 3 of 37 five-minute
+  windows would otherwise exceed 1600, and truncation marks every tracked
+  pool `DEGRADED` (`UI_WINDOW_TRUNCATED`), which blocks all PAPER entries.
+  The snapshot publishes `shadow_events_window` (count only). Signature
+  state/reason and the in-memory yield counters are unchanged by the table
+  split.
 - `NEO_TAPE_VALIDATED_DECODER_VERSIONS` (comma-separated) lists additional
   validated versions. Default: only V1. `live_tape_status.decoder` publishes
   the default, shadow and validated versions.
@@ -81,34 +92,57 @@ re-decoded or rewritten.
 The recorder keeps an in-memory per-pool count of classified bodies and the
 swaps they yielded (`TapeRecorder.decode_yield`; window
 `NEO_TAPE_YIELD_WINDOW_MS`, default 2 h; reset on restart; no journal query).
+It publishes two counts:
+
+- `decoded_swaps`: events whose quality flags are a subset of
+  {`QUOTE_USD_UNKNOWN`, `QUOTE_ASSET_USD_REFERENCE_ESTIMATE`}. The swap legs
+  are exact; only the SOL/USD valuation is missing or estimated.
+- `usable_swaps`: events without any quality flag (what the engine and the
+  Lab accept as flow).
+
 A supported entry candidate whose bodies reached `NEO_TAPE_SHED_MIN_BODIES`
-(default 40) with zero engine-usable swaps (events without quality flags) is
-excluded from entry and exploration seats and its lease is released for
-`NEO_TAPE_SHED_COOLDOWN_MS` (default 30 min). After the cooldown the pool is
-re-evaluated from bodies fetched after `retry_at` only. Pinned exit pools are
-never shed. Shadow-path events do not count as usable, so a pool that decodes
-only through the shadow path is shed like any other until the version is
-validated; its `shadow_swaps` count is published.
+(default 40) with zero decoded swaps is excluded from entry and exploration
+seats and its lease is released for `NEO_TAPE_SHED_COOLDOWN_MS` (default
+30 min). Shedding on zero *usable* swaps would, during a Jupiter SOL/USD
+reference outage (every WSOL event flagged `QUOTE_USD_UNKNOWN` or
+`QUOTE_ASSET_USD_REFERENCE_ESTIMATE`; 13% of journal events, one ~50-minute
+stretch at ~60%), have shed every entry candidate for 30 minutes. After the
+cooldown the pool is re-evaluated from bodies fetched after `retry_at` only;
+the retry floor is kept even when the pool leaves the feed, until it is older
+than the yield window, so a pool returning after its cooldown is not shed
+again on the old evidence. Pinned exit pools are never shed. Shadow-path
+events are neither decoded nor usable, so a pool that decodes only through
+the shadow path is shed like any other until the version is validated; its
+`shadow_swaps` count is published.
+
+`TapeRecorder.poll` restricts the fresh pending-body queue (and discovery's
+reservation for it) to pools in the current selection, so pending signatures
+of shed or de-selected pools no longer spend the per-poll body budget. They
+stay pending in the journal and age into the existing small historical
+maintenance budget.
 
 `live_tape_status.entry_scheduling` now publishes `shed_policy`,
 `shed_pool_count`, `shed_pools_in_feed` and `shed_pools` (symbol, mint, pool,
-reason `ZERO_USABLE_SWAPS_AFTER_BODIES`, bodies, usable/shadow swaps, first
-and last body time, `shed_at`, `retry_at`).
+reason `ZERO_DECODED_SWAPS_AFTER_BODIES`, bodies, decoded/usable/shadow swaps,
+first and last body time, `shed_at`, `retry_at`).
 
 ## How it will be evaluated (24 h shadow comparison, before any validation)
 
-1. Count shadow events per pool and per hour from the journal
-   (`events.payload.decoder_version = …V2`) against the pool's DexScreener
+1. Count shadow events per pool and per hour from the journal's
+   `shadow_events` table (every row there is a
+   `PUMP_SWAP_REVERSED_CASH_LEG_EVENT_V2` event; V1 events stay in `events`)
+   against the pool's DexScreener
    `txns.m5`/`volume` recorded in `training/observations.jsonl`; the decoded
    share must rise for reversed pools without creating events for pools whose
    DexScreener counts are zero.
-2. For reversed pools with both V1 and V2 events, compare the distributions of
-   `quote_amount` and `token_amount` per direction; a systematic difference
-   would indicate a leg or direction error.
+2. For reversed pools with both V1 events (`events`) and V2 events
+   (`shadow_events`), compare the distributions of `quote_amount` and
+   `token_amount` per direction; a systematic difference would indicate a
+   leg or direction error.
 3. Re-run the body cross-check (event base leg against pool vault delta, user
    quote leg against the user's token account delta) on a fresh sample of V2
    signatures.
-4. Confirm `entry_scheduling.shed_pools` lists only pools with zero usable
+4. Confirm `entry_scheduling.shed_pools` lists only pools with zero decoded
    swaps and that seats were reassigned to pools that later reached
    `COMPLETE` coverage.
 5. Only then may the owner set

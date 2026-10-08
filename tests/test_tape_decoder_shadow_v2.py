@@ -248,17 +248,74 @@ class RecorderAndEngineConsumerTests(unittest.TestCase):
         self.rec.process(lambda calls: [{'result': copy.deepcopy(self.tx)} for _ in calls])
         state = self.rec.db.execute('SELECT state,reason FROM signatures').fetchone()
         self.assertEqual((state['state'], state['reason']), ('unclassified', FLAG))
-        stored = [json.loads(r['payload']) for r in self.rec.db.execute('SELECT payload FROM events')]
+        # Shadow-path events live in their own journal table only.
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM events').fetchone()[0], 0)
+        stored = [json.loads(r['payload']) for r in self.rec.db.execute('SELECT payload FROM shadow_events')]
         self.assertEqual([(e['decoder_version'], e['quality_flags']) for e in stored], [(V2, [FLAG])])
+        row = self.rec.db.execute('SELECT signature,pair,event_time,available,event_id FROM shadow_events').fetchone()
+        self.assertEqual((row['signature'], row['pair'], row['event_id']),
+                         (self.row['signature'], self.row['pair'], stored[0]['event_id']))
+        self.assertEqual((row['event_time'], row['available']), (stored[0]['event_time'], stored[0]['available_at']))
         snapshot = self.rec.snapshot([self.metadata])
         coverage = snapshot['pair_coverage'][self.row['pair']]
         self.assertEqual((coverage['status'], coverage['reason']), ('DEGRADED', 'UNCLASSIFIED_TRANSACTIONS'))
-        self.assertEqual(snapshot['events'][0]['decoder_version'], V2)
+        self.assertEqual(snapshot['events'], [])
+        self.assertEqual((snapshot['events_total'], snapshot['shadow_events_window']), (0, 1))
         self.assertEqual(snapshot['decoder']['validated_versions'], [V1])
         self.assertEqual(self.rec.decode_yield(self.row['pair']),
-                         {'bodies': 1, 'usable_swaps': 0, 'shadow_swaps': 1,
+                         {'bodies': 1, 'decoded_swaps': 0, 'usable_swaps': 0, 'shadow_swaps': 1,
                           'first_body_at': self.clock[0], 'last_body_at': self.clock[0],
                           'window_ms': self.rec.yield_window_ms, 'since': self.clock[0]-self.rec.yield_window_ms})
+
+    def test_shadow_events_never_count_toward_the_projection_window_or_max_events(self):
+        # A second, otherwise complete pool must not be marked
+        # UI_WINDOW_TRUNCATED because of shadow-path volume elsewhere.
+        clean = dict(self.metadata, pair='CLEAN-POOL', address='CLEAN-MINT')
+        with self.rec.db:
+            self.rec.db.execute('INSERT INTO pairs(pair,mint,complete_since,last_poll,metadata) VALUES(?,?,?,?,?)',
+                                (clean['pair'], clean['address'], self.block_ms-60_000, self.clock[0], json.dumps(clean)))
+            for index in range(2):
+                self.rec.db.execute('INSERT INTO events VALUES(?,?,?,?,?,?)',
+                    (f'valid-{index}', f'valid-{index}', clean['pair'], self.block_ms-index, self.block_ms,
+                     json.dumps({'event_id': f'valid-{index}', 'pair': clean['pair']})))
+        self.rec.process(lambda calls: [{'result': copy.deepcopy(self.tx)} for _ in calls])
+        shadow = 50
+        with self.rec.db:
+            self.rec.db.executemany('INSERT INTO shadow_events VALUES(?,?,?,?,?,?)',
+                ((f'shadow-{i}', f'shadow-{i}', self.row['pair'], self.block_ms, self.block_ms,
+                  json.dumps({'event_id': f'shadow-{i}', 'quality_flags': [FLAG]})) for i in range(shadow)))
+        with patch.object(tape, 'MAX_EVENTS', 2):
+            snapshot = self.rec.snapshot([self.metadata, clean])
+        self.assertFalse(snapshot['projection_truncated'])
+        self.assertEqual([event['event_id'] for event in snapshot['events']], ['valid-0', 'valid-1'])
+        self.assertEqual(snapshot['shadow_events_window'], shadow+1)
+        self.assertEqual(snapshot['pair_coverage'][clean['pair']]['status'], 'COMPLETE')
+        self.assertNotIn('UI_WINDOW_TRUNCATED',
+                         [record['reason'] for record in snapshot['pair_coverage'].values()])
+        # The truncation guard itself still works for validated events.
+        with self.rec.db:
+            self.rec.db.execute('INSERT INTO events VALUES(?,?,?,?,?,?)',
+                ('valid-2', 'valid-2', clean['pair'], self.block_ms-2, self.block_ms, json.dumps({'event_id': 'valid-2'})))
+        with patch.object(tape, 'MAX_EVENTS', 2):
+            snapshot = self.rec.snapshot([self.metadata, clean])
+        self.assertTrue(snapshot['projection_truncated'])
+        self.assertEqual(snapshot['pair_coverage'][clean['pair']]['reason'], 'UI_WINDOW_TRUNCATED')
+
+    def test_shadow_table_is_added_to_an_existing_journal_without_touching_its_rows(self):
+        path = self.rec.path
+        with self.rec.db:
+            self.rec.db.execute('INSERT INTO events VALUES(?,?,?,?,?,?)',
+                                ('kept', 'kept', self.row['pair'], self.block_ms, self.block_ms, '{"kept":true}'))
+            self.rec.db.execute('DROP TABLE shadow_events')
+        self.rec.close()
+        self.rec = tape.TapeRecorder(path, clock=lambda: self.clock[0], tx_budget=4)
+        tables = {row['name'] for row in self.rec.db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        self.assertIn('shadow_events', tables)
+        indexes = {row['name'] for row in self.rec.db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+        self.assertTrue({'shadow_event_time_idx', 'shadow_event_pair_time_idx'} <= indexes)
+        self.assertEqual([tuple(row) for row in self.rec.db.execute('SELECT event_id,payload FROM events')],
+                         [('kept', '{"kept":true}')])
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM shadow_events').fetchone()[0], 0)
 
     def test_engine_live_flow_treats_shadow_events_as_degraded_until_validated(self):
         for name, filename in (('NEO_MARKET_STATE_PATH', 'state.json'), ('NEO_MARKET_AUDIT_PATH', 'audit.jsonl'),

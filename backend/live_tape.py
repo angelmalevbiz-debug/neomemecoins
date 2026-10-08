@@ -66,6 +66,14 @@ DECODER_VERSION = 'PUMP_SWAP_EVENT_DECODER_V1'
 REVERSED_CASH_LEG_DECODER_VERSION = 'PUMP_SWAP_REVERSED_CASH_LEG_EVENT_V2'
 SHADOW_DECODER_VERSIONS = (REVERSED_CASH_LEG_DECODER_VERSION,)
 UNVALIDATED_DECODER_FLAG = 'DECODER_PATH_UNVALIDATED'
+# Events of an unvalidated decoder path are journaled in their own table so
+# the shadow comparison keeps them while the UI projection, its MAX_EVENTS
+# truncation guard and every flow consumer read only the validated table.
+SHADOW_EVENTS_TABLE = 'shadow_events'
+# A body counts as decoded for seat shedding when its events carry no flag
+# other than these FX-reference flags: a Jupiter SOL/USD outage leaves the
+# swap itself exactly decoded, so it must not release every candidate's seat.
+FX_REFERENCE_FLAGS = frozenset({'QUOTE_USD_UNKNOWN','QUOTE_ASSET_USD_REFERENCE_ESTIMATE'})
 # In-memory decode-yield window used by seat shedding; never a journal query.
 YIELD_WINDOW_MS = max(60_000,int(os.getenv('NEO_TAPE_YIELD_WINDOW_MS','7200000')))
 _B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
@@ -455,14 +463,28 @@ def parse_trade(tx,metadata):
     return events[0] if len(events)==1 else None
 
 
+def _is_shadow_event(event):
+    return UNVALIDATED_DECODER_FLAG in (event.get('quality_flags') or ())
+
+
+def _pair_filter(pairs):
+    """SQL fragment restricting the pending queue to the current selection."""
+    if pairs is None:
+        return '',()
+    pairs = tuple(dict.fromkeys(pairs))
+    if not pairs:
+        return 'AND 0 ',()
+    return 'AND pair IN ('+','.join('?'*len(pairs))+') ',pairs
+
+
 class TapeRecorder:
     def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET,
                  historical_tx_budget=HISTORICAL_TX_BUDGET,yield_window_ms=YIELD_WINDOW_MS):
         self.path,self.clock = Path(path),clock
         self.page_size,self.page_budget,self.tx_budget = page_size,page_budget,tx_budget
         self.historical_tx_budget = max(0,int(historical_tx_budget))
-        # Per pool, one in-memory row per poll: (classified_at, bodies,
-        # engine-usable swaps, shadow-path swaps). Restart starts from zero,
+        # Per pool, one in-memory row per poll: (classified_at, bodies, decoded
+        # swaps, engine-usable swaps, shadow-path swaps). Restart starts from zero,
         # so shedding is conservative and never touches the durable journal.
         self.yield_window_ms = max(60_000,int(yield_window_ms))
         self._yield = {}
@@ -487,6 +509,10 @@ class TapeRecorder:
                 event_time INTEGER NOT NULL,available INTEGER NOT NULL,payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS event_time_idx ON events(event_time);
             CREATE INDEX IF NOT EXISTS event_pair_time_idx ON events(pair,event_time);
+            CREATE TABLE IF NOT EXISTS shadow_events(event_id TEXT PRIMARY KEY,signature TEXT NOT NULL,pair TEXT NOT NULL,
+                event_time INTEGER NOT NULL,available INTEGER NOT NULL,payload TEXT NOT NULL);
+            CREATE INDEX IF NOT EXISTS shadow_event_time_idx ON shadow_events(event_time);
+            CREATE INDEX IF NOT EXISTS shadow_event_pair_time_idx ON shadow_events(pair,event_time);
         ''')
         self.db.commit()
 
@@ -494,16 +520,19 @@ class TapeRecorder:
         self.db.close()
 
     def _record_yield(self,classified_at,counts):
-        for pair,(bodies,usable,shadow) in counts.items():
+        for pair,(bodies,decoded,usable,shadow) in counts.items():
             if bodies:
-                self._yield.setdefault(pair,[]).append((int(classified_at),bodies,usable,shadow))
+                self._yield.setdefault(pair,[]).append((int(classified_at),bodies,decoded,usable,shadow))
 
     def decode_yield(self,pair,since=0):
         """Bodies classified for one pool and the swaps they yielded.
 
-        ``usable_swaps`` counts events without quality flags, i.e. the only
-        events the engine and the Lab accept as flow. ``shadow_swaps`` counts
-        events recorded by an unvalidated decoder path. Only rows at or after
+        ``decoded_swaps`` counts events whose only quality flags, if any, are
+        FX-reference flags (the swap legs are exact; only the SOL/USD value
+        is missing or estimated). ``usable_swaps`` counts events without
+        quality flags, i.e. the only events the engine and the Lab accept as
+        flow. ``shadow_swaps`` counts events recorded by an unvalidated
+        decoder path; they are never decoded or usable. Only rows at or after
         ``since`` (and within the in-memory window) are counted.
         """
         current = self.clock()
@@ -514,8 +543,8 @@ class TapeRecorder:
         else:
             self._yield.pop(pair,None)
         rows = [row for row in rows if row[0]>=floor]
-        return {'bodies':sum(r[1] for r in rows),'usable_swaps':sum(r[2] for r in rows),
-                'shadow_swaps':sum(r[3] for r in rows),
+        return {'bodies':sum(r[1] for r in rows),'decoded_swaps':sum(r[2] for r in rows),
+                'usable_swaps':sum(r[3] for r in rows),'shadow_swaps':sum(r[4] for r in rows),
                 'first_body_at':rows[0][0] if rows else None,'last_body_at':rows[-1][0] if rows else None,
                 'window_ms':self.yield_window_ms,'since':floor}
 
@@ -537,13 +566,17 @@ class TapeRecorder:
         # services. A fixed half-budget left unused body capacity even when
         # there were no retries. Every pool still gets at least one signature
         # per round, including pinned pools; process() retains its exact cap.
+        # Only the current selection's bodies are due: poll() restricts
+        # process() to the same pools, so de-selected or shed pools' pending
+        # signatures must not shrink the discovery budget either.
         observed = self.clock()
+        selection,selection_params = _pair_filter(metadata['pair'] for metadata in feed)
         due = self.db.execute('''SELECT count(*) n FROM (
             SELECT signature FROM signatures INDEXED BY pending_fresh_idx
             WHERE state='pending' AND next_retry<=?
-                AND COALESCE(event_time,observed)>=?
+                AND COALESCE(event_time,observed)>=? '''+selection+'''
             ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC
-            LIMIT ?)''', (observed,observed-WINDOW_MS,self.tx_budget)).fetchone()['n']
+            LIMIT ?)''', (observed,observed-WINDOW_MS,*selection_params,self.tx_budget)).fetchone()['n']
         discovery_remaining = max(len(active)*self.page_budget,self.tx_budget-due)
         # One shared page batch per round, rather than one HTTP call per pool.
         # Unused capacity from short pages can serve remaining pools next round.
@@ -631,18 +664,21 @@ class TapeRecorder:
                     next_active.append(metadata)
             active = next_active
 
-    def process(self,rpc):
+    def process(self,rpc,pairs=None):
         # Prioritize on-chain time: an old pagination row discovered just now
         # must not displace an already observed live transaction. Large legacy
         # retry queues remain durable, but get only a small maintenance budget
         # instead of filling every unused live request slot on each poll.
+        # ``pairs`` is the current selection: fresh bodies of pools that were
+        # shed or de-selected stay pending and do not spend the live budget.
         current = self.clock()
         cutoff = current-WINDOW_MS
         order = 'ORDER BY COALESCE(event_time,observed) DESC,observed DESC,slot DESC LIMIT ?'
+        selection,selection_params = _pair_filter(pairs)
         pending = list(self.db.execute(
             "SELECT * FROM signatures INDEXED BY pending_fresh_idx WHERE state='pending' AND next_retry<=? "
-            'AND COALESCE(event_time,observed)>=? '+order,
-            (current,cutoff,self.tx_budget)))
+            'AND COALESCE(event_time,observed)>=? '+selection+order,
+            (current,cutoff,*selection_params,self.tx_budget)))
         historical_budget = min(self.historical_tx_budget,max(0,self.tx_budget-len(pending)))
         if historical_budget:
             pending.extend(self.db.execute(
@@ -699,17 +735,20 @@ class TapeRecorder:
                     except (ValueError,TypeError,KeyError,IndexError,AttributeError,OverflowError):
                         classification,events,reason = 'unclassified',[],'TRANSACTION_SCHEMA_MISMATCH'
                 if classification!='retry':
-                    bodies,usable,shadow = yield_counts.get(row['pair'],(0,0,0))
+                    bodies,decoded,usable,shadow = yield_counts.get(row['pair'],(0,0,0,0))
                     yield_counts[row['pair']] = (
                         bodies+1,
+                        decoded+sum(1 for event in events if set(event.get('quality_flags') or ())<=FX_REFERENCE_FLAGS),
                         usable+sum(1 for event in events if not event.get('quality_flags')),
-                        shadow+sum(1 for event in events if UNVALIDATED_DECODER_FLAG in (event.get('quality_flags') or [])))
+                        shadow+sum(1 for event in events if _is_shadow_event(event)))
                 with self.db:
                     for event in events:
                         event.update(signature=signature,slot=event.get('slot') or row['slot'])
                         event_id = f"{signature}:{row['pair']}:{event['event_index']}"
                         event['event_id'] = event_id
-                        self.db.execute('INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?)',
+                        # Shadow-path events never enter the projection table.
+                        table = SHADOW_EVENTS_TABLE if _is_shadow_event(event) else 'events'
+                        self.db.execute(f'INSERT OR IGNORE INTO {table} VALUES(?,?,?,?,?,?)',
                             (event_id,signature,row['pair'],event['event_time'],event['available_at'],json.dumps(event,allow_nan=False)))
                     attempts = row['attempts']+1
                     delay = min(60_000,1000*2**min(attempts-1,6))
@@ -772,12 +811,16 @@ class TapeRecorder:
                 'backlog':total_backlog,'current_backlog':current_backlog,
                 'stale_pending':max(0,total_backlog-current_backlog),
                 'classifications':counts,'events_total':self.db.execute('SELECT count(*) n FROM events').fetchone()['n'],
+                # Journaled for the shadow comparison only; never projected and
+                # never counted against MAX_EVENTS.
+                'shadow_events_window':self.db.execute(
+                    f'SELECT count(*) n FROM {SHADOW_EVENTS_TABLE} WHERE event_time>=?',(cutoff,)).fetchone()['n'],
                 'window_ms':WINDOW_MS,'projection_truncated':truncated,
                 'lag_ms':max((max(0,current-r['oldest_pending_at']) for r in coverage.values() if r['oldest_pending_at']),default=0)}
 
     def poll(self,feed,rpc=rpc_batch):
         self.discover(feed,rpc)
-        self.process(rpc)
+        self.process(rpc,pairs=[metadata['pair'] for metadata in feed])
         return self.snapshot(feed)
 
 

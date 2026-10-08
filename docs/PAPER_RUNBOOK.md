@@ -185,7 +185,7 @@ Executed in a worktree on `main` at `2ee0df1` plus this change, with the reposit
 
 | Executed command | Result |
 | --- | --- |
-| `.venv/Scripts/python.exe scripts/run_python_checks.py` | PASS: `tests/` 661 tests and `backend/tests/` 148 tests; temporary account paths, both child exit codes 0 |
+| `.venv/Scripts/python.exe scripts/run_python_checks.py` | PASS: `tests/` 670 tests and `backend/tests/` 148 tests (after the review follow-up: separate `shadow_events` table, shedding on zero decoded swaps, retry floor across feed gaps, body budget limited to the current selection); temporary account paths, both child exit codes 0 |
 | `npm run lint` | PASS, TypeScript noEmit |
 | `npm run check:strategy` | PASS: unchanged `WINNER_ENSEMBLE_PAPER_V1` strategy hash and 50 support-file hashes on the `UTF8_LF` basis |
 | `npm run build` | PASS, strategy/extension guards, 32 frontend tests, Vite and extension archive; nonfatal Vite chunk-size warning |

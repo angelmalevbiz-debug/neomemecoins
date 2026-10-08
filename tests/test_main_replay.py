@@ -72,8 +72,10 @@ class MainReplayTests(unittest.TestCase):
         self.assertNotEqual(int(sale['raw_quote']['inAmount']),entry['token_raw_amount'])
         self.assertAlmostEqual(entry['preflight_quantity_adjustment'],.996)
         with tempfile.TemporaryDirectory() as tmp:
-            first=observation(NOW)
-            first['coin']['updatedAt']=NOW-900
+            # The live entry-stage facts (feed, flow, safety, price) precede the
+            # preflight that starts at NOW-700; the row is recorded at NOW.
+            first=observation(NOW-900)
+            first.update(available_at=NOW,observed_at=NOW)
             first['source']['execution_evidence']={'entry':entry,'exit':sale}
             last=observation(NOW+1000)
             last['source']['execution_evidence']['mark']={

@@ -36,9 +36,11 @@ class ActivityTests(unittest.TestCase):
         lab.rush_brain._SAMPLE_BY_PAIR.clear()
         lab.STATE={'started_at':42,'books':{s['id']:lab.empty_book(s) for s in lab.STRATEGIES}}
 
-    def test_all_34_rules_exist(self):
-        self.assertEqual(len(a.RULES),34)
+    def test_all_36_rules_exist(self):
+        # 34 original books plus the COST_FIRST_ESTABLISHED_V1 pair.
+        self.assertEqual(len(a.RULES),36)
         self.assertEqual(set(a.RULES),{s['id'] for s in lab.STRATEGIES})
+        self.assertTrue(set(lab.cost_first.BOOK_IDS)<=set(a.RULES))
         for rule in a.RULES.values():self.assertGreaterEqual(rule.liquidity,10000)
 
     def test_every_strategy_can_match_its_family(self):
@@ -152,16 +154,29 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(a.entry_notional_limit('PRECISION',19.09,150),19.09)
 
     def test_scalper_sizes_down_and_keeps_cost_checks_at_low_balance(self):
+        # LAB_ACTIVE_V6: a $4.77 risk-capped entry pays ~1.52% (fixed network
+        # fees dominate), above the 1.5% cap, so it is reported as cost-infeasible
+        # instead of being forced. At a balance whose cap fits, it still sizes down.
         lab.STATE['books']['SCALPER']['balance']=19.09
         c=coin();c['priceChange']['h1']=20
         with patch.object(lab,'now_ms',return_value=NOW):
             lab.maybe_open([c],flows())
         book=lab.STATE['books']['SCALPER']
-        self.assertIsNotNone(book['position'])
-        self.assertLessEqual(book['position']['notional_usd'],19.09*.25)
-        self.assertGreaterEqual(book['position']['notional_usd'],a.SCALPER_MIN_NOTIONAL_USD)
+        self.assertIsNone(book['position'])
         self.assertEqual(book['entry_diagnostics']['risk_limited_notional_usd'],4.7725)
-        self.assertGreaterEqual(book['position']['entry_roundtrip_pnl_pct'],-a.MAX_ENTRY_COST_PCT)
+        self.assertEqual(book['entry_diagnostics']['cost_rejected'],1)
+        self.assertEqual(book['entry_diagnostics']['cost_infeasible_candidates'],1)
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'modeled_roundtrip_cost_limit')
+        self.assertEqual(book['entry_diagnostics']['max_entry_roundtrip_cost_pct'],1.5)
+        book['balance']=40
+        with patch.object(lab,'now_ms',return_value=NOW):
+            lab.maybe_open([c],flows())
+        self.assertIsNotNone(book['position'])
+        self.assertLessEqual(book['position']['notional_usd'],40*.25)
+        self.assertGreaterEqual(book['position']['notional_usd'],a.SCALPER_MIN_NOTIONAL_USD)
+        self.assertGreaterEqual(book['position']['entry_roundtrip_pnl_pct'],-a.admission_cost_cap_pct(lab.STOP_LOSS))
+        self.assertEqual(book['position']['entry_cost_cap_pct'],1.5)
+        self.assertGreaterEqual(book['position']['stop_headroom_pct'],1.5)
 
     def test_scalper_stops_below_risk_sized_minimum(self):
         lab.STATE['books']['SCALPER']['balance']=7.99
@@ -189,6 +204,11 @@ class ActivityTests(unittest.TestCase):
         self.assertIsNotNone(q)
         self.assertLess(q['notional'],150)
         self.assertGreaterEqual(q['initial_pnl_pct'],-2.75)
+        tight=a.affordable_entry(c,500,150,lab.entry_execution,lab.exit_execution,
+                                 max_entry_cost_pct=a.admission_cost_cap_pct(lab.STOP_LOSS))
+        self.assertIsNotNone(tight)
+        self.assertLess(tight['notional'],q['notional'])
+        self.assertGreaterEqual(tight['initial_pnl_pct'],-1.5)
 
     def test_tighter_promoted_cost_cap_rejects_without_waiving_costs(self):
         c=coin()
@@ -236,8 +256,14 @@ class ActivityTests(unittest.TestCase):
         for b in opened:
             self.assertEqual(b['balance'],b['starting_balance'])
             self.assertEqual(b['position']['entry_policy_version'],a.POLICY_VERSION)
+            self.assertEqual(b['position']['entry_policy_version'],'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP')
             self.assertLess(b['position']['open_pnl_usd'],0)
-            self.assertGreaterEqual(b['position']['entry_roundtrip_pnl_pct'],-2.75)
+            # LAB_ACTIVE_V6: TEST books share the funded 0.5 x stop cost cap.
+            self.assertGreaterEqual(b['position']['entry_roundtrip_pnl_pct'],-1.5)
+            self.assertEqual(b['position']['entry_cost_cap_pct'],1.5)
+            self.assertEqual(b['position']['stop_loss_net_pct'],3.0)
+            self.assertAlmostEqual(b['position']['stop_headroom_pct'],
+                                   3.0+b['position']['entry_roundtrip_pnl_pct'],places=5)
         promoted=[lab.STATE['books'][key] for key in lab.PROMOTED_STRATEGIES]
         self.assertEqual(sum(book['starting_balance'] for book in promoted),1000)
         for book in promoted:
@@ -334,7 +360,7 @@ class ActivityTests(unittest.TestCase):
         request.assert_not_called()
         self.assertEqual(book['position']['current_price'],coin()['priceUsd'])
 
-    def test_net_stop_all_34_no_loss_clamping(self):
+    def test_net_stop_all_36_no_loss_clamping(self):
         c=coin()
         for b in lab.STATE['books'].values():
             b['position']={'trade_no':1,'address':ADDRESS,'pairAddress':PAIR,'entry_price':1,
@@ -353,7 +379,9 @@ class ActivityTests(unittest.TestCase):
 
     def test_momentum_rush_opens_broader_low_cap_setup_without_promoting_it(self):
         c=coin()
-        c.update(score=86,marketCap=40000,liquidityUsd=12000,ageMinutes=12)
+        # Liquidity 60k keeps the modeled round trip of a $60 low-cap entry
+        # inside the V6 1.5% cap; score 84 keeps the shared MOMENTUM rule off.
+        c.update(score=84,marketCap=40000,liquidityUsd=60000,ageMinutes=12)
         c['priceChange']={'m5':8,'h1':30}
         c['volume']={'h1':20000}
         c['txns']={'m5':{'buys':40,'sells':10}}
@@ -390,6 +418,9 @@ class ActivityTests(unittest.TestCase):
     def test_constants_preserved(self):
         self.assertEqual((lab.STOP_LOSS,lab.TAKE_PROFIT,lab.MAX_HOLD_MIN),(3,10,60))
         self.assertEqual(lab.TRADE_NOTIONAL,150)
+        self.assertEqual(lab.lab_cost_cap_pct(),promoted_guard.max_entry_cost_pct(lab.STOP_LOSS))
+        self.assertEqual(lab.lab_cost_cap_pct(),1.5)
+        self.assertEqual(a.MAX_ENTRY_COST_PCT,2.75)
         self.assertEqual(lab.STRATEGY_START_BALANCES['SCALPER'],100)
 
 if __name__=='__main__':unittest.main()

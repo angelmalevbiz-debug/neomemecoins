@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""One-shot repository patch for the isolated PAPER Momentum Rush Brain test strategy."""
+"""One-shot repository patch for the isolated PAPER Momentum Rush Brain test strategy.
+
+HISTORICAL, NO LONGER APPLIES: this migration was integrated long ago and the
+current strategy_lab.py, lab_activity.py and strategy-lock.json (for example
+LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP and the COST_FIRST_ESTABLISHED_V1 books)
+supersede the text it patches. It is kept only for old checkouts; on an integrated
+tree it is a guarded no-op (tests/test_rush_patch_idempotence.py). Do not read
+its replacement strings as the active Lab policy. Its logic is intentionally
+unchanged.
+"""
 from __future__ import annotations
 
 import hashlib

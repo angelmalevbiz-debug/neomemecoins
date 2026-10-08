@@ -160,6 +160,22 @@ class UniverseRuleTests(unittest.TestCase):
         for reason in rejections(coin(dexId='raydium', liquidityUsd=1000), cap_usd=150):
             self.assertIn(reason, cf.REJECTION_REASONS)
 
+    def test_physical_rejections_are_the_v1_universe_without_the_structural_guard(self):
+        # The archived 2026-10-08 forensics reproduce the V1 universe through these helpers;
+        # the entry screen (rejections) adds STRUCTURAL_RUG_GUARD_V1 and fails closed.
+        import cost_first_engine_profile as cfp
+        young = coin(pairCreatedAt=NOW - 30 * 60_000)
+        for market in (coin(), young, coin(liquidityUsd=249_999), coin(dexId='raydium')):
+            physical = cf.physical_rejections(market, cap_usd=150)
+            expected = physical or structural_rug_guard.check(market, NOW, REGISTRY)['reasons']
+            self.assertEqual(rejections(market, cap_usd=150), expected)
+        self.assertEqual(cf.physical_rejections(young, cap_usd=150), [])
+        self.assertEqual(rejections(young, cap_usd=150), ['rug_young_pool'])
+        self.assertEqual(cf.rejections(coin(), cap_usd=150), ['rug_input_unknown'], 'no registry: fail closed')
+        self.assertEqual(cfp.physical_universe_rejections(coin(), 200.0), [])
+        self.assertEqual(cfp.universe_rejections(coin(), 200.0), ['rug_input_unknown'])
+        self.assertEqual(cf.PREVIOUS_UNIVERSE_VERSION, 'COST_FIRST_UNIVERSE_V1')
+
     def test_describe_is_a_planning_record_not_a_quote(self):
         record = describe(coin(), cap_usd=150)
         self.assertEqual(record['fee_tier_bps'], 30.0)
@@ -412,8 +428,9 @@ class LabBookPairTests(unittest.TestCase):
             for field, value in before[book['id']].items():
                 if field != 'strategy_lifecycle':
                     self.assertEqual(book[field], value, field)
+        # LAB_STRATEGY_LIFECYCLE_V2: the pair's V1 closes (before the structural guard) count too.
         self.assertEqual(report['policy']['activity_versions_by_strategy'],
-                         {key: cf.ENTRY_POLICY_VERSION for key in cf.BOOK_IDS})
+                         {key: [cf.ENTRY_POLICY_VERSION, 'COST_FIRST_ESTABLISHED_V1'] for key in cf.BOOK_IDS})
         # Retirement stops new entries only; the open positions still exit normally.
         quotes = {book['id']: book['position']['remaining_cost_basis_usd'] * .925
                   for book in (self.control, self.scaled)}

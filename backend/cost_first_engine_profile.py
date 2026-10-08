@@ -134,6 +134,15 @@ def universe_rejections(coin: dict[str, Any], cap_usd: float, *, now=None,
                                  now=now, ticker_registry=ticker_registry)
 
 
+def physical_universe_rejections(coin: dict[str, Any], cap_usd: float) -> list[str]:
+    """COST_FIRST_UNIVERSE_V1 (physical screens only), for the archived research forensics.
+
+    Never an entry screen: the engine uses universe_rejections, which adds
+    STRUCTURAL_RUG_GUARD_V1 and fails closed without a ticker registry.
+    """
+    return cost_first.physical_rejections(coin, cap_usd=cap_usd, minimum_notional_usd=MIN_ENTRY_NOTIONAL_USD)
+
+
 def is_market_candidate(coin: dict[str, Any], cap_usd: float, *, now=None, ticker_registry=None) -> bool:
     return not universe_rejections(coin, cap_usd, now=now, ticker_registry=ticker_registry)
 

@@ -416,7 +416,7 @@ class PersonalEnginePositions:
 class TapePoolScheduler:
     def __init__(self, lease_ms=LEASE_MS, *, shed_min_bodies=SHED_MIN_BODIES,
                  shed_cooldown_ms=SHED_COOLDOWN_MS, yield_window_ms=YIELD_WINDOW_MS,
-                 personal_pin_limit=PERSONAL_PIN_LIMIT, registry_path=None):
+                 personal_pin_limit=PERSONAL_PIN_LIMIT, registry_path=None, registry_seed_paths=()):
         self.lease_ms = max(30_000, int(lease_ms))
         self.personal_pin_limit = max(0, int(personal_pin_limit))
         self.leases = {}
@@ -426,8 +426,10 @@ class TapePoolScheduler:
         self.yield_window_ms = max(60_000, int(yield_window_ms))
         self.shed = {}
         self.yield_since = {}
-        # DEFENSIVE_ENTRY_LAYER_V1 of the tape process (own registry and history).
-        self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path)
+        # DEFENSIVE_ENTRY_LAYER_V1 of the tape process (own registry and history); a
+        # new or empty registry is seeded read-only from ``registry_seed_paths``.
+        self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path,
+                                                         seed_paths=registry_seed_paths)
 
     def defensive_entry_decision(self, coin, now):
         """Seat screen: the structural guard withholds the seat; heat flags are log-only.

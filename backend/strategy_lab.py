@@ -73,7 +73,10 @@ def entry_defense_layer():
     global DEFENSE
     with DEFENSE_LOCK:
         if DEFENSE is None:
-            DEFENSE=entry_defense.DefensiveEntryLayer(registry_path=entry_defense.registry_path_for(STATE_PATH))
+            path=entry_defense.registry_path_for(STATE_PATH)
+            # A new or empty registry starts from main's and the tape's ticker memory.
+            DEFENSE=entry_defense.DefensiveEntryLayer(
+                registry_path=path,seed_paths=entry_defense.sibling_registry_paths(path))
         return DEFENSE
 
 def defensive_entry_decision(coin,now,*,blocked_pools,heat_log_only=False):
@@ -513,18 +516,20 @@ def registry_compatibility(books):
     }
 
 def lifecycle_activity_versions():
-    """Entry-policy version each TEST book stamps on its own closes.
+    """Entry-policy versions whose closes count as retirement evidence, per own-policy book.
 
-    The COST_FIRST pair records cost_first.ENTRY_POLICY_VERSION (V2 since the
-    structural rug guard joined its universe), every other TEST book the shared
-    LAB_ACTIVE policy; retirement evidence is counted on exactly those.
+    The COST_FIRST pair stamps cost_first.ENTRY_POLICY_VERSION (V2 since the
+    structural rug guard joined its universe) and every other TEST book the
+    shared LAB_ACTIVE policy. LAB_STRATEGY_LIFECYCLE_V2 also counts the closes
+    of the entry-only predecessor (COST_FIRST_ESTABLISHED_V1, LAB_ACTIVE_V6),
+    so the defensive-layer bump never delays a retirement.
     """
-    return {book_id:cost_first.ENTRY_POLICY_VERSION for book_id in cost_first.BOOK_IDS}
+    return {book_id:cost_first.LIFECYCLE_EVIDENCE_VERSIONS for book_id in cost_first.BOOK_IDS}
 
 def review_strategy_lifecycle(books):
     return lifecycle.apply_lifecycle(
         books,registered_ids={s['id'] for s in STRATEGIES},
-        promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.POLICY_VERSION,
+        promoted_ids=set(PROMOTED_STRATEGIES),activity_version=activity.LIFECYCLE_EVIDENCE_VERSIONS,
         activity_versions=lifecycle_activity_versions(),
         execution_version=EXECUTION_MODEL_VERSION,now=now_ms())
 
@@ -1104,6 +1109,20 @@ def maybe_open(feed,flows):
                 book['entry_diagnostics']['blocked_reason']=refusal
                 book['entry_diagnostics']['commit_recheck_rejected']=1
                 continue
+        # DEFENSIVE_ENTRY_LAYER_V1 again at commit, as the engine does: on the commit clock
+        # and this book's closed history as it is now. The Lab has no newer observation than
+        # this refresh, so a pool that turns hot after it is refused at the next refresh;
+        # here a stale pair history, a moved 5-minute reference or a new loss refuses it.
+        commit_at=now_ms()
+        final_defensive=defensive_entry_decision(
+            coin,commit_at,blocked_pools=pool_loss_memory.index(book.get('history') or [],commit_at),
+            heat_log_only=heat_log_only)
+        if not final_defensive['allowed']:
+            defensive_summary['commit_recheck_blocked']=int(defensive_summary.get('commit_recheck_blocked') or 0)+1
+            book['entry_diagnostics']['blocked_reason']=(final_defensive['reasons'] or ['defensive_entry'])[0]
+            book['entry_diagnostics']['commit_recheck_rejected']=1
+            continue
+        defensive=final_defensive
         if brain:
             book['entry_diagnostics']['risk_limited_notional_usd']=round(candidate_limit,4)
         address=coin['address']; price=num(coin['priceUsd'])
@@ -1147,7 +1166,7 @@ def maybe_open(feed,flows):
             'stop_loss_net_pct':position_stop,
             'stop_headroom_pct':activity.stop_headroom_pct(position_stop,proposed['initial_pnl_pct']),
             'entry_size_reduced':notional+0.02<candidate_limit,
-            # DEFENSIVE_ENTRY_LAYER_V1 decision this entry passed (log-only heat flags included).
+            # DEFENSIVE_ENTRY_LAYER_V1 decision this entry passed at commit (log-only heat flags included).
             'defensive_entry':entry_defense.compact(defensive),
             'pnl_pct':round(proposed['initial_pnl_pct'],3),
             'open_pnl_usd':round(proposed['initial_pnl_usd'],4),

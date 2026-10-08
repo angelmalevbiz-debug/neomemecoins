@@ -12,6 +12,14 @@ universe `COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD` (the structural rug guard
 `cost_first_established.rejections`), and the heat veto and pool loss memory run before quotes.
 The strategy id, exits and `EXIT_IMPACT_EMERGENCY_V2` are unchanged; the default and
 `ORDER_FLOW_ADAPTIVE` hashes quoted below are the pre-layer values and have changed.
+With the layer, the `effective_config_hash` values (code defaults, no `NEO_*` overrides,
+pinned exactly by `tests/test_cost_first_engine_profile.py`) are:
+`COST_FIRST_ESTABLISHED_PAPER_V1` `b29a6c5c772d6438dc14202f241eaa2071fbe48d56c63fbeee60cf9988b1cd12`,
+`WINNER_ENSEMBLE_PAPER_V1` `04d06c9a319aeb0130d50985fefd0d87f000f134d9cf01ab8cde1c8d5e584740`,
+`ORDER_FLOW_ADAPTIVE` `b7811a9683eba453ff617b6dcf8160c67bf197bb0e80268ab0497999861fe019`.
+A new cost-first account's ticker registry is seeded from the Lab's and the tape's
+sidecars; check that they hold entries before enabling the profile (see
+[DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#cold-start)).
 
 ## What it is
 

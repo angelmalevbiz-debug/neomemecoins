@@ -5,7 +5,7 @@ calls an external API or touches a real account. Covers the cost-first
 universe as the market screen, the unchanged engine gates, the size rule,
 EXIT_IMPACT_EMERGENCY_V2 (sell anchor, fallback anchor, arm then confirm,
 disarm, stop priority, fresh forced quote), per-position exit policies, the
-/state config and that the default and ORDER_FLOW_ADAPTIVE hashes are unchanged.
+/state config and the exact effective_config_hash of all three engine strategies.
 """
 import copy
 import importlib
@@ -76,6 +76,15 @@ TOKENS_PER_USD = 1_000_000  # fixture route: 1 token (6 decimals) per quoted USD
 # left them unchanged; DEFENSIVE_ENTRY_LAYER_V1 changes both visibly.
 DEFAULT_HASH_AT_69BE225 = 'fe08e29c142e0675cfbde9c6d4728a0a4429a64797fdec4ef7532ca6a183e62c'
 ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c200156fdefaeae4f3666ecdc4'
+# effective_config_hash of the three engine strategies with DEFENSIVE_ENTRY_LAYER_V1
+# (PR #23 after its second review: heat window coverage, 40,000-entry registry with
+# cold-start seeding; code defaults, no NEO_* overrides). Positions record this hash as
+# their audit identity, so an engine default, a profile field or a layer threshold may
+# only change together with these pins (and docs/DEFENSIVE_ENTRY_LAYER.md).
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '04d06c9a319aeb0130d50985fefd0d87f000f134d9cf01ab8cde1c8d5e584740'
+ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
+    'b7811a9683eba453ff617b6dcf8160c67bf197bb0e80268ab0497999861fe019')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = 'b29a6c5c772d6438dc14202f241eaa2071fbe48d56c63fbeee60cf9988b1cd12'
 
 
 def universe_coin(now, **overrides):
@@ -765,14 +774,19 @@ class CostFirstConfigTests(unittest.TestCase):
 
     def test_default_and_order_flow_adaptive_hashes_change_visibly_with_the_defensive_layer(self):
         # DEFENSIVE_ENTRY_LAYER_V1, the V5 entry policies and the V2 score model are
-        # behaviour changes, so neither pre-layer hash may survive (2026-10-08).
+        # behaviour changes, so neither pre-layer hash may survive (2026-10-08); the
+        # new values are pinned exactly so any later config change fails here.
         if _ENV_OVERRIDES_AT_IMPORT:
             self.skipTest(f'environment overrides change the engine hash: {_ENV_OVERRIDES_AT_IMPORT}')
-        for strategy, old in ((m.DEFAULT_SIGNAL_STRATEGY, DEFAULT_HASH_AT_69BE225),
-                              (oct4.STRATEGY_ID, ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225)):
+        for strategy, old, pinned in (
+                (m.DEFAULT_SIGNAL_STRATEGY, DEFAULT_HASH_AT_69BE225, DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1),
+                (oct4.STRATEGY_ID, ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225,
+                 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1),
+                (cfp.STRATEGY_ID, None, COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1)):
             with self.subTest(strategy=strategy):
                 m.activate_strategy(strategy)
                 current = m.effective_config_hash()
+                self.assertEqual(current, pinned)
                 self.assertNotEqual(current, old)
                 with patch.object(entry_defense, 'VERSION', 'DEFENSIVE_ENTRY_LAYER_PROBE'):
                     self.assertNotEqual(m.effective_config_hash(), current, 'the layer is part of the hash')

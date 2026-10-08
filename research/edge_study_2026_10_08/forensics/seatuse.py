@@ -28,7 +28,7 @@ for row in con.execute(q):
     ofa_rej = [x for x in OFA.market_rejections(coin, now=r['t']) if x != 'stale_feed']
     rt200 = rt_pct(coin, 200.0)
     ofa_ok = not ofa_rej and rt200 is not None and rt200 <= 2.75
-    cf_ok = not CFP.universe_rejections(coin, 200.0)
+    cf_ok = not CFP.physical_universe_rejections(coin, 200.0)   # the V1 universe this study measured
     k = (int(r['t'] // 60000), r['pair'])
     u = units.setdefault(k, {'grp': set(), 'we': False, 'ofa': False, 'cf': False, 'sym': r['sym'], 'complete': False})
     u['grp'].add(grp)

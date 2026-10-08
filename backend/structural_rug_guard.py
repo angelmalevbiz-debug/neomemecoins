@@ -42,6 +42,15 @@ every scan's feed and only registrations first seen at or before ``now``
 count. The registry persists as a small bounded JSON sidecar next to the
 account state (atomic replace, entries unseen for 14 days pruned, a corrupt or
 missing file starts empty and never stops the engine).
+
+Bounds: at most 40,000 entries. The research scan log saw about 2,150 pairs a
+day, so 14 days need about 30,000; when the cap still evicts, the effective
+horizon (the newest evicted sighting) is published in ``status()``.
+
+Cold start: a new or empty registry is seeded read-only from the sidecars of
+the other PAPER services on the host (``seed_paths``: the main engine, the Lab,
+the tape). A ticker registry is market memory, not account memory, so a seed
+only adds sightings (it can only block more); a seed file is never written.
 """
 from dataclasses import asdict, dataclass
 import json
@@ -52,11 +61,17 @@ import tempfile
 import threading
 import time
 
+from shared_snapshot_io import read_shared_text
+
 VERSION = 'STRUCTURAL_RUG_GUARD_V1'
 REGISTRY_VERSION = 'TICKER_REGISTRY_V1'
 REASONS = ('rug_input_unknown', 'rug_lp_pullable', 'rug_young_pool',
            'rug_fake_market_cap', 'rug_ticker_reuse')
 DAY_MS = 86_400_000
+REGISTRY_RETENTION_DAYS = 14
+REGISTRY_MAX_ENTRIES = 40_000
+REGISTRY_SAVE_INTERVAL_MS = 300_000
+REGISTRY_SEED_VERSION = 'TICKER_REGISTRY_SEED_V1'
 
 
 @dataclass(frozen=True)
@@ -116,6 +131,10 @@ def age_minutes(coin: dict, now):
     return (current - created) / 60_000
 
 
+def _path_key(path) -> str:
+    return os.path.normcase(os.path.abspath(os.fspath(path)))
+
+
 def _identity(coin: dict):
     mint = coin.get('address')
     pair = coin.get('pairAddress')
@@ -132,17 +151,25 @@ class TickerRegistry:
     seen for ``retention_ms`` are pruned and at most ``max_entries`` are kept
     (least recently seen evicted first), so memory and the sidecar stay
     bounded. All methods are thread-safe and never raise on persistence
-    problems; a failed save is reported in ``status()``.
+    problems; a failed save is reported in ``status()``. A registry that is
+    empty after loading its own sidecar is seeded from ``seed_paths``.
     """
 
-    def __init__(self, path=None, *, retention_ms=14 * DAY_MS, max_entries=20_000,
-                 save_interval_ms=300_000, prune_interval_ms=60_000, clock=None):
+    def __init__(self, path=None, *, retention_ms=REGISTRY_RETENTION_DAYS * DAY_MS,
+                 max_entries=REGISTRY_MAX_ENTRIES, save_interval_ms=REGISTRY_SAVE_INTERVAL_MS,
+                 prune_interval_ms=60_000, clock=None, seed_paths=()):
         self.path = Path(path) if path else None
         self.retention_ms = max(DAY_MS, int(retention_ms))
         self.max_entries = max(16, int(max_entries))
         self.save_interval_ms = max(0, int(save_interval_ms))
         self.prune_interval_ms = max(0, int(prune_interval_ms))
         self.clock = clock or (lambda: int(time.time() * 1000))
+        own = _path_key(self.path) if self.path is not None else None
+        seeds = {}
+        for seed in seed_paths or ():
+            if seed and _path_key(seed) != own:
+                seeds.setdefault(_path_key(seed), Path(seed))
+        self.seed_paths = tuple(seeds.values())
         self._lock = threading.RLock()
         self._entries = {}      # (mint, pair) -> [ticker, first_seen, last_seen]
         self._by_ticker = {}    # ticker -> set of (mint, pair)
@@ -153,8 +180,17 @@ class TickerRegistry:
         self.load_skipped_rows = 0
         self.save_error = None
         self.saves = 0
+        # Effective memory horizon (finding: a full cap evicts before 14 days).
+        self.cap_evictions = 0
+        self._cap_horizon_ms = None
+        self._cap_evicted_at = None
+        self._oldest_last_seen = None
+        self.seed_status = {}
+        self.seeded_entries = 0
         if self.path is not None:
             self._load()
+        if not self._entries and self.seed_paths:
+            self._seed()
 
     # ----------------------------------------------------------- mutation --
     def _add(self, key, ticker, first_seen, last_seen):
@@ -225,9 +261,15 @@ class TickerRegistry:
                 # Evict the least recently seen down to 90% so eviction is amortized.
                 keep = int(self.max_entries * 0.9)
                 order = sorted(self._entries.items(), key=lambda item: (item[1][2], item[0]))
-                for key, _row in order[:len(self._entries) - keep]:
+                evicted = order[:len(self._entries) - keep]
+                for key, _row in evicted:
                     self._remove(key)
                     removed += 1
+                # Sightings last seen before this are forgotten earlier than the retention.
+                self.cap_evictions += len(evicted)
+                self._cap_horizon_ms = stamp - evicted[-1][1][2]
+                self._cap_evicted_at = stamp
+            self._oldest_last_seen = min((row[2] for row in self._entries.values()), default=None)
             if removed:
                 self._dirty = True
             return removed
@@ -248,49 +290,96 @@ class TickerRegistry:
 
     def status(self) -> dict:
         with self._lock:
+            reference = self._pruned_at
+            oldest = self._oldest_last_seen
             return {'version': REGISTRY_VERSION, 'entries': len(self._entries),
                     'tickers': len(self._by_ticker), 'max_entries': self.max_entries,
                     'retention_days': self.retention_ms / DAY_MS,
+                    # Effective horizon at the last prune: the oldest sighting kept and,
+                    # when the entry cap evicted, the age of the newest evicted sighting.
+                    'oldest_last_seen_days': (None if oldest is None or reference is None
+                                              else round(max(0.0, reference - oldest) / DAY_MS, 2)),
+                    'cap_evictions': self.cap_evictions,
+                    'cap_limited_horizon_days': (None if self._cap_horizon_ms is None
+                                                 else round(max(0.0, self._cap_horizon_ms) / DAY_MS, 2)),
+                    'cap_evicted_at': self._cap_evicted_at,
                     'persistent': self.path is not None,
                     'sidecar': self.path.name if self.path is not None else None,
                     'load_status': self.load_status, 'load_skipped_rows': self.load_skipped_rows,
+                    'seed': {'version': REGISTRY_SEED_VERSION, 'sources': dict(self.seed_status),
+                             'entries': self.seeded_entries},
                     'saved_at': self._saved_at, 'saves': self.saves, 'save_error': self.save_error}
 
     # -------------------------------------------------------- persistence --
-    def _load(self):
+    @staticmethod
+    def _read_sidecar(path, *, shared=False):
+        """('OK', rows), ('MISSING', []) or ('CORRUPT', []) for one sidecar; never raises.
+
+        ``shared`` reads with delete sharing (a sibling service may be replacing it).
+        """
         try:
-            if not self.path.exists():
-                self.load_status = 'MISSING_STARTED_EMPTY'
-                return
-            data = json.loads(self.path.read_text(encoding='utf-8'))
+            if not path.exists():
+                return 'MISSING', []
+            text = read_shared_text(path) if shared else path.read_text(encoding='utf-8')
+            data = json.loads(text)
             if not isinstance(data, dict) or data.get('version') != REGISTRY_VERSION:
                 raise ValueError('unsupported ticker registry')
             rows = data.get('entries')
             if not isinstance(rows, list):
                 raise ValueError('ticker registry without entries')
+            return 'OK', rows
         except Exception:
+            return 'CORRUPT', []
+
+    def _merge_rows(self, rows) -> int:
+        """Add valid sidecar rows (caller holds the lock); returns the number skipped."""
+        skipped = 0
+        for row in rows:
+            try:
+                mint, pair, ticker, first_seen, last_seen = row
+                first, last = _finite(first_seen), _finite(last_seen)
+                if (not isinstance(mint, str) or not mint or not isinstance(pair, str) or not pair
+                        or not isinstance(ticker, str) or not ticker or normalize_ticker(ticker) != ticker
+                        or first is None or last is None or first > last):
+                    raise ValueError('invalid row')
+            except (TypeError, ValueError):
+                skipped += 1
+                continue
+            self._add((mint, pair), ticker, first, last)
+        return skipped
+
+    def _load(self):
+        status, rows = self._read_sidecar(self.path)
+        if status == 'MISSING':
+            self.load_status = 'MISSING_STARTED_EMPTY'
+            return
+        if status == 'CORRUPT':
             # A corrupt or unreadable sidecar starts empty; the next save replaces it.
             self.load_status = 'CORRUPT_STARTED_EMPTY'
             self._entries, self._by_ticker = {}, {}
             return
-        skipped = 0
         with self._lock:
-            for row in rows:
-                try:
-                    mint, pair, ticker, first_seen, last_seen = row
-                    first, last = _finite(first_seen), _finite(last_seen)
-                    if (not isinstance(mint, str) or not mint or not isinstance(pair, str) or not pair
-                            or not isinstance(ticker, str) or not ticker or normalize_ticker(ticker) != ticker
-                            or first is None or last is None or first > last):
-                        raise ValueError('invalid row')
-                except (TypeError, ValueError):
-                    skipped += 1
-                    continue
-                self._add((mint, pair), ticker, first, last)
-            self.load_skipped_rows = skipped
+            self.load_skipped_rows = self._merge_rows(rows)
             self.load_status = 'LOADED'
             self._dirty = False
         self.prune(self.clock(), force=True)
+
+    def _seed(self):
+        """Seed a new or empty registry from sibling sidecars (read-only; never raises)."""
+        for path in self.seed_paths:
+            status, rows = self._read_sidecar(path, shared=True)
+            added = 0
+            if status == 'OK':
+                with self._lock:
+                    before = len(self._entries)
+                    self._merge_rows(rows)
+                    added = len(self._entries) - before
+            self.seed_status[path.name] = 'SEEDED' if status == 'OK' else status
+            self.seeded_entries += added
+        if self.seeded_entries:
+            with self._lock:
+                self._dirty = True
+            self.prune(self.clock(), force=True)
 
     def maybe_save(self, now) -> bool:
         stamp = _finite(now)
@@ -414,6 +503,13 @@ def config(params: GuardParameters = PARAMS) -> dict:
             'market_cap_basis': 'marketCap, else fdv', 'age_basis': 'pairCreatedAt at decision time',
             'ticker_normalization': 'alphanumerics only, casefolded',
             'ticker_reuse_rule': 'another pool with a DIFFERENT mint registered at or before now',
+            'registry': {'version': REGISTRY_VERSION, 'retention_days': REGISTRY_RETENTION_DAYS,
+                         'max_entries': REGISTRY_MAX_ENTRIES,
+                         'save_interval_seconds': REGISTRY_SAVE_INTERVAL_MS // 1000,
+                         'cap_eviction': 'least recently seen first, down to 90%; the effective horizon is published',
+                         'seed_version': REGISTRY_SEED_VERSION,
+                         'seed_rule': ('a new or empty registry merges the sibling services\' sidecars '
+                                       'read-only (main engine, Lab, tape); seeds only add sightings')},
             'fail_closed': True, 'distinct_from': 'engine_rug_guard.RUG_GUARD_V2 (unchanged)',
             'fake_market_cap_threshold_note': '2% liquidity/market cap is holdout-informed (research froze 1%); conservative, not validated',
             'is_entry_authorization': False, 'profitability_proven': False}

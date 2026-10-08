@@ -24,6 +24,10 @@ import promoted_entry_guard as promoted_guard
 POLICY_VERSION = 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY'
 PREVIOUS_POLICY_VERSION = 'LAB_ACTIVE_V6_STOP_BUDGET_COST_CAP'
 DEFENSIVE_ENTRY_VERSION = 'DEFENSIVE_ENTRY_LAYER_V1'
+# Retirement evidence of a TEST book (LAB_STRATEGY_LIFECYCLE_V2): V7 only removes
+# entries from V6, so V6 closes keep counting and the bump never delays a
+# retirement (as the ensemble keeps V4 closes in its loss throttle).
+LIFECYCLE_EVIDENCE_VERSIONS = (POLICY_VERSION, PREVIOUS_POLICY_VERSION)
 REENTRY_SECONDS = 60
 LOSS_REENTRY_SECONDS = 180
 SCALPER_REENTRY_SECONDS = 600

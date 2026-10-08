@@ -21,6 +21,7 @@ import order_flow_adaptive_oct4 as oct4
 import cost_first_engine_profile as cost_first_profile
 import entry_defense
 import pool_loss_memory
+import structural_rug_guard
 import promoted_entry_guard as promoted_guard
 import entry_size_backoff
 import market_discovery
@@ -96,6 +97,9 @@ SCORE_LP_RISK_LIQ_MC = 1.0
 # (coin scoreV1), so exits under GOLD_ADAPTIVE_NET_CANDIDATE_V1 are unchanged
 # for positions opened before and after this change.
 EXIT_CONTEXT_SCORE_VERSION = PREVIOUS_SCORE_VERSION
+# RugCheck/price prewarm population (see Monitor.prewarm_entry_checks).
+PREWARM_VERSION = 'PREWARM_V2_DEFENSIVE_POPULATION'
+PREWARM_MAX_CANDIDATES = 4
 TRADE_NOTIONAL_USD = float(os.getenv('NEO_TRADE_NOTIONAL_USD', '200'))
 MAX_DAILY_LOSS_USD = float(os.getenv('NEO_MAX_DAILY_LOSS_USD', '100'))
 MAX_POSITION_RISK_USD = float(os.getenv('NEO_MAX_POSITION_RISK_USD', '250'))
@@ -915,6 +919,7 @@ class State:
                     'defensive_entry': dict(entry_defense.VERSIONS),
                     'score_version': SCORE_VERSION,
                     'exit_context_score_version': EXIT_CONTEXT_SCORE_VERSION,
+                    'prewarm_version': PREWARM_VERSION,
                     'paper_only': True,
                     'runtime_version': runtime.VERSION,
                     'daily_budget_sizing': True,
@@ -1657,8 +1662,11 @@ class Monitor:
         """This engine's entry_defense.DefensiveEntryLayer."""
         with self._entry_defense_lock:
             if self._entry_defense is None:
+                # A new or empty registry is seeded read-only from the other services'
+                # sidecars (the Lab's and the tape's; see sibling_registry_paths).
+                path = entry_defense.registry_path_for(STATE_PATH)
                 self._entry_defense = entry_defense.DefensiveEntryLayer(
-                    registry_path=entry_defense.registry_path_for(STATE_PATH))
+                    registry_path=path, seed_paths=entry_defense.sibling_registry_paths(path))
             return self._entry_defense
 
     def observe_entry_defense(self, feed: list[dict[str, Any]], now: int | None = None) -> None:
@@ -1755,31 +1763,32 @@ class Monitor:
         return report
 
     def prewarm_entry_checks(self, feed: list[dict[str, Any]]) -> None:
-        """Warm only the most time-sensitive candidates; avoid provider queues.
+        """Warm the price and RugCheck reports of likely next entries; avoid provider queues.
 
-        A pool the defensive entry layer blocks cannot be entered, so its
-        price and RugCheck reports are not requested.
+        PREWARM_V2_DEFENSIVE_POPULATION: only pools the defensive entry layer
+        can allow are warmed. STRUCTURAL_RUG_GUARD_V1 blocks every pool younger
+        than 12 h, so the old young-pool population (ageMinutes <= 360) could
+        never be entered; candidates are now established pools (pair age >= 720
+        min at now) that pass the active strategy's market screen and the layer,
+        ranked by 5-minute activity and score, at most 4 per scan. Prewarming
+        never admits an entry; every gate still runs at entry.
         """
         candidates = []
         stamp = now_ms()
         blocked_pools = self.entry_loss_index(stamp)
+        registry = self.defense.registry
         for coin in feed:
-            age = num(coin.get('ageMinutes'), 999999)
-            if num(coin.get('score')) < 60 or num(coin.get('liquidityUsd')) < 4000 or age > 360:
+            age = structural_rug_guard.age_minutes(coin, stamp)
+            if (age is None or age < structural_rug_guard.PARAMS.young_pool_max_age_minutes
+                    or num(coin.get('liquidityUsd')) < 4000 or not market_candidate(coin, stamp, registry)):
                 continue
             if not self.defensive_entry_decision(coin, stamp, blocked_pools=blocked_pools)['allowed']:
                 continue
             tx = (coin.get('txns') or {}).get('m5') or {}
             activity = num(tx.get('buys')) + num(tx.get('sells'))
-            priority = (
-                1 if age <= 45 else 0,
-                1 if age <= 180 else 0,
-                activity,
-                num(coin.get('score')),
-            )
-            candidates.append((priority, coin))
+            candidates.append(((activity, num(coin.get('score'))), coin))
         candidates.sort(key=lambda row: row[0], reverse=True)
-        for _, coin in candidates[:4]:
+        for _, coin in candidates[:PREWARM_MAX_CANDIDATES]:
             price_integrity.check(coin)
             rug_guard.check(coin)
 
@@ -3093,7 +3102,8 @@ class Monitor:
                 setups = sum(1 for c in feed if c.get('posture') == 'SETUP')
                 STATE.message = STATE.entry_diagnostics.get('message') or f'Проверени {len(feed)} token-а; отворени позиции: {len(STATE.positions)}.'
                 STATE.save()
-            # Prewarm provider checks before the short EARLY flow window fires.
+            # Prewarm the price and RugCheck reports of the established pools the
+            # defensive layer can allow (PREWARM_V2_DEFENSIVE_POPULATION).
             if training_bridge.enabled():
                 for coin in feed:
                     training_bridge.observe(coin,STATE.live_flow(coin['address'],pair_address=coin.get('pairAddress')),

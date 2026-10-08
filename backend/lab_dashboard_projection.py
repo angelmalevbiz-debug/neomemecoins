@@ -103,7 +103,7 @@ def compact_strategy_lab(data):
             diagnostics['defensive_entry'] = {
                 field: defensive[field] for field in (
                     'version', 'checked', 'blocked', 'rejections', 'primary_rejections', 'log_only_flags',
-                    'pool_loss_cooldown_pools', 'heat_log_only') if field in defensive}
+                    'pool_loss_cooldown_pools', 'heat_log_only', 'commit_recheck_blocked') if field in defensive}
         if 'cost_feasibility' in diagnostics:
             diagnostics['cost_feasibility'] = compact_cost_feasibility(
                 diagnostics['cost_feasibility'],

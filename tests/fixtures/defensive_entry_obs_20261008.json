@@ -139,6 +139,52 @@
    "family": "fake_market_cap_2pct",
    "observed_at": 1791422073917
   },
+  "DOTF_5GaCcKLd": {
+   "coin": {
+    "address": "umfFX5o3",
+    "ageMinutes": 8116.8,
+    "dexId": "pumpswap",
+    "fdv": 20309212.0,
+    "liquidityUsd": 407601.74,
+    "marketCap": 20309212.0,
+    "pairAddress": "5GaCcKLd",
+    "pairCreatedAt": 1790949255000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 0.04,
+     "h24": 28.52,
+     "h6": 8.16,
+     "m5": 0.02
+    },
+    "priceNative": 0.0001765,
+    "priceUsd": 0.02031,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 48.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "DOTF",
+    "txns": {
+     "h1": {
+      "buys": 178,
+      "sells": 118
+     },
+     "m5": {
+      "buys": 13,
+      "sells": 10
+     }
+    },
+    "updatedAt": 1791436264831,
+    "volume": {
+     "h1": 8469.11,
+     "h24": 219793.79,
+     "h6": 55325.65,
+     "m5": 664.59
+    }
+   },
+   "family": "fake_market_cap_threshold_edge_ticker_reuse_only",
+   "observed_at": 1791436266653
+  },
   "GOIF_8ZMkMgWM": {
    "coin": {
     "address": "ViKiUNWG",
@@ -506,6 +552,52 @@
    },
    "family": "established",
    "observed_at": 1791420000411
+  },
+  "USDF_EpugLBw1": {
+   "coin": {
+    "address": "T6QteEAg",
+    "ageMinutes": 5820.5,
+    "dexId": "pumpswap",
+    "fdv": 20205740.0,
+    "liquidityUsd": 404766.08,
+    "marketCap": 20205740.0,
+    "pairAddress": "EpugLBw1",
+    "pairCreatedAt": 1791090134000,
+    "posture": "WAIT",
+    "priceChange": {
+     "h1": 1.71,
+     "h24": 38.93,
+     "h6": 6.44,
+     "m5": 0.22
+    },
+    "priceNative": 0.000176,
+    "priceUsd": 0.02021,
+    "quoteTokenAddress": "So11111111111111111111111111111111111111112",
+    "score": 48.0,
+    "sources": [
+     "pumpswap-address-catalog"
+    ],
+    "symbol": "USDF",
+    "txns": {
+     "h1": {
+      "buys": 176,
+      "sells": 116
+     },
+     "m5": {
+      "buys": 12,
+      "sells": 8
+     }
+    },
+    "updatedAt": 1791439365141,
+    "volume": {
+     "h1": 9337.42,
+     "h24": 226355.46,
+     "h6": 55732.14,
+     "m5": 573.84
+    }
+   },
+   "family": "fake_market_cap_threshold_edge_ticker_reuse_only",
+   "observed_at": 1791439384266
   },
   "USDP_8RCJrW94": {
    "coin": {
@@ -1257,6 +1349,83 @@
    "pair": "GhBPuDpt",
    "symbol": "WOSE",
    "ticker": "wose"
+  },
+  {
+   "first_seen": 1791392470322,
+   "mint": "HQowBX7J",
+   "pair": "FL5gakwf",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791392470521,
+   "mint": "T6QteEAg",
+   "pair": "EpugLBw1",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791392470701,
+   "mint": "A7rshCyU",
+   "pair": "ECXgmivf",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791395453786,
+   "mint": "46A8A49r",
+   "pair": "7G8HFQq7",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791395710740,
+   "mint": "aHWUREWs",
+   "pair": "8bi6Fz3G",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791403122037,
+   "mint": "wgtYm9rr",
+   "pair": "FR2UehqZ",
+   "symbol": "USDF",
+   "ticker": "usdf"
+  },
+  {
+   "first_seen": 1791379254023,
+   "mint": "RXpZH9hN",
+   "pair": "CZ67xbpv",
+   "symbol": "DOTF",
+   "ticker": "dotf"
+  },
+  {
+   "first_seen": 1791392470358,
+   "mint": "ztkLqdnd",
+   "pair": "HYZCigd7",
+   "symbol": "DOTF",
+   "ticker": "dotf"
+  },
+  {
+   "first_seen": 1791392470483,
+   "mint": "umfFX5o3",
+   "pair": "5GaCcKLd",
+   "symbol": "DOTF",
+   "ticker": "dotf"
+  },
+  {
+   "first_seen": 1791403121871,
+   "mint": "9Pe8fpDM",
+   "pair": "5iYzSzD8",
+   "symbol": "DOTF",
+   "ticker": "dotf"
+  },
+  {
+   "first_seen": 1791403121943,
+   "mint": "osHhXb2f",
+   "pair": "7iXmtUXq",
+   "symbol": "DOTF",
+   "ticker": "dotf"
   }
  ],
  "troll_series": [

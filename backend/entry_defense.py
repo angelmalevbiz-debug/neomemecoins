@@ -13,14 +13,17 @@ its own ledger's memory and the heat veto at decision and commit):
   losses on the same pool in one ledger;
 - HEAT_VETO_STACK_V1 (heat_veto.py): momentum, buy-share, volume
   acceleration, extended move, paid profile on high fees, crash, turnover,
-  and a conservative veto while a pool has under 5 minutes of history.
+  and a conservative veto while a rule's window is not covered by this
+  process's history (5-min return; 15-min high; 60-min paid-profile lookback
+  at >= 100 bps), so a restart waits instead of judging on partial windows.
 
 The layer only removes candidates. It never admits, sizes, prices or exits
 anything, and no research result shows positive expectancy after costs:
 these rules measurably cut losses, they do not create profit.
 
 One layer instance belongs to one process (engine, Lab, tape). It owns that
-process's ticker registry (persisted next to its state file) and its pair
+process's ticker registry (persisted next to its state file; a new or empty
+one is seeded read-only from the other services' sidecars) and its pair
 history; the caller feeds both with every scan's feed via ``observe``.
 Neither ``observe`` nor ``evaluate`` raises: an unexpected error blocks the
 candidate with ``defensive_entry_error`` (fail closed) and is counted.
@@ -39,6 +42,11 @@ ERROR_REASON = 'defensive_entry_error'
 REASONS_IN_ORDER = rug.REASONS + (pool_loss_memory.REASON,) + heat_veto.REASONS + (ERROR_REASON,)
 
 
+# State files of the PAPER services on this host (main engine, Lab, tape); each
+# service keeps its ticker registry next to its own state file.
+SERVICE_STATE_ENV = ('NEO_MARKET_STATE_PATH', 'NEO_STRATEGY_LAB_PATH', 'NEO_LIVE_TAPE_PATH')
+
+
 def registry_path_for(state_path):
     """Sidecar next to a state file: state.json -> state.ticker_registry.json."""
     from pathlib import Path
@@ -46,9 +54,31 @@ def registry_path_for(state_path):
     return path.with_name(f'{path.stem}.ticker_registry.json')
 
 
+def sibling_registry_paths(own_registry_path, environ=None) -> tuple:
+    """Ticker registry sidecars of the other PAPER services: read-only cold-start seeds.
+
+    Each service names its state file in its environment (SERVICE_STATE_ENV);
+    unset variables are skipped and the caller's own sidecar is excluded. A
+    personal engine's NEO_MARKET_STATE_PATH is its own account, so it seeds
+    from the Lab's and the tape's sidecars.
+    """
+    import os
+    env = os.environ if environ is None else environ
+    own = rug._path_key(own_registry_path) if own_registry_path else None
+    paths = []
+    for name in SERVICE_STATE_ENV:
+        value = env.get(name)
+        if value:
+            path = registry_path_for(value)
+            if rug._path_key(path) != own and path not in paths:
+                paths.append(path)
+    return tuple(paths)
+
+
 class DefensiveEntryLayer:
-    def __init__(self, *, registry_path=None, registry=None, history=None, clock=None):
-        self.registry = registry if registry is not None else rug.TickerRegistry(registry_path, clock=clock)
+    def __init__(self, *, registry_path=None, registry=None, history=None, clock=None, seed_paths=()):
+        self.registry = (registry if registry is not None
+                         else rug.TickerRegistry(registry_path, clock=clock, seed_paths=seed_paths))
         self.history = history if history is not None else heat_veto.PairHistory()
         self.observe_errors = 0
         self.evaluate_errors = 0

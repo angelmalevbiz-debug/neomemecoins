@@ -35,8 +35,12 @@ import structural_rug_guard
 
 VERSION = 'COST_FIRST_ESTABLISHED_V2'
 ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_V2'
+PREVIOUS_ENTRY_POLICY_VERSION = 'COST_FIRST_ESTABLISHED_V1'
 UNIVERSE_VERSION = 'COST_FIRST_UNIVERSE_V2_STRUCTURAL_RUG_GUARD'
 PREVIOUS_UNIVERSE_VERSION = 'COST_FIRST_UNIVERSE_V1'
+# Retirement evidence of the pair (LAB_STRATEGY_LIFECYCLE_V2): V2 only removes
+# entries from V1 (the structural guard), so V1 closes keep counting.
+LIFECYCLE_EVIDENCE_VERSIONS = (ENTRY_POLICY_VERSION, PREVIOUS_ENTRY_POLICY_VERSION)
 CONTROL_BOOK_ID = 'COST_FIRST_CONTROL'
 SCALED_BOOK_ID = 'COST_FIRST_SCALED'
 BOOK_IDS = (CONTROL_BOOK_ID, SCALED_BOOK_ID)
@@ -187,6 +191,22 @@ def rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
     guard's order). ``ticker_registry`` is the caller's TickerRegistry; without
     it the guard fails closed (rug_input_unknown).
     """
+    physical = physical_rejections(coin, cap_usd=cap_usd, minimum_notional_usd=minimum_notional_usd,
+                                   params=params)
+    if physical:
+        return physical
+    structural = structural_screen(coin, now=now, ticker_registry=ticker_registry)
+    return list(structural['reasons']) if structural['blocked'] else []
+
+
+def physical_rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
+                        params: UniverseParameters = UNIVERSE) -> list[str]:
+    """The physical screens alone: the COST_FIRST_UNIVERSE_V1 rule (PREVIOUS_UNIVERSE_VERSION).
+
+    Not an entry screen (``rejections`` is, with the structural guard). The
+    archived 2026-10-08 research measured this V1 universe and reproduces its
+    numbers through it.
+    """
     reasons: list[str] = []
     if str(coin.get('dexId') or '').lower() != params.dex_id:
         reasons.append('dex_not_pumpswap')
@@ -214,8 +234,7 @@ def rejections(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,
         return ['cost_model_unavailable']
     if roundtrip > params.max_fee_impact_roundtrip_pct:
         return ['fee_impact_roundtrip_above_maximum']
-    structural = structural_screen(coin, now=now, ticker_registry=ticker_registry)
-    return list(structural['reasons']) if structural['blocked'] else []
+    return []
 
 
 def candidate(coin: dict, *, cap_usd: float, minimum_notional_usd: float = 0.0,

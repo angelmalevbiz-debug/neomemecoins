@@ -174,7 +174,8 @@ class CostFirstLifecycleParityTests(unittest.TestCase):
 
     def test_production_review_counts_each_book_on_its_accepted_policy_version(self):
         versions = lab.lifecycle_activity_versions()
-        self.assertEqual(versions, {key: 'COST_FIRST_ESTABLISHED_V2' for key in lab.cost_first.BOOK_IDS})
+        self.assertEqual(versions, {key: ('COST_FIRST_ESTABLISHED_V2', 'COST_FIRST_ESTABLISHED_V1')
+                                    for key in lab.cost_first.BOOK_IDS})
         for strategy_id in lab.cost_first.BOOK_IDS:
             with self.subTest(strategy_id=strategy_id):
                 books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
@@ -189,27 +190,74 @@ class CostFirstLifecycleParityTests(unittest.TestCase):
                     self.assertEqual(evidence['closed_trades'], 12)
                     self.assertEqual(evidence['activity_version'], version)
                 self.assertEqual(report['policy']['activity_version'], lab.activity.POLICY_VERSION)
-                self.assertEqual(report['policy']['activity_versions_by_strategy'], versions)
+                self.assertEqual(report['policy']['accepted_activity_versions'],
+                                 [lab.activity.POLICY_VERSION, lab.activity.PREVIOUS_POLICY_VERSION])
+                self.assertEqual(report['policy']['activity_versions_by_strategy'],
+                                 {key: list(value) for key, value in versions.items()})
+                self.assertEqual(report['version'], 'LAB_STRATEGY_LIFECYCLE_V2_CARRIED_EVIDENCE')
 
     def test_documented_rules_give_identical_decisions_and_evidence(self):
         versions = lab.lifecycle_activity_versions()
+        shared = lab.activity.LIFECYCLE_EVIDENCE_VERSIONS
         for strategy_id in lab.cost_first.BOOK_IDS:
             for pnls in self.SAMPLES:
                 with self.subTest(strategy_id=strategy_id, pnls=pnls):
-                    pair = book(pnls, strategy_id, versions[strategy_id])
+                    pair = book(pnls, strategy_id, versions[strategy_id][0])
                     research = book(pnls)
                     pair_report = lifecycle.apply_lifecycle(
                         {strategy_id: pair}, registered_ids={strategy_id}, promoted_ids=set(),
-                        activity_version=lab.activity.POLICY_VERSION, activity_versions=versions,
+                        activity_version=shared, activity_versions=versions,
                         execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
-                    research_report = review({RESEARCH: research})
+                    research_report = lifecycle.apply_lifecycle(
+                        {RESEARCH: research}, registered_ids={RESEARCH}, promoted_ids=set(),
+                        activity_version=shared, activity_versions=versions,
+                        execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
                     self.assertEqual(bool(pair_report['retired_strategy_ids']),
                                      bool(research_report['retired_strategy_ids']))
                     pair_evidence = dict(pair['strategy_lifecycle']['evidence'])
                     research_evidence = dict(research['strategy_lifecycle']['evidence'])
-                    self.assertEqual(pair_evidence.pop('activity_version'), versions[strategy_id])
+                    self.assertEqual(pair_evidence.pop('activity_version'), versions[strategy_id][0])
+                    self.assertEqual(pair_evidence.pop('accepted_activity_versions'), list(versions[strategy_id]))
+                    pair_counts = pair_evidence.pop('closed_trades_by_activity_version')
                     research_evidence.pop('activity_version')
+                    self.assertEqual(research_evidence.pop('accepted_activity_versions'), list(shared))
+                    research_counts = research_evidence.pop('closed_trades_by_activity_version')
+                    self.assertEqual(list(pair_counts.values()), list(research_counts.values()))
                     self.assertEqual(pair_evidence, research_evidence)
+
+    def test_an_entry_only_version_bump_keeps_the_previous_closes_as_evidence(self):
+        # LAB_STRATEGY_LIFECYCLE_V2: 11 losing V6 closes plus 1 losing V7 close retire a TEST
+        # book exactly as 12 losing closes under one version do (V1 counted 1 and kept it
+        # open), and the COST_FIRST pair carries its V1 closes the same way.
+        previous = {RESEARCH: lab.activity.PREVIOUS_POLICY_VERSION,
+                    lab.cost_first.CONTROL_BOOK_ID: 'COST_FIRST_ESTABLISHED_V1'}
+        current = {RESEARCH: lab.activity.POLICY_VERSION,
+                   lab.cost_first.CONTROL_BOOK_ID: 'COST_FIRST_ESTABLISHED_V2'}
+        for strategy_id in (RESEARCH, lab.cost_first.CONTROL_BOOK_ID):
+            with self.subTest(strategy_id=strategy_id):
+                books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
+                stored = book([-4] * 12, strategy_id, current[strategy_id])
+                for row in stored['history'][:11]:
+                    row['entry_policy_version'] = previous[strategy_id]
+                books[strategy_id] = stored
+                with patch.object(lab, 'now_ms', return_value=NOW):
+                    report = lab.review_strategy_lifecycle(books)
+                self.assertEqual(report['retired_strategy_ids'], [strategy_id])
+                evidence = stored['strategy_lifecycle']['evidence']
+                self.assertEqual(evidence['closed_trades'], 12)
+                self.assertEqual(evidence['closed_trades_by_activity_version'],
+                                 {current[strategy_id]: 1, previous[strategy_id]: 11})
+                single = lifecycle.observed_evidence(stored, activity_version=current[strategy_id],
+                                                     execution_version=lab.EXECUTION_MODEL_VERSION, now=NOW)
+                self.assertEqual((single['closed_trades'], single['repeated_losses']), (1, False))
+        # Older regimes still never count: V5 closes predate the V6 cost cap.
+        books = {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}
+        books[RESEARCH] = book([-4] * 12, RESEARCH, 'LAB_ACTIVE_V5_CAUSAL_MOMENTUM_RUSH_BRAIN')
+        with patch.object(lab, 'now_ms', return_value=NOW):
+            self.assertEqual(lab.review_strategy_lifecycle(books)['retired_strategy_ids'], [])
+        self.assertEqual(books[RESEARCH]['strategy_lifecycle']['evidence']['closed_trades'], 0)
+        self.assertEqual(lifecycle.accepted_versions(['A', '', None, 'B', 'A']), ('A', 'B'))
+        self.assertEqual(lifecycle.accepted_versions(7), ())
 
     def test_other_policy_rows_never_count_for_either_side(self):
         versions = lab.lifecycle_activity_versions()

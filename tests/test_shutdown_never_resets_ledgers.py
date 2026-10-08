@@ -72,6 +72,20 @@ class RunnerShutdown(unittest.TestCase):
         self.run_service('lab', loaded, 'strategy_lab')
         loaded.persist.assert_called_once_with('stopped')
 
+    def test_tape_flushes_its_ticker_registry_on_stop(self):
+        # DEFENSIVE_ENTRY_LAYER_V1: the seat screen's ticker sightings of the last
+        # (at most 5-minute) save interval survive a clean tape restart.
+        without_recorder = service_module(KeyboardInterrupt(), True)
+        without_recorder._RECORDER = None
+        self.run_service('tape', without_recorder, 'live_tape')
+        without_recorder.flush_scheduler_registry.assert_called_once_with()
+        recording = service_module(KeyboardInterrupt(), True)
+        recorder = recording._RECORDER
+        self.run_service('tape', recording, 'live_tape')
+        recording.flush_scheduler_registry.assert_called_once_with()
+        recorder.db.commit.assert_called_once_with()
+        recorder.close.assert_called_once_with()
+
 
 class LoadFlags(unittest.TestCase):
     def setUp(self):

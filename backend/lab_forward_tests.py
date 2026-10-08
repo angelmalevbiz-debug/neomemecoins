@@ -67,10 +67,13 @@ x / (1 + x), x = 2 x value / liquidity, never below the shared model's capped
 impact; a reported liquidity of 0 is worth 0), and a position whose exact pool
 has given no usable mark beyond max hold plus 10 min closes as VANISHED at
 its last mark minus the research's 10% haircut. Both kinds are counted in the
-kill-rule evidence and the gate's vanished-or-unpriced share. An exact-pair
-refresh that reports no liquidity is unknown, not drained
-(LAB_FORWARD_MARK_LIQUIDITY_V1): it is no usable mark, so the position stays
-unpriced until a usable one arrives or the VANISHED rule closes it.
+kill-rule evidence and the gate's vanished-or-unpriced share. A mark that
+omits the pool liquidity is a reported liquidity of 0 on every path
+(LAB_FORWARD_MARK_LIQUIDITY_V2): main's scan feed and the exact-pair refresh
+both normalize the omitted field to liquidityUsd 0.0, and in the research
+every scan-feed liquidity of 0 (omitted fields included) was terminal (F6).
+Its price triggers the exits and its sale is booked as a drain, the same as a
+reported 0.
 
 Cash state (LAB_FORWARD_CASH_STATE_V1): a book whose balance cannot fund the
 fixed $200 entry (plus a network-fee reserve) and holds no position cannot
@@ -149,16 +152,16 @@ CASH_STATE_VERSION = 'LAB_FORWARD_CASH_STATE_V1'
 CONTROL_CONTINUITY_VERSION = 'LAB_FORWARD_CONTROL_CONTINUITY_V1'
 SIGNAL_CARRY_VERSION = 'LAB_FORWARD_SIGNAL_CARRY_V1'
 FILL_BASIS_VERSION = 'LAB_FORWARD_FILL_BASIS_V1'
-# Part of the close policy's parameters (and so of every config hash): an exact-pair
-# refresh that reports no pool liquidity is unknown, not drained.
-MARK_LIQUIDITY_VERSION = 'LAB_FORWARD_MARK_LIQUIDITY_V1'
+# Part of the close policy's parameters (and so of every config hash): a mark that omits
+# the pool liquidity is a reported 0, on the exact-pair refresh as in the shared feed.
+# V1 (never released, no close under it) ignored such a mark's price.
+MARK_LIQUIDITY_VERSION = 'LAB_FORWARD_MARK_LIQUIDITY_V2'
 # Storage form of a completed research-fill shadow (valuation and booking unchanged):
 # the observation snapshots are dropped once the result is computed.
 FILL_SHADOW_STORAGE_VERSION = 'LAB_FORWARD_FILL_SHADOW_COMPACT_V1'
 # lab_position_marks.parse_pair_response's mark_source (restated: that module opens an
 # HTTP session at import; a test pins equality).
 EXACT_PAIR_MARK_SOURCE = 'DEXSCREENER_EXACT_POOL_API'
-LIQUIDITY_UNKNOWN_REASON = 'exact_pool_liquidity_unknown'
 # Every released LAB_FORWARD_TESTS version whose open positions this module still
 # books and exits (with their own stored exit parameters). Add, never remove.
 KNOWN_VERSIONS = (VERSION,)
@@ -385,14 +388,15 @@ class ClosePolicyParameters:
     vanish_confirm_seconds: int = 60            # continuous no-mark time in this Lab process
     feed_alive_max_age_ms: int = 60_000         # the shared feed must still be priced
     vanish_reason: str = 'VANISHED_NO_FRESH_MARK'
-    # LAB_FORWARD_MARK_LIQUIDITY_V1. The scan feed normalizes a missing liquidity to 0 and
-    # there 0 was always terminal (research F6); the exact-pair endpoint carries its own
-    # liquidity dict, so its absence there is unknown, not a drain.
-    unknown_liquidity: str = ('LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh (DEXSCREENER_EXACT_POOL_API) '
-                              'without liquidity.usd is not a usable mark: no exit trigger, no booked valuation, '
-                              'no research-fill observation; the position counts as unpriced '
-                              '(exact_pool_liquidity_unknown) and the VANISHED rule applies. A reported '
-                              'liquidity of 0 stays drained.')
+    # LAB_FORWARD_MARK_LIQUIDITY_V2. main's make_coin and parse_pair_response both turn an
+    # omitted DexScreener liquidity into liquidityUsd 0.0, and every such scan-feed point in
+    # the research was terminal (F6: 570 of 570; LP pulls drop liquidity at an unchanged
+    # price). V1 (never released) ignored the mark instead, so its price could not stop out.
+    omitted_liquidity: str = ('LAB_FORWARD_MARK_LIQUIDITY_V2: a mark without liquidity.usd (the shared feed or the '
+                              'exact-pair refresh, DEXSCREENER_EXACT_POOL_API) is a reported liquidity of 0, as '
+                              'both normalize it: its price is used, exits trigger on it as on any mark, and the '
+                              'drain-aware exit books the sale at 0 (research F6: every scan-feed liquidity of 0, '
+                              'omitted fields included, was terminal)')
 
 
 @dataclass(frozen=True)
@@ -472,8 +476,8 @@ class FillBasisParameters:
     # A leg with no observation beyond the window resolves on time this long after it.
     resolve_grace_ms: int = 30_000
     observations: str = ("the shared feed's exact-pool observations and the exact-pair refresh "
-                         '(updatedAt, as PairHistory), each counted once, in stamp order; an exact-pair '
-                         'refresh without liquidity.usd is no observation (LAB_FORWARD_MARK_LIQUIDITY_V1)')
+                         '(updatedAt, as PairHistory), each counted once, in stamp order; an observation '
+                         'without liquidity.usd counts at a reported liquidity of 0 (LAB_FORWARD_MARK_LIQUIDITY_V2)')
     valuation: str = ('the booked model (Lab spot model + the position CALIB_V1 bps per leg, drain-aware exit) '
                       're-run at the entry and exit fill observations; net50 with the booked stress and '
                       'exit-reason extra')
@@ -1123,35 +1127,23 @@ def position_calib_bps(position) -> float:
 def reported_liquidity_usd(coin):
     """Pool liquidity as the mark reports it: a number (0 = drained) or None when it carries none.
 
-    A DexScreener pair object's own ``liquidity`` dict wins (a dict without ``usd``
-    is unknown). An exact-pair refresh (``mark_source`` DEXSCREENER_EXACT_POOL_API)
-    without that dict carries none: lab_position_marks.parse_pair_response turns
-    the missing field into liquidityUsd 0.0, which is not a drain
-    (LAB_FORWARD_MARK_LIQUIDITY_V1). Otherwise the feed's normalized
-    ``liquidityUsd``: in the scan feed a PumpSwap liquidity of exactly 0 was
-    always terminal (research F6).
+    The DexScreener pair object's own ``liquidity.usd`` wins when it is a number.
+    Otherwise the normalized ``liquidityUsd``: main's make_coin (the scan feed) and
+    lab_position_marks.parse_pair_response (the exact-pair refresh) both turn an
+    omitted ``liquidity`` or ``liquidity.usd`` into 0.0, and that is a drain on both
+    paths (LAB_FORWARD_MARK_LIQUIDITY_V2): in the research every scan-feed PumpSwap
+    liquidity of 0, omitted fields included, was terminal (F6), and an LP pull
+    drops the liquidity at an unchanged price. None only for an object that
+    carries neither field (no feed or refresh coin does).
     """
     if not isinstance(coin, dict):
         return None
     raw = coin.get('liquidity')
     if isinstance(raw, dict):
-        return _finite(raw.get('usd'))
-    if coin.get('mark_source') == EXACT_PAIR_MARK_SOURCE:
-        return None
+        reported = _finite(raw.get('usd'))
+        if reported is not None:
+            return reported
     return _finite(coin.get('liquidityUsd'))
-
-
-def mark_liquidity_unknown(coin) -> bool:
-    """LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh that reports no pool liquidity.
-
-    Such a mark is not usable for a forward position: the shared model would value
-    it at $1 of liquidity (a 20% capped impact that fires every stop) and the
-    drain-aware exit would book it at 0. The position waits for a usable mark and
-    counts as unpriced meanwhile; the VANISHED rule covers a pool that never gives
-    one. A reported liquidity of 0 (``liquidity.usd`` 0) stays a drain.
-    """
-    return (isinstance(coin, dict) and coin.get('mark_source') == EXACT_PAIR_MARK_SOURCE
-            and reported_liquidity_usd(coin) is None)
 
 
 def drain_aware_impact_pct(value_usd, liquidity, shared_impact_pct) -> float:
@@ -1330,10 +1322,10 @@ def _resolve_at_window_end(leg, now):
 def advance_fill_leg(leg, coin, now, *, key=None, params: FillBasisParameters = FILL_BASIS) -> bool:
     """Advance one pending leg with an observation of its exact pool (``coin`` None: time only).
 
-    Observations at or before the decision, of another pool, not newer than the
-    last one used, or an exact-pair refresh without liquidity
-    (LAB_FORWARD_MARK_LIQUIDITY_V1) are ignored. Returns True when the leg
-    resolved now.
+    Observations at or before the decision, of another pool or not newer than the
+    last one used are ignored. An observation without liquidity.usd counts at a
+    reported liquidity of 0 (LAB_FORWARD_MARK_LIQUIDITY_V2). Returns True when the
+    leg resolved now.
     """
     if not isinstance(leg, dict) or leg.get('status') != FILL_PENDING:
         return False
@@ -1341,8 +1333,7 @@ def advance_fill_leg(leg, coin, now, *, key=None, params: FillBasisParameters = 
     current = _finite(now)
     if start is None or price0 is None:
         return _resolve_leg(leg, FILL_NO_NEXT, None, now)
-    if (isinstance(coin, dict) and (key is None or _identity(coin) == key)
-            and not mark_liquidity_unknown(coin)):
+    if isinstance(coin, dict) and (key is None or _identity(coin) == key):
         stamp, price = observation_ms(coin, now), _finite(coin.get('priceUsd'))
         last = _finite(leg.get('last_observed_at'))
         if (stamp is not None and price is not None and price > 0 and stamp > start

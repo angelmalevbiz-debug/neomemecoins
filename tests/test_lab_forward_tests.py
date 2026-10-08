@@ -65,12 +65,13 @@ MINUTE = 60_000
 HOUR = 60 * MINUTE
 DAY = 24 * HOUR
 # Frozen config hashes (sha256 of each book's canonical parameter JSON). A parameter
-# change must change these pins, strategy-lock.json and docs/STRATEGY_VALIDATION.md together.
+# change must change these pins, strategy-lock.json (lab_forward_tests.config_hashes and
+# books) and the hash table in docs/LAB_FORWARD_TESTS.md together; tests check all three.
 PINNED_CONFIG_HASHES = {
-    'LAB_A_SURGE_EST_GUARD': '4be3a080fcee4abad0decb023bcf4bbbd6616aa211a40da18d22f542da848665',
-    'RND_LAB_A': 'c8d501ef27d8cee39b00b90b3e01a1a7e88b3aa24bef611582b34c1c43579514',
-    'LAB_B_DIP_MKTDIP_GUARD': 'da426cd42aa7a1fe7ef7719054a65522223cf819034983ed0b414db7b63c70f4',
-    'RND_LAB_B': '457858b25b0c15e98772543e384f1effcc568e09c705926a25787cb784815261',
+    'LAB_A_SURGE_EST_GUARD': 'c3cb986d9d94fdf553e33b77ffe881c29fe62da7c5d15070ae0f71c390c98158',
+    'RND_LAB_A': 'b3899110e80fe0e4251accc8856d0e106631e96532886717736e3a3c257975a5',
+    'LAB_B_DIP_MKTDIP_GUARD': '45caa1ff70562f1020ad7da531ac8f9c4d03aedd237d915fc9c1fc31b5ab0e94',
+    'RND_LAB_B': '9d47aece480a0d5c38d08b06b64253f272ebced7d8e87779280a88c94ddf61e5',
 }
 
 
@@ -329,6 +330,15 @@ class DefinitionTests(unittest.TestCase):
                          (tape_pool_scheduler.POLICY_VERSION, tape_pool_scheduler.PREVIOUS_POLICY_VERSION))
         self.assertFalse(seats['flow_free_lab_positions_pinned'])
         self.assertEqual(lock['tape_decoder']['seat_shedding_policy_version'], tape_pool_scheduler.POLICY_VERSION)
+        self.assertEqual(section['mark_liquidity']['version'], lf.MARK_LIQUIDITY_VERSION)
+
+    def test_the_doc_publishes_the_pinned_hashes(self):
+        """The runbook's deploy check compares the published hashes with this doc and the lock."""
+        doc = (Path(__file__).resolve().parents[1] / 'docs' / 'LAB_FORWARD_TESTS.md').read_text(encoding='utf-8')
+        for book_id, digest in PINNED_CONFIG_HASHES.items():
+            with self.subTest(book_id=book_id):
+                self.assertIn(f'| `{book_id}` | `{digest}` |', doc)
+        self.assertEqual(lf.CONFIG_HASHES, PINNED_CONFIG_HASHES)
 
 
 # ------------------------------------------------------------------ LAB_A signal
@@ -667,49 +677,50 @@ class CostTests(unittest.TestCase):
         self.assertEqual((drained['impact_pct'], drained['net_proceeds_usd']), (100.0, 0.0))
         self.assertAlmostEqual(lab.exit_execution(dict(coin, liquidityUsd=0.0), qty)['impact_pct'], 20.0,
                                msg='the shared model alone books a drained pool at about -21%')
-        # The DexScreener pair object's own liquidity dict wins; a dict without usd is unknown.
+        # The DexScreener pair object's own liquidity.usd wins when it is a number; a dict without
+        # it falls back to the normalized liquidityUsd (0.0 from make_coin and parse_pair_response).
         self.assertEqual(lf.reported_liquidity_usd({'liquidityUsd': 0.0, 'liquidity': {'usd': 5_000}}), 5_000)
-        self.assertIsNone(lf.reported_liquidity_usd({'liquidityUsd': 0.0, 'liquidity': {}}))
+        self.assertEqual(lf.reported_liquidity_usd({'liquidityUsd': 0.0, 'liquidity': {}}), 0.0)
         self.assertEqual(lf.reported_liquidity_usd({'liquidityUsd': 0.0}), 0.0)
+        # An object that carries neither field (no feed or refresh coin does) keeps the shared impact.
         unknown = dict(coin, liquidity={})
         unknown.pop('liquidityUsd')
+        self.assertIsNone(lf.reported_liquidity_usd(unknown))
         self.assertEqual(lab.calibrated_exit_execution(unknown, qty, 0.0, drain_aware=True)['impact_pct'],
                          lab.exit_execution(unknown, qty)['impact_pct'])
 
-    def test_an_exact_pair_refresh_without_liquidity_is_unknown_not_drained(self):
-        """Review finding: parse_pair_response turns a missing liquidity field into liquidityUsd 0.0,
-        which read as a drain (impact 100%, close_kind 'drained', about -$200 on a $200 entry)."""
+    def test_an_exact_pair_refresh_without_liquidity_is_a_reported_zero(self):
+        """LAB_FORWARD_MARK_LIQUIDITY_V2 (final review r2): an omitted liquidity is booked as main
+        normalizes it (liquidityUsd 0.0) on both paths. V1 treated it as unknown and ignored the
+        mark's price, so no stop could fire on it (research F6: every scan-feed 0 was terminal)."""
         coin = pool(full('Mint'), full('Pair'), 0.01, 300_000.0, 1_800_000_000_000, marketCap=10_000_000.0,
                     priceNative=0.01 / 120)
+        self.assertFalse(hasattr(lf, 'mark_liquidity_unknown'))
+        self.assertEqual(lf.MARK_LIQUIDITY_VERSION, 'LAB_FORWARD_MARK_LIQUIDITY_V2')
+        self.assertIn('LAB_FORWARD_MARK_LIQUIDITY_V2', lf.CLOSE_POLICY.omitted_liquidity)
+        self.assertIn('LAB_FORWARD_MARK_LIQUIDITY_V2', lf.FILL_BASIS.observations)
         missing = exact_pair_mark(coin, coin['updatedAt'])
         self.assertNotIn('liquidity', missing)
-        self.assertEqual(missing['liquidityUsd'], 0.0, 'the shared parser is unchanged for every other book')
-        self.assertIsNone(lf.reported_liquidity_usd(missing))
-        self.assertTrue(lf.mark_liquidity_unknown(missing))
-        self.assertEqual(lf.close_kind('STOP_LOSS_5_NET', lf.reported_liquidity_usd(missing)), 'marked')
+        self.assertEqual(missing['liquidityUsd'], 0.0, 'the shared parser is unchanged')
         no_usd = exact_pair_mark(coin, coin['updatedAt'], liquidity=None)
-        self.assertTrue(lf.mark_liquidity_unknown(no_usd))
-        # A reported 0 is still a drain, on the exact-pair path and in the scan feed alike.
         zero = exact_pair_mark(coin, coin['updatedAt'], liquidity=0)
-        self.assertEqual(lf.reported_liquidity_usd(zero), 0.0)
-        self.assertFalse(lf.mark_liquidity_unknown(zero))
-        self.assertEqual(lf.close_kind('STOP_LOSS_5_NET', lf.reported_liquidity_usd(zero)), 'drained')
         feed_zero = dict(coin, liquidityUsd=0.0, mark_source='SHARED_LIVE_FEED_EXACT_POOL')
-        self.assertEqual(lf.reported_liquidity_usd(feed_zero), 0.0)
-        self.assertFalse(lf.mark_liquidity_unknown(feed_zero))
+        for label, mark in (('omitted', missing), ('usd_none', no_usd), ('zero', zero), ('feed_zero', feed_zero)):
+            with self.subTest(label):
+                self.assertEqual(lf.reported_liquidity_usd(mark), 0.0)
+                self.assertEqual(lf.close_kind('STOP_LOSS_5_NET', lf.reported_liquidity_usd(mark)), 'drained')
+                drained = lab.calibrated_exit_execution(mark, 20_000.0, 0.0, drain_aware=True)
+                self.assertEqual((drained['impact_pct'], drained['net_proceeds_usd']), (100.0, 0.0))
         known = exact_pair_mark(coin, coin['updatedAt'], liquidity=300_000.0)
         self.assertEqual(lf.reported_liquidity_usd(known), 300_000.0)
-        self.assertFalse(lf.mark_liquidity_unknown(known))
-        # An unknown-liquidity refresh is no research-fill observation either.
+        # A liquidity-less refresh is a research-fill observation like any other (at liquidity 0).
         leg = lf.new_fill_leg(coin, coin['updatedAt'])
         later = exact_pair_mark(dict(coin, priceUsd=0.0101), coin['updatedAt'] + 20_000)
-        self.assertFalse(lf.advance_fill_leg(leg, later, coin['updatedAt'] + 20_500,
-                                             key=(coin['address'], coin['pairAddress'])))
-        self.assertEqual((leg['status'], leg['later_observations']), (lf.FILL_PENDING, 0))
-        later = exact_pair_mark(dict(coin, priceUsd=0.0101), coin['updatedAt'] + 25_000, liquidity=290_000.0)
-        self.assertTrue(lf.advance_fill_leg(leg, later, coin['updatedAt'] + 25_500,
+        self.assertTrue(lf.advance_fill_leg(leg, later, coin['updatedAt'] + 20_500,
                                             key=(coin['address'], coin['pairAddress'])))
-        self.assertEqual((leg['status'], leg['fill_price']), (lf.FILL_NEXT_REFRESH, 0.0101))
+        self.assertEqual((leg['status'], leg['fill_price'], leg['later_observations']),
+                         (lf.FILL_NEXT_REFRESH, 0.0101, 1))
+        self.assertEqual(lf.reported_liquidity_usd(lf.fill_leg_coin(coin, leg)), 0.0)
 
 
 # ------------------------------------------------------------------ kill rule and promotion gate
@@ -1951,61 +1962,55 @@ class LabIntegrationTests(unittest.TestCase):
         with patch.object(lab.POSITION_MARK_FEED, 'resolve', side_effect=lambda position, prices, now: dict(mark)):
             lab.update_positions({}, [alive])
 
-    def test_an_exact_pair_refresh_without_liquidity_neither_triggers_nor_books_a_drain(self):
-        """Review finding: one refresh payload without a liquidity field booked the position at about -$200."""
-        points = self.open_neet()
-        book = self.books[lf.LAB_A_ID]
-        position = book['position']
-        entry_mark = dict(position['last_mark'])
-        # The pool left the feed; its refresh repeats the entry print 30 s later, without liquidity.
-        decision = points[1]
-        missing = exact_pair_mark(decision, decision['updatedAt'] + 30_000, priceUsd=decision['priceUsd'] * 1.002)
-        self.poll_exact_pair(missing)
-        self.assertIsNotNone(book['position'], 'no stop from $1 of model liquidity')
-        self.assertEqual(book['history'], [])
-        self.assertEqual(book['balance'], 500.0)
-        position = book['position']
-        self.assertEqual((position['quote_status'], position['quote_unavailable_reason']),
-                         ('unavailable', lf.LIQUIDITY_UNKNOWN_REASON))
-        self.assertEqual(position['last_mark'], entry_mark, 'an unknown-liquidity mark is not a usable last mark')
-        leg = position['research_fill']['entry']
-        self.assertEqual((leg['status'], leg['later_observations']), (lf.FILL_PENDING, 0))
-        # The next refresh reports the pool's liquidity: an ordinary mark again.
-        known = exact_pair_mark(decision, decision['updatedAt'] + 40_000, liquidity=decision['liquidityUsd'],
-                                priceUsd=decision['priceUsd'] * 1.002)
-        self.poll_exact_pair(known)
-        position = book['position']
-        self.assertIsNotNone(position)
-        self.assertEqual((position['quote_status'], position['quote_unavailable_reason'], position['mark_source']),
-                         ('fresh', None, lf.EXACT_PAIR_MARK_SOURCE))
-        self.assertEqual(position['research_fill']['entry']['status'], lf.FILL_NEXT_REFRESH)
-        self.assertGreater(position['pnl_pct'], -5.0)
-        # A refresh that reports liquidity 0 is still a drain.
-        zero = exact_pair_mark(decision, decision['updatedAt'] + 60_000, liquidity=0)
-        self.poll_exact_pair(zero)
-        self.assertIsNone(book['position'])
-        trade = book['history'][0]
+    def assert_drained_close(self, book, trade):
+        """The booked close of a drained pool: the model stop fired, the sale is worth 0."""
         self.assertEqual((trade['exit_reason'], trade['close_kind'], trade['exit_liquidity_usd']),
                          ('STOP_LOSS_5_NET', 'drained', 0.0))
+        self.assertAlmostEqual(trade['pnl_pct'], -100.0, delta=0.05)
+        self.assertAlmostEqual(trade['net50_pct'], -100.0, delta=0.05)
+        self.assertAlmostEqual(book['balance'], 500.0 + trade['pnl_usd'], places=3)
+        self.assertLess(book['balance'], 300.1, 'the funded $200 is lost')
+        self.assertEqual(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['drained_closes'], 1)
 
-    def test_a_pool_that_only_refreshes_without_liquidity_closes_as_vanished(self):
+    def test_an_exact_pair_refresh_without_liquidity_at_minus_50_stops_out_and_books_the_drain(self):
+        """Final review r2: under LAB_FORWARD_MARK_LIQUIDITY_V1 liquidity-less refreshes at 50% of the
+        entry price kept the position open and unpriced for 70 min (no stop) and closed it as
+        VANISHED at the last usable mark - 10% (about -11.4%). V2 books the omitted liquidity as main
+        normalizes it (0): the first such refresh fires the stop and books at least the -50%."""
         points = self.open_neet()
         book = self.books[lf.LAB_A_ID]
-        opened, last_price = book['position']['opened_at'], book['position']['last_mark']['priceUsd']
+        position = book['position']
+        self.assertIsNotNone(position, book['entry_diagnostics'])
         decision = points[1]
-        for minutes in (30, 60.5, 69.9):
-            mark = exact_pair_mark(decision, opened + minutes * MINUTE - 2_000)
-            self.poll_exact_pair(mark, at=opened + minutes * MINUTE)
-            self.assertIsNotNone(book['position'], minutes)
-            self.assertEqual(book['position']['quote_unavailable_reason'], lf.LIQUIDITY_UNKNOWN_REASON)
-        self.assertTrue(lf.evidence(book, lf.LAB_A_ID, self.clock[0])['open_unpriced_past_max_hold'],
-                        'past its max hold without a usable mark, no max-hold exit on an unknown mark')
-        self.poll_exact_pair(exact_pair_mark(decision, opened + 70.05 * MINUTE - 2_000), at=opened + 70.05 * MINUTE)
+        crashed = exact_pair_mark(decision, decision['updatedAt'] + 30_000,
+                                  priceUsd=position['entry_price'] * 0.5,
+                                  priceNative=decision['priceNative'] * 0.5)
+        self.assertNotIn('liquidity', crashed)
+        self.poll_exact_pair(crashed)
+        self.assertIsNone(book['position'], 'the -5% stop fires on the observed -50% price')
+        trade = book['history'][0]
+        self.assert_drained_close(book, trade)
+        self.assertLessEqual(trade['pnl_pct'], -50.0)
+        self.assertLessEqual(trade['net50_pct'], -50.0)
+        self.assertLess(trade['model_pnl_pct'], -50.0, 'the trigger saw the observed price')
+        # The exit leg of the research-fill shadow is decided at that mark (liquidity 0 as booked).
+        self.assertEqual(trade['research_fill']['exit']['decision_price'], crashed['priceUsd'])
+
+    def test_an_lp_pull_reported_without_liquidity_is_booked_like_a_reported_zero(self):
+        """LP pulls drop the liquidity at an unchanged price (research forensics). Whether DexScreener
+        reports liquidity.usd 0 or omits the field, the close is the same as the shared feed's drain."""
+        points = self.open_neet()
+        book = self.books[lf.LAB_A_ID]
+        self.assertIsNotNone(book['position'], book['entry_diagnostics'])
+        decision = points[1]
+        pulled = exact_pair_mark(decision, decision['updatedAt'] + 30_000)
+        self.assertEqual(pulled['priceUsd'], decision['priceUsd'])
+        self.poll_exact_pair(pulled)
         self.assertIsNone(book['position'])
         trade = book['history'][0]
-        self.assertEqual((trade['exit_reason'], trade['close_kind']), ('VANISHED_NO_FRESH_MARK', 'vanished'))
-        self.assertAlmostEqual(trade['exit_price'], last_price * 0.9, places=12)
-        self.assertGreater(trade['pnl_pct'], -11.5, 'the last usable mark minus 10%, not a drain')
+        self.assert_drained_close(book, trade)
+        self.assertLess(trade['model_pnl_pct'], -20.0, 'the shared model at liquidity 0 trips the stop')
+        self.assertGreater(trade['model_pnl_pct'], -23.0)
 
     def test_a_pool_without_marks_closes_as_vanished_after_max_hold_plus_grace(self):
         points = self.open_neet()

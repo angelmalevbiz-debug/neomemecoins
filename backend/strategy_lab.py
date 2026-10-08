@@ -341,8 +341,11 @@ def atomic_write_path(path,data):
     """Write ``data`` as JSON atomically (fsync, then replace); returns the bytes written."""
     path.parent.mkdir(parents=True,exist_ok=True)
     tmp=path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    # json.dumps runs the C encoder (json.dump streams through the pure-Python one): the
+    # same bytes, several times faster on a large ledger rewritten every loop.
+    text=json.dumps(data,ensure_ascii=False,allow_nan=False)
     with tmp.open('w',encoding='utf-8') as handle:
-        json.dump(data,handle,ensure_ascii=False,allow_nan=False)
+        handle.write(text)
         handle.flush()
         os.fsync(handle.fileno())
         size=os.fstat(handle.fileno()).st_size
@@ -878,17 +881,11 @@ def update_positions(flows,feed):
             pos['quote_unavailable_reason']='network_price_unknown'
             if forward: close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
             continue
-        if forward and lab_forward.mark_liquidity_unknown(coin):
-            # LAB_FORWARD_MARK_LIQUIDITY_V1: an exact-pair refresh without pool liquidity is unknown,
-            # not drained ($1 of model liquidity would fire every stop and the drain-aware exit would
-            # book 0). No trigger, no valuation: the position is unpriced until a usable mark arrives.
-            pos['quote_status']='unavailable'
-            pos['quote_age_ms']=max(0,decision_at-int(num(pos.get('mark_received_at'),num(pos.get('updated_at')))))
-            pos['quote_unavailable_reason']=lab_forward.LIQUIDITY_UNKNOWN_REASON
-            close_vanished_forward_position(book,pos,decision_at,forward_feed_alive)
-            continue
         if forward:
             # A usable mark of the exact pool: reset the no-mark clock, keep it for a VANISHED valuation.
+            # LAB_FORWARD_MARK_LIQUIDITY_V2: a mark that omits the pool liquidity is a reported 0 (the
+            # shared feed and the exact-pair refresh normalize it alike): its price triggers the exits
+            # and the drain-aware exit books the sale at 0, as for an explicit 0.
             FORWARD_UNPRICED_SINCE.pop(forward_position_key(pos),None)
             pos['last_mark']=lab_forward.mark_snapshot(coin,num(coin.get('mark_received_at'),decision_at),
                                                        pos.get('last_mark'))

@@ -57,16 +57,25 @@ minutes of the 60-minute coverage window:
         --journal .runtime\\accounts\\training\\observations.jsonl
         --out .runtime\\accounts\\state.ticker_registry.json
 
-The services must be stopped for every run, the first one and
-``--replace-stale`` alike: a running main keeps its own registry in memory and
-rewrites its sidecar at its next periodic save (within 5 min), and the Lab,
-the tape and the personal engines seed only when their registry starts, so a
-seed written under running services is silently lost. The tool therefore
-refuses to write into a runtime directory (the output's folder or any parent)
-whose ``services/processes.json`` exists without ``services/stop.request``
-(Stop writes that marker, Start removes it). The marker proves that Stop ran,
-not that every process exited: when Stop reported that services are still
-flushing, wait until ``-Action Status`` shows none running first.
+The services must be stopped whenever a seed is written into the runtime
+folder, the first one and ``--replace-stale`` alike: a running main keeps its
+own registry in memory and rewrites its sidecar at its next periodic save
+(within 5 min), and the Lab, the tape and the personal engines seed only when
+their registry starts, so a seed written under running services is silently
+lost. The tool therefore refuses to write into a runtime directory (the
+output's folder or any parent) whose ``services/processes.json`` exists
+without ``services/stop.request`` (Stop writes that marker, Start removes it).
+The marker proves that Stop ran, not that every process exited: when Stop
+reported that services are still flushing, wait until ``-Action Status`` shows
+none running first.
+
+First deploy only, while no ``state.ticker_registry.json`` exists (the
+pre-release services have no ticker registry and never write it): the replay
+may run before Stop, so that it is not part of the outage. Run the release
+checkout's copy of this tool with ``--out`` in a scratch folder outside
+``.runtime`` (the journal is opened 'rb' with read/write sharing, so main keeps
+appending), then copy the sidecar into ``.runtime\\accounts`` after Stop and
+start within the printed window (docs/PAPER_RUNBOOK.md, first deploy).
 
 The output must not exist. An earlier attempt (services started before the
 seed, a rolled-back deploy, a failed first try) can leave a sidecar that does
@@ -353,7 +362,8 @@ def replay_minutes_argument(value) -> float:
 def main(argv=None, *, clock=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--journal', required=True, type=Path,
-                        help='training observations.jsonl, read in place (read only; services stopped)')
+                        help=('training observations.jsonl, read in place (read only); services stopped, or on '
+                              'the first deploy running with --out outside .runtime'))
     parser.add_argument('--out', required=True, type=Path, help='new sidecar path; must not exist')
     parser.add_argument('--replace-stale', action='store_true',
                         help=('replace an existing --out only when its coverage at the wall clock is not '

@@ -131,8 +131,11 @@ Rules fixed before the run:
   counted. Neither basis is an executable quote.
 - **Drained and vanished pools (`LAB_FORWARD_CLOSE_POLICY_V1`).** A drained pool is
   booked with a constant-product exit, so liquidity 0 is worth 0, not the shared model's
-  capped −21%. A pool with no usable mark beyond max hold + 10 min closes at its last mark
-  minus 10%. Both are ordinary closes in the kill-rule and gate samples, counted as
+  capped −21%. A mark that omits the liquidity is a reported 0 on the shared feed and the
+  exact-pair refresh alike (`LAB_FORWARD_MARK_LIQUIDITY_V2`, the normalization main's
+  `make_coin` applied to the research scan log), so its price still triggers the exits. A
+  pool with no usable mark beyond max hold + 10 min closes at its last mark minus 10%.
+  Both are ordinary closes in the kill-rule and gate samples, counted as
   `drained_closes` / `vanished_closes`.
 - **Kill rule (`LAB_FORWARD_KILL_RULE_V1`, each of the four books).** After ≥ 50 closes of
   the frozen config, the book is retired when mean net50 < 0 and the upper bound of the

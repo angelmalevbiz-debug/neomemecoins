@@ -46,10 +46,14 @@ The frozen hashes, with the Lab's default cost model:
 
 | Book | `lab_config_hash` |
 |---|---|
-| `LAB_A_SURGE_EST_GUARD` | `4be3a080fcee4abad0decb023bcf4bbbd6616aa211a40da18d22f542da848665` |
-| `RND_LAB_A` | `c8d501ef27d8cee39b00b90b3e01a1a7e88b3aa24bef611582b34c1c43579514` |
-| `LAB_B_DIP_MKTDIP_GUARD` | `da426cd42aa7a1fe7ef7719054a65522223cf819034983ed0b414db7b63c70f4` |
-| `RND_LAB_B` | `457858b25b0c15e98772543e384f1effcc568e09c705926a25787cb784815261` |
+| `LAB_A_SURGE_EST_GUARD` | `c3cb986d9d94fdf553e33b77ffe881c29fe62da7c5d15070ae0f71c390c98158` |
+| `RND_LAB_A` | `b3899110e80fe0e4251accc8856d0e106631e96532886717736e3a3c257975a5` |
+| `LAB_B_DIP_MKTDIP_GUARD` | `45caa1ff70562f1020ad7da531ac8f9c4d03aedd237d915fc9c1fc31b5ab0e94` |
+| `RND_LAB_B` | `9d47aece480a0d5c38d08b06b64253f272ebced7d8e87779280a88c94ddf61e5` |
+
+The same four values are pinned in `tests/test_lab_forward_tests.py` and in
+`strategy-lock.json` (`lab_forward_tests.config_hashes`); a test checks that this table,
+the lock and the module agree.
 
 The canonical parameters of every book include the signal carry
 (`LAB_FORWARD_SIGNAL_CARRY_V1`, including that these books never request the Lab's
@@ -57,7 +61,7 @@ Jupiter price probe), the hypothesis-control protocol
 (`LAB_FORWARD_CONTROL_CONTINUITY_V1`), the research-fill basis
 (`LAB_FORWARD_FILL_BASIS_V1`, with the kill rule's two bases and its bootstrap minimum)
 and the close policy (`LAB_FORWARD_CLOSE_POLICY_V1`, including
-`LAB_FORWARD_MARK_LIQUIDITY_V1`), described below. No close exists under the earlier
+`LAB_FORWARD_MARK_LIQUIDITY_V2`), described below. No close exists under the earlier
 hashes: the PR had not run when they changed.
 
 The canonical parameters include the resolved Lab cost-model knobs
@@ -315,24 +319,36 @@ these four books only:
   the shared model while `x ≤ 0.25`, so ordinary trades are unchanged. It rises toward
   100% as liquidity drains, and a reported liquidity of 0 sells for nothing.
   - The reported liquidity is the DexScreener pair object's own `liquidity.usd` when
-    the mark carries that object, else the feed's `liquidityUsd`. In the scan feed, a
-    PumpSwap liquidity of exactly 0 was always terminal.
-  - Unknown liquidity keeps the shared impact.
+    the mark carries it as a number, else the normalized `liquidityUsd`. In the scan
+    feed, a PumpSwap liquidity of exactly 0 was always terminal.
+  - Only an object that carries neither field keeps the shared impact; no feed or
+    exact-pair coin is such an object.
   - The exit **triggers** are unchanged: the uncalibrated model net still decides, and
     a drained pool trips the stop.
-- **Missing liquidity is unknown, not drained (`LAB_FORWARD_MARK_LIQUIDITY_V1`).** The
-  exact-pair refresh (`lab_position_marks`, `mark_source` `DEXSCREENER_EXACT_POOL_API`)
-  turns a response without a `liquidity` field into `liquidityUsd` 0.0, and the research
-  evidence that 0 is terminal (F6) covers only the scan feed, not that endpoint. Read as
-  0, one such payload valued the pool at $1 of model liquidity (a 20% capped impact, a
-  model net near −21% that fires the stop of both hypotheses) and the drain-aware exit at
-  0, booking about −$200 and `close_kind` `drained`. For these books an exact-pair
-  refresh without `liquidity.usd` is therefore **no usable mark**: no exit trigger, no
-  booked valuation, no research-fill observation. The position stays `unavailable`
-  (`quote_unavailable_reason` `exact_pool_liquidity_unknown`, counted as unpriced) until a
-  usable mark arrives, and the vanished rule below closes a pool that never gives one. A
-  reported `liquidity.usd` of 0 is still a drain. Every other book keeps the shared
-  handling.
+- **Omitted liquidity is a reported 0 (`LAB_FORWARD_MARK_LIQUIDITY_V2`).** DexScreener
+  can return a pair without a `liquidity` field (or without `liquidity.usd`). Main's
+  scan feed (`market_monitor.make_coin`) and the exact-pair refresh
+  (`lab_position_marks.parse_pair_response`, `mark_source` `DEXSCREENER_EXACT_POOL_API`)
+  both turn that into `liquidityUsd` 0.0, and these books read it the same way on both
+  paths: the mark is priced, its price triggers the exits as any mark does, and the
+  drain-aware exit books the sale at 0 (`close_kind` `drained`). The research scan log
+  was written through the same `make_coin`, so its 570 PumpSwap points with liquidity 0,
+  every one of them terminal (F6), include any omitted fields; and an LP pull drops the
+  liquidity at an unchanged price (research forensics), so an omitted field is booked as
+  the drain it was in the research.
+  - Version 1 of this rule (never released; no close exists under it) treated such an
+    exact-pair refresh as unknown and ignored the mark, price included. A final review's
+    probe showed the cost: with refreshes at 50% of the entry price and no liquidity field the
+    −5% stop never fired, the position stayed unpriced for 70 min and closed as
+    `VANISHED_NO_FRESH_MARK` at the last usable mark − 10% (booked −11.4%, net50 −12.3%)
+    instead of at least −50%, and an LP pull reported that way would have been booked near
+    −10% instead of about −100%. The same DexScreener condition was also booked two ways,
+    as a drain through the shared feed and not at all through the exact-pair refresh.
+  - Substituting the pool's last known liquidity was considered and rejected: an LP pull
+    keeps its price, so that would book an omitted-field drain near 0%.
+  - Tests pin both cases: a liquidity-less refresh at −50% stops out and books at least
+    −50% (−100%, drained), and one at an unchanged price is booked exactly like a reported
+    0. Every other book keeps the shared handling.
 - **Vanished pool.** A position closes as `VANISHED_NO_FRESH_MARK` at its last usable
   mark minus 10% when all of these hold:
   - it is held at least max hold + 10 min (70 min);
@@ -396,8 +412,8 @@ one leg per side:
   last price minus the haircut, as booked.
 - **Observations.** The shared feed's observations of the exact pool and the exact-pair
   refresh (`updatedAt`, as `PairHistory` counts them), each used once, oldest first; an
-  exact-pair refresh without `liquidity.usd` is no observation
-  (`LAB_FORWARD_MARK_LIQUIDITY_V1`). After
+  observation without `liquidity.usd` counts at a reported liquidity of 0
+  (`LAB_FORWARD_MARK_LIQUIDITY_V2`), as booked. After
   a close, a pool that left the feed is refreshed through the exact-pair path for the
   window. A leg with no observation past its window resolves on time, 30 s after the
   window (`resolve_grace_ms`).
@@ -428,7 +444,14 @@ including the 1.3 KB `defensive_entry` decision, which is kept: for these books 
 the log-only heat metrics and the structural guard's inputs that the heat log-only
 evaluation needs. `strategy_lab.persistence` (`LAB_PERSIST_METRICS_V1`) publishes the last
 write's `ledger_bytes`, `compact_bytes`, `write_seconds` and `write_share_of_poll`, so the
-ledger's growth is visible before it slows the loop.
+ledger's growth is visible before it slows the loop. The ledger is serialized with
+`json.dumps` (the C encoder) and written in one call; `json.dump` streamed it through the
+pure-Python encoder. The bytes are identical; on a copy of the live Lab ledger (1.9 MB)
+and on the same ledger with 10 times its history (18.1 MB) serialization fell from 0.051 s
+to 0.014 s and from 0.461 s to 0.147 s. Lab history is never trimmed and the controls keep
+closing, so [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) gives an action threshold:
+`write_share_of_poll` at 0.5 or above calls for an owner decision on archiving Lab
+history or writing the full ledger only when it changes.
 
 What uses it:
 

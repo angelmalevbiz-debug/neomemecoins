@@ -125,6 +125,12 @@ The sidecar has these properties:
 - It is written atomically (temp file, fsync, replace, Windows retry), on the first
   observation, then at most once every 5 minutes, and again on a clean shutdown (main
   engine, Lab and tape). A crash loses at most 5 minutes of ticker memory.
+- A hard stop (TerminateProcess, `taskkill /F`) during a save skips its cleanup and
+  leaves the temporary (`.<sidecar>.<8 characters>.tmp`, up to several MB) beside the
+  sidecar. The registry deletes its own such files once they are at least 10 minutes old,
+  when it starts and at most every 10 minutes after that, before a save
+  (`TICKER_REGISTRY_TEMP_SWEEP_V1`, `status().stale_temps.removed`). Only that exact name
+  pattern next to its own sidecar is a candidate; no other file is touched.
 - Entries unseen for 14 days are pruned. At most 40,000 entries are kept; the least
   recently seen are evicted first. The research scan log saw 2,042 pairs in 22.8 h
   (about 2,150 a day), so 14 days need about 30,000 entries. The earlier 20,000 cap
@@ -320,13 +326,23 @@ and the tool printed warming false and exited 0 while every registry would warm 
 
 Run it in place on the live journal after the services stopped (do not copy it: a copy
 of a journal of tens of GB only costs disk and minutes of the 60-minute window), check
-that it exits 0 (`vouches_at_end` true), then start the services before the printed
-`start_services_before_utc`; the Lab, the tape and personal engines then seed from main's
-sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full procedure, including when a
-rerun cannot help.
+that it exits 0 (`vouches_at_end` true), then start the services at least 5 minutes
+before the printed `start_services_before_utc`; the Lab, the tape and personal engines
+then seed from main's sidecar. See [PAPER_RUNBOOK.md](PAPER_RUNBOOK.md) for the full
+procedure, including when a rerun cannot help.
 
-The services must be stopped for every run of the tool, the first one and
-`--replace-stale` alike. A running main keeps its registry in memory and rewrites
+On the first deploy only, while no `state.ticker_registry.json` exists, the replay can
+run before Stop instead, so that it is not part of the outage: the pre-release services
+have no ticker registry and never write that file, and the tool opens the journal
+read-only (`'rb'`, read/write sharing), so main keeps appending. The release checkout's
+copy of the tool writes the sidecar to a scratch folder outside `.runtime`, and the
+operator copies it into `.runtime\accounts` after Stop; the 60-minute window then starts
+at the end of the replay, and the outage is only stop, backup, copy, sync, lock check and
+start. Main and the personal engines must hold no position before Stop either way
+(PAPER_RUNBOOK.md, first deploy).
+
+The services must be stopped whenever a seed is written into the runtime folder, the
+first one and `--replace-stale` alike. A running main keeps its registry in memory and rewrites
 `state.ticker_registry.json` at its next periodic save (within 5 min), and the Lab, the
 tape and the personal engines read a seed only when their registry starts or restarts its
 coverage. A seed written under running services is therefore overwritten: in a review

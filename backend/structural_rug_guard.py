@@ -116,6 +116,7 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import tempfile
 import threading
@@ -148,6 +149,15 @@ REGISTRY_SIGHTING_MERGE_INTERVAL_MS = 300_000
 SIDECAR_READ_VERSION = 'TICKER_REGISTRY_SIDECAR_READ_V1'
 SIDECAR_READ_ATTEMPTS = 3
 SIDECAR_REREAD_INTERVAL_MS = 60_000
+# A hard stop (TerminateProcess, taskkill /F, power loss) inside save() skips its
+# finally and leaves the mkstemp temporary ('.' + sidecar name + '.' + 8 characters
+# + '.tmp', up to several MB) beside the sidecar. The registry deletes its own such
+# files once they are older than this, at start and at most this often after that
+# (a write in progress is seconds old). Storage hygiene only: no decision changes.
+SIDECAR_TEMP_SWEEP_VERSION = 'TICKER_REGISTRY_TEMP_SWEEP_V1'
+SIDECAR_TEMP_STALE_SECONDS = 600
+# tempfile.mkstemp puts exactly eight characters of this alphabet between prefix and suffix.
+_SIDECAR_TEMP_CORE = re.compile(r'[a-z0-9_]{8}')
 # A longer absence of market observations restarts the registry's coverage.
 REGISTRY_MAX_GAP_MS = HOUR_MS
 # A feed observation stamped this far after the scan clock is clock skew, not the future.
@@ -293,6 +303,45 @@ def _identity(coin: dict):
     return mint, pair
 
 
+def remove_stale_sidecar_temps(path, max_age_seconds=SIDECAR_TEMP_STALE_SECONDS, now=None) -> list:
+    """Delete save() temporaries of this sidecar abandoned by a hard stop; returns the names removed.
+
+    Only names ``TickerRegistry.save`` creates for this exact sidecar, in its own
+    directory, are candidates (``.<sidecar name>.<8 characters>.tmp``, regular
+    files whose os.stat mtime is at least ``max_age_seconds`` old): the sidecar
+    itself, other services' sidecars and temporaries, ledgers and every other
+    file are never touched. Never raises; a file still open elsewhere is left for
+    a later sweep.
+    """
+    if path is None:
+        return []
+    path = Path(path)
+    prefix, suffix = '.' + path.name + '.', '.tmp'
+    current = time.time() if now is None else now
+    removed = []
+    try:
+        entries = list(os.scandir(path.parent))
+    except OSError:
+        return removed
+    for entry in entries:
+        name = entry.name
+        if not (name.startswith(prefix) and name.endswith(suffix)
+                and _SIDECAR_TEMP_CORE.fullmatch(name[len(prefix):len(name) - len(suffix)])):
+            continue
+        try:
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            # os.stat, not the cached directory entry: Windows can report a stale mtime
+            # there for a file another handle is still writing.
+            if current - os.stat(entry.path, follow_symlinks=False).st_mtime < max_age_seconds:
+                continue
+            os.unlink(entry.path)
+        except OSError:
+            continue
+        removed.append(name)
+    return removed
+
+
 class TickerRegistry:
     """Past-only record of (mint, pool) -> normalized ticker with first/last sighting.
 
@@ -385,7 +434,11 @@ class TickerRegistry:
         self._own_reread_at = None
         self.own_reread_attempts = 0
         self.corrupt_backup = None
+        # TICKER_REGISTRY_TEMP_SWEEP_V1: temporaries a hard-stopped save() left behind.
+        self.stale_temps_removed = 0
+        self._next_temp_sweep = None
         if self.path is not None:
+            self._sweep_stale_temps()
             self._load()
         # Seeded unless its own coverage already vouches (current and >= 24 h): a sidecar
         # left by a short earlier run (services started before the first-deploy seed)
@@ -712,6 +765,8 @@ class TickerRegistry:
                                      'kept_not_overwritten': self._own_sidecar_kept,
                                      'reread_attempts': self.own_reread_attempts,
                                      'corrupt_backup': self.corrupt_backup},
+                    'stale_temps': {'version': SIDECAR_TEMP_SWEEP_VERSION,
+                                    'removed': self.stale_temps_removed},
                     'seed': {'version': REGISTRY_SEED_VERSION, 'sources': dict(self.seed_status),
                              'entries': self.seeded_entries, 'running_reseeds': self.reseeds,
                              'last_seed_at': self._seeded_at,
@@ -1022,15 +1077,34 @@ class TickerRegistry:
             dirty = self._dirty
         return self.save() if dirty else False
 
+    def _sweep_stale_temps(self, *, force=True) -> int:
+        """Delete this sidecar's abandoned save() temporaries (start, then at most every 10 min)."""
+        if self.path is None:
+            return 0
+        current = time.monotonic()
+        if not force and self._next_temp_sweep is not None and current < self._next_temp_sweep:
+            return 0
+        self._next_temp_sweep = current + SIDECAR_TEMP_STALE_SECONDS
+        removed = len(remove_stale_sidecar_temps(self.path))
+        self.stale_temps_removed += removed
+        return removed
+
     def save(self, now=None) -> bool:
         """Atomically replace the sidecar (temp file + fsync + replace); never raises.
 
         Refused while the own sidecar is kept unread (it may hold intact
         memory this run has not seen); the observations stay dirty and are
-        saved once ``maybe_reread_own_sidecar`` has merged it.
+        saved once ``maybe_reread_own_sidecar`` has merged it. At most every
+        10 minutes it first deletes this sidecar's save() temporaries that a
+        hard stop abandoned (the one left by this process's own start is too
+        young to go at start).
         """
         if self.path is None:
             return False
+        try:
+            self._sweep_stale_temps(force=False)
+        except Exception:
+            pass
         stamp = _finite(now)
         stamp = self.clock() if stamp is None else stamp
         with self._lock:

@@ -126,6 +126,87 @@ maintenance budget.
 reason `ZERO_DECODED_SWAPS_AFTER_BODIES`, bodies, decoded/usable/shadow swaps,
 first and last body time, `shed_at`, `retry_at`).
 
+## Cost-first seats and personal-engine pins (policy `STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS`)
+
+Status: observation capacity only. No entry, exit, cost, risk, size or
+ledger rule changes; the tape still never decides whether to trade. The
+seat-shedding rules above are unchanged under the V4 policy name.
+
+Why:
+
+- The tape follows at most `NEO_TAPE_MAX_PAIRS` pools (4 in the local
+  runtime) and an entry needs a COMPLETE 30 s exact-pool window, so a pool
+  without a seat can never pass the flow gate. The COST_FIRST Lab book pair
+  (PR #16) found that its universe pools match neither the main nor the funded
+  candidate screens and only reached the tape through exploration seats, while
+  78% of the main screen's passers are fee-infeasible (research
+  `analyst-funnel.md`) and cannot pass the quote gate anyway.
+- `_held_coins` pinned only positions from the main engine's `/state` and Lab
+  book positions. Positions of the gateway-spawned personal engines were never
+  pinned, so their exits could lose exact-pool flow coverage.
+
+What changed (`backend/tape_pool_scheduler.py`, `backend/live_tape.py`):
+
+1. Seat groups, best first: estimated feasible main/funded candidate (V3 group
+   0, unchanged) > **COST_FIRST universe pool**
+   (`cost_first_established.candidate`, the Lab book pair's own definition:
+   PumpSwap, SOL quote, fee tier <= 50 bps, liquidity >= $250k, modeled fee +
+   impact <= 1.2% at the planning notional) > matched candidate whose modeled
+   round trip exceeds the cost cap or is unknown (V3 group 1) > other
+   exploration (V3 group 2). The planning notional is the Lab entry cap
+   (`NEO_LAB_TRADE_NOTIONAL`, default $150, the same variable and default as
+   `strategy_lab.TRADE_NOTIONAL`) with the Lab minimum notional. Within a
+   group the existing V3 ordering (fair rotation, then the cost-aware activity
+   priority) applies. Only group 0 pre-empts a running 60 s lease, exactly as
+   before; a cost-first pool takes the next freed seat and is retained before
+   lower groups when seats shrink. The seat budget
+   (`NEO_TAPE_MAX_PAIRS` minus pins) and the per-poll body budget are
+   unchanged. A cost-first pool can still be shed for zero decoded swaps.
+2. Open positions of every personal PAPER engine are pinned by exact
+   (mint, pool), after main's and Lab's pins, with duplicates taking one seat.
+   The recorder reads the account registry `NEO_USER_STATE_PATH` read-only
+   (missing: no personal pins; unreadable: the file is skipped and the last
+   good port list, if any, stays in use) and, for each listed `engine_port`
+   (1024-65535, deduplicated, at most `NEO_TAPE_PERSONAL_ENGINE_LIMIT`, default
+   16), GETs `http://127.0.0.1:<port>/state` with a
+   `NEO_TAPE_PERSONAL_STATE_TIMEOUT_SECONDS` timeout (default 0.75 s, capped
+   at 2 s). Each port and the registry are read at most once per
+   `NEO_TAPE_PERSONAL_STATE_CACHE_MS` (default 5 s), including after a
+   failure. A failed engine keeps its last successful positions for
+   `NEO_TAPE_PERSONAL_STATE_RETAIN_MS` (default 30 s), then contributes
+   nothing. Pins still take precedence over entry seats and are never shed.
+
+Published in `live_tape_status.entry_scheduling` (no account identifiers):
+`selected_cost_first_pools`, `unselected_cost_first_pools`, a `cost_first`
+block (universe version, planning notional, candidate/selected/unselected
+counts, members also estimated feasible, rejection reasons, up to 6 examples
+with fee tier, liquidity and modeled fee + impact, `is_entry_authorization:
+false`), `pinned_personal_pools`, `pinned_personal_only_pools` and
+`personal_engines` (registry status, engines listed/reachable/retained/
+unavailable/over limit, fetches this poll, open positions, cache, timeout).
+
+Proof that nothing else moved: on 300 random seeds x 40 polls without a
+cost-first pool or personal position the V4 scheduler returns the same pools,
+order, leases, shed records and V3 report fields as V3; the default
+`WINNER_ENSEMBLE_PAPER_V1` and `ORDER_FLOW_ADAPTIVE` `effective_config_hash`
+values are identical before and after (no engine file changed). Tests:
+`tests/test_tape_cost_first_seats_and_personal_pins.py`.
+
+How it will be evaluated: over at least 24 h after deployment, compare with
+the preceding 24 h (same tape budget): the share of polls in which at least
+one cost-first pool has a seat, the share of cost-first pools reaching
+`COMPLETE` coverage, the COST_FIRST Lab books' `cost_first_universe` versus
+flow-confirmed candidate counts, and, for every personal-engine close, whether
+its pool was `COMPLETE` through the hold. Seat counts and coverage are not
+evidence of edge; the COST_FIRST books are still judged only under
+`docs/STRATEGY_VALIDATION.md` on future, untouched observations.
+
+Limits: cost-first seats displace exploration of over-budget matched pools
+when seats are scarce; a personal engine slower than the timeout for longer
+than the retention period loses its pins until it answers again; each personal
+`/state` read transfers that engine's full snapshot (bounded by the cache
+period).
+
 ## How it will be evaluated (24 h shadow comparison, before any validation)
 
 1. Count shadow events per pool and per hour from the journal's

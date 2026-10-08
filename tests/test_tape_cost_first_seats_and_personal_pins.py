@@ -1,0 +1,465 @@
+"""Tape seats for the COST_FIRST universe and pins for personal-engine positions.
+
+STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS keeps every V3 rule and
+adds two observation-only changes:
+
+1. Pools in the COST_FIRST universe (cost_first_established.candidate, the
+   Lab book pair's definition) form a seat group directly below estimated
+   feasible main/funded candidates and above matched candidates whose modeled
+   round trip already exceeds the cost cap (or is unknown). Same seat budget,
+   same leases; only an estimated feasible candidate pre-empts a lease.
+2. Open positions of every personal PAPER engine in the account registry are
+   pinned by exact (mint, pool) like main's. The registry is read-only; each
+   engine's /state is fetched at most once per cache period, failures are
+   ignored, a briefly unreachable engine keeps its last positions for a
+   bounded time.
+
+Nothing here admits, sizes or exits a trade. No network: every fetch is
+injected.
+"""
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import cost_first_established as cost_first
+import lab_activity
+import live_tape as tape
+import paper_market_feasibility as feasibility
+import strategy_lab as lab
+import tape_pool_scheduler as scheduler_module
+from tape_pool_scheduler import PersonalEnginePositions, TapePoolScheduler
+
+
+NOW = 1_800_000_000_000
+SOL_USD = 115
+
+
+def market_coin(name, *, cap=10_000_000, liquidity=1_500_000, activity=60, score=98):
+    """A main/funded-matching market observation (same shape as the V3 tests)."""
+    return {'address': name + '-mint', 'pairAddress': name + '-pair',
+            'symbol': name, 'dexId': 'pumpswap',
+            'quoteTokenAddress': feasibility.SOL_QUOTE_MINT,
+            'priceUsd': .001, 'priceNative': .001 / SOL_USD,
+            'score': score, 'marketCap': cap, 'liquidityUsd': liquidity,
+            'ageMinutes': 30, 'updatedAt': NOW,
+            'priceChange': {'m5': 5, 'h1': 10},
+            'txns': {'m5': {'buys': activity * 2 // 3, 'sells': activity // 3}},
+            'volume': {'h1': liquidity * .5}}
+
+
+def cost_first_coin(name, *, activity=60, liquidity=1_500_000, cap=10_000_000):
+    """In the COST_FIRST universe (37.5 bps tier, >= $250k) but matching no
+    main or funded market rule (score 0, no momentum)."""
+    coin = market_coin(name, cap=cap, liquidity=liquidity, activity=activity, score=0)
+    coin.update(priceChange={'m5': -40, 'h1': -60}, ageMinutes=100_000, volume={'h1': 0})
+    return coin
+
+
+def feasible_coin(name):
+    """Estimated feasible for main/funded, but outside COST_FIRST (55 bps tier)."""
+    return market_coin(name, cap=5_750_000)
+
+
+def over_budget_coin(name):
+    """Matches main/funded market rules but its modeled fixed cost exceeds the cap."""
+    return market_coin(name, cap=100_000, liquidity=15_000)
+
+
+def position(coin, dex='pumpswap'):
+    return {'address': coin['address'], 'pairAddress': coin['pairAddress'],
+            'coin_snapshot': {'dexId': dex, 'symbol': coin['symbol'], 'priceUsd': 1}}
+
+
+def pin(name, dex='pumpswap'):
+    return {'address': name + '-mint', 'pairAddress': name + '-pair',
+            'coin_snapshot': {'dexId': dex, 'symbol': name, 'priceUsd': 1}}
+
+
+class FixturePreconditions(unittest.TestCase):
+    def test_fixtures_are_what_the_tests_claim(self):
+        self.assertTrue(cost_first.candidate(cost_first_coin('cf'), cap_usd=150))
+        self.assertEqual(lab_activity.market_features(cost_first_coin('cf'))['score'], 0)
+        _, report = TapePoolScheduler().select({'feed': [cost_first_coin('cf')]}, now=NOW, max_tracked=1)
+        self.assertEqual((report['estimated_feasible_market_candidates'],
+                          report['estimated_fixed_cost_over_budget'],
+                          report['estimated_cost_unknown']), (0, 0, 0))
+        _, report = TapePoolScheduler().select({'feed': [over_budget_coin('ob')]}, now=NOW, max_tracked=1)
+        self.assertEqual(report['estimated_fixed_cost_over_budget'], 1)
+        self.assertFalse(cost_first.candidate(over_budget_coin('ob'), cap_usd=150))
+
+    def test_planning_notional_is_the_lab_book_definition(self):
+        self.assertEqual(scheduler_module.COST_FIRST_PLANNING_NOTIONAL_USD, lab.TRADE_NOTIONAL)
+        self.assertEqual(scheduler_module.COST_FIRST_MIN_NOTIONAL_USD, lab_activity.MIN_NOTIONAL_USD)
+
+
+class CostFirstSeatTests(unittest.TestCase):
+    def test_cost_first_ranks_above_a_matched_over_budget_candidate(self):
+        feed = [over_budget_coin('costly'), cost_first_coin('cheap')]
+        selected, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], ['cheap'])
+        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V4_COST_FIRST_PINS')
+        self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (1, 0))
+        self.assertEqual(report['cost_first']['candidate_pools'], 1)
+        self.assertEqual(report['estimated_fixed_cost_over_budget'], 1)
+        self.assertFalse(report['cost_first']['is_entry_authorization'])
+        self.assertFalse(report['model_is_execution_quote'])
+        self.assertFalse(report['profitability_proven'])
+
+    def test_cost_first_ranks_above_unmatched_exploration_and_unknown_cost(self):
+        unknown = market_coin('unknown')
+        unknown['quoteTokenAddress'] = None
+        exploration = cost_first_coin('explore', liquidity=20_000)
+        self.assertFalse(cost_first.candidate(exploration, cap_usd=150))
+        feed = [unknown, exploration, cost_first_coin('cheap')]
+        selected, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], ['cheap'])
+        self.assertEqual(report['estimated_cost_unknown'], 1)
+
+    def test_estimated_feasible_candidate_still_precedes_cost_first(self):
+        feasible = feasible_coin('feasible')
+        self.assertFalse(cost_first.candidate(feasible, cap_usd=150))
+        selected, report = TapePoolScheduler().select(
+            {'feed': [cost_first_coin('cheap', activity=900), feasible]}, now=NOW, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], ['feasible'])
+        self.assertEqual(report['estimated_feasible_market_candidates'], 1)
+        self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (0, 1))
+        self.assertEqual(report['cost_first']['examples'][0]['selected'], False)
+
+    def test_cost_first_member_that_is_also_estimated_feasible_stays_in_the_feasible_group(self):
+        both = market_coin('both')
+        self.assertTrue(cost_first.candidate(both, cap_usd=150))
+        _, report = TapePoolScheduler().select({'feed': [both]}, now=NOW, max_tracked=1)
+        self.assertEqual(report['cost_first']['also_estimated_feasible'], 1)
+        self.assertEqual(report['selected_exploration_pools'], 0)
+        self.assertEqual(report['cost_first']['examples'][0]['group'], scheduler_module.GROUP_FEASIBLE)
+
+    def test_seat_budget_is_never_exceeded_and_counts_add_up(self):
+        feed = [cost_first_coin(f'cf{index}') for index in range(10)] + [over_budget_coin('costly')]
+        state = {'feed': feed, 'positions': [pin('held-a'), pin('held-b')]}
+        selected, report = TapePoolScheduler().select(state, now=NOW, max_tracked=4)
+        self.assertEqual(len(selected), 4)
+        self.assertEqual(report['entry_capacity'], 2)
+        self.assertEqual(report['selected_entry_pools'], 2)
+        self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (2, 8))
+        self.assertEqual(len(report['cost_first']['examples']), scheduler_module.COST_FIRST_EXAMPLE_LIMIT)
+        self.assertTrue(all(row['is_execution_quote'] is False for row in report['cost_first']['examples']))
+        self.assertNotIn('costly-pair', report['selected_pairs'])
+
+    def test_pins_beyond_the_budget_leave_no_cost_first_seat(self):
+        state = {'feed': [cost_first_coin('cheap')], 'positions': [pin(f'held{index}') for index in range(5)]}
+        selected, report = TapePoolScheduler().select(state, now=NOW, max_tracked=4)
+        self.assertEqual(len(selected), 5)
+        self.assertEqual(report['entry_capacity'], 0)
+        self.assertEqual((report['selected_cost_first_pools'], report['unselected_cost_first_pools']), (0, 1))
+
+    def test_existing_cost_aware_priority_orders_cost_first_pools(self):
+        feed = [cost_first_coin('quiet', activity=3), cost_first_coin('active', activity=60)]
+        selected, _ = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=1)
+        self.assertEqual([row['symbol'] for row in selected], ['active'])
+
+    def test_cost_first_waits_for_an_exploration_lease_but_feasible_still_preempts(self):
+        scheduler = TapePoolScheduler()
+        costly = over_budget_coin('costly')
+        selected, _ = scheduler.select({'feed': [costly]}, now=NOW, max_tracked=1)
+        self.assertEqual(selected[0]['symbol'], 'costly')
+        feed = [costly, cost_first_coin('cheap')]
+        selected, _ = scheduler.select({'feed': feed}, now=NOW + 2_000, max_tracked=1)
+        self.assertEqual(selected[0]['symbol'], 'costly')  # running lease kept
+        selected, _ = scheduler.select({'feed': feed}, now=NOW + 60_000, max_tracked=1)
+        self.assertEqual(selected[0]['symbol'], 'cheap')  # first refill after expiry
+        feasible = feasible_coin('feasible')
+        selected, _ = scheduler.select({'feed': feed + [feasible]}, now=NOW + 62_000, max_tracked=1)
+        self.assertEqual(selected[0]['symbol'], 'feasible')  # V3 pre-emption unchanged
+
+    def test_cost_first_lease_is_retained_before_lower_groups_when_seats_shrink(self):
+        scheduler = TapePoolScheduler()
+        feed = [cost_first_coin('cheap'), over_budget_coin('costly')]
+        selected, _ = scheduler.select({'feed': feed}, now=NOW, max_tracked=2)
+        self.assertEqual({row['symbol'] for row in selected}, {'cheap', 'costly'})
+        selected, _ = scheduler.select({'feed': feed, 'positions': [pin('held')]}, now=NOW + 1_000,
+                                       max_tracked=2)
+        self.assertEqual([row['symbol'] for row in selected], ['held', 'cheap'])
+
+    def test_universe_membership_matches_the_lab_definition_and_rejections_are_published(self):
+        feed = [cost_first_coin('cheap'), cost_first_coin('thin', liquidity=100_000),
+                cost_first_coin('pricey', cap=100_000), over_budget_coin('costly')]
+        _, report = TapePoolScheduler().select({'feed': feed}, now=NOW, max_tracked=4)
+        expected = sum(cost_first.candidate(coin, cap_usd=lab.TRADE_NOTIONAL,
+                                            minimum_notional_usd=lab_activity.MIN_NOTIONAL_USD)
+                       for coin in feed)
+        self.assertEqual(report['cost_first']['candidate_pools'], expected)
+        self.assertEqual(report['cost_first']['universe_version'], cost_first.UNIVERSE_VERSION)
+        self.assertEqual(report['cost_first']['rejections'],
+                         {'fee_tier_above_maximum': 1, 'liquidity_below_minimum': 2})
+
+    def test_shed_cost_first_pool_releases_its_seat_like_any_candidate(self):
+        cheap = cost_first_coin('cheap')
+        stats = {'bodies': 40, 'decoded_swaps': 0, 'usable_swaps': 0, 'shadow_swaps': 0}
+        selected, report = TapePoolScheduler().select(
+            {'feed': [cheap]}, now=NOW, max_tracked=1, decode_yield=lambda pair, since=0: stats)
+        self.assertEqual(selected, [])
+        self.assertEqual(report['shed_pool_count'], 1)
+        self.assertEqual(report['cost_first']['candidate_pools'], 0)
+
+
+class RegistryFixture(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.registry = Path(self.directory.name) / 'user_accounts.json'
+        self.engines = {}
+        self.calls = []
+
+    def write_registry(self, accounts):
+        self.registry.write_text(json.dumps({'accounts': accounts}), encoding='utf-8')
+
+    def fetch(self, port, timeout_seconds):
+        self.calls.append((port, timeout_seconds))
+        engine = self.engines.get(port)
+        if isinstance(engine, Exception):
+            raise engine
+        if engine is None:
+            raise ConnectionRefusedError('engine not listening')
+        return engine
+
+    def source(self, **kwargs):
+        return PersonalEnginePositions(self.fetch, registry_path=self.registry, **kwargs)
+
+
+class PersonalEngineSourceTests(RegistryFixture):
+    def test_missing_registry_is_skipped_without_any_fetch(self):
+        positions, report = self.source().collect(NOW)
+        self.assertEqual(positions, [])
+        self.assertEqual(report['registry_status'], 'MISSING')
+        self.assertEqual(self.calls, [])
+
+    def test_unreadable_registry_is_skipped_without_any_fetch(self):
+        for text in ('{not json', '[]', '{"accounts": []}'):
+            self.registry.write_text(text, encoding='utf-8')
+            positions, report = self.source().collect(NOW)
+            self.assertEqual((positions, report['registry_status']), ([], 'UNREADABLE'))
+        self.assertEqual(self.calls, [])
+
+    def test_registry_unreadable_after_a_good_read_keeps_the_last_good_ports(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=1_000)
+        source.collect(NOW)
+        self.registry.write_text('{"accounts": {"a": {"engine_port": 188', encoding='utf-8')  # mid-write
+        positions, report = source.collect(NOW + 1_000)
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual(report['registry_status'], 'UNREADABLE_USING_LAST_GOOD')
+        self.registry.unlink()
+        positions, report = source.collect(NOW + 2_000)
+        self.assertEqual((positions, report['registry_status']), ([], 'MISSING'))
+
+    def test_registry_is_only_read(self):
+        self.write_registry({'user-a': {'engine_port': 18800, 'balance': 990.0}})
+        before = (self.registry.read_bytes(), self.registry.stat().st_mtime_ns)
+        self.engines[18800] = {'positions': []}
+        self.source().collect(NOW)
+        self.assertEqual((self.registry.read_bytes(), self.registry.stat().st_mtime_ns), before)
+
+    def test_invalid_and_duplicate_ports_are_skipped_and_limit_applies(self):
+        self.write_registry({'a': {'engine_port': 18800}, 'b': {'engine_port': '18800'},
+                             'c': {'engine_port': True}, 'd': {'engine_port': 80},
+                             'e': {'engine_port': 'x'}, 'f': {}, 'g': 'bad',
+                             'h': {'engine_port': 18802}, 'i': {'engine_port': 18801},
+                             'j': {'engine_port': [18803]}})
+        for port in (18800, 18801, 18802):
+            self.engines[port] = {'positions': []}
+        _, report = self.source(engine_limit=2).collect(NOW)
+        self.assertEqual(sorted(port for port, _ in self.calls), [18800, 18801])
+        self.assertEqual((report['engines_listed'], report['engines_over_limit']), (3, 1))
+
+    def test_unreachable_engine_is_ignored_and_others_are_pinned(self):
+        self.write_registry({'a': {'engine_port': 18800}, 'b': {'engine_port': 18801},
+                             'c': {'engine_port': 18802}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        self.engines[18801] = TimeoutError('busy')
+        self.engines[18802] = {'no_positions': True}  # malformed state
+        positions, report = self.source().collect(NOW)
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual((report['engines_reachable'], report['engines_unavailable']), (1, 2))
+        self.assertTrue(all(timeout <= 2.0 for _, timeout in self.calls))
+
+    def test_each_port_is_fetched_at_most_once_per_cache_period_even_after_failure(self):
+        self.write_registry({'a': {'engine_port': 18800}, 'b': {'engine_port': 18801}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=5_000)
+        for offset in (0, 1_000, 2_000, 4_999):
+            positions, report = source.collect(NOW + offset)
+            self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual(sorted(self.calls), [(18800, source.timeout_seconds), (18801, source.timeout_seconds)])
+        self.assertEqual(report['fetches_this_poll'], 0)
+        source.collect(NOW + 5_000)
+        self.assertEqual(len(self.calls), 4)
+
+    def test_last_positions_are_retained_for_a_bounded_time_after_a_failure(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=1_000, retain_ms=10_000)
+        source.collect(NOW)
+        self.engines[18800] = ConnectionResetError('restarting')
+        positions, report = source.collect(NOW + 5_000)
+        self.assertEqual([row['pairAddress'] for row in positions], ['a1-pair'])
+        self.assertEqual(report['engines_stale_retained'], 1)
+        positions, report = source.collect(NOW + 10_001)
+        self.assertEqual((positions, report['engines_unavailable']), ([], 1))
+        self.engines[18800] = {'positions': []}
+        positions, report = source.collect(NOW + 12_000)
+        self.assertEqual((positions, report['engines_reachable']), ([], 1))
+
+    def test_closed_position_is_dropped_on_the_next_successful_read(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=1_000)
+        source.collect(NOW)
+        self.engines[18800] = {'positions': []}
+        positions, _ = source.collect(NOW + 1_000)
+        self.assertEqual(positions, [])
+
+    def test_removed_account_stops_being_polled_after_the_registry_refresh(self):
+        self.write_registry({'a': {'engine_port': 18800}})
+        self.engines[18800] = {'positions': [pin('a1')]}
+        source = self.source(cache_ms=1_000)
+        source.collect(NOW)
+        self.write_registry({})
+        positions, report = source.collect(NOW + 1_000)
+        self.assertEqual((positions, report['engines_listed']), ([], 0))
+        self.assertEqual(len(self.calls), 1)
+
+    def test_diagnostics_carry_no_account_identity(self):
+        self.write_registry({'00000000-aaaa-bbbb-cccc-123456789abc': {'engine_port': 18800,
+                                                                      'email': 'x@example.invalid'}})
+        self.engines[18800] = {'positions': []}
+        _, report = self.source().collect(NOW)
+        text = json.dumps(report)
+        self.assertNotIn('00000000', text)
+        self.assertNotIn('example.invalid', text)
+
+
+class PersonalPinSchedulingTests(unittest.TestCase):
+    def test_personal_positions_are_pinned_before_entry_seats(self):
+        state = {'feed': [cost_first_coin('cheap'), feasible_coin('feasible')],
+                 'positions': [pin('main')]}
+        selected, report = TapePoolScheduler().select(
+            state, now=NOW, max_tracked=2, personal_positions=[pin('user')])
+        self.assertEqual([row['pairAddress'] for row in selected], ['main-pair', 'user-pair'])
+        self.assertEqual((report['pinned_exit_pools'], report['pinned_personal_pools'],
+                          report['pinned_personal_only_pools'], report['entry_capacity']), (2, 1, 1, 0))
+        self.assertEqual(report['selected_pairs'], ['main-pair', 'user-pair'])
+
+    def test_duplicate_pools_across_engines_and_main_take_one_seat(self):
+        shared, other = pin('shared'), pin('other')
+        state = {'feed': [cost_first_coin('cheap')], 'positions': [shared],
+                 'strategy_lab': {'books': {'book': {'position': other}}}}
+        personal = [dict(shared), dict(other), pin('user'), pin('user'), dict(shared)]
+        selected, report = TapePoolScheduler().select(state, now=NOW, max_tracked=4,
+                                                      personal_positions=personal)
+        pairs = [row['pairAddress'] for row in selected]
+        self.assertEqual(pairs, ['shared-pair', 'other-pair', 'user-pair', 'cheap-pair'])
+        self.assertEqual(len(pairs), len(set(pairs)))
+        self.assertEqual((report['pinned_exit_pools'], report['pinned_personal_pools'],
+                          report['pinned_personal_only_pools']), (3, 3, 1))
+
+    def test_main_pin_values_are_unchanged_when_a_personal_engine_holds_the_same_pool(self):
+        main = {'address': 'm-mint', 'pairAddress': 'm-pair', 'dexId': 'pumpswap', 'symbol': 'MAIN'}
+        personal = {'address': 'm-mint', 'pairAddress': 'm-pair', 'dexId': 'pumpswap', 'symbol': 'USER'}
+        selected, _ = TapePoolScheduler().select({'positions': [main]}, now=NOW, max_tracked=1,
+                                                 personal_positions=[personal])
+        self.assertEqual(selected[0]['symbol'], 'MAIN')
+
+    def test_personal_pins_beyond_the_budget_are_all_kept(self):
+        personal = [pin(f'user{index}') for index in range(6)]
+        selected, report = TapePoolScheduler().select({'feed': [cost_first_coin('cheap')]}, now=NOW,
+                                                      max_tracked=4, personal_positions=personal)
+        self.assertEqual(len(selected), 6)
+        self.assertEqual(report['entry_capacity'], 0)
+
+    def test_unsupported_personal_pool_is_reported_not_pinned(self):
+        selected, report = TapePoolScheduler().select(
+            {}, now=NOW, max_tracked=4, personal_positions=[pin('ray', dex='raydium')])
+        self.assertEqual(selected, [])
+        self.assertEqual((report['unsupported_held_pools'], report['pinned_personal_pools']), (1, 0))
+
+    def test_personal_pin_refreshes_from_the_exact_pool_and_is_never_shed(self):
+        cheap = cost_first_coin('cheap')
+        other_pool = dict(cheap, pairAddress='other-pair', symbol='OTHER')
+        stats = {'bodies': 500, 'decoded_swaps': 0, 'usable_swaps': 0, 'shadow_swaps': 0}
+        selected, report = TapePoolScheduler().select(
+            {'feed': [other_pool, cheap]}, now=NOW, max_tracked=1,
+            decode_yield=lambda pair, since=0: stats, personal_positions=[position(cheap)])
+        self.assertEqual(selected[0]['pairAddress'], 'cheap-pair')
+        self.assertEqual(selected[0]['liquidityUsd'], cheap['liquidityUsd'])
+        self.assertNotIn(('cheap-mint', 'cheap-pair'), {(r['address'], r['pairAddress'])
+                                                        for r in report['shed_pools']})
+
+    def test_without_personal_positions_reports_zero(self):
+        _, report = TapePoolScheduler().select({'feed': []}, now=NOW, max_tracked=4)
+        self.assertEqual((report['pinned_personal_pools'], report['pinned_personal_only_pools']), (0, 0))
+
+
+class FeedSnapshotWiringTests(RegistryFixture):
+    class Response:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    def test_feed_snapshot_pins_personal_positions_and_publishes_them(self):
+        self.write_registry({'a': {'engine_port': 18900}, 'b': {'engine_port': 18901}})
+        self.engines[18900] = {'positions': [pin('user')]}
+        self.engines[18901] = OSError('down')
+        main = {'feed': [cost_first_coin('cheap'), over_budget_coin('costly')], 'positions': [pin('main')]}
+        with patch.object(tape.SESSION, 'get', return_value=self.Response(main)) as get, \
+                patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
+                patch.object(tape, '_PERSONAL_ENGINES', self.source()), \
+                patch.object(tape, 'shared_quote_reference', return_value=None), \
+                patch.object(tape, 'MAX_TRACKED', 3), \
+                patch.object(tape, 'now_ms', return_value=NOW):
+            rows = tape.feed_snapshot()
+        self.assertEqual(get.call_count, 1)  # only main /state; personal reads use the injected fetch
+        self.assertEqual([row['pair'] for row in rows], ['main-pair', 'user-pair', 'cheap-pair'])
+        scheduling = tape.STATUS['entry_scheduling']
+        self.assertEqual(scheduling['pinned_personal_pools'], 1)
+        self.assertEqual(scheduling['selected_cost_first_pools'], 1)
+        self.assertEqual(scheduling['personal_engines']['registry_status'], 'OK')
+        self.assertEqual((scheduling['personal_engines']['engines_reachable'],
+                          scheduling['personal_engines']['engines_unavailable']), (1, 1))
+        self.assertTrue(scheduling['personal_engines']['read_only'])
+
+    def test_feed_snapshot_with_missing_registry_behaves_as_before(self):
+        main = {'feed': [feasible_coin('feasible')], 'positions': [pin('main')]}
+        with patch.object(tape.SESSION, 'get', return_value=self.Response(main)), \
+                patch.object(tape, '_POOL_SCHEDULER', TapePoolScheduler()), \
+                patch.object(tape, '_PERSONAL_ENGINES', self.source()), \
+                patch.object(tape, 'shared_quote_reference', return_value=None), \
+                patch.object(tape, 'MAX_TRACKED', 2), \
+                patch.object(tape, 'now_ms', return_value=NOW):
+            rows = tape.feed_snapshot()
+        self.assertEqual([row['pair'] for row in rows], ['main-pair', 'feasible-pair'])
+        self.assertEqual(tape.STATUS['entry_scheduling']['personal_engines']['registry_status'], 'MISSING')
+        self.assertEqual(self.calls, [])
+
+    def test_default_fetch_reads_only_loopback_state_with_the_given_timeout(self):
+        with patch.object(tape.SESSION, 'get', return_value=self.Response({'positions': []})) as get:
+            self.assertEqual(tape.personal_engine_state(18950, .75), {'positions': []})
+        get.assert_called_once_with('http://127.0.0.1:18950/state', timeout=.75)
+
+    def test_default_source_reads_the_registry_named_by_the_environment(self):
+        self.write_registry({})
+        with patch.dict(os.environ, {'NEO_USER_STATE_PATH': str(self.registry)}):
+            _, report = PersonalEnginePositions(self.fetch).collect(NOW)
+        self.assertEqual((report['registry_status'], report['engines_listed']), ('OK', 0))
+
+
+if __name__ == '__main__':
+    unittest.main()

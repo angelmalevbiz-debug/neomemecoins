@@ -22,7 +22,7 @@ from urllib.parse import urlsplit
 import requests
 import honest_quote_transport as quote_transport
 import winner_ensemble
-from tape_pool_scheduler import TapePoolScheduler
+from tape_pool_scheduler import PersonalEnginePositions, TapePoolScheduler
 from pool_reference_proof import proves_no_pool_swap
 from shared_snapshot_io import read_shared_text, replace_shared_snapshot
 from tape_pool_owner_proof import collect_pool_owner_proofs, foreign_reference_candidate
@@ -104,6 +104,16 @@ _NEXT_REFERENCE_AT = 0
 _POOL_SCHEDULER = TapePoolScheduler()
 
 
+def personal_engine_state(port,timeout_seconds):
+    """GET one personal PAPER engine's /state on the loopback interface only."""
+    response = SESSION.get(f'http://127.0.0.1:{int(port)}/state',timeout=timeout_seconds)
+    response.raise_for_status()
+    return response.json()
+
+
+_PERSONAL_ENGINES = PersonalEnginePositions(lambda port,timeout: personal_engine_state(port,timeout))
+
+
 def shared_quote_reference():
     """One shared background FX observation, never one API request per token."""
     global _NEXT_REFERENCE_AT
@@ -156,8 +166,14 @@ def feed_snapshot():
     # Seat shedding reads the recorder's in-memory decode yield only; the
     # scheduler still never decides whether to trade.
     decode_yield = _RECORDER.decode_yield if _RECORDER is not None else None
+    # Open positions of every personal PAPER engine in the account registry
+    # are pinned like main's; unreachable engines and a missing registry are
+    # skipped, so this never blocks the main tape poll.
+    personal_positions, personal = _PERSONAL_ENGINES.collect(observed)
     coins, scheduling = _POOL_SCHEDULER.select(state, now=observed, max_tracked=MAX_TRACKED,
-                                               decode_yield=decode_yield)
+                                               decode_yield=decode_yield,
+                                               personal_positions=personal_positions)
+    scheduling['personal_engines'] = personal
     STATUS['entry_scheduling'] = scheduling
     shared_reference=shared_quote_reference()
     for coin in coins:

@@ -64,10 +64,15 @@ high win rate can still lose money after costs.
 
 ## Deployment boundaries
 
-The public Pages build uses the VPS API at
-`https://neo-meme-api.169-58-211-177.sslip.io`. The public VPS and the Windows
-services have different PAPER histories. A successful local restart or Pages
-build does not establish that the VPS Python services received this repair.
+Superseded on 2026-10-07: the public Pages build now reads the repository
+variable `NEO_API_URL`, which points at the PC's authenticated gateway through a
+Cloudflare Quick Tunnel; see [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md). The
+VPS address `https://neo-meme-api.169-58-211-177.sslip.io` is only the workflow's
+fallback when that variable is unset. The earlier statement that the Pages build
+used the VPS API described the configuration before the variable was set. The
+public VPS and the Windows services still have different PAPER histories. A
+successful local restart or Pages build does not establish that the VPS Python
+services received this repair.
 
 Read-only probes found the public VPS reachable with fresh state and correct
 gateway CORS. Its Desktop Commander administrative connector was offline, so

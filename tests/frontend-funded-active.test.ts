@@ -32,3 +32,13 @@ test('V2 exposes the real fixed size without a small fallback', () => {
     open_positions:0,max_positions:4,target_orders_per_hour:50,exposure_usd:0,daily_loss_limit_usd:12.5});
   assert.match(text!, /вход \$100\.00, без намаляване/);
 });
+
+test('contributed PAPER capital is labelled separately from trading profit', () => {
+  const text=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100',
+    fixed_notional_usd:100,funded_capital_usd:1000,effective_position_capacity:4,
+    trades:2,wins:0,win_rate:0,net_pnl_usd:-2.30,orders_last_60m:2,closed_last_60m:2,
+    open_positions:0,max_positions:4,target_orders_per_hour:50,exposure_usd:0,daily_loss_limit_usd:50});
+  assert.match(text!,/внесен PAPER капитал \$1000\.00 \(не е печалба\)/);
+  assert.match(text!,/капиталов капацитет 4 позиции/);
+  assert.match(text!,/нетен PnL −\$2\.30/);
+});

@@ -23,7 +23,8 @@ ISOLATED_PATHS={'NEO_MARKET_STATE_PATH':'state.json','NEO_MARKET_AUDIT_PATH':'au
 # A shell's main-engine path (personal engines' ticker registry seed) and its HF switches and
 # budget knobs never reach the tests.
 CLEARED_ENV=('NEO_MAIN_MARKET_STATE_PATH','NEO_LAB_HF_ENABLED','NEO_LAB_HF_RETIRE',
-             'NEO_LAB_HF_DAILY_CAP_USD','NEO_LAB_HF_START_BALANCE_USD')
+             'NEO_LAB_HF_DAILY_CAP_USD','NEO_LAB_HF_START_BALANCE_USD',
+             'NEO_LAB_AUTHORIZED_CAPITAL_USD','NEO_LAB_FUNDED_ACTIVE_ENABLED')
 
 
 def isolated_environment(directory,base=None):

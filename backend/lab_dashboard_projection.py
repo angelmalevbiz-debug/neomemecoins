@@ -10,7 +10,8 @@ def compact_position(position):
         'entry_network_fee_usd','estimated_exit_fee_usd','estimated_exit_impact_pct','execution_mode',
         'execution_source','entry_policy_version','updated_at','mark_received_at','mark_source',
         'quote_status','quote_age_ms','quote_unavailable_reason','entry_roundtrip_pnl_pct','entry_cost_cap_pct',
-        'stop_loss_net_pct','stop_headroom_pct','exit_parameters','exit_policy_label') if key in position}
+        'stop_loss_net_pct','stop_headroom_pct','exit_parameters','exit_policy_label',
+        'peak_net_pct','profit_protection') if key in position}
 
 # Scalar planning fields of a cost feasibility summary. The per-candidate
 # best_candidates list stays only on funded (PROMOTED_PAPER) books, so the
@@ -85,7 +86,8 @@ def compact_strategy_lab(data):
                               'exit_parameters')
             }, position, FORWARD_POSITION_FIELDS)
             position=_with_present(position,raw.get('position') or {},
-                ('capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes'))
+                ('capacity_test','quality_mode','strategy_validation','capacity_test_shadow','exit_policy_changes',
+                 'peak_net_pct','profit_protection'))
         else:
             position = None
         history = []
@@ -105,7 +107,8 @@ def compact_strategy_lab(data):
                               'entry_slippage_pct', 'exit_slippage_pct',
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
                               'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label')
-            }, trade, FORWARD_HISTORY_FIELDS+('capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes')))
+            }, trade, FORWARD_HISTORY_FIELDS+('capacity_test','quality_mode','strategy_validation',
+                'capacity_test_shadow','exit_policy_changes','exit_parameters','peak_net_pct','profit_protection')))
         books[key] = {
             'id': raw.get('id', key),
             'name': raw.get('name', key),

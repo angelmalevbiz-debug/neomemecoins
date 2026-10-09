@@ -61,9 +61,11 @@ def summarize(rows):
 def audit(ledger):
     books = ledger.get('books') or {}
     rows = [r for sid in BOOKS for r in (books.get(sid) or {}).get('history', [])]
-    policy = defaultdict(list)
+    policy, exit_policy = defaultdict(list), defaultdict(list)
     for row in rows:
         policy[row.get('entry_policy_version', 'LEGACY_UNKNOWN')].append(row)
+        exit_policy[(row.get('exit_parameters') or {}).get('version') or
+                    row.get('exit_policy_label') or 'LEGACY_UNKNOWN'].append(row)
     test = [r for r in rows if r.get('capacity_test') is True]
     def shadow_pass(row):
         s = row.get('capacity_test_shadow') or {}
@@ -94,6 +96,8 @@ def audit(ledger):
         opened += [dict(strategy=sid, trade_no=p.get('trade_no'), symbol=p.get('symbol'),
                         pool=p.get('pairAddress'), entry_policy=p.get('entry_policy_version'),
                         exit_policy=(p.get('exit_parameters') or {}).get('version'),
+                        historical_peak_net_pct=p.get('peak_net_pct'),
+                        profit_protection=p.get('profit_protection'),
                         net_mark_usd=p.get('open_pnl_usd'), quote_status=p.get('quote_status'),
                         updated_at=p.get('updated_at')) for p in positions]
     pools = Counter(p['pool'] for p in opened if p['pool'])
@@ -101,6 +105,7 @@ def audit(ledger):
         updated_at=ledger.get('updated_at'), primary_total=summarize(rows),
         by_book={sid:summarize((books.get(sid) or {}).get('history', [])) for sid in BOOKS},
         by_entry_policy={name:summarize(group) for name, group in sorted(policy.items())},
+        by_exit_policy={name:summarize(group) for name, group in sorted(exit_policy.items())},
         capacity_test={**summarize(test), 'shadow_admission_counts':shadow,
                        'defense_rejections':dict(defense_reasons)},
         open_positions=opened, open_position_count=len(opened), unique_open_pools=len(pools),

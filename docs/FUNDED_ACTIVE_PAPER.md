@@ -1,11 +1,46 @@
 # Named strategy PAPER repair — 2026-10-09
 
-## Quality-first prospective test (current Windows mode)
+## Adaptive net-profit protection (current Windows mode, supersedes fixed-only exits)
+
+The owner's latest request explicitly asks to protect +$10–15 instead of
+waiting for +$30 and giving the gain back. `FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100`
+keeps V4 admission and all its safety, cost and daily risk gates. It uses
+`PAPER_ADAPTIVE_EXIT_V1_NET30_STOP5_LOCK80` for new lots and amends recognized
+open PAPER lots of the four named promoted books with an appended audit event.
+This supersedes the earlier instruction to prohibit exits before +$30.
+
+After a fresh exact-pool mark shows at least +$4 NET after modeled costs, track
+the highest net dollars observed since activation. The trigger is:
+`peak - max($1, 20% × peak)`: +$4 → +$3, +$10 → +$8, +$15 → +$12.
+It only rises; it is stored in the ledger and survives a restart. There is no
+fixed holding-time exit. +$30 remains the upper profit target, -$5 the initial
+net stop trigger. Both the adaptive exit and stop book the actual modeled
+quote, NOT the threshold; gaps, stale data, fees and impact can give a worse
+result or a loss. This is PAPER observed-pool modeling, not wallet execution.
+
+For amended lots the tracker starts at the first fresh mark AFTER activation.
+Historical `peak_net_pct` remains an observation only; a lost past peak cannot
+be recovered or presented as protected profit. Every amendment records old/new
+parameters, time and owner-request reason. Existing entry receipts, quantities,
+history, contributions and balances are untouched by migration. Stops on old
+lots tighten from $10 to $5 prospectively; a position already below the trigger
+may close at the first fresh actual quote, including worse than -$5.
+
+Current entry-policy outcomes and exit-policy cohorts must remain separate:
+an old capacity-test entry managed with a new exit is NOT a new quality entry.
+The dashboard shows the tracker/floor per open lot and the reason new entries
+are paused even while a position is open. Older losses still count against
+the $50 UTC-day risk budget. No reset, forced refill or expanded loss budget.
+Neither the +$4 arm nor 20% giveback is fitted or validated on the tiny winner
+sample. Better future win rate or positive expectancy has not been established.
+Exits can protect only observed gains, not predict every losing trade.
+
+## Quality-first prospective test (previous V4 Windows mode)
 
 The owner's subsequent request was to analyze losses/wins and optimize net
 outcomes, with discretion over risk. The Windows launcher now selects
 `NEO_LAB_QUALITY_ENABLED=1`, `NEO_LAB_CAPACITY_TEST_ENABLED=0` and PAPER mode:
-**FUNDED_ACTIVE_PAPER_V4_QUALITY_100**. Quality takes precedence if both flags
+**FUNDED_ACTIVE_PAPER_V4_QUALITY_100** (now superseded by V5 above). Quality takes precedence if both flags
 are inherited. Neither opt-in can select its policy in LIVE mode.
 
 The initial read-only [outcome audit](PAPER_OUTCOME_AUDIT_20261009.md) found 106 load-test
@@ -37,7 +72,7 @@ daily-loss gates. It adds prospective (not historically fitted) requirements:
   costs; a gap may book a loss beyond $5. The target remains the owner's request,
   not evidence that this market offers enough 30% moves for a high win rate.
 
-Every existing lot keeps its frozen exit policy (+$30/-$10 for current load
+Under the former V4 release, every existing lot kept its frozen exit policy (+$30/-$10 for load
 test lots). No entry receipt, close, quantity, contribution or balance is
 rewritten. Older losses STILL count toward the $50 UTC-day entry budget;
 switching policy cannot restart a spent loss budget. Position management

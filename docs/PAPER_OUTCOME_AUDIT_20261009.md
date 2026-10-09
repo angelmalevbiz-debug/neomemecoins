@@ -75,6 +75,9 @@ is `.runtime/paper-quality-predeploy.json`, with its own source SHA-256.
 
 ## Scoped prospective change, not a fitted promise
 
+The V4 change below was deployed before the owner's subsequent profit-
+protection request. Its fixed-only exit preservation is superseded by V5.
+
 V4 ends load-test admission, reinstates all vetoes/risk budgets, caps roundtrip
 cost at 1.5%, requires a stronger size-scaled confirmed buy pulse, prevents
 new cross-book duplicate exposure, and pauses losing pools across the cohort.
@@ -93,3 +96,29 @@ AND open PnL, over distinct pool episodes and multiple days. Do not promote
 based on utilization, tests, a handful of wins, higher closed win rate with
 hidden open losses, or in-sample threshold tuning. No real-money authorization
 or profitability claim is part of this release.
+
+## Subsequent observed giveback and V5 hypothesis — approximately 18:32 UTC
+
+The actual live ledger showed CLAUDIA in all four books with an observed
+historical net peak +$14.916014 but a current net mark near -$1.9554 each.
+GNODE had peaked at +$5.840516 / +$6.068172 in Momentum / Precision, versus
+current marks +$1.2902 / +$1.5081. USDF in Precision / Ultra had a peak and
+current mark of approximately +$4.6833. These were open marks, not closes or
+executable historical alternatives. The duplicated pools are correlated.
+The cause is the frozen +$30/-$10 fixed-only policy, not a four-minute exit.
+
+At that snapshot, 148 primary closes included 6 wins and -$386.2218 net;
+the load-test subset was 111 closes, 1 win, -$302.4182. The capacity-test
+winner QI made +$30.6503, while PQC lost -$10.5149 after a recorded +$4.0845
+peak. All four daily entry budgets were already spent. V4 had no entry or
+close, so no V4 win rate exists. A historical peak alone cannot replay
+what an earlier stop would have filled or measure an improved win rate.
+
+V5 introduces prospective protection from +$4 NET: the floor follows
+`peak - max($1, 20% × peak)`. No time exit; retain upper +$30 target and -$5
+initial stop. The user's latest request authorizes audited exit amendments
+of old PAPER lots, without reclassifying their entries or using old peaks.
+The tracker starts with the first fresh post-activation mark. The audit tool
+now also groups closed outcomes by stored EXIT version. Validate actual
+future closed results including gaps, average loss, profit factor and open
+drawdown; synthetic path tests do not establish dominance or profitability.

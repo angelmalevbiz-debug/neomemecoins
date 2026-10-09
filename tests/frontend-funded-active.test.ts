@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { fundedActiveSummary, labEntryStatus } from '../src/lib/labStrategyView';
+import { fundedActiveSummary, profitProtectionSummary, labEntryStatus } from '../src/lib/labStrategyView';
 
 test('active PAPER summary separates current policy, entries, exits and no results', () => {
   const result = fundedActiveSummary({ version: 'FUNDED_ACTIVE_PAPER_V1', trades: 0, wins: 0,
@@ -89,4 +89,31 @@ test('quality admission rejects small flow, correlated lots and repeated losing 
     assert.ok(labEntryStatus({id:'EARLY',starting_balance:1000,balance:950,
       entry_diagnostics:{blocked_reason:reason}}).includes(text));
   }
+});
+
+test('adaptive summary allows early protection and shows the real daily entry pause', () => {
+  const text=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100',quality_mode:true,
+    exit_policy:{version:'PAPER_ADAPTIVE_EXIT_V1_NET30_STOP5_LOCK80',take_profit_net_usd:30,
+      stop_loss_net_usd:5,profit_protection_arm_net_usd:4,profit_giveback_fraction:.2,minimum_profit_giveback_usd:1},
+    trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,
+    open_positions:4,max_positions:4,target_orders_per_hour:50,exposure_usd:400,daily_loss_limit_usd:50,
+    daily_net_usd:-60,blocked_reason:'funded_active_daily_loss_limit',adaptive_open_positions:4});
+  assert.match(text!,/защита от \+\$4.00 нето/);
+  assert.match(text!,/20% от нетния връх/);
+  assert.match(text!,/може да затвори преди \+\$30/);
+  assert.match(text!,/Дневният лимит/);
+  assert.match(text!,/дневен нетен резултат −\$60.00/);
+  assert.match(text!,/с адаптивен изход 4 отворени/);
+  assert.doesNotMatch(text!,/запазени изходи|без кратък таймер и trailing/);
+});
+
+test('per-lot protection distinguishes waiting, unarmed, armed and stale without guaranteed profits', () => {
+  const state={version:'adaptive',activated_at:1,last_mark_at:null,peak_net_usd:null,floor_net_usd:null,armed:false};
+  assert.equal(profitProtectionSummary(),null);
+  assert.match(profitProtectionSummary(state,'fresh')!,/първа прясна цена/);
+  assert.match(profitProtectionSummary({...state,last_mark_at:2},'fresh')!,/още не е включена/);
+  const armed={...state,last_mark_at:2,peak_net_usd:15,floor_net_usd:12,armed:true};
+  assert.match(profitProtectionSummary(armed,'fresh')!,/праг за изход \+\$12.00/);
+  assert.match(profitProtectionSummary(armed,'fresh')!,/не е гарантирана печалба/);
+  assert.match(profitProtectionSummary(armed,'stale')!,/Котировката не е прясна/);
 });

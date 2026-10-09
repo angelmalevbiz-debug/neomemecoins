@@ -758,6 +758,7 @@ def load_state():
     # authorization never turns an old TEST book into a funded trading book.
     funding=active_paper.apply_authorized_funding(books,now_ms()) if cohort_active or not stored_books else []
     exit_changes=active_paper.apply_capacity_exit_policy(books,now_ms())
+    exit_changes+=active_paper.apply_adaptive_exit_policy(books,now_ms())
     setup=dict(raw.get('portfolio_setup') or {})
     if all(books[sid].get('starting_balance')==1000 for sid in PROMOTED_STRATEGIES):
         setup.update(total_allocated_capital_usd=4000.0,allocation_per_strategy_usd=1000.0)
@@ -972,6 +973,8 @@ def update_positions(flows,feed):
             # The exits this position was opened with (its stored exit_parameters).
             reason=lab_forward.exit_reason(pos,model_live_pct,hold)
         elif active_paper.is_active_position(pos):
+            active_paper.observe_profit_protection(pos,total_live_pct,
+                num(coin.get('mark_received_at'),num(coin.get('updatedAt'))))
             reason=active_paper.exit_reason(pos,total_live_pct,hold)
         elif cost_first_exits is not None:
             reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)

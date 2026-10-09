@@ -331,6 +331,19 @@ HF_GROUP = 'HF_EXPERIMENT'
 HF_CONTROL = 'HF_RND_E95'
 HF_HYPOTHESES = ('HF_QUIET_E95', 'HF_DIP15_E95')
 HF_NOTIONAL_USD = 25.0
+# The HF books' own directory and checkpoint version: an HF checkpoint is also named state.json,
+# but it is not an engine ledger (--archive-dir skips it; --lab-hf reads the journal).
+HF_DIRECTORY = 'strategy_lab_hf'
+HF_CHECKPOINT_VERSION = 'HF_CHECKPOINT_V1'
+
+
+def is_hf_checkpoint_file(path: Path) -> bool:
+    """Whether ``path`` holds a LAB_HIGH_FREQUENCY_V1 checkpoint (version HF_CHECKPOINT_V1)."""
+    try:
+        data = load_json(path)[0]
+    except ValueError:
+        return False
+    return isinstance(data, dict) and data.get('version') == HF_CHECKPOINT_VERSION
 
 
 def _hf_fee_bucket(fee_bps: Any) -> str:
@@ -447,6 +460,8 @@ class LedgerCollector:
         self.trades: dict[str, dict[str, Any]] = {}
         self.conflicts: set[str] = set()
         self.sources: list[dict[str, Any]] = []
+        # Files an --archive-dir scan recognised but did not read as ledgers (HF checkpoints).
+        self.skipped: list[dict[str, Any]] = []
         self.rejected: dict[str, int] = defaultdict(int)
         self.duplicates = 0
         self.filtered_by_window = 0
@@ -614,12 +629,26 @@ class LedgerCollector:
                              'closed_rows': admitted, 'books': len({f.parent.name for f in files}),
                              'journal_files': len(files)})
 
+    def _skip_hf_checkpoint(self, root: Path, path: Path) -> None:
+        relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else path.name
+        self.skipped.append({'kind': 'hf_checkpoint', 'file': scrub(relative),
+                             'reason': 'LAB_HIGH_FREQUENCY_V1 checkpoint, not an engine ledger; '
+                                       'read its strategy_lab_hf directory with --lab-hf'})
+
     def add_archive_dir(self, root: Path, label: str | None = None) -> int:
         """Scan for ledger copies. ``label`` applies to engine ledgers that are not under
-        ``users/<account-uuid>/``; those keep the account named by their directory."""
+        ``users/<account-uuid>/``; those keep the account named by their directory.
+
+        A LAB_HIGH_FREQUENCY_V1 checkpoint (``strategy_lab_hf/state.json``, also in reset
+        archives) is skipped and listed in ``skipped``: its trades are journal rows, read
+        with ``--lab-hf``.
+        """
         found = 0
         for path in sorted(root.rglob('*.json')):
             if path.name == 'state.json':
+                if HF_DIRECTORY in (root.name, *path.relative_to(root).parent.parts):
+                    self._skip_hf_checkpoint(root, path)
+                    continue
                 derived = derive_account_label(path.resolve())
                 explicit = label if label is not None and derived == 'main' else None
                 if explicit is not None:
@@ -628,7 +657,14 @@ class LedgerCollector:
                     if owner is not None and owner != explicit:
                         raise ValueError(f'{display_path(path)}: --archive-dir label "{explicit}" conflicts with its '
                                          f'demo_session_id owner "{owner}"; give that file its own --state label')
-                self.add_engine_ledger(path, explicit)
+                try:
+                    self.add_engine_ledger(path, explicit)
+                except ValueError:
+                    # An HF checkpoint copied outside a strategy_lab_hf directory is still not a ledger.
+                    if not is_hf_checkpoint_file(path):
+                        raise
+                    self._skip_hf_checkpoint(root, path)
+                    continue
                 found += 1
             elif path.name == 'strategy_lab.json':
                 self.add_lab_ledger(path)
@@ -966,6 +1002,7 @@ def build_report(collector: LedgerCollector, *, iterations: int, seed: int) -> d
         'window': {'since': iso(collector.since), 'until': iso(collector.until),
                    'filtered_out_by_window': collector.filtered_by_window},
         'sources': collector.sources,
+        'skipped_inputs': collector.skipped,
         'dedupe': {'unique_closed_trades': len(trades), 'duplicate_copies_skipped': collector.duplicates,
                    'conflicting_ids_excluded': len(collector.conflicts),
                    'rejected_rows': dict(collector.rejected),
@@ -1085,6 +1122,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     for source in report['sources']:
         who = source.get('account') if source['kind'] == 'engine' else f"{source.get('books')} books"
         out.append(f"| {source['kind']} | {scrub(who)} | {scrub(source['file'])} | {source['closed_rows']} | {source['sha256'][:16]}... |\n")
+    for skipped in report.get('skipped_inputs') or []:
+        out.append(f"\nSkipped {scrub(skipped['file'])}: {scrub(skipped['reason'])}.\n")
     out.append('\n## Engine accounts\n')
     out.append(_table('By account', report['engine']['by_account']))
     out.append('\n' + report['engine']['note'] + '\n')
@@ -1210,6 +1249,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f'warning: no state.json or strategy_lab.json under {display_path(root)}', file=sys.stderr)
     except (OSError, ValueError) as exc:
         fail(exc)
+    if collector.skipped:
+        print(f'note: skipped {len(collector.skipped)} LAB_HIGH_FREQUENCY_V1 checkpoint(s) (not engine ledgers); '
+              'pass their strategy_lab_hf directory with --lab-hf to include HF journal closes', file=sys.stderr)
 
     report = build_report(collector, iterations=args.bootstrap, seed=args.seed)
     markdown = render_markdown(report)

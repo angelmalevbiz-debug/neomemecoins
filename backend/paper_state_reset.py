@@ -243,9 +243,73 @@ def reset_training_offline(training_root, *, training_balance=500.0):
             flock(lock, LOCK_UN)
 
 
+def _safe_relative(name):
+    """A manifest path of a directory archive: relative, '/'-separated, no '..', no drive or root."""
+    if not isinstance(name, str) or not name or '\\' in name or ':' in name or name.startswith('/'):
+        return None
+    parts = name.split('/')
+    if any(part in ('', '.', '..') for part in parts):
+        return None
+    return Path(*parts)
+
+
+def restore_directory_archive(archive, root):
+    """Restore a directory archive (archive_directory, e.g. strategy_lab_hf/) into ``root``.
+
+    Every file is checked against the manifest before anything changes. The directory now in
+    ``root`` is first moved into its own checksummed reset archive (nothing is deleted); the
+    restored tree is copied (the archive stays intact) into a staging directory, verified, and
+    then put in place. The writers (the Lab) must be stopped.
+    """
+    archive, root = Path(archive).resolve(), Path(root).resolve()
+    manifest = json.loads((archive / 'manifest.json').read_text(encoding='utf-8'))
+    name = manifest.get('directory')
+    if not isinstance(name, str) or not name or Path(name).name != name or name in ('.', '..'):
+        raise ValueError('unsafe manifest directory')
+    source_root = (archive / name).resolve()
+    if source_root.parent != archive or not source_root.is_dir():
+        raise ValueError('archive directory missing; restore refused')
+    verified = {}
+    for relative, metadata in manifest['files'].items():
+        path = _safe_relative(relative)
+        if path is None:
+            raise ValueError('unsafe manifest filename')
+        source = (source_root / path).resolve()
+        if not source.is_relative_to(source_root) or not source.is_file():
+            raise ValueError('unsafe manifest filename')
+        digest, size = _hash_file(source)
+        if digest != metadata['sha256'] or size != metadata['bytes']:
+            raise ValueError('archive checksum mismatch; restore refused')
+        verified[relative] = (source, path, metadata)
+    target = root / name
+    if target.exists() and not target.is_dir():
+        raise ValueError(f'{name} is not a directory; restore refused')
+    staging = root / f'{name}.restore-{uuid.uuid4().hex[:8]}'
+    staging.mkdir(parents=True, mode=0o700)
+    for relative, (source, path, metadata) in verified.items():
+        destination = staging / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        digest, size = _copy_file_checked(source, destination)
+        if digest != metadata['sha256'] or size != metadata['bytes']:
+            raise OSError('restore checksum mismatch; restore refused')
+    # Preserve the current directory: anything in it moves whole into a new reset archive
+    # (archive_directory recreates it empty); only the empty directory itself is removed.
+    preserved = None
+    if target.is_dir():
+        if any(target.iterdir()):
+            preserved = archive_directory(root, name)
+        target.rmdir()
+    os.replace(staging, target)
+    return {'restored_directory': name, 'restored_files': sorted(verified),
+            'previous_state_archive': None if preserved is None else str(preserved)}
+
+
 def restore_archive(archive, root):
     archive, root = Path(archive).resolve(), Path(root).resolve()
     manifest = json.loads((archive / 'manifest.json').read_text(encoding='utf-8'))
+    if 'directory' in manifest:
+        # A whole-directory archive (archive_directory: the LAB_HIGH_FREQUENCY_V1 strategy_lab_hf/).
+        return restore_directory_archive(archive, root)
     verified = {}
     for name, metadata in manifest['files'].items():
         if Path(name).name != name:

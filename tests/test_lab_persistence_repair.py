@@ -47,7 +47,10 @@ class LabPersistenceRepairTests(unittest.TestCase):
         state={'activity_version':lab.activity.POLICY_VERSION}
         writes=[PermissionError('online'),PermissionError('degraded'),
                 PermissionError('retry'),PermissionError('degraded'),None,None]
+        # main() also builds the LAB_HIGH_FREQUENCY_V1 container, which loads and checkpoints
+        # HF_ROOT (NEO_STRATEGY_LAB_HF_DIR, else next to the Lab ledger): never a real HF root here.
         with patch.object(lab,'STATE',{}),patch.object(lab,'load_state',return_value=state),\
+             patch.object(lab,'build_high_frequency',return_value=None) as build_hf,patch.object(lab,'HF',None),\
              patch.object(lab,'flow_map',return_value={}),patch.object(lab,'update_positions'),\
              patch.object(lab,'maybe_open') as open_entry,patch.object(lab,'persist',side_effect=writes) as persist,\
              patch.object(lab,'ENTRY_REFRESH_SECONDS',0),\
@@ -59,6 +62,7 @@ class LabPersistenceRepairTests(unittest.TestCase):
             self.assertEqual(open_entry.call_count,2)
             self.assertEqual(persist.call_count,6)
             self.assertEqual(persist.call_args_list[4].args,('degraded','Recovering a failed state write'))
+            build_hf.assert_called_once_with()
 
 
 if __name__=='__main__':

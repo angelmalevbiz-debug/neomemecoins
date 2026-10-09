@@ -151,10 +151,18 @@ ENV_START_BALANCE = 'NEO_LAB_HF_START_BALANCE_USD'
 ENV_DAILY_CAP = 'NEO_LAB_HF_DAILY_CAP_USD'
 ENV_RETIRE = 'NEO_LAB_HF_RETIRE'
 ENV_ROOT = 'NEO_STRATEGY_LAB_HF_DIR'
-# Process budget (not a strategy parameter): HF work over TIME_BUDGET_MS in TIME_BUDGET_LOOPS
-# consecutive Lab loops stops new HF orders (hf_degraded); exits continue.
+# Process budget HF_TIME_BUDGET_V1 (not a strategy parameter): HF work over TIME_BUDGET_MS in
+# TIME_BUDGET_LOOPS consecutive Lab loops stops new HF orders (hf_degraded); exits continue. A
+# degraded loop does no order work, so it is fast by construction: degraded clears only after
+# TIME_BUDGET_MIN_DEGRADED_MS and TIME_BUDGET_CLEAR_LOOPS consecutive loops within the budget
+# (hysteresis), which bounds slow order work to about 3 loops in every 5 minutes.
+TIME_BUDGET_VERSION = 'HF_TIME_BUDGET_V1'
 TIME_BUDGET_MS = 250.0
 TIME_BUDGET_LOOPS = 3
+TIME_BUDGET_CLEAR_LOOPS = 30
+TIME_BUDGET_MIN_DEGRADED_MS = 300_000
+# An HF error published in the dashboard view while it is this recent (strategy_lab hf_error).
+ERROR_VIEW_MS = 600_000
 # Cost functions strategy_lab injects (avoids a circular import; the shared model stays there).
 COST_FUNCTIONS = ('entry_execution', 'exit_execution', 'calibrated_entry_execution', 'calibrated_exit_execution',
                   'pumpswap_fee_bps', 'sol_usd_from_coin', 'pair_liquidity_usd', 'forward_cost_model')
@@ -972,11 +980,22 @@ class HighFrequencyLab:
         self.books = {book_id: new_book(book_id, self.budget) for book_id in BOOK_IDS}
         self.journal = Journal(self.root / 'journal')
         self.seq = 0
+        # Seqs of rows emitted (journaled) but not yet fully applied: while any exists, no
+        # checkpoint is written, so a restart replays them from the journal (exactly once).
+        self._in_flight = set()
         self.loaded = False
         self.started_at = None
+        # written_at of the checkpoint this process loaded (the previous process's last one).
+        self.previous_written_at = None
         self.degraded = False
         self.slow_loops = 0
+        self.fast_loops = 0
+        self.degraded_since = None
+        self.degraded_cleared_at = None
+        self.degraded_episodes = 0
         self.loop_ms = []
+        # HF failures reported by the Lab (strategy_lab hf_end_loop / persist): published in metrics.
+        self.errors = {'count': 0, 'last': None, 'last_at': None, 'consecutive_loops': 0}
         self.dirty = False
         self.lock = threading.RLock()
         self.retire_flags = retire_flag_ids(self.environ)
@@ -1009,8 +1028,13 @@ class HighFrequencyLab:
         self.seq += 1
         row = {'v': 1, 'seq': self.seq, 'kind': kind, 'book': book_id, 'cfg': cfg or self.cfg[book_id],
                'budget': self.budget_hash, 'at': int(at), 'entry_policy_version': ENTRY_POLICY_VERSION, **fields}
+        # A stop (KeyboardInterrupt from the local stop marker) or an error between the journal
+        # append and the end of _apply leaves this seq in flight: the checkpoint is then skipped
+        # (see checkpoint_if_due) and the restart replays the row instead of losing it.
+        self._in_flight.add(row['seq'])
         self.journal.append(row)
         self._apply(row)
+        self._in_flight.discard(row['seq'])
         self.dirty = True
         return row
 
@@ -1141,11 +1165,13 @@ class HighFrequencyLab:
                     written = _finite(data.get('written_at'))
                     if written is not None:
                         min_day = day_label(written - DAY_MS)
+                        self.previous_written_at = int(written)
                 except (OSError, ValueError, KeyError, TypeError):
                     # The journal is the record: rebuild from every row.
                     self.books = {book_id: new_book(book_id, self.budget) for book_id in BOOK_IDS}
                     self.seq = 0
                     self.memory.toggles = {}
+                    self.previous_written_at = None
                     report['checkpoint'] = 'unreadable_rebuilt_from_journal'
             report['torn_tails'] = self.journal.repair_torn_tails()
             checkpoint_seq = self.seq
@@ -1158,7 +1184,9 @@ class HighFrequencyLab:
                 self._apply(row)
                 report['replayed_rows'] += 1
             self.checkpoint_stats['seq'] = checkpoint_seq
+            report['previous_checkpoint_at'] = self.previous_written_at
             # Restart rules (HF_FILL_NEXT_REFRESH_V1).
+            outage = None if self.previous_written_at is None else max(0, now - self.previous_written_at)
             for book_id in BOOK_IDS:
                 book = self.books[book_id]
                 for slot in sorted(list(book['slots'].values()), key=lambda item: item['trade_no']):
@@ -1166,8 +1194,12 @@ class HighFrequencyLab:
                         self._emit(book_id, 'cancel', self._slot_fields(slot, reason=CANCEL_RESTART), now,
                                    cfg=slot['cfg'])
                         report['restart_cancels'] += 1
-                    elif slot['state'] == OPEN:
-                        slot['restarted_at'] = now
+                        continue
+                    # Held slots remember the restart: a FEED_GAP or VANISHED close whose last mark
+                    # predates it is flagged restart_gap (the outage, not the pool, made the gap).
+                    slot['restarted_at'] = now
+                    slot['restart_outage_ms'] = outage
+                    if slot['state'] == OPEN:
                         report['resumed_open'] += 1
                     elif slot['state'] == EXIT_ORDERED:
                         report['resumed_exit_ordered'] += 1
@@ -1212,6 +1244,13 @@ class HighFrequencyLab:
             if not self.loaded:
                 return False
             self.journal.flush()
+            if self._in_flight:
+                # A journaled row was not fully applied (a stop or an error inside _emit): the state
+                # in memory may miss it or hold half of it. Keep the previous checkpoint; the next
+                # load replays every row above its seq, this one included.
+                self.checkpoint_stats['skipped_in_flight'] = int(self.checkpoint_stats.get('skipped_in_flight') or 0) + 1
+                self.checkpoint_stats['in_flight_seqs'] = sorted(self._in_flight)[:10]
+                return False
             if not force and (not self.dirty or now - self.last_checkpoint_at < 15_000):
                 return False
             started = time.perf_counter()
@@ -1229,18 +1268,60 @@ class HighFrequencyLab:
 
     # ---------------------------------------------------------------- per-loop work
 
-    def record_loop_time(self, milliseconds) -> bool:
-        """Time budget: > 250 ms of HF work in 3 consecutive loops sets hf_degraded (exits continue).
+    def record_loop_time(self, milliseconds, now=None) -> bool:
+        """HF_TIME_BUDGET_V1: > 250 ms of HF work in 3 consecutive loops sets hf_degraded (exits continue).
 
-        It clears at the first loop within the budget (no new orders also means less work).
+        A degraded loop does no order work, so it is fast whatever made the order work slow:
+        degraded therefore clears only after at least 5 minutes AND 30 consecutive loops within
+        the budget (hysteresis). Sustained slowness then costs about 3 slow loops per 5 minutes
+        instead of 3 in every 4 loops.
         """
         with self.lock:
+            now = int(self.clock() if now is None else now)
             value = _finite(milliseconds) or 0.0
             self.loop_ms.append(round(value, 3))
             del self.loop_ms[:-30]
-            self.slow_loops = self.slow_loops + 1 if value > TIME_BUDGET_MS else 0
-            self.degraded = self.slow_loops >= TIME_BUDGET_LOOPS
+            slow = value > TIME_BUDGET_MS
+            self.slow_loops = self.slow_loops + 1 if slow else 0
+            self.fast_loops = 0 if slow else self.fast_loops + 1
+            if not self.degraded:
+                if self.slow_loops >= TIME_BUDGET_LOOPS:
+                    self.degraded = True
+                    self.degraded_since = now
+                    self.degraded_episodes += 1
+            elif (self.fast_loops >= TIME_BUDGET_CLEAR_LOOPS
+                  and now - int(self.degraded_since if self.degraded_since is not None else now)
+                  >= TIME_BUDGET_MIN_DEGRADED_MS):
+                self.degraded = False
+                self.degraded_since = None
+                self.degraded_cleared_at = now
             return self.degraded
+
+    def flush_journal(self) -> int:
+        """HF_JOURNAL_V1: the one flush + fsync per touched file of a Lab loop (strategy_lab.hf_end_loop).
+
+        update() and on_refresh() only append rows; the Lab flushes them once at the end of the
+        loop, always before persist() checkpoints.
+        """
+        with self.lock:
+            return self.journal.flush()
+
+    def note_errors(self, errors, now=None) -> None:
+        """The HF errors of one Lab loop (an empty list ends a run of failing loops)."""
+        with self.lock:
+            if not errors:
+                self.errors['consecutive_loops'] = 0
+                return
+            self.errors['consecutive_loops'] = int(self.errors['consecutive_loops']) + 1
+            for text in errors:
+                self.note_error(text, now)
+
+    def note_error(self, text, now=None) -> None:
+        """One HF failure (published as persistence.hf.errors and in the dashboard view)."""
+        with self.lock:
+            self.errors['count'] = int(self.errors['count']) + 1
+            self.errors['last'] = str(text)[:300]
+            self.errors['last_at'] = int(self.clock() if now is None else now)
 
     def _observations(self, slot, prices, now):
         key = (slot['address'], slot['pairAddress'])
@@ -1292,7 +1373,8 @@ class HighFrequencyLab:
                         slot.setdefault('_unpriced_since', now)
                     self._step(book_id, slot, None, None, now, feed_alive=feed_alive)
             self._limits(now)
-            self.journal.flush()
+            # Rows stay pending until the Lab's end-of-loop flush (flush_journal), so a file
+            # touched here and again in on_refresh is fsynced once per loop.
 
     def _step(self, book_id, slot, coin, stamp, now, *, feed_alive=False) -> None:
         """One observation (or, with ``coin`` None, the passage of time) through a slot's state machine."""
@@ -1332,14 +1414,22 @@ class HighFrequencyLab:
             return
         if slot['state'] != EXIT_ORDERED:
             return
+        leg = slot['exit_leg']
+        if (not slot['exit_waiting_next'] and isinstance(leg, dict)
+                and leg.get('status') != lab_forward.FILL_PENDING):
+            # A resolved exit leg whose close did not happen (a valuation error, or a stop between
+            # the resolution and the close row): fill at the next observation, as the harness
+            # takes the next point, instead of holding the slot, its pool and its reservation forever.
+            slot['exit_waiting_next'] = True
+            self.dirty = True
         if coin is None:
-            leg = slot['exit_leg']
             if not slot['exit_waiting_next'] and lab_forward.advance_fill_leg(leg, None, now, key=key):
                 if leg['status'] in (lab_forward.FILL_NEXT_REFRESH, lab_forward.FILL_QUIET):
-                    self._close_at_leg(book_id, slot, now)
+                    if not self._close_at_leg(book_id, slot, now):
+                        slot['exit_waiting_next'] = True
                 else:
                     slot['exit_waiting_next'] = True
-                    self.dirty = True
+                self.dirty = True
             if str(slot['trade_no']) in book['slots']:
                 self._vanish_check(book_id, slot, now, feed_alive)
             return
@@ -1347,7 +1437,6 @@ class HighFrequencyLab:
             if not self._feed_gap(book_id, slot, coin, stamp, now):
                 self._close_late(book_id, slot, coin, stamp, now)
             return
-        leg = slot['exit_leg']
         if lab_forward.advance_fill_leg(leg, coin, now, key=key):
             if leg['status'] in (lab_forward.FILL_NEXT_REFRESH, lab_forward.FILL_QUIET):
                 if not self._close_at_leg(book_id, slot, now, fill_coin=coin if leg['fill_at'] == stamp else None):
@@ -1364,6 +1453,7 @@ class HighFrequencyLab:
     def _mark(self, slot, coin, stamp) -> None:
         slot['last_mark'] = lab_forward.mark_snapshot(coin, stamp, slot.get('last_mark'))
         slot['last_mark_at'] = int(stamp)
+        slot['_marked_in_process'] = True
         entry = slot.get('entry') or {}
         try:
             quote = self.cost.calibrated_exit_execution(coin, _finite(entry.get('qty')) or 0.0,
@@ -1372,8 +1462,32 @@ class HighFrequencyLab:
         except (ValueError, TypeError, ZeroDivisionError):
             pass
 
+    @staticmethod
+    def _restart_gap(slot, last_mark_at, until) -> dict:
+        """Close fields of a FEED_GAP / VANISHED close whose gap spans a Lab restart.
+
+        The valuation rules are unchanged (FEED_GAP: min(pre-gap, return); VANISHED: last mark
+        minus 10%); the flag tells a gap the outage made (a deploy, a watchdog recovery, a
+        rollback) apart from a pool or a feed that went quiet while the Lab ran.
+        """
+        restarted = _finite(slot.get('restarted_at'))
+        # restarted_at is set at every load on the slots held through it; _marked_in_process (never
+        # checkpointed) once this process has marked the slot: only a gap from a mark taken before
+        # the restart to the first one after it spans the outage.
+        if restarted is None or last_mark_at is None or slot.get('_marked_in_process'):
+            return {}
+        outage = _finite(slot.get('restart_outage_ms'))
+        return {'restart_gap': True, 'restarted_at': int(restarted),
+                'restart_outage_ms': None if outage is None else int(outage),
+                'gap_ms': int(until - last_mark_at)}
+
     def _feed_gap(self, book_id, slot, coin, stamp, now) -> bool:
-        """A held pool returning after more than FILL.feed_gap_ms: FEED_GAP at min(pre-gap, return)."""
+        """A held pool returning after more than FILL.feed_gap_ms: FEED_GAP at min(pre-gap, return).
+
+        This also closes the slots held through a Lab outage longer than feed_gap_ms (their exit
+        was due during it): the rule takes precedence over late_exit_restart, and the close is
+        flagged restart_gap.
+        """
         last = _finite(slot.get('last_mark_at'))
         if last is None or stamp - last <= FILL.feed_gap_ms:
             return False
@@ -1385,7 +1499,8 @@ class HighFrequencyLab:
             back_price > 0 and back_price < pre_price)
         value_coin = coin if use_return else pre
         return self._close(book_id, slot, now, kind=CLOSE_FEED_GAP, exit_coin=value_coin, exit_fill_at=stamp,
-                           exit_status=FILL_FEED_GAP, exit_lag_ms=None, exit_outlier_basis=None)
+                           exit_status=FILL_FEED_GAP, exit_lag_ms=None, exit_outlier_basis=None,
+                           extra=self._restart_gap(slot, last, stamp))
 
     def _vanish_check(self, book_id, slot, now, feed_alive) -> bool:
         last = _finite(slot.get('last_mark_at'))
@@ -1399,7 +1514,8 @@ class HighFrequencyLab:
             slot['vanish_unvaluable'] = True
             return False
         return self._close(book_id, slot, now, kind=CLOSE_VANISHED, exit_coin=coin, exit_fill_at=int(now),
-                           exit_status=lab_forward.FILL_VANISHED, exit_lag_ms=None, exit_outlier_basis=None)
+                           exit_status=lab_forward.FILL_VANISHED, exit_lag_ms=None, exit_outlier_basis=None,
+                           extra=self._restart_gap(slot, last, now))
 
     # ---------------------------------------------------------------- entry fill
 
@@ -1558,7 +1674,7 @@ class HighFrequencyLab:
         return {'pnl': float(closed['net_proceeds_usd']) - float(_round(opened['capital_committed_usd'], 8))}
 
     def _close(self, book_id, slot, now, *, kind, exit_coin, exit_fill_at, exit_status, exit_lag_ms,
-               exit_outlier_basis) -> bool:
+               exit_outlier_basis, extra=None) -> bool:
         book = self.books[book_id]
         entry = slot.get('entry')
         if not entry or not isinstance(exit_coin, dict):
@@ -1622,6 +1738,7 @@ class HighFrequencyLab:
             'price_audit': {'entry': entry.get('audit'), 'exit': self._audit_cached(exit_coin, now)},
             'late_exit_restart': bool(slot.get('late_exit_restart')),
             'balance_after': _round(float(book['balance']) + pnl, 6), 'closed_at': int(now),
+            **(extra or {}),
         }
         self._emit(book_id, 'close', fields, now, cfg=slot['cfg'])
         return True
@@ -1704,6 +1821,12 @@ class HighFrequencyLab:
         evaluation = kill_evaluation(rows, self.journal_closes(CONTROL_ID, since=int(agg['first_close_at'])
                                                                if agg and agg.get('first_close_at') else None))
         evaluation.update(closes=closes, utc_days=days, at=int(now), checkpoint=int(kill['next_checkpoint']))
+        # The retire row first: a stop between it and the bookkeeping below leaves a retired book
+        # (journaled), never an advanced checkpoint counter without its retirement.
+        if evaluation['met']:
+            self._retire(book_id, 'kill_checkpoint', now, {key: evaluation[key] for key in (
+                'closes', 'utc_days', 'mean_net50_usd', 'ci95_net50_usd', 'gap_net50_pct',
+                'control_ci_half_width_pct', 'within_fee_bucket_gap_pct')})
         kill['last'] = evaluation
         kill['checkpoints'] = int(kill.get('checkpoints') or 0) + 1
         step = KILL_RULE.checkpoint_every_closes
@@ -1712,10 +1835,6 @@ class HighFrequencyLab:
             following += step
         kill['next_checkpoint'] = following
         self.dirty = True
-        if evaluation['met']:
-            self._retire(book_id, 'kill_checkpoint', now, {key: evaluation[key] for key in (
-                'closes', 'utc_days', 'mean_net50_usd', 'ci95_net50_usd', 'gap_net50_pct',
-                'control_ci_half_width_pct', 'within_fee_bucket_gap_pct')})
         return evaluation
 
     # ---------------------------------------------------------------- decisions (each Lab refresh)
@@ -1839,7 +1958,6 @@ class HighFrequencyLab:
             for book_id in BOOK_IDS:
                 self.diagnostics[book_id] = self._decide(book_id, candidates, defensive, stats, now)
             self.refresh_stats = stats
-            self.journal.flush()
             return stats
 
     def _defensive(self, cache, stats, candidate, now):
@@ -1936,6 +2054,11 @@ class HighFrequencyLab:
             now = int(self.clock())
             return {
                 'version': VERSION, 'loaded': self.loaded, 'degraded': self.degraded, 'slow_loops': self.slow_loops,
+                'time_budget': {'version': TIME_BUDGET_VERSION, 'degraded_since': self.degraded_since,
+                                'degraded_cleared_at': self.degraded_cleared_at,
+                                'degraded_episodes': self.degraded_episodes, 'fast_loops': self.fast_loops},
+                # strategy_lab reports every HF failure here too (hf_error is the current loop's only).
+                'errors': dict(self.errors),
                 'loop_ms_last': self.loop_ms[-1] if self.loop_ms else None,
                 'loop_ms_max_recent': max(self.loop_ms) if self.loop_ms else None,
                 'refresh': dict(self.refresh_stats),
@@ -2075,9 +2198,14 @@ class HighFrequencyLab:
                     'last_closes': book['last_closes'][:10],
                     'blocked_reason': (self.diagnostics.get(book_id) or {}).get('blocked_reason'),
                 })
+            last_error_at = self.errors.get('last_at')
+            last_error = ({'text': self.errors.get('last'), 'at': last_error_at, 'count': self.errors.get('count'),
+                           'consecutive_loops': self.errors.get('consecutive_loops')}
+                          if last_error_at is not None and now - int(last_error_at) <= ERROR_VIEW_MS else None)
             return {'version': VERSION, 'title': 'Висока честота (HF)',
                     'badge': 'ЕКСПЕРИМЕНТ · ОЧАКВА СЕ ЗАГУБА', 'portfolio_group': PORTFOLIO_GROUP,
                     'updated_at': int(now), 'loaded': self.loaded, 'degraded': self.degraded,
+                    'last_error': last_error,
                     'notional_usd': BOOK_RULES.notional_usd, 'hold_seconds': EXIT.hold_ms // 1000,
                     'expected_net50_pct_per_trade': -3.6, 'automatic_promotion': AUTOMATIC_PROMOTION,
                     'profitability_proven': PROFITABILITY_PROVEN,
@@ -2091,6 +2219,8 @@ def compact_close(row) -> dict:
     flags = [name for name in ('entry_outlier', 'exit_outlier', 'gain_capped') if guard.get(name)]
     if row.get('late_exit_restart'):
         flags.append('late_exit_restart')
+    if row.get('restart_gap'):
+        flags.append('restart_gap')
     if row.get('plm_v1_would_block'):
         flags.append('plm_v1_would_block')
     return {'trade_no': row.get('trade_no'), 'seq': row.get('seq'), 'symbol': row.get('symbol'),
@@ -2155,6 +2285,11 @@ def config_view(hashes=None, budget: BudgetParameters = DEFAULT_BUDGET, *, enabl
         'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': PROFITABILITY_PROVEN,
         'expected_result': EXPECTED_RESULT, 'is_entry_authorization': False,
         'storage': 'strategy_lab_hf/ (journal/<BOOK>/<YYYY-MM-DD>.jsonl and state.json); never in strategy_lab.json',
-        'time_budget': {'max_ms_per_loop': TIME_BUDGET_MS, 'consecutive_loops': TIME_BUDGET_LOOPS,
-                        'action': 'hf_degraded: no new orders, exits continue; clears at the first loop within budget'},
+        'time_budget': {'version': TIME_BUDGET_VERSION, 'max_ms_per_loop': TIME_BUDGET_MS,
+                        'consecutive_loops': TIME_BUDGET_LOOPS, 'clear_after_loops': TIME_BUDGET_CLEAR_LOOPS,
+                        'min_degraded_ms': TIME_BUDGET_MIN_DEGRADED_MS,
+                        'action': ('hf_degraded: no new orders, exits continue; clears after at least '
+                                   'min_degraded_ms and clear_after_loops consecutive loops within budget')},
+        'journal_flush': ('one flush + fsync per touched file per Lab loop (strategy_lab.hf_end_loop), before '
+                          'the checkpoint; a kill checkpoint flushes once more before it reads the journal'),
     }

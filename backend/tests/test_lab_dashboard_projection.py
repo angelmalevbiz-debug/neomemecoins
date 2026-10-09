@@ -179,6 +179,15 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertNotIn('high_frequency', compact_strategy_lab({'books': {}}))
         self.assertNotIn('high_frequency', compact_strategy_lab({'books': {}, 'high_frequency': ['bad']}))
 
+    def test_passes_the_current_hf_error_through_to_get_state(self):
+        # Review finding: strategy_lab wrote hf_error into the full ledger only; main's GET /state
+        # serves this projection, so an HF failure was invisible there.
+        state = compact_strategy_lab({'books': {}, 'hf_error': 'on_refresh: KeyError: x'})
+        self.assertEqual(state['hf_error'], 'on_refresh: KeyError: x')
+        self.assertEqual(len(compact_strategy_lab({'books': {}, 'hf_error': 'e' * 2000})['hf_error']), 600)
+        for absent in ({'books': {}}, {'books': {}, 'hf_error': ''}, {'books': {}, 'hf_error': {'x': 1}}):
+            self.assertNotIn('hf_error', compact_strategy_lab(absent))
+
 
 if __name__ == '__main__':
     unittest.main()

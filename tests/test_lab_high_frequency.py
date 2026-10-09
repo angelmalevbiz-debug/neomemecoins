@@ -201,6 +201,8 @@ class Harness:
         self.hf.update(lab.hf_feed_prices(feed), self.now, alive)
         if refresh:
             self.hf.on_refresh(feed, self.now)
+        # The Lab's end of loop (strategy_lab.hf_end_loop): the one journal flush of the loop.
+        self.hf.flush_journal()
         return feed
 
     def rows(self, kind=None, book=None, **match):
@@ -289,6 +291,27 @@ class DefinitionTests(unittest.TestCase):
         for book_id, digest in PINNED_CONFIG_HASHES.items():
             self.assertIn(f'| `{book_id}` | `{digest}` |', doc)
         self.assertIn(f'`{PINNED_BUDGET_HASH}`', doc)
+
+    def test_the_lock_mirrors_the_frozen_parameters_and_the_process_rules(self):
+        section = json.loads((ROOT / 'strategy-lock.json').read_text(encoding='utf-8'))['lab_high_frequency']
+        plain = lambda value: json.loads(json.dumps(dataclasses.asdict(value)))
+        for key, value in (('universe', hf.UNIVERSE), ('refresh_event', hf.REFRESH_EVENT),
+                           ('book_rules', hf.BOOK_RULES), ('pool_rule', hf.POOL_RULE), ('exit', hf.EXIT),
+                           ('fills', hf.FILL), ('print_guard', hf.PRINT_GUARD), ('accounting', hf.ACCOUNTING),
+                           ('budget', hf.DEFAULT_BUDGET)):
+            with self.subTest(key=key):
+                self.assertEqual(section[key], plain(value))
+        kill = plain(hf.KILL_RULE)
+        self.assertEqual({name: section['kill'][name] for name in kill}, kill)
+        self.assertEqual({name: section['defensive'][name] for name in hf.DEFENSIVE_MODES}, hf.DEFENSIVE_MODES)
+        budget = hf.config_view()['time_budget']
+        process = section['process']['time_budget']
+        self.assertEqual((process['version'], process['max_ms_per_loop'], process['consecutive_loops'],
+                          process['clear_after_loops'], process['min_degraded_ms']),
+                         (budget['version'], budget['max_ms_per_loop'], budget['consecutive_loops'],
+                          budget['clear_after_loops'], budget['min_degraded_ms']))
+        self.assertIn('restart_gap', section['fills_restart_outage'])
+        self.assertIn('hf_end_loop', section['storage']['journal'])
 
     def test_the_hash_is_canonical_and_covers_the_strategy(self):
         for book_id in hf.BOOK_IDS:
@@ -1246,6 +1269,137 @@ class PersistenceTests(unittest.TestCase):
         close = h.rows('close', hf.RND_ID)[0]
         self.assertTrue(close['late_exit_restart'])
 
+    def test_an_outage_over_10_min_closes_held_slots_as_a_flagged_feed_gap(self):
+        # Review finding: a deploy, watchdog recovery or rollback longer than 10 minutes closes the
+        # held slots as FEED_GAP at min(pre-gap, return) (that rule takes precedence over
+        # late_exit_restart), and those closes could not be told apart from real feed gaps.
+        outcomes = {}
+        for minutes in (3, 15, 45):
+            with self.subTest(minutes=minutes):
+                h = Harness(self)
+                with draws(1):
+                    open_position(h, 1)
+                    h.step((1, 1.02))
+                    self.assertEqual(h.slots()[0]['state'], hf.OPEN)
+                    h.hf.checkpoint_if_due(h.now, force=True)
+                    stopped_at = h.now
+                    h.restart(advance=minutes * MINUTE)
+                    for price in (1.03, 1.04, 1.05):
+                        h.step((1, price))
+                close = h.rows('close', hf.RND_ID)[0]
+                outcomes[minutes] = close
+                if minutes == 3:
+                    self.assertEqual((close['close_kind'], close['exit_status']), ('HF_TIME_120', lf.FILL_NEXT_REFRESH))
+                    self.assertTrue(close['late_exit_restart'])
+                    self.assertNotIn('restart_gap', close)
+                    continue
+                self.assertEqual((close['close_kind'], close['exit_status']), ('FEED_GAP', 'feed_gap'))
+                self.assertAlmostEqual(close['exit_fill_price'], 1.02, places=9)   # min(pre-gap, return)
+                self.assertTrue(close['restart_gap'])
+                self.assertEqual(close['restart_outage_ms'], h.hf.started_at - stopped_at)
+                self.assertGreater(close['gap_ms'], 10 * MINUTE)
+                self.assertIn('restart_gap', h.hf.books[hf.RND_ID]['last_closes'][0]['flags'])
+        self.assertLess(outcomes[15]['pnl_usd'], outcomes[3]['pnl_usd'])
+        # A real feed gap while the Lab runs (marked after the restart) is never flagged.
+        h = Harness(self)
+        with draws(1):
+            open_position(h, 1)
+            h.hf.checkpoint_if_due(h.now, force=True)
+            h.restart(advance=MINUTE)
+            h.step((1, 1.02))
+            for _ in range(70):
+                h.step(advance=10 * SECOND, alive=False)
+            h.step((1, 0.99))
+        close = h.rows('close', hf.RND_ID)[0]
+        self.assertEqual(close['close_kind'], 'FEED_GAP')
+        self.assertNotIn('restart_gap', close)
+
+    def test_a_vanish_across_a_restart_is_flagged(self):
+        h = Harness(self)
+        with draws(1):
+            open_position(h, 1)
+            h.hf.checkpoint_if_due(h.now, force=True)
+            h.restart(advance=12 * MINUTE)
+            for _ in range(8):
+                h.step((2, 1.0), advance=10 * SECOND)
+        close = h.rows('close', hf.RND_ID)[0]
+        self.assertEqual(close['close_kind'], 'VANISHED')
+        self.assertTrue(close['restart_gap'])
+
+    def test_an_exit_ordered_slot_is_never_stranded_by_a_failed_close(self):
+        # Review finding (a): the time-only branch ignored a failed close of a resolved quiet leg, so
+        # the slot stayed EXIT_ORDERED (slot, pool and $25.10 held) while the pool kept printing.
+        h = Harness(self)
+        with draws(1):
+            open_position(h, 1)
+            walk_to_trigger(h, 1, 1.02)
+            slot = h.slots()[0]
+            self.assertEqual(slot['state'], hf.EXIT_ORDERED)
+            original = h.hf.cost.calibrated_exit_execution
+            failing = {'on': True}
+
+            def exit_execution(*args, **kwargs):
+                if failing['on']:
+                    raise ValueError('network_price_unknown')
+                return original(*args, **kwargs)
+            h.hf.cost = SimpleNamespace(**{**vars(h.hf.cost), 'calibrated_exit_execution': exit_execution})
+            h.step((1, 1.02))                        # the same print: the quiet candidate fill
+            for _ in range(60):                      # then no print while the feed is alive: the leg
+                h.step((2, 1.0))                     # resolves quiet at the window end, on time alone
+                if slot['exit_leg']['status'] != lf.FILL_PENDING:
+                    break
+            self.assertEqual(slot['exit_leg']['status'], lf.FILL_QUIET)
+            self.assertEqual(h.rows('close'), [])    # the close failed (no network price)
+            self.assertTrue(slot['exit_waiting_next'])
+            failing['on'] = False
+            h.step((1, 1.01))
+        close = h.rows('close', hf.RND_ID)[0]
+        self.assertEqual(close['exit_status'], 'late_next_observation')
+        self.assertEqual(h.slots(), [])
+        # A slot restored in that state (resolved leg, no close, not waiting) recovers the same way.
+        h2 = Harness(self)
+        with draws(1):
+            open_position(h2, 1)
+            walk_to_trigger(h2, 1, 1.02)
+            slot = h2.slots()[0]
+            slot['exit_leg']['status'] = lf.FILL_QUIET
+            slot['exit_waiting_next'] = False
+            h2.step((1, 1.0))
+        self.assertEqual(len(h2.rows('close', hf.RND_ID)), 1)
+        self.assertEqual(h2.slots(), [])
+
+    def test_a_stop_between_the_journal_and_the_state_never_loses_the_row(self):
+        # Review finding (b): a KeyboardInterrupt (the local stop) between journal.append and _apply
+        # let persist('stopped') checkpoint a seq that included the unapplied close, so the restart
+        # never replayed it: balance 1000, no aggregate, the slot EXIT_ORDERED for good.
+        h = Harness(self)
+        with draws(1):
+            open_position(h, 1)
+            walk_to_trigger(h, 1, 1.02)
+            h.hf.checkpoint_if_due(h.now, force=True)
+            apply = h.hf._apply
+
+            def interrupted(row):
+                if row['kind'] == 'close':
+                    raise KeyboardInterrupt
+                return apply(row)
+            with patch.object(h.hf, '_apply', side_effect=interrupted), self.assertRaises(KeyboardInterrupt):
+                h.step((1, 1.0))
+            # persist('stopped'): the journal is flushed, the checkpoint is not written.
+            self.assertFalse(h.hf.checkpoint_if_due(h.now, force=True))
+            self.assertEqual(h.hf.checkpoint_stats['skipped_in_flight'], 1)
+            journaled = h.rows('close', hf.RND_ID)
+            self.assertEqual(len(journaled), 1)
+            stored = json.loads((h.root / 'state.json').read_text(encoding='utf-8'))
+            self.assertLess(stored['seq'], journaled[0]['seq'])
+            report = h.restart(advance=4 * SECOND)
+        self.assertGreaterEqual(report['replayed_rows'], 1)
+        book = h.hf.books[hf.RND_ID]
+        self.assertEqual(book['slots'], {})
+        self.assertAlmostEqual(book['balance'], 1000.0 + journaled[0]['pnl_usd'], places=6)
+        self.assertEqual(book['aggregates'][PINNED_CONFIG_HASHES[hf.RND_ID]]['n'], 1)
+        self.assertTrue(h.hf.checkpoint_if_due(h.now, force=True))
+
     def test_an_exit_ordered_leg_keeps_resolving_after_a_restart(self):
         h = Harness(self)
         with draws(1):
@@ -1397,8 +1551,78 @@ class PerformanceAndViewTests(unittest.TestCase):
             walk_to_trigger(h, 1, 1.02)
             h.step((1, 1.0))
             self.assertEqual(len(h.rows('close')), 1)
+            # Hysteresis: a fast (degraded, order-free) loop does not clear it.
             h.hf.record_loop_time(10.0)
+            self.assertTrue(h.hf.degraded)
+            h.now += hf.TIME_BUDGET_MIN_DEGRADED_MS
+            for _ in range(hf.TIME_BUDGET_CLEAR_LOOPS):
+                h.hf.record_loop_time(10.0)
         self.assertFalse(h.hf.degraded)
+        metrics = h.hf.metrics()['time_budget']
+        self.assertEqual((metrics['degraded_episodes'], metrics['degraded_cleared_at']), (1, h.now))
+
+    def test_sustained_slowness_stays_degraded_instead_of_flapping(self):
+        # Review finding: degraded cleared at the first loop under budget, and a degraded loop is fast
+        # because it does no order work, so slow order work ran in about 3 of every 4 loops.
+        h = Harness(self)
+        slow_loops = 0
+        for loop in range(1200):                    # 40 minutes of 2 s loops
+            h.now += 2 * SECOND
+            slow = not h.hf.degraded                # order work is slow whenever it runs
+            slow_loops += slow
+            h.hf.record_loop_time(400.0 if slow else 5.0)
+        # At most 3 slow loops per degraded episode, and episodes at least 5 minutes apart.
+        episodes = h.hf.metrics()['time_budget']['degraded_episodes']
+        self.assertLessEqual(episodes, 1 + 40 // 5)
+        self.assertLessEqual(slow_loops, 3 * episodes)
+        self.assertLess(slow_loops / 1200, 0.03)
+        # The degraded window never clears before 5 minutes, even with every loop in budget.
+        h2 = Harness(self)
+        for _ in range(3):
+            h2.hf.record_loop_time(300.0)
+        for _ in range(149):                        # 298 s of fast loops
+            h2.now += 2 * SECOND
+            h2.hf.record_loop_time(1.0)
+        self.assertTrue(h2.hf.degraded)
+        h2.now += 2 * SECOND
+        h2.hf.record_loop_time(1.0)
+        self.assertFalse(h2.hf.degraded)
+        self.assertEqual(hf.config_view()['time_budget']['version'], 'HF_TIME_BUDGET_V1')
+
+    def test_each_journal_file_is_fsynced_at_most_once_per_lab_loop(self):
+        # Review finding: update() and on_refresh() each flushed, so a book that closed in update and
+        # ordered in on_refresh fsynced its day file twice in one loop. The Lab now flushes once, at
+        # the end of the loop (strategy_lab.hf_end_loop), before persist() checkpoints.
+        h = Harness(self)
+        rng = random.Random(5)
+        prices = {n: 1.0 for n in range(1, 13)}
+        journal = h.hf.journal
+        written = []                                 # (loop, path) of every file write + fsync
+        original = journal.flush
+        current = {'loop': -1}
+
+        def counting_flush():
+            written.extend((current['loop'], str(path)) for path in journal._pending)
+            return original()
+        journal.flush = counting_flush
+        touched_both = 0
+        with patch.object(lf, 'hashed_coin', side_effect=lambda pair, t, p, salt: rng.random() < 0.5):
+            for loop in range(600):
+                current['loop'] = loop
+                h.now += 2 * SECOND
+                for n in prices:
+                    prices[n] = round(prices[n] * (1 + rng.uniform(-0.01, 0.01)), 8)
+                feed = [h.coin(n, prices[n]) for n in prices]
+                h.hf.update(lab.hf_feed_prices(feed), h.now, True)
+                after_update = {str(path): len(lines) for path, lines in journal._pending.items()}
+                h.hf.on_refresh(feed, h.now)
+                touched_both += any(len(lines) > after_update[str(path)] for path, lines in journal._pending.items()
+                                    if str(path) in after_update)
+                h.hf.flush_journal()               # strategy_lab.hf_end_loop
+                h.hf.checkpoint_if_due(h.now)      # persist(): nothing left to flush
+        self.assertGreater(len([row for row in h.rows() if row['kind'] == 'close']), 20)
+        self.assertGreater(touched_both, 0)          # the case the finding measured happened
+        self.assertEqual(len(written), len(set(written)))
 
 
 # ------------------------------------------------------------------ the Lab process
@@ -1502,6 +1726,113 @@ class StrategyLabIntegrationTests(unittest.TestCase):
             self.assertTrue(lab.RESET_REQUESTED)
             container = lab.build_high_frequency()
         self.assertIsNotNone(container.load_report['archive'])
+
+    def test_an_hf_failure_reaches_the_published_state_and_the_metrics(self):
+        # Review finding: hf_error stayed in the full ledger; the compact projection that main's
+        # GET /state serves dropped it, and persistence.hf had no error field, so a broken HF looked
+        # healthy (running true) on /state.
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}):
+            container = lab.build_high_frequency()
+        for loop in range(3):
+            errors = []
+            self.clock['now'] += 2 * SECOND
+            with patch.object(container, 'update', side_effect=PermissionError('journal locked')):
+                lab.hf_update([], errors)
+            lab.hf_refresh([], errors)
+            lab.hf_end_loop(1.0, errors)
+            lab.persist('online')
+        compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+        self.assertIn('PermissionError: journal locked', compact['hf_error'])
+        published = compact['persistence']['hf']['errors']
+        self.assertEqual((published['count'], published['consecutive_loops']), (3, 3))
+        self.assertIn('journal locked', published['last'])
+        self.assertEqual(published['last_at'], self.clock['now'])
+        self.assertIn('journal locked', compact['high_frequency']['last_error']['text'])
+        # A checkpoint that cannot be written is reported, and the metrics are still published.
+        container.dirty = True
+        with patch.object(container, 'checkpoint_if_due', side_effect=PermissionError('state.json locked')):
+            lab.hf_end_loop(1.0, [])
+            lab.persist('online')
+        compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+        self.assertIn('checkpoint: PermissionError: state.json locked', compact['hf_error'])
+        self.assertEqual(compact['persistence']['hf']['errors']['count'], 4)
+        self.assertEqual(compact['persistence']['hf']['errors']['consecutive_loops'], 0)
+        # A clean loop clears hf_error; the counters keep the history; the view drops the error later.
+        lab.hf_end_loop(1.0, [])
+        lab.persist('online')
+        compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+        self.assertNotIn('hf_error', compact)
+        self.assertEqual(compact['persistence']['hf']['errors']['count'], 4)
+        # The rollout check reads persistence.hf.refresh.at (the last HF refresh) for staleness.
+        self.assertIn('at', compact['persistence']['hf']['refresh'])
+        self.clock['now'] += hf.ERROR_VIEW_MS + SECOND
+        self.assertIsNone(container.dashboard_view(self.clock['now'])['last_error'])
+
+    def test_the_end_of_loop_flushes_the_journal_once(self):
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}):
+            container = lab.build_high_frequency()
+        with draws(1):
+            for price in (1.0, 1.01):
+                self.clock['now'] += 2 * SECOND
+                feed = [make_coin(1, price, self.clock['now'] - 500)]
+                errors = []
+                lab.hf_update(feed, errors)
+                lab.hf_refresh(feed, errors)
+                pending = container.journal.pending()
+                lab.hf_end_loop(1.0, errors)
+                self.assertEqual(container.journal.pending(), 0)
+        self.assertGreater(pending, 0)
+        self.assertTrue(any((self.root / 'strategy_lab_hf' / 'journal').rglob('*.jsonl')))
+        with patch.object(container, 'flush_journal', side_effect=OSError('disk full')):
+            errors = []
+            lab.hf_end_loop(1.0, errors)
+        self.assertIn('journal: OSError: disk full', lab.STATE['hf_error'])
+
+
+class GateIsolationTests(unittest.TestCase):
+    """Review finding: lab.main() builds a real HF container, so a test that runs it must never
+    reach an HF root outside its temp dir, inside the gate or run alone."""
+
+    def test_the_gate_points_the_hf_root_at_its_temp_dir_and_clears_the_hf_knobs(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('run_python_checks', ROOT / 'scripts' / 'run_python_checks.py')
+        checks = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(checks)
+        with tempfile.TemporaryDirectory(prefix='neo-gate-') as tmp:
+            shell = {'NEO_STRATEGY_LAB_HF_DIR': r'C:\neo\live\strategy_lab_hf', 'NEO_LAB_HF_ENABLED': '0',
+                     'NEO_LAB_HF_RETIRE': 'HF_QUIET_E95', 'NEO_LAB_HF_DAILY_CAP_USD': '5',
+                     'NEO_LAB_HF_START_BALANCE_USD': '9', 'NEO_MAIN_MARKET_STATE_PATH': r'C:\neo\state.json'}
+            env = checks.isolated_environment(Path(tmp), base=shell)
+            self.assertEqual(env['NEO_STRATEGY_LAB_HF_DIR'], str(Path(tmp) / 'strategy_lab_hf'))
+            for name in ('NEO_LAB_HF_ENABLED', 'NEO_LAB_HF_RETIRE', 'NEO_LAB_HF_DAILY_CAP_USD',
+                         'NEO_LAB_HF_START_BALANCE_USD', 'NEO_MAIN_MARKET_STATE_PATH'):
+                self.assertNotIn(name, env)
+            for name, value in env.items():
+                if name in checks.ISOLATED_PATHS:
+                    self.assertTrue(Path(value).is_relative_to(Path(tmp)), name)
+
+    def test_lab_main_tests_run_alone_write_no_hf_root(self):
+        import subprocess
+        import sys
+        modules = []
+        for suite in ('tests', 'backend/tests'):
+            for path in sorted((ROOT / suite).glob('test_*.py')):
+                text = path.read_text(encoding='utf-8')
+                if path.resolve() != Path(__file__).resolve() and ('lab.main()' in text or 'strategy_lab.main()' in text):
+                    modules.append((suite, path.stem))
+        self.assertIn(('tests', 'test_lab_persistence_repair'), modules)
+        for suite, module in modules:
+            with self.subTest(module=f'{suite}/{module}'), \
+                    tempfile.TemporaryDirectory(prefix='neo-sentinel-hf-') as tmp:
+                sentinel = Path(tmp)
+                env = dict(os.environ, PYTHONUTF8='1', PYTHONPATH=str(ROOT / 'backend'), NEO_ENGINE_MODE='PAPER',
+                           NEO_STRATEGY_LAB_PATH=str(sentinel / 'lab' / 'strategy_lab.json'),
+                           NEO_STRATEGY_LAB_COMPACT_PATH=str(sentinel / 'lab' / 'strategy_lab_compact.json'),
+                           NEO_STRATEGY_LAB_HF_DIR=str(sentinel / 'hf'), NEO_LAB_HF_ENABLED='1')
+                result = subprocess.run([sys.executable, '-m', 'unittest', module], cwd=ROOT / suite, env=env,
+                                        capture_output=True, text=True, timeout=600)
+                self.assertEqual(result.returncode, 0, result.stderr[-3000:])
+                self.assertEqual(sorted(str(path.relative_to(sentinel)) for path in sentinel.rglob('*')), [])
 
 
 # ------------------------------------------------------------------ parity with the research simulator

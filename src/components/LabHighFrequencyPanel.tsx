@@ -1,6 +1,6 @@
 import {
-  HF_BADGE, HF_EMPTY, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfCloseKind, hfGapText, hfKillText, hfMoney, hfPct,
-  hfSnapshotOrNull, hfStatusText, hfStatusTone, type LabHighFrequencyBook,
+  HF_BADGE, HF_EMPTY, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfCloseKind, hfErrorText, hfGapText, hfKillText, hfMoney,
+  hfPct, hfSnapshotOrNull, hfStatusText, hfStatusTone, type LabHighFrequencyBook,
 } from '../lib/labHighFrequencyView';
 
 const toneClass = {
@@ -68,6 +68,7 @@ function BookCard({ book }: { book: LabHighFrequencyBook }) {
 
 export default function LabHighFrequencyPanel({ data }: { data?: unknown }) {
   const snapshot = hfSnapshotOrNull(data);
+  const error = hfErrorText(snapshot);
   return <section data-testid="lab-high-frequency" className="border-b border-white/[0.06]">
     <header className="px-4 pb-2 pt-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -75,6 +76,7 @@ export default function LabHighFrequencyPanel({ data }: { data?: unknown }) {
         <span data-testid="hf-badge" className="rounded-md border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[9px] font-black tracking-wide text-amber-200">{HF_BADGE}</span>
       </div>
       <p data-testid="hf-note" className="mt-2 max-w-4xl text-[11px] leading-5 text-amber-100/80">{HF_NOTE}</p>
+      {error && <p data-testid="hf-error" className="mt-2 max-w-4xl break-words text-[11px] leading-5 text-red-200">{error}</p>}
     </header>
     {!snapshot ? <p data-testid="hf-empty" className="px-4 pb-4 text-[11px] text-slate-400">{HF_EMPTY}</p>
       : snapshot.books.length === 0 ? <p data-testid="hf-empty" className="px-4 pb-4 text-[11px] text-slate-400">{HF_EMPTY}</p>

@@ -1737,18 +1737,39 @@ def hf_refresh(feed,errors):
     return (time.perf_counter()-started)*1000
 
 def hf_end_loop(milliseconds,errors):
-    """Time budget (> 250 ms of HF work in 3 consecutive loops: hf_degraded, exits continue) and
-    STATE['hf_error'] of this loop; an HF error never stops the Lab."""
+    """The loop's one journal flush (HF_JOURNAL_V1), the time budget (HF_TIME_BUDGET_V1: > 250 ms of
+    HF work in 3 consecutive loops: hf_degraded, exits continue) and STATE['hf_error'] of this loop,
+    also counted in persistence.hf.errors; an HF error never stops the Lab."""
     if HF is None:
         return
+    started=time.perf_counter()
+    try:
+        HF.flush_journal()
+    except Exception as e:
+        errors.append(hf_error_text('journal',e))
+    milliseconds+=(time.perf_counter()-started)*1000
     try:
         HF.record_loop_time(milliseconds)
     except Exception as e:
         errors.append(hf_error_text('time_budget',e))
+    try:
+        HF.note_errors(errors)
+    except Exception:
+        pass
     if errors:
         STATE['hf_error']=' | '.join(errors)[:600]
     else:
         STATE.pop('hf_error',None)
+
+def hf_persist_error(stage,error,now):
+    """An HF failure inside persist(): appended to this loop's hf_error and counted in the HF metrics."""
+    text=hf_error_text(stage,error)
+    previous=STATE.get('hf_error')
+    STATE['hf_error']=(f'{previous} | {text}' if previous else text)[:600]
+    try:
+        HF.note_error(text,now)
+    except Exception:
+        pass
 
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
@@ -1789,14 +1810,18 @@ def persist(status='online',error=None):
     hf_view=None
     hf_metrics=None
     if HF is not None:
+        hf_now=now_ms()
         try:
-            hf_now=now_ms()
             HF.checkpoint_if_due(hf_now,force=status=='stopped')
+        except Exception as e:
+            # Published below (hf_error, persistence.hf.errors) even though the checkpoint failed.
+            hf_persist_error('checkpoint',e,hf_now)
+        try:
             STATE['activity_config']['lab_high_frequency']={**HF.config(),'running':bool(HF.loaded)}
             hf_metrics=HF.metrics()
             hf_view=HF.dashboard_view(hf_now)
         except Exception as e:
-            STATE['hf_error']=hf_error_text('persist',e)
+            hf_persist_error('persist',e,hf_now)
     else:
         STATE['activity_config']['lab_high_frequency']={**hf_lab.config_view(enabled_flag=hf_lab.enabled()),
                                                         'running':False}

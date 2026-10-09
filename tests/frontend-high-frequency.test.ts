@@ -5,8 +5,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabHighFrequencyPanel from '../src/components/LabHighFrequencyPanel';
 import {
-  HF_BADGE, HF_CAP_TEXT, HF_EMPTY, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfGapText, hfKillText, hfMoney,
-  hfSnapshotOrNull, hfStatusText, type LabHighFrequencyBook, type LabHighFrequencySnapshot,
+  HF_BADGE, HF_CAP_TEXT, HF_EMPTY, HF_ERROR_PREFIX, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfErrorText, hfGapText,
+  hfKillText, hfMoney, hfSnapshotOrNull, hfStatusText, type LabHighFrequencyBook, type LabHighFrequencySnapshot,
 } from '../src/lib/labHighFrequencyView';
 
 const book = (id: string, changes: Partial<LabHighFrequencyBook> = {}): LabHighFrequencyBook => ({
@@ -74,6 +74,24 @@ test('the fallback says there is no HF data when the key is absent or malformed'
   }
   assert.equal(hfSnapshotOrNull({ books: [] })?.books.length, 0);
   assert.equal(hfSnapshotOrNull('nope'), null);
+});
+
+test('a recent HF failure is shown above the books and nothing is shown without one', () => {
+  const failing: LabHighFrequencySnapshot = {
+    ...snapshot([book('HF_RND_E95')]),
+    last_error: { text: 'update: PermissionError: journal', at: 1, count: 4, consecutive_loops: 3 },
+  };
+  assert.equal(HF_ERROR_PREFIX, 'Грешка в HF');
+  const text = hfErrorText(failing)!;
+  assert.match(text, /^Грешка в HF: update: PermissionError: journal \(поредни цикли с грешка: 3\)/);
+  const html = renderToStaticMarkup(createElement(LabHighFrequencyPanel, { data: failing }));
+  assert.match(html, /data-testid="hf-error"/);
+  assert.match(html, /PermissionError: journal/);
+  assert.equal(hfErrorText(snapshot([book('HF_RND_E95')])), null);
+  assert.equal(hfErrorText({ last_error: { text: '' } }), null);
+  assert.equal(hfErrorText(null), null);
+  const clean = renderToStaticMarkup(createElement(LabHighFrequencyPanel, { data: snapshot([book('HF_RND_E95')]) }));
+  assert.doesNotMatch(clean, /hf-error/);
 });
 
 test('cap bar, kill evidence, gap with fee buckets and cancels never overstate', () => {

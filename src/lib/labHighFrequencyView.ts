@@ -45,6 +45,8 @@ export type LabHighFrequencyBook = {
 
 export type LabHighFrequencySnapshot = {
   version?: string; title?: string; badge?: string; updated_at?: number; loaded?: boolean; degraded?: boolean;
+  // The last HF failure while it is at most 10 minutes old (strategy_lab hf_error).
+  last_error?: { text?: string | null; at?: number | null; count?: number | null; consecutive_loops?: number | null } | null;
   notional_usd?: number; hold_seconds?: number; expected_net50_pct_per_trade?: number;
   automatic_promotion?: boolean; profitability_proven?: boolean;
   universe?: { events?: number | null; universe?: number | null; pools?: number | null };
@@ -56,6 +58,7 @@ export const HF_BADGE = 'ЕКСПЕРИМЕНТ · ОЧАКВА СЕ ЗАГУБ�
 export const HF_NOTE = 'Около 50 сделки/час на книга, $25 на сделка, изход след 2 мин. Цени: следващото опресняване на DexScreener + моделирани разходи (CALIB_V1, net50); не е изпълнима котировка. Изследването очаква ≈ −3,6% на сделка (≈ $37–44/час на книга). Измерване, не стратегия; без промоция.';
 export const HF_EMPTY = 'Няма HF данни';
 export const HF_CAP_TEXT = 'спрян до 00:00 UTC';
+export const HF_ERROR_PREFIX = 'Грешка в HF';
 
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
@@ -158,6 +161,14 @@ const closeKinds: Record<string, string> = {
 
 export function hfCloseKind(kind: string | undefined): string {
   return (kind && closeKinds[kind]) || kind || '—';
+}
+
+export function hfErrorText(snapshot: Pick<LabHighFrequencySnapshot, 'last_error'> | null): string | null {
+  const error = snapshot?.last_error;
+  if (!error || typeof error.text !== 'string' || !error.text) return null;
+  const loops = finite(error.consecutive_loops) && error.consecutive_loops > 0
+    ? ` (поредни цикли с грешка: ${error.consecutive_loops})` : '';
+  return `${HF_ERROR_PREFIX}: ${error.text}${loops}. Данните по-долу може да не са актуални.`;
 }
 
 export function hfSnapshotOrNull(data: unknown): LabHighFrequencySnapshot | null {

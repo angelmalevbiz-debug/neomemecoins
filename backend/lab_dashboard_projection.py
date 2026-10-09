@@ -231,5 +231,9 @@ def compact_strategy_lab(data):
     high_frequency = data.get('high_frequency')
     if isinstance(high_frequency, dict):
         result['high_frequency'] = high_frequency
+    # The current loop's HF failure (strategy_lab hf_error), so main's GET /state shows it.
+    hf_error = data.get('hf_error')
+    if isinstance(hf_error, str) and hf_error:
+        result['hf_error'] = hf_error[:600]
 
     return result

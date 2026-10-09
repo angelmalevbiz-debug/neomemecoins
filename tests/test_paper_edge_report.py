@@ -284,6 +284,44 @@ class HighFrequencyJournalTests(unittest.TestCase):
             with patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit):
                 edge.main(['--lab-hf', str(Path(tmp) / 'absent')])
 
+    def test_archive_dir_skips_hf_checkpoints_and_still_reads_the_ledgers(self):
+        # Review finding: reset-all archives strategy_lab_hf/ (with its state.json checkpoint) next to
+        # the engine ledgers, and an HF Lab reset archives it inside strategy_lab_hf/archive/. The
+        # documented --archive-dir scan sent those checkpoints to the engine reader and exited 2.
+        checkpoint = {'version': 'HF_CHECKPOINT_V1', 'family': 'LAB_HIGH_FREQUENCY_V1', 'seq': 7,
+                      'books': {'HF_RND_E95': {'start_balance': 1000.0, 'balance': 999.3}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            backup = Path(tmp) / 'ledgers' / 'archive'
+            write(backup / 'reset-1' / 'state.json', engine_state('S1', [engine_trade('S1', 1, -1.0)]))
+            hf_root = backup / 'reset-2' / 'strategy_lab_hf'
+            write(hf_root / 'state.json', checkpoint)
+            write_hf_journal(hf_root, [hf_close('HF_RND_E95', 1, -3.7)])
+            write(hf_root / 'archive' / 'reset-9-abcd' / 'state.json', checkpoint)
+            # A checkpoint copied out of its directory is still recognised by its version.
+            write(backup / 'loose' / 'state.json', checkpoint)
+            output = Path(tmp) / 'out' / 'edge'
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--output', str(output), '--bootstrap', '5',
+                                 '--quiet'])
+            self.assertEqual(code, 0, err)
+            self.assertIn('skipped 3 LAB_HIGH_FREQUENCY_V1 checkpoint(s)', err)
+            self.assertIn('--lab-hf', err)
+            report = json.loads(output.with_name('edge.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['engine']['by_account']['main']['closed_trades'], 1)
+            self.assertEqual(report['lab']['unique_closed_trades'], 0)
+            self.assertEqual(sorted(item['file'] for item in report['skipped_inputs']),
+                             ['loose/state.json', 'reset-2/strategy_lab_hf/archive/reset-9-abcd/state.json',
+                              'reset-2/strategy_lab_hf/state.json'])
+            self.assertIn('Skipped reset-2/strategy_lab_hf/state.json',
+                          output.with_name('edge.md').read_text(encoding='utf-8'))
+            # The HF journal of that archive is read with --lab-hf, as the note says.
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--lab-hf', str(hf_root), '--quiet'])
+            self.assertEqual(code, 0, err)
+            # Anything else that is not an engine ledger still fails the scan.
+            write(backup / 'other' / 'state.json', {'version': 'SOMETHING_ELSE'})
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('not an engine ledger', err)
+
 
 class LabAndCliTests(unittest.TestCase):
     def test_lab_books_are_deduped_and_measured_separately(self):

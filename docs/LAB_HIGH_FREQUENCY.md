@@ -157,7 +157,9 @@ window, 30 s grace).
 - An entry with no later observation within 60 s is cancelled with
   `hf_entry_no_next_observation` and its slot is released.
 - An exit with no observation within 60 s waits for the next observation and fills there
-  (`late_next_observation`), as the harness took the next point.
+  (`late_next_observation`), as the harness took the next point. So does an exit leg that
+  resolved but could not be closed (for example no network price at the fill): the slot never
+  stays EXIT_ORDERED with its pool and its $25.10 reservation held.
 - Out-of-feed held pools are marked through the existing
   `lab_position_marks.POSITION_MARK_FEED.resolve`. At most 9 HF positions can be open, within
   its limit of 16 pending refreshes.
@@ -166,14 +168,27 @@ window, 30 s grace).
   exact-pair refresh. The close is valued at the last mark minus 10%
   (`lab_forward_tests.vanished_coin`).
 - **FEED_GAP:** a held pool that comes back after more than 10 minutes is valued at
-  min(pre-gap price, return price). A return at liquidity 0 values at the return. This only
-  happens when VANISHED could not fire, for example when the shared feed was down too.
+  min(pre-gap price, return price). A return at liquidity 0 values at the return. This
+  happens when VANISHED could not fire: the shared feed was down too, or the Lab process
+  itself was down (a deploy, a watchdog recovery, a rollback).
 - A pool at liquidity 0 is valued at 0 (drain-aware exit).
 - **Restart:**
   - ORDERED slots are cancelled with reason `restart`.
-  - OPEN slots resume. An overdue exit is ordered at the first observation after the restart
-    (`late_exit_restart`).
+  - OPEN slots resume. When a slot's first observation after the restart is at most 10
+    minutes after its last mark, an overdue exit is ordered there (`late_exit_restart`).
   - EXIT_ORDERED legs keep resolving.
+  - **A longer gap** (more than 10 minutes from a slot's last mark before the stop to its
+    first observation after the restart, so in practice an outage of about 10 minutes or
+    more) closes the slot as `FEED_GAP` at min(pre-gap price, return price) at that
+    observation. The FEED_GAP rule takes precedence over `late_exit_restart`, and the
+    valuation is conservative by construction. A pool that does not come back closes as
+    `VANISHED` (last mark minus 10%) once this process has looked for it for 60 s.
+  - Such closes carry `restart_gap: true`, `restarted_at`, `restart_outage_ms` (from the
+    previous process's last checkpoint to the restart) and `gap_ms`, and show the flag
+    `restart_gap` on the dashboard. A gap that starts after the restart (the slot was marked
+    by the new process) is a real feed gap and is never flagged. The flag is a record only:
+    the closes stay in the aggregates, the cap and the kill-rule evidence, and the rescoring
+    can split them out.
 
 ### Print guard: HF_PRINT_GUARD_V1 (valuation)
 
@@ -261,9 +276,12 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
 ## Storage: HF_JOURNAL_V1 / HF_CHECKPOINT_V1
 
 - **Journal:** append-only `strategy_lab_hf/journal/<BOOK>/<YYYY-MM-DD>.jsonl` (UTC day of
-  the row). Each loop does one flush + fsync per touched file. Every state change is a row,
-  and each row carries `v`, `seq`, `book`, `cfg`, `budget`, `at` and
-  `entry_policy_version: LAB_HIGH_FREQUENCY_V1`.
+  the row). Every state change is a row, and each row carries `v`, `seq`, `book`, `cfg`,
+  `budget`, `at` and `entry_policy_version: LAB_HIGH_FREQUENCY_V1`.
+- **One flush + fsync per touched file per Lab loop:** `update` and `on_refresh` only append
+  rows; `strategy_lab.hf_end_loop` flushes them once at the end of the loop
+  (`HighFrequencyLab.flush_journal`), before `persist()` checkpoints. A kill checkpoint (at
+  500 closes, then every 250) flushes once more before it reads the journal.
 - **Row kinds:**
   - `order`: `side: entry` or `side: exit`;
   - `fill`: the entry fill;
@@ -280,6 +298,8 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   - shadows and audit: `research_fill`, `decision_print_shadow`, `print_guard`,
     `plm_v1_would_block` (at close) and `plm_v1_at_order`, `price_audit`,
     `late_exit_restart`;
+  - restart (FEED_GAP / VANISHED across a restart only): `restart_gap`, `restarted_at`,
+    `restart_outage_ms`, `gap_ms`;
   - balance: `balance_after`, `closed_at`.
 - **Checkpoint:** `strategy_lab_hf/state.json` is written atomically every 15 s when anything
   changed, and on stop (`persist('stopped')` forces it). The journal is always flushed first.
@@ -290,6 +310,11 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   - per-book aggregates, the last 20 closes and the last `seq`.
 
   It is well under 200 KB.
+- **No checkpoint over a half-applied row:** a row is journaled, then applied. When a stop
+  (the local stop marker interrupts the Lab) or an error lands between the two, the row's
+  `seq` stays in flight and no checkpoint is written, not even the forced one on stop
+  (`persistence.hf.checkpoint.skipped_in_flight` counts these). The journal still gets the
+  row, and the next load replays it from the previous checkpoint.
 - **Restart:** the container loads the checkpoint and replays journal rows with `seq` above
   the checkpoint's, in `seq` order and exactly once. It then applies the restart rules above.
   - An unreadable checkpoint is rebuilt from the whole journal.
@@ -310,8 +335,19 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   - A Lab reset flag (`NEO_STRATEGY_LAB_RESET_FLAG`) moves `journal/` and `state.json` into
     `strategy_lab_hf/archive/reset-<ms>-<id>/`.
   - `paper_state_reset.reset_all_offline` moves the whole `strategy_lab_hf/` into the reset
-    archive with a sha256 manifest and recreates it empty.
+    archive with a sha256 manifest (`directory: strategy_lab_hf`, nested file paths) and
+    recreates it empty.
   - Nothing is deleted.
+- **Restore** (Lab stopped):
+  - A reset-all archive restores with the documented command,
+    `paper_runtime.py restore --root <accounts> --archive <accounts>/archive/reset-<...> --offline`.
+    `paper_state_reset.restore_archive` sees the manifest's `directory` and verifies every
+    file's sha256 and size first (an unsafe path or a mismatch refuses before anything
+    changes). It then moves the current `strategy_lab_hf/` into a new reset archive and copies
+    the archived tree back; the archive stays intact.
+  - A Lab-reset archive (`strategy_lab_hf/archive/reset-<ms>-<id>/`) has no manifest. Move the
+    current `journal/` and `state.json` aside into a new folder under `strategy_lab_hf/archive/`,
+    then move the archived `journal/` and `state.json` back into `strategy_lab_hf/`.
 
 ## Process integration (`backend/strategy_lab.py`)
 
@@ -324,12 +360,24 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   - `HF.update` after `update_positions`;
   - `HF.on_refresh` after `maybe_open` when the refresh is due.
 
-  Each call has its own `try/except`. An error sets `STATE['hf_error']` and the Lab
-  continues.
-- **Time budget:** HF work over 250 ms in 3 consecutive loops makes HF `hf_degraded`: no new
-  orders, while exits continue. It clears at the first loop within budget.
+  - `hf_end_loop` at the end of the loop: the loop's one journal flush, the time budget and
+    the loop's errors.
+
+  Each call has its own `try/except`, and the Lab continues. An error:
+  - sets `STATE['hf_error']` for that loop, which the compact projection passes through, so
+    main's `GET /state` shows it as `strategy_lab.hf_error`;
+  - counts in `strategy_lab.persistence.hf.errors` (`count`, `last`, `last_at`,
+    `consecutive_loops`);
+  - shows above the books on the dashboard (`high_frequency.last_error`) for 10 minutes.
+- **Time budget (HF_TIME_BUDGET_V1):** HF work (update, decisions and the journal flush) over
+  250 ms in 3 consecutive loops makes HF `hf_degraded`: no new orders, while exits continue.
+  A degraded loop does no order work and is fast by construction, so degraded clears only
+  after at least 5 minutes and 30 consecutive loops within budget. Sustained slowness then
+  costs about 3 slow loops per 5 minutes. `persistence.hf.time_budget` publishes
+  `degraded_since`, `degraded_cleared_at` and `degraded_episodes`.
 - **`persist()`:**
-  - It checkpoints, forced on stop.
+  - It checkpoints, forced on stop. A checkpoint failure is reported as above, and the
+    definition, metrics and view are still published.
   - It publishes `activity_config.lab_high_frequency` (definition, hashes, budget, mismatches,
     `running`) and `persistence.hf` (loop time, journal and checkpoint writes, the refresh's
     universe counts, price-audit use and orders in the last 60 minutes).
@@ -370,7 +418,11 @@ Each book shows:
 - a cap bar and the kill evidence;
 - the gap vs the control, with its CI and within fee buckets;
 - the top-pair share and cancels by reason;
-- an expandable list of the last 10 closes.
+- an expandable list of the last 10 closes, with their flags (`entry_outlier`,
+  `exit_outlier`, `gain_capped`, `late_exit_restart`, `restart_gap`, `plm_v1_would_block`).
+
+An HF failure of the last 10 minutes is shown in red above the books
+(`Грешка в HF: <stage: error> (поредни цикли с грешка: N)`).
 
 The view is at most 16 KB. Without the key the panel shows `Няма HF данни`.
 
@@ -381,6 +433,11 @@ The view is at most 16 KB. Without the key the panel shows `Няма HF данн
     resets are skipped.
   - The report adds a `high_frequency` section: each hypothesis against the same-period
     control, with a pair-bootstrap CI and **always the within-fee-bucket gap**.
+  - `--archive-dir` skips HF checkpoints (`strategy_lab_hf/state.json`, also inside reset
+    archives, or any file versioned `HF_CHECKPOINT_V1`): they are not engine ledgers. It lists
+    them in `skipped_inputs` and on stderr; read those journals with `--lab-hf`.
+  - Closes flagged `restart_gap` are ordinary rows; split them out when a deploy fell inside
+    the window.
 - `scripts/evaluate_paper_lab.py --hf-dir DIR` measures each (book, config hash) with
   `paper_lab_metrics.measure_hf_rows`. It reports multi-slot orders per hour, closes per
   hour, the most slots held at once, cancels by reason, close kinds, cap trips and
@@ -434,17 +491,34 @@ faster.
    - `strategy_lab.activity_config.lab_high_frequency.config_hashes` equals the table above
      and the deployed `strategy-lock.json`;
    - `cost_model_mismatches` is empty and `running` is true;
+   - `strategy_lab.hf_error` is absent and `strategy_lab.persistence.hf.errors.consecutive_loops`
+     is 0 (`running` only says the container loaded; it stays true while HF calls fail);
+   - `strategy_lab.persistence.hf.refresh.at` is current (a few seconds old, like
+     `strategy_lab.updated_at`): a stale value means HF decisions stopped;
    - `strategy_lab.persistence.hf.refresh.universe` (the HF universe count per refresh) is
      above 0 once the feed runs.
 3. After the 15-minute heat warm-up, and while a book's session is open and its cap is not
    tripped, expect 40-50 orders an hour per book (`persistence.hf.orders_last_60m`).
 4. Check that `persistence.hf.journal.last_flush_ms` and `checkpoint.last_ms` stay small,
-   and that `persistence.hf.price_audit.checks_last_60s` is at most 2.
+   that `persistence.hf.checkpoint.skipped_in_flight` stays absent or 0, and that
+   `persistence.hf.price_audit.checks_last_60s` is at most 2.
 5. Rescore daily from a copy of the journal (`paper_edge_report.py --lab-hf`), and evaluate
    the gap at each kill checkpoint.
 
-To disable the family, set `NEO_LAB_HF_ENABLED=0` and restart the Lab. The journal and the
-checkpoint stay on disk, and the next enabled start resumes from them.
+**Deploys, rollbacks and redeploys** stop the Lab. ORDERED entries are cancelled as
+`restart`. Held slots resume, but if more than 10 minutes pass between a slot's last mark
+and its first observation after the restart, the slot closes as FEED_GAP (or VANISHED)
+flagged `restart_gap` (see Fills). Keep HF outages under 10 minutes where possible, and
+record the stop and start times and the affected `trade_no`s
+(`journal/<BOOK>/<day>.jsonl` rows with `restart_gap` or `reason: restart`) in the deploy
+notes. A rollback to a release without this module leaves `strategy_lab_hf/` untouched on
+disk: the next release with it resumes from the checkpoint, and the outage rule above
+applies to the held slots.
+
+To disable the family, set `NEO_LAB_HF_ENABLED=0` at User scope (see
+[PAPER_RUNBOOK.md](PAPER_RUNBOOK.md#lab-high-frequency-books-lab_high_frequency_v1)) and
+restart the Lab. The journal and the checkpoint stay on disk, and the next enabled start
+resumes from them.
 
 ## Changing the test
 

@@ -757,6 +757,7 @@ def load_state():
     # Legacy/draining cohorts must finish promotion and manage their exits;
     # authorization never turns an old TEST book into a funded trading book.
     funding=active_paper.apply_authorized_funding(books,now_ms()) if cohort_active or not stored_books else []
+    exit_changes=active_paper.apply_capacity_exit_policy(books,now_ms())
     setup=dict(raw.get('portfolio_setup') or {})
     if all(books[sid].get('starting_balance')==1000 for sid in PROMOTED_STRATEGIES):
         setup.update(total_allocated_capital_usd=4000.0,allocation_per_strategy_usd=1000.0)
@@ -768,7 +769,8 @@ def load_state():
             'strategy_lifecycle':review_strategy_lifecycle(books),
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
-            'portfolio_setup':setup or None, '_funding_requires_persist':bool(funding)}
+            'portfolio_setup':setup or None, '_funding_requires_persist':bool(funding),
+            '_exit_policy_requires_persist':bool(exit_changes)}
 
 STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
@@ -2006,10 +2008,13 @@ def main():
             setup=STATE.get('portfolio_setup') or {}
             setup['promotion_error']=str(e)[:200]
             STATE['portfolio_setup']=setup
-    if STATE.pop('_funding_requires_persist',False):
+    funding_changed=STATE.pop('_funding_requires_persist',False)
+    exits_changed=STATE.pop('_exit_policy_requires_persist',False)
+    if funding_changed or exits_changed:
         # Persist the audited credit before allowing any entry; a failed write
         # restarts fail-closed, never spends an unrecorded virtual contribution.
-        persist('starting','Owner-authorized PAPER capital contribution recorded')
+        persist('starting',('Owner-authorized PAPER capital contribution recorded' if funding_changed
+                            else 'Owner-authorized PAPER exit policy change recorded'))
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()

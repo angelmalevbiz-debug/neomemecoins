@@ -388,6 +388,7 @@ export type FundedActiveStats = {
   target_orders_per_hour: number; exposure_usd: number; daily_loss_limit_usd: number; fixed_notional_usd?: number;
   funded_capital_usd?: number; effective_position_capacity?: number;
   capacity_test?: boolean; risk_limits_shadow_only?: boolean;
+  exit_policy?: { version: string; take_profit_net_usd: number; stop_loss_net_usd: number };
 };
 
 export function fundedActiveSummary(stats?: FundedActiveStats) {
@@ -397,6 +398,7 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const capital = stats.funded_capital_usd == null ? '' : ` · внесен PAPER капитал ${usd(stats.funded_capital_usd)} (не е печалба)`;
   const capacity = stats.effective_position_capacity == null ? '' : ` · капиталов капацитет ${stats.effective_position_capacity} позиции`;
   const mode = stats.capacity_test ? 'ТЕСТ ЗАПЪЛВАНЕ — не е вход по стратегически сигнал; не доказва печалба' : 'Нова PAPER политика';
+  const exits = stats.capacity_test && stats.exit_policy ? ` · цел +${usd(stats.exit_policy.take_profit_net_usd)} нето / стоп −${usd(stats.exit_policy.stop_loss_net_usd)} нето · без кратък таймер и trailing; праговете не гарантират цена на изхода` : '';
   const limits = stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
-  return `${mode}${size}${capital} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}`;
+  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}`;
 }

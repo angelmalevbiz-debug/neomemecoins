@@ -5,7 +5,7 @@ import funded_active_paper as active_paper
 def compact_position(position):
     return {key:position[key] for key in (
         'trade_no','symbol','address','pairAddress','strategy_id','opened_at','pnl_pct','open_pnl_usd',
-        'capacity_test','strategy_validation','capacity_test_shadow',
+        'capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes',
         'notional_usd','entry_price','execution_entry_price','current_price','entry_dex_fee_usd',
         'entry_network_fee_usd','estimated_exit_fee_usd','estimated_exit_impact_pct','execution_mode',
         'execution_source','entry_policy_version','updated_at','mark_received_at','mark_source',
@@ -85,7 +85,7 @@ def compact_strategy_lab(data):
                               'exit_parameters')
             }, position, FORWARD_POSITION_FIELDS)
             position=_with_present(position,raw.get('position') or {},
-                ('capacity_test','strategy_validation','capacity_test_shadow'))
+                ('capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes'))
         else:
             position = None
         history = []
@@ -105,7 +105,7 @@ def compact_strategy_lab(data):
                               'entry_slippage_pct', 'exit_slippage_pct',
                               'entry_roundtrip_pnl_pct', 'entry_cost_cap_pct', 'stop_loss_net_pct',
                               'stop_headroom_pct', 'entry_universe_version', 'exit_policy_label')
-            }, trade, FORWARD_HISTORY_FIELDS+('capacity_test','strategy_validation','capacity_test_shadow')))
+            }, trade, FORWARD_HISTORY_FIELDS+('capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes')))
         books[key] = {
             'id': raw.get('id', key),
             'name': raw.get('name', key),

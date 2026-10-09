@@ -31,7 +31,45 @@ def atomic_json(path, data):
 def worker_snapshot(engine):
     # The parent's subprocess handle must own the process holding the journal
     # lock. This diagnostic also distinguishes a restarted worker's snapshot.
-    return {**engine.snapshot(), 'worker_pid': os.getpid()}
+    return {**engine.snapshot(), 'worker_pid': os.getpid(),
+            'journal_integrity': {'malformed_rows': engine.state.get('journal_malformed_rows', 0),
+                                  'last_bad_offset': engine.state.get('journal_last_bad_offset'),
+                                  'promotion_blocked_by_gap': bool(engine.state.get('recording_drops_total'))}}
+
+
+def consume_batch(engine, source, offset, minimum_time):
+    """Checkpoint complete corrupt rows as explicit gaps; retry incomplete tails.
+
+    Never repairs the source, fabricates a row, or treats missing data as proof.
+    The gap counter participates in the learner's existing promotion veto.
+    """
+    changed = False
+    with source.open('rb') as handle:
+        if handle.seek(0, 2) < offset:
+            offset = 0
+        handle.seek(offset)
+        for _ in range(MAX_BATCH_ROWS):
+            line = handle.readline()
+            if not line or not line.endswith(b'\n'):
+                break
+            row_offset = offset
+            offset += len(line)
+            changed = True
+            try:
+                row = json.loads(line)
+                if not isinstance(row, dict):
+                    raise ValueError('Observation is not an object')
+                available = int(row.get('available_at', 0))
+            except (ValueError, TypeError, OverflowError, UnicodeError):
+                engine.state['invalid_observations'] += 1
+                engine.state['recording_drops_total'] += 1
+                engine.state['journal_malformed_rows'] = engine.state.get('journal_malformed_rows', 0) + 1
+                engine.state['journal_last_bad_offset'] = row_offset
+                continue
+            if available < minimum_time or engine.has_seen(row.get('id')):
+                continue
+            engine.ingest(row, persist=False)
+    return offset, changed
 
 
 def follow(root, config):
@@ -64,22 +102,7 @@ def follow(root, config):
             if source.exists():
                 # Replay the durable journal after a crash; existing IDs are skipped.
                 # Partial final lines are retained for the next pass, never discarded.
-                with source.open('rb') as handle:
-                    if handle.seek(0, 2) < offset:
-                        offset = 0
-                    handle.seek(offset)
-                    for _ in range(MAX_BATCH_ROWS):
-                        line = handle.readline()
-                        if not line or not line.endswith(b'\n'):
-                            break
-                        offset += len(line)
-                        changed = True
-                        row = json.loads(line)
-                        if int(row.get('available_at', 0)) < minimum_time:
-                            continue
-                        if engine.has_seen(row.get('id')):
-                            continue
-                        engine.ingest(row, persist=False)
+                offset, changed = consume_batch(engine, source, offset, minimum_time)
             if changed:
                 # The append-only source is durable before it enters this worker.
                 # Commit the whole batch and its byte offset atomically so the

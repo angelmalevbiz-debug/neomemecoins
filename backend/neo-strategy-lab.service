@@ -8,6 +8,7 @@ Type=simple
 User=root
 WorkingDirectory=/root/neo-meme-trade
 Environment=PYTHONUNBUFFERED=1
+Environment=NEO_LAB_FUNDED_ACTIVE_ENABLED=1
 ExecStart=/usr/bin/python3 /root/neo-meme-trade/backend/strategy_lab.py
 Restart=always
 RestartSec=3

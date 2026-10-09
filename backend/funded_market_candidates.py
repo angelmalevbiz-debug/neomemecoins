@@ -9,6 +9,7 @@ from dataclasses import asdict
 from typing import Any
 
 import lab_activity as activity
+import funded_active_paper as active_paper
 
 
 VERSION = 'FUNDED_MARKET_BRANCHES_V1'
@@ -125,6 +126,8 @@ def matched_branches(strategy_id: str, coin: dict, features: dict,
     """
     if strategy_id not in FUNDED_STRATEGIES:
         return []
+    if active_paper.enabled():
+        return [active_paper.VERSION + '_' + strategy_id] if active_paper.matches(strategy_id, coin) else []
     matches = []
     if activity.RULES[strategy_id].matches(features, require_flow=require_flow):
         matches.append(strategy_id)
@@ -143,6 +146,8 @@ def _json_rule(strategy_id: str) -> dict:
 
 def candidate_config() -> dict[str, dict]:
     """Publish all branches while preserving the legacy top-level rule fields."""
+    if active_paper.enabled():
+        return active_paper.candidate_config()
     configs = {}
     for strategy_id in FUNDED_STRATEGIES:
         original = _json_rule(strategy_id)

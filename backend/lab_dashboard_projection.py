@@ -1,4 +1,15 @@
 """Small read-only dashboard projection of Strategy Lab state."""
+import funded_active_paper as active_paper
+
+
+def compact_position(position):
+    return {key:position[key] for key in (
+        'trade_no','symbol','address','pairAddress','strategy_id','opened_at','pnl_pct','open_pnl_usd',
+        'notional_usd','entry_price','execution_entry_price','current_price','entry_dex_fee_usd',
+        'entry_network_fee_usd','estimated_exit_fee_usd','estimated_exit_impact_pct','execution_mode',
+        'execution_source','entry_policy_version','updated_at','mark_received_at','mark_source',
+        'quote_status','quote_age_ms','quote_unavailable_reason','entry_roundtrip_pnl_pct','entry_cost_cap_pct',
+        'stop_loss_net_pct','stop_headroom_pct','exit_parameters','exit_policy_label') if key in position}
 
 # Scalar planning fields of a cost feasibility summary. The per-candidate
 # best_candidates list stays only on funded (PROMOTED_PAPER) books, so the
@@ -101,6 +112,8 @@ def compact_strategy_lab(data):
             'allocation_usd': raw.get('allocation_usd', raw.get('starting_balance', 0)),
             'max_position_fraction': raw.get('max_position_fraction', 1.0),
             'position': position,
+            **({'positions':[compact_position(p) for p in active_paper.positions(raw)]}
+               if isinstance(raw.get('positions'),list) else {}),
             'history': history,
             **({'runtime_compatibility': raw['runtime_compatibility']}
                if isinstance(raw.get('runtime_compatibility'), dict) else {}),
@@ -128,6 +141,7 @@ def compact_strategy_lab(data):
                     'defensive_rejected', 'defensive_entry',
                     # LAB_FORWARD_TESTS_V1: universe/signal counts and the LAB_B regime.
                     'lab_forward',
+                    'funded_active',
                 )
                 if isinstance(raw.get('entry_diagnostics'), dict)
                 and field in raw['entry_diagnostics']

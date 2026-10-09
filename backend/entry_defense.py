@@ -120,7 +120,8 @@ class DefensiveEntryLayer:
             self.evaluate_errors += 1
         self.last_error = f'{stage}:{type(exc).__name__}'
 
-    def evaluate(self, coin, now, *, blocked_pools=None, closed_history=None, heat_log_only=False) -> dict:
+    def evaluate(self, coin, now, *, blocked_pools=None, closed_history=None, heat_log_only=False,
+                 structural_parameters=None) -> dict:
         """All three vetoes for one candidate at ``now`` (ms); ``allowed`` only when none blocks.
 
         ``blocked_pools`` is a pool_loss_memory.index of the deciding ledger
@@ -130,13 +131,15 @@ class DefensiveEntryLayer:
         """
         try:
             return self._evaluate(coin, now, blocked_pools=blocked_pools, closed_history=closed_history,
-                                  heat_log_only=heat_log_only)
+                                   heat_log_only=heat_log_only, structural_parameters=structural_parameters)
         except Exception as exc:
             self._note_error('evaluate', exc)
             return error_decision(exc)
 
-    def _evaluate(self, coin, now, *, blocked_pools, closed_history, heat_log_only) -> dict:
-        structural = rug.check(coin, now, self.registry)
+    def _evaluate(self, coin, now, *, blocked_pools, closed_history, heat_log_only,
+                  structural_parameters=None) -> dict:
+        structural = (rug.check(coin, now, self.registry) if structural_parameters is None else
+                      rug.check(coin, now, self.registry, params=structural_parameters))
         loss = pool_loss_memory.check(coin, now, history=closed_history, blocked=blocked_pools)
         heat = heat_veto.evaluate(coin, now, self.history, log_only=heat_log_only)
         reasons = (list(structural['reasons']) if structural['blocked'] else []) + list(loss['reasons'])

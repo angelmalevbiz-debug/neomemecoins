@@ -177,6 +177,11 @@ export function partitionLabStrategies<T extends ViewBook>(books: T[], stats: Re
 }
 
 const reasons: Record<string, string> = {
+  funded_active_daily_loss_limit: 'Дневният лимит за PAPER загуба е достигнат',
+  funded_active_marks_unavailable: 'Чака прясна оценка на отворените позиции',
+  funded_active_slots_full: 'Всички паралелни PAPER позиции са заети',
+  funded_active_hourly_order_limit: 'Лимитът от 50 нови входа за час е достигнат',
+  funded_active_exposure_limit: 'Няма свободен капитал в лимита за експозиция',
   no_market_signal: 'Няма пазарен сигнал по правилата',
   promoted_verified_flow_unavailable: 'Чака пресен потвърден поток',
   promoted_verified_flow_stale: 'Потвърденият поток е остарял',
@@ -206,7 +211,7 @@ const reasons: Record<string, string> = {
   rug_young_pool: 'Pool-ът е по-млад от 12 часа',
   rug_fake_market_cap: 'Надута капитализация (>= $20M) при ликвидност под 2%',
   rug_ticker_reuse: 'Тикерът вече е използван от друг mint',
-  rug_ticker_registry_warming: 'Регистърът на тикерите наблюдава пазара под 24 ч.: токен под 14 дни чака',
+  rug_ticker_registry_warming: 'Регистърът на тикерите още няма достатъчна непрекъсната история',
   pool_loss_cooldown: 'Пауза 6 ч. след 2 поредни загуби в същия pool',
   heat_history_warming: 'Историята на pool-а още не покрива прозорците на проверката (5/15/60 мин. след рестарт)',
   heat_input_unknown: 'Липсва текуща цена за проверка на прегряване',
@@ -375,4 +380,16 @@ export function quoteFailureStatus(code?: string) {
 
 export function labEntryStatus(book: EntryViewBook, backendAvailable = true) {
   return labEntryView(book, backendAvailable).status;
+}
+
+export type FundedActiveStats = {
+  version: string; trades: number; wins: number; win_rate: number | null; net_pnl_usd: number;
+  orders_last_60m: number; closed_last_60m: number; open_positions: number; max_positions: number;
+  target_orders_per_hour: number; exposure_usd: number; daily_loss_limit_usd: number;
+};
+
+export function fundedActiveSummary(stats?: FundedActiveStats) {
+  if (!stats) return null;
+  const win = stats.win_rate == null ? 'няма затворени сделки' : `${stats.win_rate.toFixed(1)}% печеливши`;
+  return `Нова PAPER политика · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions} · цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
 }

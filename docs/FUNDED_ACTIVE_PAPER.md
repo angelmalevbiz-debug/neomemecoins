@@ -22,17 +22,28 @@ less continuity evidence for bounded PAPER research, not LIVE safety proof. The 
 only applies these scoped age/continuity thresholds for a matching active hypothesis; this supplies
 observations, never permission for main or a personal engine to trade.
 
+The owner subsequently authorized a separately audited virtual capital
+contribution to **$1,000 contributed per strategy**. The Windows launcher sets
+`NEO_LAB_AUTHORIZED_CAPITAL_USD=1000`: startup credits the difference from prior
+contributed capital once, records `funding_events`, and persists before entries.
+Trading losses are never replenished on restart. Prior histories, open lots and
+realized dollar P&L are preserved; totals exclude capital contributions from profit.
+The four ledgers now total $4,000 contributed, not $4,000 profit or guaranteed cash.
+No external wallet or real-money account is involved. This opt-in is not added
+to unrelated Linux accounts.
+
 The owner requested larger entries: exactly $100, without a $25 fallback,
 and at most 50% of the current book balance per entry. At most four concurrent
 exact-pool positions and 50% total committed exposure, no leverage. With the
-existing $201–250 balances this normally means **one $100 position**, not four.
+initial $201–250 balances this meant one $100 position, not four. The authorized
+contribution now supplies capacity for four, subject to losses and risk budgets.
 Insufficient remaining exposure blocks entry instead of buying a small remainder.
 V1/V2 positions retain frozen exits; prior active losses and orders still consume
 daily/hourly risk limits and losing-run cooldown. V3 performance is reported separately.
 Existing positions
 consume capacity; duplicate mint entries in a book are prohibited. Each book
-has a rolling cap of 50 new orders/hour (not a minimum). Four-minute maximum
-holding time creates capacity for that order target; market evidence, RPC
+has a rolling cap of 50 new orders/hour (not a minimum). Four slots with a four-minute
+holding time supply concurrency for that target; one slot did not. Market evidence, RPC
 coverage, safety, cost and risk gates can still yield fewer entries.
 
 Fresh confirmed exact-pool flow, fresh completed full same-pool safety and

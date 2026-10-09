@@ -17,6 +17,8 @@ import funded_market_candidates as candidates
 from lab_dashboard_projection import compact_strategy_lab
 from tape_pool_scheduler import TapePoolScheduler, lab_pin_positions
 
+REAL_HEAT_EVALUATE=entry_defense.heat_veto.evaluate
+
 NOW = 1_800_000_000_000
 MINT = 'BrUimx7KncgRNTggAdZdaX2s5XUqQyR6XMRmEg4mpump'
 PAIR = '8t34p7n94man8wcmFdHedYkJaWEhA9nKGJMLZyZUzbn'
@@ -177,6 +179,23 @@ class ActivePolicyTests(unittest.TestCase):
             with patch.object(lab, 'STATE', {'books': {sid: b}}), patch.object(lab, 'STRATEGIES', [s]):
                 c = coin(); lab.maybe_open([c], flows([c]))
                 self.assertIsNotNone(b['position'], sid)
+
+    def test_all_named_books_have_a_path_through_real_heat_not_just_a_mock(self):
+        # Synthetic unit fixture only: proves logical reachability, not live
+        # market availability, achieved frequency or profitable performance.
+        c=coin(priceChange={'m5':1.2,'h1':5,'h6':10,'h24':20},
+               txns={'m5':{'buys':42,'sells':20}},volume={'m5':4500,'h1':60_000},
+               sources=['pumpswap-address-catalog'])
+        for stamp in range(NOW-960_000,NOW+1,60_000):
+            self.layer.history.observe([{**c,'updatedAt':stamp}],stamp)
+        with patch.object(entry_defense.heat_veto,'evaluate',side_effect=REAL_HEAT_EVALUATE):
+            for sid in active.RULES:
+                strategy={'id':sid,'name':sid};b=lab.empty_book(strategy)
+                b['portfolio_group']='PROMOTED_PAPER'
+                with patch.object(lab,'STATE',{'books':{sid:b}}),patch.object(lab,'STRATEGIES',[strategy]):
+                    lab.maybe_open([c],flows([c]))
+                self.assertIsNotNone(b['position'],(sid,b.get('entry_diagnostics')))
+                self.assertFalse(b['position']['defensive_entry']['heat_veto']['vetoed'])
 
     def test_four_slots_are_real_and_duplicate_mints_never_fill_them(self):
         self.book['balance'] = 1000

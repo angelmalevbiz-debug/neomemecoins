@@ -110,6 +110,8 @@ def compact_strategy_lab(data):
             'balance': raw.get('balance', 0),
             'portfolio_group': raw.get('portfolio_group', 'TEST'),
             'allocation_usd': raw.get('allocation_usd', raw.get('starting_balance', 0)),
+            'initial_starting_balance_usd':raw.get('initial_starting_balance_usd',raw.get('starting_balance',0)),
+            'funding_events':raw.get('funding_events',[]),
             'max_position_fraction': raw.get('max_position_fraction', 1.0),
             'position': position,
             **({'positions':[compact_position(p) for p in active_paper.positions(raw)]}

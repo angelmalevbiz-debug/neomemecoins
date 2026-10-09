@@ -14,6 +14,8 @@ import structural_rug_guard as rug
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
 MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
+FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
+FUNDING_VERSION = 'USER_AUTHORIZED_PAPER_CAPITAL_1000_20261009'
 MAX_SLOTS = 4
 MAX_NOTIONAL_USD = 100.0
 MIN_NOTIONAL_USD = 100.0
@@ -43,6 +45,53 @@ def enabled():
 
 def applies(book):
     return enabled() and book.get('id') in RULES and book.get('portfolio_group') == 'PROMOTED_PAPER'
+
+
+def apply_authorized_funding(books, now):
+    """One audited virtual top-up, never replenishment of trading losses.
+
+    Explicitly enabled only by the owner-authorized local launcher. Validate
+    the entire cohort before any credit; preserve histories and open lots.
+    Restart uses total contributed capital, never a target cash balance.
+    """
+    target = os.getenv(FUNDING_ENV)
+    if target is None:
+        return []
+    if target != '1000' or not enabled():
+        raise ValueError('Unsupported or disabled PAPER capital authorization')
+    plan = []
+    for sid in RULES:
+        book = books.get(sid)
+        if (not isinstance(book, dict) or book.get('id') != sid
+                or book.get('portfolio_group') != 'PROMOTED_PAPER'):
+            raise ValueError('Capital authorization requires the complete funded PAPER cohort')
+        contributed = finite(book.get('starting_balance'), math.nan)
+        balance = finite(book.get('balance'), math.nan)
+        events = book.get('funding_events', [])
+        if (not math.isfinite(contributed) or not 0 < contributed <= 1000
+                or not math.isfinite(balance) or balance < 0 or not isinstance(events, list)
+                or not all(isinstance(e, dict) for e in events)):
+            raise ValueError('Invalid PAPER funding ledger')
+        previous = [e for e in events if e.get('id') == FUNDING_VERSION]
+        if len(previous) > 1 or (previous and contributed != 1000):
+            raise ValueError('Inconsistent PAPER funding authorization')
+        if contributed < 1000:
+            if previous:
+                raise ValueError('Refusing repeated PAPER capital credit')
+            plan.append((book, 1000-contributed, contributed, balance, events))
+    applied = []
+    for book, amount, contributed, balance, events in plan:
+        event = dict(id=FUNDING_VERSION, strategy_id=book['id'],
+                     kind='PAPER_CAPITAL_CONTRIBUTION', amount_usd=amount,
+                     at=int(now), contributed_before_usd=contributed, contributed_after_usd=1000.0,
+                     balance_before_usd=balance, balance_after_usd=balance+amount,
+                     real_money=False, profit=False, history_reset=False)
+        book.setdefault('initial_starting_balance_usd', contributed)
+        book['funding_events'] = [*events, event]
+        book['balance'] = balance+amount
+        book['starting_balance'] = book['allocation_usd'] = 1000.0
+        applied.append({'strategy_id':book['id'], **event})
+    return applied
 
 
 def finite(value, default=0.0):
@@ -184,6 +233,9 @@ def capacity(book, now):
               'funded_active_hourly_order_limit' if orders >= ORDERS_PER_HOUR else
               'funded_active_exposure_limit' if free < MIN_NOTIONAL_USD else None)
     return dict(open_positions=len(rows), max_positions=MAX_SLOTS, exposure_usd=round(exposure, 6),
+                funded_capital_usd=finite(book.get('starting_balance')),
+                fixed_notional_usd=MAX_NOTIONAL_USD,
+                effective_position_capacity=min(MAX_SLOTS, int(balance*MAX_EXPOSURE_FRACTION//MAX_NOTIONAL_USD)),
                 available_exposure_usd=free, orders_last_60m=orders, target_orders_per_hour=ORDERS_PER_HOUR,
                 daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=daily_budget, blocked_reason=reason)
 

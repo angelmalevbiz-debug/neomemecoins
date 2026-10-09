@@ -740,7 +740,7 @@ def load_state():
             b['max_position_fraction']=1.0
         elif s['id'] in PROMOTED_STRATEGIES and (cohort_active or existing is None):
             b['portfolio_group']='PROMOTED_PAPER'
-            b['allocation_usd']=PROMOTED_ALLOCATION
+            b['allocation_usd']=num(b.get('starting_balance'),PROMOTED_ALLOCATION)
             b['max_position_fraction']=PROMOTED_MAX_POSITION_FRACTION
         elif s['id'] in PROMOTED_STRATEGIES:
             b['portfolio_group']='TEST'
@@ -753,13 +753,21 @@ def load_state():
         active_paper.synchronize_alias(b)
         books[s['id']]=b
     compatibility=registry_compatibility(books)
+    # Legacy/draining cohorts must finish promotion and manage their exits;
+    # authorization never turns an old TEST book into a funded trading book.
+    funding=active_paper.apply_authorized_funding(books,now_ms()) if cohort_active or not stored_books else []
+    setup=dict(raw.get('portfolio_setup') or {})
+    if all(books[sid].get('starting_balance')==1000 for sid in PROMOTED_STRATEGIES):
+        setup.update(total_allocated_capital_usd=4000.0,allocation_per_strategy_usd=1000.0)
+        if not stored_books:
+            setup.update(version='PROMOTED_PAPER_COHORT_V1',status='ACTIVE')
     return {'started_at':now_ms() if reset_requested else (raw.get('started_at') or now_ms()),
             'updated_at':now_ms(),'status':'starting','books':books,
             'stats':raw.get('stats') or {},'registry_compatibility':compatibility,
             'strategy_lifecycle':review_strategy_lifecycle(books),
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
-            'portfolio_setup':raw.get('portfolio_setup')}
+            'portfolio_setup':setup or None, '_funding_requires_persist':bool(funding)}
 
 STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
@@ -1956,8 +1964,11 @@ def persist(status='online',error=None):
         'version':'PROMOTED_PAPER_COHORT_V1',
         'status':previous_setup.get('status') or default_setup_status,
         'group':'PROMOTED_PAPER',
-        'total_allocated_capital_usd':PROMOTED_TOTAL_CAPITAL,
-        'allocation_per_strategy_usd':PROMOTED_ALLOCATION,
+        'total_allocated_capital_usd':sum(num(STATE['books'][key].get('allocation_usd'),PROMOTED_ALLOCATION)
+                                        for key in PROMOTED_STRATEGIES),
+        'allocation_per_strategy_usd':(num(STATE['books'][PROMOTED_STRATEGIES[0]].get('allocation_usd'),PROMOTED_ALLOCATION)
+            if len({num(STATE['books'][key].get('allocation_usd'),PROMOTED_ALLOCATION)
+                    for key in PROMOTED_STRATEGIES})==1 else None),
         'max_position_fraction':PROMOTED_MAX_POSITION_FRACTION,
         'strategies':list(PROMOTED_STRATEGIES),
         'accounts_are_independent':True,
@@ -1991,6 +2002,10 @@ def main():
             setup=STATE.get('portfolio_setup') or {}
             setup['promotion_error']=str(e)[:200]
             STATE['portfolio_setup']=setup
+    if STATE.pop('_funding_requires_persist',False):
+        # Persist the audited credit before allowing any entry; a failed write
+        # restarts fail-closed, never spends an unrecorded virtual contribution.
+        persist('starting','Owner-authorized PAPER capital contribution recorded')
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()

@@ -150,6 +150,7 @@ $settings = @{
     # Spread the existing 48-transaction body budget over four market candidates.
     # Candidate-first ranking avoids spending coverage on busy pools the entry policy would reject.
     # Pools outside this bounded set have unavailable flow until monitored.
+    NEO_LAB_AUTHORIZED_CAPITAL_USD='1000';
     NEO_TAPE_MAX_PAIRS='4'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
     NEO_TAPE_TX_PER_POLL='48'; NEO_TAPE_HISTORICAL_TX_PER_POLL='1'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');

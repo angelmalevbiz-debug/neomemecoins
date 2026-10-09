@@ -230,6 +230,16 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(len(answers),10)
         self.assertEqual([len(payload) for payload in posted],[4,4,2])
 
+    def test_rpc_timeout_is_bounded_and_configurable_in_transport(self):
+        seen=[]
+        class Response:
+            def raise_for_status(self): return None
+            def json(self): return [{'id':1,'result':[]}]
+        def post(_url,*,json,timeout): seen.append(timeout); return Response()
+        with patch.object(tape,'RPC_TIMEOUT_SECONDS',3.0),patch.object(tape.SESSION,'post',side_effect=post):
+            tape.rpc_batch([('getSignaturesForAddress',['pair',{}])])
+        self.assertEqual(seen,[(1.5,3.0)])
+
     def test_get_transaction_respects_single_call_public_rpc_contract(self):
         posted=[]
         class Response:

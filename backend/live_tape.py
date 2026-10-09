@@ -31,6 +31,7 @@ MAX_TRACK_ACTIVITY = max(MIN_TRACK_ACTIVITY,int(os.getenv('NEO_TAPE_MAX_TXNS_M5'
 PAGE_BUDGET = max(1,int(os.getenv('NEO_TAPE_PAGES_PER_POLL','1')))
 TX_BUDGET = max(1,int(os.getenv('NEO_TAPE_TX_PER_POLL','10')))
 RPC_BATCH_SIZE = max(1,int(os.getenv('NEO_TAPE_RPC_BATCH_SIZE','20')))
+RPC_TIMEOUT_SECONDS = max(1.0,min(15.0,float(os.getenv('NEO_TAPE_RPC_TIMEOUT_SECONDS','4.0'))))
 GET_TRANSACTION_WORKERS = max(1,min(4,int(os.getenv('NEO_TAPE_GET_TRANSACTION_WORKERS','2'))))
 WINDOW_MS = 300_000
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
@@ -174,7 +175,7 @@ def rpc_batch(calls):
         return answers
     payload = [{'jsonrpc':'2.0','id':i+1,'method':method,'params':params} for i,(method,params) in enumerate(calls)]
     try:
-        response = SESSION.post(RPC_URL,json=payload,timeout=15)
+        response = SESSION.post(RPC_URL,json=payload,timeout=(1.5,RPC_TIMEOUT_SECONDS))
         response.raise_for_status()
         return align_rpc_answers(calls,response.json())
     except (requests.RequestException,RuntimeError,ValueError):

@@ -614,7 +614,7 @@ class TapePoolScheduler:
             # planning estimate because canonical/noncanonical fees can differ.
             main_cost = feasibility.execution_feasibility(
                 coin, main_cost_cap, base_slippage_bps=0, latency_buffer_bps=0)
-            funded_cap=(max(active_paper.RULES[sid]['cost'] for sid in funded_rules)
+            funded_cap=(max(active_paper.entry_cost_limit(sid) for sid in funded_rules)
                         if active_paper.enabled() and funded_rules else 1.5)
             funded_cost = feasibility.execution_feasibility(coin, funded_cap)
             matched = bool(main_rules or funded_rules)

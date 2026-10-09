@@ -12,10 +12,13 @@ from dataclasses import replace
 import structural_rug_guard as rug
 
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
+QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V4_QUALITY_100'
+QUALITY_EXIT_VERSION = 'PAPER_QUALITY_EXIT_V1_NET30_STOP5'
+QUALITY_ENV = 'NEO_LAB_QUALITY_ENABLED'
 CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
 CAPACITY_EXIT_VERSION = 'PAPER_CAPACITY_EXIT_V2_NET30_STOP10'
 CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
-MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
+MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION, QUALITY_VERSION,
                               CAPACITY_TEST_VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
@@ -49,12 +52,55 @@ def enabled():
 
 def capacity_test_enabled():
     # Never selected implicitly or in LIVE, even if a shell inherits the flag.
-    return (enabled() and os.getenv(CAPACITY_TEST_ENV)=='1' and os.getenv('NEO_ENGINE_MODE')=='PAPER'
+    return (enabled() and not quality_enabled() and os.getenv(CAPACITY_TEST_ENV)=='1' and os.getenv('NEO_ENGINE_MODE')=='PAPER'
+            and os.getenv('NEO_EXECUTION_MODE','PAPER')=='PAPER')
+
+
+def quality_enabled():
+    # If both flags are inherited, quality wins: load-test bypasses cannot run.
+    return (enabled() and os.getenv(QUALITY_ENV)=='1' and os.getenv('NEO_ENGINE_MODE')=='PAPER'
             and os.getenv('NEO_EXECUTION_MODE','PAPER')=='PAPER')
 
 
 def reporting_version():
-    return CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
+    return QUALITY_VERSION if quality_enabled() else CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
+
+
+def entry_cost_limit(strategy_id):
+    return min(RULES[strategy_id]['cost'], 1.5) if quality_enabled() else RULES[strategy_id]['cost']
+
+
+def quality_admission(coin, features, now, books):
+    """Additional prospective guards, never a fitted win-probability score.
+
+    Existing market, full defense, exact-pool flow/safety/price and cost gates
+    remain mandatory. Strength of flow is scaled to the fixed $100 order;
+    four copies of one pool are one exposure, not four independent signals.
+    Closed losing pools across the cohort rest for 30 minutes before re-entry.
+    """
+    if not quality_enabled():
+        return {'allow': True, 'reason': None}
+    flow = features.get('verified_flow') or {}
+    trades, wallets, buys, sells = [finite(flow.get(k), math.nan) for k in
+                                  ('trades', 'unique_wallets', 'buy_usd', 'sell_usd')]
+    if (not all(math.isfinite(v) for v in (trades, wallets, buys, sells))
+            or trades != int(trades) or wallets != int(wallets) or trades < 6 or wallets < 4
+            or min(buys, sells) < 0 or buys < 3*MAX_NOTIONAL_USD
+            or buys-sells < MAX_NOTIONAL_USD or buys < 1.5*max(sells, 1.0)):
+        return {'allow': False, 'reason': 'quality_buy_flow_too_small'}
+    for book in books.values():
+        if not applies(book):
+            continue
+        def same_market(row):
+            return (row.get('address') == coin.get('address') or
+                    row.get('pairAddress') == coin.get('pairAddress'))
+        if any(same_market(p) for p in positions(book)):
+            return {'allow': False, 'reason': 'quality_correlated_position'}
+        for trade in book.get('history') or []:
+            age = now-finite(trade.get('closed_at'), -math.inf)
+            if same_market(trade) and 0 <= age < 30*60_000 and finite(trade.get('pnl_usd')) <= 0:
+                return {'allow': False, 'reason': 'quality_pool_loss_pause'}
+    return {'allow': True, 'reason': None}
 
 
 def applies(book):
@@ -255,9 +301,18 @@ def capacity(book, now):
 
 
 def exit_parameters(strategy_id):
+    if quality_enabled():
+        return quality_exit_parameters()
     return dict(version=VERSION, stop_loss_net_pct=RULES[strategy_id]['stop'],
                 take_profit_net_pct=6.0 if strategy_id == 'EARLY' else 4.0,
                 max_hold_minutes=4.0, profit_trail_arm_net_pct=2.0, profit_trail_drawdown_pct=1.0)
+
+
+def quality_exit_parameters():
+    # New lots only. Keep the requested $30 net target, halve the $10 loss
+    # budget. A stop is a trigger, not a guaranteed fill (losses are unclamped).
+    return {**capacity_exit_parameters(MAX_NOTIONAL_USD), 'version':QUALITY_EXIT_VERSION,
+            'stop_loss_net_usd':5.0, 'stop_loss_net_pct':5.0}
 
 
 def capacity_exit_parameters(notional_usd=MAX_NOTIONAL_USD):
@@ -310,17 +365,18 @@ def apply_capacity_exit_policy(books, now):
 
 def exit_reason(position, net_pct, hold_minutes):
     exits = position['exit_parameters']
-    if exits.get('version') == CAPACITY_EXIT_VERSION:
+    if exits.get('version') in {CAPACITY_EXIT_VERSION, QUALITY_EXIT_VERSION}:
         # Dollar target, not a gross price move or a percentage of a changed
         # account balance. Peak PnL and elapsed time cannot cause an early exit.
         notional = finite(position.get('notional_usd'), math.nan)
         net_usd = finite(net_pct, math.nan) * notional / 100
         if not math.isfinite(net_usd) or notional <= 0:
             return None
+        prefix = 'QUALITY' if exits['version'] == QUALITY_EXIT_VERSION else 'CAPACITY_TEST'
         if net_usd <= -exits['stop_loss_net_usd']:
-            return 'CAPACITY_TEST_STOP_NET_USD'
+            return prefix+'_STOP_NET_USD'
         if net_usd >= exits['take_profit_net_usd']:
-            return 'CAPACITY_TEST_TAKE_PROFIT_NET_USD'
+            return prefix+'_TAKE_PROFIT_NET_USD'
         return None
     if net_pct <= -exits['stop_loss_net_pct']:
         return 'FUNDED_ACTIVE_STOP_NET'
@@ -339,7 +395,14 @@ def performance(book, now):
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
     policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
     return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': MAX_NOTIONAL_USD,
-            **({'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
+            **({'exit_policy':quality_exit_parameters()} if quality_enabled() else
+               {'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
+            'quality_mode':quality_enabled(), 'entry_cost_limit_pct':entry_cost_limit(book['id']),
+            'legacy_open_positions':sum(p.get('entry_policy_version')!=reporting_version() for p in positions(book)),
+            'legacy_closed_trades':sum(t.get('entry_policy_version')!=reporting_version() for t in book.get('history',[])),
+            'legacy_net_pnl_usd':round(sum(finite(t.get('pnl_usd')) for t in book.get('history',[])
+                                         if t.get('entry_policy_version')!=reporting_version()),4),
+            'open_net_pnl_usd':round(sum(finite(p.get('open_pnl_usd')) for p in positions(book)),4),
             'capacity_test':capacity_test_enabled(), 'strategy_validation':False,
             'risk_limits_shadow_only':capacity_test_enabled(),
             'strategy_policy_version':VERSION,
@@ -353,12 +416,25 @@ def performance(book, now):
 
 
 def candidate_config():
-    return {sid: {**rule, 'candidate_branches': [{'id': VERSION + '_' + sid,
-            'constraints': dict(rule), 'score_is_admission_gate': False}]} for sid, rule in RULES.items()}
+    result = {}
+    for sid, rule in RULES.items():
+        effective = {**rule, 'cost':entry_cost_limit(sid),
+                     'stop':5.0 if quality_enabled() else rule['stop']}
+        result[sid] = {**effective, 'candidate_branches':[{'id':reporting_version()+'_'+sid,
+                       'constraints':dict(effective), 'score_is_admission_gate':False}]}
+    return result
 
 
 def config():
     return dict(version=reporting_version(), enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
+                quality_enabled=quality_enabled(),quality_version=QUALITY_VERSION,
+                quality_rules={'maximum_roundtrip_cost_pct':1.5,'minimum_confirmed_30s_trades':6,
+                    'minimum_confirmed_30s_wallets':4,'minimum_confirmed_30s_buy_usd':300,
+                    'minimum_confirmed_30s_net_buy_usd':100,'minimum_buy_sell_usd_ratio':1.5,
+                    'cohort_duplicate_mint_or_pool_allowed':False,'cohort_loss_pause_minutes':30,
+                    'market_flow_defense_safety_price_cost_and_daily_limits_required':True,
+                    'force_fill':False,'exits_apply_to_new_lots_only':True,
+                    'evidence_status':'PROSPECTIVE_UNVALIDATED_NOT_FITTED_TO_WINNERS'},
                 capacity_test_enabled=capacity_test_enabled(),capacity_test_version=CAPACITY_TEST_VERSION,
                 capacity_test_exits=capacity_exit_parameters(),
                 capacity_test_rules={'target_total_slots':16,'notional_usd':100,'minimum_liquidity_usd':50_000,

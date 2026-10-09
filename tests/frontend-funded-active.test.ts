@@ -65,3 +65,28 @@ test('capacity test exit summary shows net dollar target and stop without claimi
   assert.match(text!,/праговете не гарантират цена на изхода/);
   assert.match(text!,/не доказва печалба/);
 });
+
+test('quality separates old losses and open marks from unproven current-policy outcomes', () => {
+  const text=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V4_QUALITY_100',quality_mode:true,
+    entry_cost_limit_pct:1.5,legacy_closed_trades:23,legacy_net_pnl_usd:-70.88,
+    legacy_open_positions:4,open_net_pnl_usd:2,
+    exit_policy:{version:'PAPER_QUALITY_EXIT_V1_NET30_STOP5',take_profit_net_usd:30,stop_loss_net_usd:5},
+    trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,
+    open_positions:4,max_positions:4,target_orders_per_hour:50,exposure_usd:400,daily_loss_limit_usd:50});
+  assert.match(text!,/PAPER КАЧЕСТВО/);
+  assert.match(text!,/без принудително запълване/);
+  assert.match(text!,/нови позиции: цел \+\$30\.00 нето \/ стоп −\$5\.00 нето/);
+  assert.match(text!,/23 затворени, нето −\$70\.88/);
+  assert.match(text!,/отворен PnL \$2\.00 \(не е прибрана печалба\)/);
+  assert.match(text!,/няма затворени сделки/);
+  assert.match(text!,/дневен лимит загуба/);
+  assert.doesNotMatch(text!,/не спират теста/);
+});
+
+test('quality admission rejects small flow, correlated lots and repeated losing pools with readable reasons', () => {
+  for (const [reason,text] of [['quality_buy_flow_too_small','твърде слаб'],
+    ['quality_correlated_position','друга PAPER сметка'],['quality_pool_loss_pause','30 минути']]) {
+    assert.ok(labEntryStatus({id:'EARLY',starting_balance:1000,balance:950,
+      entry_diagnostics:{blocked_reason:reason}}).includes(text));
+  }
+});

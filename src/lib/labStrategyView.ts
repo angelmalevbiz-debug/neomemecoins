@@ -187,6 +187,9 @@ const reasons: Record<string, string> = {
   promoted_verified_flow_stale: 'Потвърденият поток е остарял',
   promoted_buy_pressure_unconfirmed: 'Няма потвърден натиск от купувачи',
   promoted_recent_loss_cooldown: 'Пауза след скорошна загуба',
+  quality_buy_flow_too_small: 'Потвърденият купувачески поток е твърде слаб за вход $100',
+  quality_correlated_position: 'Този токен или pool вече е отворен в друга PAPER сметка',
+  quality_pool_loss_pause: 'Пауза 30 минути след загуба в този pool',
   promoted_safety_unknown: 'Чака завършена проверка за безопасност',
   promoted_safety_not_fresh_pass: 'Чака прясна проверка за безопасност',
   promoted_safety_unavailable: 'Чака прясна пълна проверка за безопасност',
@@ -388,6 +391,9 @@ export type FundedActiveStats = {
   target_orders_per_hour: number; exposure_usd: number; daily_loss_limit_usd: number; fixed_notional_usd?: number;
   funded_capital_usd?: number; effective_position_capacity?: number;
   capacity_test?: boolean; risk_limits_shadow_only?: boolean;
+  quality_mode?: boolean; entry_cost_limit_pct?: number;
+  legacy_open_positions?: number; legacy_closed_trades?: number; legacy_net_pnl_usd?: number;
+  open_net_pnl_usd?: number;
   exit_policy?: { version: string; take_profit_net_usd: number; stop_loss_net_usd: number };
 };
 
@@ -397,8 +403,10 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const size = stats.fixed_notional_usd == null ? '' : ` · вход ${usd(stats.fixed_notional_usd)}, без намаляване`;
   const capital = stats.funded_capital_usd == null ? '' : ` · внесен PAPER капитал ${usd(stats.funded_capital_usd)} (не е печалба)`;
   const capacity = stats.effective_position_capacity == null ? '' : ` · капиталов капацитет ${stats.effective_position_capacity} позиции`;
-  const mode = stats.capacity_test ? 'ТЕСТ ЗАПЪЛВАНЕ — не е вход по стратегически сигнал; не доказва печалба' : 'Нова PAPER политика';
-  const exits = stats.capacity_test && stats.exit_policy ? ` · цел +${usd(stats.exit_policy.take_profit_net_usd)} нето / стоп −${usd(stats.exit_policy.stop_loss_net_usd)} нето · без кратък таймер и trailing; праговете не гарантират цена на изхода` : '';
+  const mode = stats.quality_mode ? 'PAPER КАЧЕСТВО — само потвърдени сигнали; без принудително запълване; печалба не е доказана'
+    : stats.capacity_test ? 'ТЕСТ ЗАПЪЛВАНЕ — не е вход по стратегически сигнал; не доказва печалба' : 'Нова PAPER политика';
+  const exits = stats.exit_policy ? ` · ${stats.quality_mode ? 'нови позиции: ' : ''}цел +${usd(stats.exit_policy.take_profit_net_usd)} нето / стоп −${usd(stats.exit_policy.stop_loss_net_usd)} нето · без кратък таймер и trailing; праговете не гарантират цена на изхода` : '';
+  const quality = stats.quality_mode ? ` · разходи до ${stats.entry_cost_limit_pct?.toFixed(2) ?? '1.50'}% · един токен само в една сметка · стари позиции ${stats.legacy_open_positions ?? 0} (запазени изходи) · история преди тази политика: ${stats.legacy_closed_trades ?? 0} затворени, нето ${usd(stats.legacy_net_pnl_usd ?? 0)} · отворен PnL ${usd(stats.open_net_pnl_usd ?? 0)} (не е прибрана печалба)` : '';
   const limits = stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
-  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}`;
+  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}${quality}`;
 }

@@ -5,7 +5,7 @@ import funded_active_paper as active_paper
 def compact_position(position):
     return {key:position[key] for key in (
         'trade_no','symbol','address','pairAddress','strategy_id','opened_at','pnl_pct','open_pnl_usd',
-        'capacity_test','strategy_validation','capacity_test_shadow','exit_policy_changes',
+        'capacity_test','quality_mode','strategy_validation','capacity_test_shadow','exit_policy_changes',
         'notional_usd','entry_price','execution_entry_price','current_price','entry_dex_fee_usd',
         'entry_network_fee_usd','estimated_exit_fee_usd','estimated_exit_impact_pct','execution_mode',
         'execution_source','entry_policy_version','updated_at','mark_received_at','mark_source',

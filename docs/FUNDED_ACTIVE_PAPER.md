@@ -1,9 +1,56 @@
 # Named strategy PAPER repair — 2026-10-09
 
-## Owner-requested capacity test (current Windows mode)
+## Quality-first prospective test (current Windows mode)
+
+The owner's subsequent request was to analyze losses/wins and optimize net
+outcomes, with discretion over risk. The Windows launcher now selects
+`NEO_LAB_QUALITY_ENABLED=1`, `NEO_LAB_CAPACITY_TEST_ENABLED=0` and PAPER mode:
+**FUNDED_ACTIVE_PAPER_V4_QUALITY_100**. Quality takes precedence if both flags
+are inherited. Neither opt-in can select its policy in LIVE mode.
+
+The read-only [outcome audit](PAPER_OUTCOME_AUDIT_20261009.md) found 106 load-test
+closes, zero winners, -$290.0473 net, and zero passes of the shadow confirmed
+flow gate. This supports ending forced fills, not an assertion that any
+replacement strategy has positive expectancy. The five older winning rows
+are too few and too correlated to train a reliable winner classifier.
+
+For NEW lots only, V4 keeps the four distinct physical market screens but
+requires all the original market/structural/heat/pool-loss, fresh confirmed
+exact-pool flow, full safety, independent price, cash/exposure, hourly and
+daily-loss gates. It adds prospective (not historically fitted) requirements:
+
+- Fixed $100 entry, full modeled roundtrip cost <=1.5% for every book, no
+  size backoff and no fee reduction.
+- A complete fresh 30-second window with >=6 confirmed swaps, >=4 independent
+  signing wallets, buy USD >=$300, net buy USD >=$100 and buy/sell USD >=1.5.
+  The existing identity/freshness/coverage checks remain mandatory at commit.
+- A mint or pool can be open in only one of the four named books at a time.
+  Existing correlated lots are preserved, not automatically liquidated.
+- A losing pool in ANY of the four books, including older policy rows,
+  receives a 30-minute cohort re-entry pause, in addition to existing vetoes.
+- `PAPER_QUALITY_EXIT_V1_NET30_STOP5`: +$30 NET target, -$5 NET stop trigger,
+  no short time exit or early trailing. The dollar trigger includes all modeled
+  costs; a gap may book a loss beyond $5. The target remains the owner's request,
+  not evidence that this market offers enough 30% moves for a high win rate.
+
+Every existing lot keeps its frozen exit policy (+$30/-$10 for current load
+test lots). No entry receipt, close, quantity, contribution or balance is
+rewritten. Older losses STILL count toward the $50 UTC-day entry budget;
+switching policy cannot restart a spent loss budget. Position management
+continues even when new entries pause. Fewer than 16 occupied slots, and even
+zero new entries, are valid outcomes of required quality/risk checks.
+
+Current-policy outcomes, preserved old closes/net losses, old open lots and
+unrealized open PnL are shown separately. No open +2% mark is called a closed
+win; zero new-policy closes means win rate is unknown, not 0% or 100% success.
+Tests verify mechanics only. Prospective closed net results across multiple
+pools/days are required before claiming improved win rate or profitability.
+MAIN, personal, other Lab/HF books, fees and wallet execution are unchanged.
+
+## Owner-requested capacity test (previous Windows mode)
 
 The owner explicitly requested 15–16 of the 16 slots filled at all times for
-testing, independently of strategic signals. The Windows launcher now opts
+testing, independently of strategic signals. The Windows launcher previously opted
 into `NEO_LAB_CAPACITY_TEST_ENABLED=1` together with `NEO_ENGINE_MODE=PAPER`.
 This selects **PAPER_CAPACITY_TEST_V1_FIXED_100**, not the strategy admission
 described below. Each named book is visibly suffixed `ТЕСТ ЗАПЪЛВАНЕ`.

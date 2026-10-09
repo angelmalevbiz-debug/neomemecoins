@@ -83,6 +83,8 @@ def entry_defense_layer():
             # A registry without current coverage merges main's and the tape's ticker memory.
             DEFENSE=entry_defense.DefensiveEntryLayer(
                 registry_path=path,seed_paths=entry_defense.sibling_registry_paths(path))
+            DEFENSE.funded_heat_seed=active_paper.seed_pair_history(
+                DEFENSE.history,STATE_PATH.parent/'funded_heat_seed.json',now_ms())
         return DEFENSE
 
 def defensive_entry_decision(coin,now,*,blocked_pools,heat_log_only=False):
@@ -1897,6 +1899,8 @@ def persist(status='online',error=None):
             'per_strategy_parameters':active_paper.config(),'maximum_roundtrip_cost_pct':None})
     STATE['activity_config']['cost_first_established']=cost_first.config()
     STATE['activity_config']['funded_active_paper']=active_paper.config()
+    if DEFENSE is not None:
+        STATE['activity_config']['funded_active_paper']['history_seed']=getattr(DEFENSE,'funded_heat_seed',None)
     STATE['activity_config']['defensive_entry']=entry_defense.config()
     STATE['activity_config']['lab_forward_tests']=lab_forward.config()
     STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),

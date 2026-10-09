@@ -3,10 +3,12 @@ import json
 import os
 import sys
 import unittest
+import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import funded_active_paper as active
 import entry_defense
 import structural_rug_guard as rug
@@ -72,6 +74,68 @@ class ActivePolicyTests(unittest.TestCase):
             result = rug.check(c, NOW, self.layer.registry, params=active.structural_parameters(sid))
             self.assertFalse(result['blocked'], (sid, result))
         self.assertIn('rug_young_pool', rug.check(coin(), NOW, self.layer.registry)['reasons'])
+
+    def test_paper_ticker_continuity_is_scoped_and_still_enforced(self):
+        self.layer.registry.coverage_ms.return_value=90*60_000
+        c=coin()
+        self.assertIn('rug_ticker_registry_warming',rug.check(c,NOW,self.layer.registry)['reasons'])
+        self.assertFalse(rug.check(c,NOW,self.layer.registry,params=active.structural_parameters('EARLY'))['blocked'])
+        self.layer.registry.coverage_ms.return_value=30*60_000
+        self.assertIn('rug_ticker_registry_warming',rug.check(c,NOW,self.layer.registry,
+            params=active.structural_parameters('EARLY'))['reasons'])
+
+    def test_real_history_seed_replays_only_recorded_prices_and_preserves_gaps(self):
+        from heat_veto import PairHistory
+        rows=[{'available_at':t,'coin':{**coin(), 'updatedAt':t,
+            'sources':['pumpswap-address-catalog'],'priceUsd':price}}
+            for t,price in [(NOW-1_000_000,.01),(NOW-900_000,.012),(NOW-100,.011)]]
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'seed.json'
+            path.write_text(json.dumps({'version':'FUNDED_HEAT_SEED_V1','observed_until':NOW-100,
+                'observations':rows}),encoding='utf-8')
+            history=PairHistory()
+            result=active.seed_pair_history(history,path,NOW)
+            self.assertEqual(result['status'],'REPLAYED_REAL_OBSERVATIONS')
+            self.assertEqual(result['samples'],3)
+            self.assertEqual(history.observing_since,NOW-1_000_000)
+            # Last long gap isn't filled with invented intermediate observations.
+            record=history._pairs[(rows[0]['coin']['address'],rows[0]['coin']['pairAddress'])]
+            self.assertEqual(record['since'],NOW-100)
+            self.assertEqual(len(record['gaps']),1)
+
+    def test_stale_future_and_incomplete_seeds_never_claim_warmup(self):
+        from heat_veto import PairHistory
+        good={'available_at':NOW-100,'coin':{**coin(),'updatedAt':NOW-100,
+                                            'sources':['pumpswap-address-catalog']}}
+        seeds=[dict(version='FUNDED_HEAT_SEED_V1',observed_until=NOW-130_000,observations=[]),
+               dict(version='FUNDED_HEAT_SEED_V1',observed_until=NOW,observations=[good,
+                    {'available_at':NOW+1,'coin':{**good['coin'],'updatedAt':NOW+1}}]),
+               dict(version='FUNDED_HEAT_SEED_V1',observed_until=NOW,observations=[
+                    {'available_at':NOW-100,'coin':{**good['coin'],'sources':None}}])]
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'seed.json'
+            for seed in seeds:
+                path.write_text(json.dumps(seed),encoding='utf-8')
+                history=PairHistory(); result=active.seed_pair_history(history,path,NOW)
+                self.assertNotEqual(result['status'],'REPLAYED_REAL_OBSERVATIONS')
+                self.assertIsNone(history.observing_since)
+
+    def test_seed_builder_reads_journal_without_inventing_or_repeating_observations(self):
+        from build_funded_heat_seed import build
+        base={'available_at':NOW-100,'observed_at':NOW-100,'coin':{**coin(),
+              'sources':['pumpswap-address-catalog'],'updatedAt':NOW-100},
+              'source':{'kind':'MAIN_SHARED_READ_ONLY_OBSERVATION'}}
+        rows=[base,base,{**base,'coin':{**base['coin'],'updatedAt':NOW+1}},
+              {**base,'source':{'kind':'OTHER'}},
+              {**base,'coin':{**base['coin'],'sources':['open-position']}}]
+        with tempfile.TemporaryDirectory() as directory:
+            journal=Path(directory)/'observations.jsonl'
+            journal.write_text('\n'.join(json.dumps(row) for row in rows)+'\n',encoding='utf-8')
+            before=journal.read_bytes()
+            seed=build(journal,NOW)
+            self.assertEqual(journal.read_bytes(),before)
+            self.assertEqual(len(seed['observations']),1)
+            self.assertEqual(seed['observations'][0]['coin']['priceUsd'],base['coin']['priceUsd'])
 
     def test_actual_loop_opens_early_without_rewriting_history_or_balance(self):
         before = copy.deepcopy(self.book)

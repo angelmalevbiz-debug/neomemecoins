@@ -211,7 +211,7 @@ const reasons: Record<string, string> = {
   rug_young_pool: 'Pool-ът е по-млад от 12 часа',
   rug_fake_market_cap: 'Надута капитализация (>= $20M) при ликвидност под 2%',
   rug_ticker_reuse: 'Тикерът вече е използван от друг mint',
-  rug_ticker_registry_warming: 'Регистърът на тикерите наблюдава пазара под 24 ч.: токен под 14 дни чака',
+  rug_ticker_registry_warming: 'Регистърът на тикерите още няма достатъчна непрекъсната история',
   pool_loss_cooldown: 'Пауза 6 ч. след 2 поредни загуби в същия pool',
   heat_history_warming: 'Историята на pool-а още не покрива прозорците на проверката (5/15/60 мин. след рестарт)',
   heat_input_unknown: 'Липсва текуща цена за проверка на прегряване',

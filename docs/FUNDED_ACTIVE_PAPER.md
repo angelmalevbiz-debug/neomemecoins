@@ -15,8 +15,11 @@ The previous Early age <=120 min / Ultra <=360 min could never survive the
 shared minimum age of 720 min. Active candidates use declared physical pool
 conditions, not discovery-score bonuses. Their structural age floor is
 scoped to the named Lab book; LP-pullability, fake cap, ticker reuse/coverage,
-unknown input, heat veto and per-pool loss memory remain enforced. The tape
-only relaxes its age screen for a matching active hypothesis; this supplies
+unknown input, heat veto and per-pool loss memory remain enforced. Active PAPER
+ticker continuity requires 60 minutes rather than main's unchanged 24 hours;
+all persisted sightings and the reuse veto remain. This explicitly trades
+less continuity evidence for bounded PAPER research, not LIVE safety proof. The tape
+only applies these scoped age/continuity thresholds for a matching active hypothesis; this supplies
 observations, never permission for main or a personal engine to trade.
 
 Four concurrent exact-pool positions, at most $25 and 10% of current book
@@ -40,6 +43,14 @@ per-pool 6-hour repeated-loss cooldown. Entry rate never overrides risk.
 Active exits use their stored net parameters, fresh exact-pool marks, net
 take-profit and net trailing profit protection. They do not read tape flow,
 so held active pools don't consume scarce entry observation seats.
+
+`scripts/build_funded_heat_seed.py` can prepare `funded_heat_seed.json` in the
+runtime accounts directory from the recorder journal (input opened read-only,
+bounded byte/time span, no history-ledger writes). Lab/tape may replay only a
+fresh (<2 min), completely validated cache of actual recent main-feed prices
+and paid-profile source flags. Future, stale, held-only, missing-source or
+malformed records never supply synthetic warm-up. Real gaps still reset the
+pair's coverage. A missing/stale/invalid cache retains the normal warm-up.
 
 ## Honest outcome reporting
 

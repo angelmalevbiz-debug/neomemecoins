@@ -8,7 +8,7 @@ $targetRoot=[IO.Path]::GetFullPath($RuntimeRepository)
 if ($sourceRoot -eq $targetRoot) { throw 'Source and runtime must be different checkouts.' }
 $files=@('backend/funded_active_paper.py','backend/strategy_lab.py','backend/funded_market_candidates.py',
     'backend/entry_defense.py','backend/tape_pool_scheduler.py','backend/lab_dashboard_projection.py',
-    'scripts/start_local_paper.ps1',
+    'scripts/start_local_paper.ps1','scripts/build_funded_heat_seed.py',
     'src/lib/labStrategyView.ts','docs/FUNDED_ACTIVE_PAPER.md','strategy-lock.json')
 $liveLock=Get-Content -LiteralPath (Join-Path $targetRoot 'strategy-lock.json') -Raw | ConvertFrom-Json
 $incomingLock=Get-Content -LiteralPath (Join-Path $sourceRoot 'strategy-lock.json') -Raw | ConvertFrom-Json
@@ -62,6 +62,8 @@ foreach($account in $registry.accounts.PSObject.Properties) {
     if (@($personal.positions).Count) { throw 'A personal PAPER engine has an open position; deploy refused.' }
 }
 # Only the established launcher stops its identity-checked PAPER cohort. No PID kill.
+& (Join-Path $targetRoot '.venv/Scripts/python.exe') (Join-Path $sourceRoot 'scripts/build_funded_heat_seed.py') --journal (Join-Path $targetRoot '.runtime/accounts/training/observations.jsonl') --out (Join-Path $targetRoot '.runtime/accounts/funded_heat_seed.json')
+if ($LASTEXITCODE -ne 0) { Write-Warning 'No fresh history seed; normal fail-closed warm-up will apply.' }
 & $launcher -Action Stop
 if ($LASTEXITCODE -ne 0) { throw 'Graceful stop failed; no files overwritten.' }
 $backup=Join-Path $targetRoot ".runtime/release-backup-funded-active-$stamp"

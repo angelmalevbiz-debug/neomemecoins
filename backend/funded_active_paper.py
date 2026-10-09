@@ -6,6 +6,7 @@ own exits. Observation seats and admission use the same candidate universe.
 """
 import math
 import os
+import json
 from dataclasses import replace
 
 import structural_rug_guard as rug
@@ -80,8 +81,45 @@ def matches(strategy_id, coin):
 
 
 def structural_parameters(strategy_id):
-    """Only age is scoped to this hypothesis; every other structural veto remains."""
-    return replace(rug.PARAMS, young_pool_max_age_minutes=RULES[strategy_id]['age'][0])
+    """PAPER scope: retain ticker sightings/reuse veto with one hour of continuity."""
+    return replace(rug.PARAMS, young_pool_max_age_minutes=RULES[strategy_id]['age'][0],
+                   ticker_registry_min_coverage_minutes=60.0)
+
+
+def seed_pair_history(history, path, now):
+    """Replay genuine recent main-feed observations, never invent coverage or prices."""
+    result={'version':'FUNDED_HEAT_SEED_V1','status':'NO_SEED','samples':0}
+    if not enabled() or not path.is_file():
+        return result
+    try:
+        if path.stat().st_size>32*1024*1024:
+            raise ValueError('seed too large')
+        seed=json.loads(path.read_text(encoding='utf-8'))
+        until=finite(seed.get('observed_until'),-1)
+        if seed.get('version')!='FUNDED_HEAT_SEED_V1' or not 0<=now-until<=120_000:
+            return {**result,'status':'STALE_OR_UNKNOWN_SEED'}
+        rows=seed.get('observations')
+        if not isinstance(rows,list) or not rows or len(rows)>150_000:
+            raise ValueError('invalid row bound')
+        previous=0
+        for row in rows:
+            available=finite(row.get('available_at'),-1)
+            c=row.get('coin') or {}
+            observed=finite(c.get('updatedAt'),-1)
+            if (not until-3_660_000<=observed<=available<=until<=now or available<previous
+                    or not isinstance(c.get('sources'),list) or not c['sources']
+                    or not all(isinstance(s,str) and s.strip() for s in c['sources'])
+                    or not rug.market_observation(c) or finite(c.get('priceUsd'))<=0
+                    or not all(isinstance(c.get(k),str) and c[k].strip() for k in ('address','pairAddress'))):
+                raise ValueError('invalid observation')
+            previous=available
+        for row in rows:
+            result['samples']+=int(history.observe_coin(row['coin'],row['available_at']))
+        history.prune(now)
+        return {**result,'status':'REPLAYED_REAL_OBSERVATIONS','observed_until':until,
+                'source':seed.get('source'),'profitability_proven':False}
+    except (OSError,ValueError,TypeError,AttributeError,KeyError):
+        return {**result,'status':'INVALID_SEED_IGNORED'}
 
 
 def positions(book):
@@ -180,5 +218,6 @@ def config():
                 maximum_notional_usd=MAX_NOTIONAL_USD, max_position_fraction=MAX_POSITION_FRACTION,
                 max_exposure_fraction=MAX_EXPOSURE_FRACTION, target_orders_per_hour=ORDERS_PER_HOUR,
                 target_is_not_a_minimum_or_promise=True, daily_loss_fraction=DAILY_LOSS_FRACTION,
+                ticker_min_continuous_coverage_minutes=60, main_ticker_guard_unchanged=True,
                 rules=candidate_config(), exits={sid: exit_parameters(sid) for sid in RULES},
                 costs_unchanged=True, profitability_proven=False, real_execution_enabled=False)

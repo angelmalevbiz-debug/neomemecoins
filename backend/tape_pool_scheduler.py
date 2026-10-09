@@ -468,6 +468,9 @@ class TapePoolScheduler:
         # registry without current coverage is seeded read-only from ``registry_seed_paths``.
         self.defense = entry_defense.DefensiveEntryLayer(registry_path=registry_path,
                                                          seed_paths=registry_seed_paths)
+        if registry_path:
+            self.defense.funded_heat_seed=active_paper.seed_pair_history(
+                self.defense.history,Path(registry_path).parent/'funded_heat_seed.json',_wall_ms())
 
     def defensive_entry_decision(self, coin, now, *, leased=False):
         """Seat screen: no seat for a structurally blocked pool, no NEW seat for a hot one.
@@ -483,7 +486,7 @@ class TapePoolScheduler:
         """
         decision = self.defense.evaluate(coin, now, blocked_pools={}, heat_log_only=True)
         if (active_paper.enabled() and not decision.get('allowed')
-                and 'rug_young_pool' in decision.get('reasons', [])):
+                and {'rug_young_pool','rug_ticker_registry_warming'}.intersection(decision.get('reasons', []))):
             matching=[sid for sid in active_paper.RULES if active_paper.matches(sid,coin)]
             if matching:
                 sid=min(matching,key=lambda name:active_paper.RULES[name]['age'][0])

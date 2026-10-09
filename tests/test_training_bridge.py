@@ -140,6 +140,23 @@ class TrainingBridgeProcessTests(unittest.TestCase):
         self.assertEqual(reopened["unique_observations"], finished["unique_observations"])
         self.assertEqual(self.control(reopened)["net_pnl_usd"], self.control(finished)["net_pnl_usd"])
 
+    def test_corrupt_complete_journal_row_is_retained_reported_and_not_replayed_on_restart(self):
+        journal = self.root/'observations.jsonl'
+        corrupt = b'incomplete-old-write\n'
+        journal.write_bytes(corrupt)
+        self.start()
+        self.observe(int(time.time()*1000))
+        snapshot = self.wait_for(lambda s:s['unique_observations'] == 1)
+        self.assertEqual(snapshot['invalid_observations'], 1)
+        self.assertEqual(snapshot['recording_drops_total'], 1)
+        self.assertTrue(snapshot['journal_integrity']['promotion_blocked_by_gap'])
+        self.assertEqual(snapshot['journal_integrity']['last_bad_offset'], 0)
+        self.assertTrue(journal.read_bytes().startswith(corrupt))
+        self.stop(); self.start()
+        reopened = self.wait_for(lambda s:s['unique_observations'] == 1)
+        self.assertEqual(reopened['invalid_observations'], 1)
+        self.assertEqual(reopened['journal_integrity']['malformed_rows'], 1)
+
     def test_exited_learning_worker_is_restarted_and_resumes_from_journal(self):
         self.start()
         initial = self.wait_for(lambda s:s["unique_observations"] == 0)

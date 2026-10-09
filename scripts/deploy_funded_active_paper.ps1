@@ -85,7 +85,18 @@ Get-ChildItem -LiteralPath (Join-Path $targetRoot '.runtime/accounts') -File -Fi
     Copy-Item -Destination $ledgers
 foreach($folder in @('users','strategy_lab_hf')) {
     $live=Join-Path $targetRoot ".runtime/accounts/$folder"
-    if (Test-Path -LiteralPath $live) { Copy-Item -LiteralPath $live -Destination $ledgers -Recurse }
+    if (Test-Path -LiteralPath $live) {
+        # Personal journals are tens of GB too. Back up ledgers/config, never
+        # duplicate append-only observation streams or old reset archives.
+        foreach($file in (Get-ChildItem -LiteralPath $live -Recurse -File)) {
+            $inside=$file.FullName.Substring($live.Length).TrimStart([char[]]@('\','/'))
+            if ($inside -match '(^|[\\/])archive([\\/]|$)' -or $file.Name -eq 'observations.jsonl') { continue }
+            if ($file.Extension -ne '.json' -and !($folder -eq 'strategy_lab_hf' -and $file.Extension -eq '.jsonl')) { continue }
+            $saved=Join-Path (Join-Path $ledgers $folder) $inside
+            New-Item -ItemType Directory -Path (Split-Path $saved) -Force | Out-Null
+            Copy-Item -LiteralPath $file.FullName -Destination $saved
+        }
+    }
 }
 [IO.File]::WriteAllText((Join-Path $backup 'manifest.json'),($manifest | ConvertTo-Json -Depth 4))
 foreach($relative in $files) {

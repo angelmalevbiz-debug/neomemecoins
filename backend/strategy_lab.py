@@ -14,6 +14,7 @@ import entry_defense
 import heat_veto
 import pool_loss_memory
 import lab_forward_tests as lab_forward
+import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -30,6 +31,8 @@ DEX='https://api.dexscreener.com'
 STATE_PATH=Path(os.getenv('NEO_STRATEGY_LAB_PATH','/var/lib/neo-market/strategy_lab.json'))
 COMPACT_PATH=Path(os.getenv('NEO_STRATEGY_LAB_COMPACT_PATH',str(STATE_PATH.parent/'strategy_lab_compact.json')))
 RESET_FLAG_PATH=Path(os.getenv('NEO_STRATEGY_LAB_RESET_FLAG','/var/lib/neo-market/strategy_lab.reset'))
+# LAB_HIGH_FREQUENCY_V1 books keep their own journal and checkpoint here, never in strategy_lab.json.
+HF_ROOT=Path(os.getenv(hf_lab.ENV_ROOT,str(STATE_PATH.parent/'strategy_lab_hf')))
 LIVE_TAPE_PATH=Path(os.getenv('NEO_LIVE_TAPE_PATH','/var/lib/neo-market/live_tape.json'))
 START_BALANCE=float(os.getenv('NEO_LAB_START_BALANCE','500'))
 PROMOTED_STRATEGIES=('EARLY','MOMENTUM','PRECISION','ULTRA_PRECISION')
@@ -695,7 +698,10 @@ def review_strategy_lifecycle(books):
     return lab_forward.apply_kill_rules(books,review,registered_ids=registered,now=now)
 
 def load_state():
+    global RESET_REQUESTED
     reset_requested=RESET_FLAG_PATH.exists()
+    # The HF books (strategy_lab_hf/) follow a requested Lab reset (archived, never deleted).
+    RESET_REQUESTED=RESET_REQUESTED or reset_requested
     if reset_requested:
         raw={}
         try: RESET_FLAG_PATH.unlink()
@@ -746,6 +752,16 @@ STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
 # Set once main() has loaded the durable ledger; shutdown persists only after that.
 LOADED=False
+# Whether this process found the Lab reset flag (load_state consumes the flag file).
+RESET_REQUESTED=False
+# LAB_HIGH_FREQUENCY_V1 container (built by main() when NEO_LAB_HF_ENABLED is '1', the default).
+HF=None
+# HF_MARK_FEED_V1: HF's own exact-pair mark feed (created with the first HF build).
+HF_MARK_FEED=None
+# HF build attempts of this process; a failed build is retried every HF_BUILD_RETRY_MS.
+HF_BUILD_RETRY_MS=60_000
+HF_BUILD={'attempts':0,'failures':0,'last_attempt_at':None,'last_error':None,'next_attempt_at':None,
+          'built_at':None}
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
     STATE['activity_started_at']=now_ms()
@@ -1673,6 +1689,135 @@ def stats(book):
             'zero_capital_trades':len(zero_capital),
             'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}
 
+def build_high_frequency():
+    """LAB_HIGH_FREQUENCY_V1 container of this Lab process, or None when NEO_LAB_HF_ENABLED is not '1'.
+
+    Its books, journal and checkpoint live in HF_ROOT (strategy_lab_hf/), never in STATE['books']
+    or strategy_lab.json. The shared cost model and defensive layer are injected, with HF's own
+    exact-pair mark feed (HF_MARK_FEED, never POSITION_MARK_FEED, so an HF refresh never queues
+    ahead of a Lab book's); a Lab reset (the flag load_state consumed) archives the HF root's
+    state as well, once.
+    """
+    global HF, HF_MARK_FEED, RESET_REQUESTED
+    if not hf_lab.enabled():
+        HF=None
+        return None
+    if HF_MARK_FEED is None:
+        # HF_MARK_FEED_V1: HF's own exact-pair feed; the Lab books keep POSITION_MARK_FEED to themselves.
+        HF_MARK_FEED=hf_lab.new_mark_feed()
+    HF_BUILD['attempts']+=1
+    HF_BUILD['last_attempt_at']=now_ms()
+    container=hf_lab.HighFrequencyLab(HF_ROOT,cost=hf_lab.cost_functions(sys.modules[__name__]),
+                                      defense=entry_defense_layer(),marks=HF_MARK_FEED,
+                                      price_audit=price_integrity,clock=now_ms)
+    try:
+        container.load(reset=RESET_REQUESTED)
+    finally:
+        if container.reset_archive is not None:
+            # The reset archive is made: a retried build must not archive the fresh root again.
+            RESET_REQUESTED=False
+    HF=container
+    HF_BUILD.update(built_at=now_ms(),last_error=None,next_attempt_at=None)
+    return container
+
+def hf_build_failed(error):
+    """A failed HF build: published (hf_error, the build status) and retried after HF_BUILD_RETRY_MS."""
+    text=hf_error_text('build',error)
+    STATE['hf_error']=text
+    HF_BUILD.update(failures=HF_BUILD['failures']+1,last_error=text,next_attempt_at=now_ms()+HF_BUILD_RETRY_MS)
+
+def hf_retry_build():
+    """While HF is enabled but not built, retry the build once HF_BUILD_RETRY_MS has passed.
+
+    A build failure (an unreadable journal file, a locked checkpoint) used to leave HF off for
+    the life of the process, with nothing on the dashboard but 'Няма HF данни'."""
+    if HF is not None or not hf_lab.enabled():
+        return False
+    due=HF_BUILD.get('next_attempt_at')
+    # Only a failed build is retried (hf_build_failed schedules next_attempt_at).
+    if due is None or now_ms()<due:
+        return False
+    try:
+        build_high_frequency()
+    except Exception as e:
+        hf_build_failed(e)
+        return False
+    return HF is not None
+
+def hf_build_status():
+    """HF build attempts of this process (published in persistence.hf and activity_config)."""
+    return {**HF_BUILD,'retry_ms':HF_BUILD_RETRY_MS}
+
+def hf_feed_prices(feed):
+    """{(mint, pool): coin} of this loop's shared feed (the marks HF.update reads)."""
+    prices={}
+    for coin in feed or []:
+        address=coin.get('address'); pair=coin.get('pairAddress')
+        if address and pair and num(coin.get('priceUsd'))>0:
+            prices[(address,pair)]=coin
+    return prices
+
+def hf_error_text(stage,error):
+    return f'{stage}: {type(error).__name__}: {error}'[:300]
+
+def hf_update(feed,errors):
+    """HF fills, marks and exits of this loop (after update_positions); returns its milliseconds."""
+    if HF is None:
+        return 0.0
+    started=time.perf_counter()
+    try:
+        now=now_ms()
+        HF.update(hf_feed_prices(feed),now,lab_forward.feed_alive(feed,now))
+    except Exception as e:
+        errors.append(hf_error_text('update',e))
+    return (time.perf_counter()-started)*1000
+
+def hf_refresh(feed,errors):
+    """HF decisions of this refresh (after maybe_open); returns its milliseconds."""
+    if HF is None:
+        return 0.0
+    started=time.perf_counter()
+    try:
+        HF.on_refresh(feed,now_ms())
+    except Exception as e:
+        errors.append(hf_error_text('on_refresh',e))
+    return (time.perf_counter()-started)*1000
+
+def hf_end_loop(milliseconds,errors):
+    """The loop's one journal flush (HF_JOURNAL_V1), the time budget (HF_TIME_BUDGET_V1: > 250 ms of
+    HF work in 3 consecutive loops: hf_degraded, exits continue) and STATE['hf_error'] of this loop,
+    also counted in persistence.hf.errors; an HF error never stops the Lab."""
+    if HF is None:
+        return
+    started=time.perf_counter()
+    try:
+        HF.flush_journal()
+    except Exception as e:
+        errors.append(hf_error_text('journal',e))
+    milliseconds+=(time.perf_counter()-started)*1000
+    try:
+        HF.record_loop_time(milliseconds)
+    except Exception as e:
+        errors.append(hf_error_text('time_budget',e))
+    try:
+        HF.note_errors(errors)
+    except Exception:
+        pass
+    if errors:
+        STATE['hf_error']=' | '.join(errors)[:600]
+    else:
+        STATE.pop('hf_error',None)
+
+def hf_persist_error(stage,error,now):
+    """An HF failure inside persist(): appended to this loop's hf_error and counted in the HF metrics."""
+    text=hf_error_text(stage,error)
+    previous=STATE.get('hf_error')
+    STATE['hf_error']=(f'{previous} | {text}' if previous else text)[:600]
+    try:
+        HF.note_error(text,now)
+    except Exception:
+        pass
+
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
     STATE['registry_compatibility']=registry_compatibility(STATE['books'])
@@ -1706,6 +1851,33 @@ def persist(status='online',error=None):
     STATE['activity_config']['lab_forward_tests']=lab_forward.config()
     STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),
                                                          'signal_carry':FORWARD_SIGNAL_CARRY.status()}
+    # LAB_HIGH_FREQUENCY_V1: checkpoint (forced on stop), published definition, metrics and the
+    # dashboard section. The HF view goes only into the compact projection: the full ledger
+    # carries the HF definition and metrics, never HF trades.
+    hf_view=None
+    hf_metrics=None
+    if HF is not None:
+        hf_now=now_ms()
+        try:
+            HF.checkpoint_if_due(hf_now,force=status=='stopped')
+        except Exception as e:
+            # Published below (hf_error, persistence.hf.errors) even though the checkpoint failed.
+            hf_persist_error('checkpoint',e,hf_now)
+        try:
+            STATE['activity_config']['lab_high_frequency']={**HF.config(),'running':bool(HF.loaded),
+                                                            'build':hf_build_status()}
+            hf_metrics={**HF.metrics(),'build':hf_build_status()}
+            hf_view=HF.dashboard_view(hf_now)
+        except Exception as e:
+            hf_persist_error('persist',e,hf_now)
+    else:
+        hf_enabled=hf_lab.enabled()
+        STATE['activity_config']['lab_high_frequency']={**hf_lab.config_view(enabled_flag=hf_enabled),
+                                                        'running':False,'build':hf_build_status()}
+        if hf_enabled and HF_BUILD['attempts']:
+            # Enabled, attempted and not built (a failed build, retried every HF_BUILD_RETRY_MS): the
+            # attempts and the last error stay visible in persistence.hf, with hf_error on GET /state.
+            hf_metrics={'version':hf_lab.VERSION,'loaded':False,'running':False,'build':hf_build_status()}
     if DEFENSE is not None:
         STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
         if status=='stopped':
@@ -1742,10 +1914,13 @@ def persist(status='online',error=None):
     if error: STATE['error']=str(error)[:200]
     else: STATE.pop('error',None)
     STATE['persistence']=dict(PERSIST_METRICS)
+    if hf_metrics is not None:
+        STATE['persistence']['hf']=hf_metrics
     published=merge_paired_snapshot(merge_astra_snapshot(STATE))
     started=time.perf_counter()
     ledger_bytes=atomic_write(published)
-    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    compact_source={**published,'high_frequency':hf_view} if hf_view is not None else published
+    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(compact_source))
     record_persist_metrics(ledger_bytes,compact_bytes,time.perf_counter()-started,now_ms())
 
 def main():
@@ -1763,6 +1938,12 @@ def main():
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()
+    try:
+        # LAB_HIGH_FREQUENCY_V1 (NEO_LAB_HF_ENABLED, default '1'); a failure leaves the Lab running
+        # without it and is retried every HF_BUILD_RETRY_MS (hf_retry_build in the loop).
+        build_high_frequency()
+    except Exception as e:
+        hf_build_failed(e)
     last_entry=0
     feed=[]
     persistence_ready=True
@@ -1783,8 +1964,13 @@ def main():
                 feed=r.json().get('feed') or []
                 last_entry=time.time()
             update_positions(flows,feed)
+            hf_retry_build()
+            hf_errors=[]
+            hf_ms=hf_update(feed,hf_errors)
             if refresh_due:
                 maybe_open(feed,flows)
+                hf_ms+=hf_refresh(feed,hf_errors)
+            hf_end_loop(hf_ms,hf_errors)
             persist('online')
             failures=0
         except Exception as e:

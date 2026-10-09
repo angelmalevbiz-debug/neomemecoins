@@ -220,6 +220,132 @@ def edge_rows(rows):
     return [edge._engine_trade(row, 'main', 'state.json') for row in rows]
 
 
+def hf_close(book, seq, net50_pct, *, pool='HFPOOL1', fee_bps=30.0, cfg='c' * 64, at=None):
+    """A LAB_HIGH_FREQUENCY_V1 journal close row (book, config hash and journal seq are its identity)."""
+    at = START + seq * MINUTE if at is None else at
+    pnl = round(25 * (net50_pct + 1.0) / 100, 6)
+    return {'v': 1, 'seq': seq, 'kind': 'close', 'book': book, 'cfg': cfg, 'budget': 'b' * 64, 'at': at,
+            'entry_policy_version': 'LAB_HIGH_FREQUENCY_V1', 'trade_no': seq, 'address': 'HFMINT', 'pairAddress': pool,
+            'decision_at': at - 150_000, 'entry_fill_price': 1.0, 'exit_fill_price': 0.98, 'close_kind': 'HF_TIME_120',
+            'pnl_usd': pnl, 'pnl_pct': round(pnl / 25 * 100, 6), 'net50_usd': round(25 * net50_pct / 100, 6),
+            'net50_pct': net50_pct, 'fee_bps': fee_bps, 'balance_after': 1000 + pnl, 'closed_at': at}
+
+
+def write_hf_journal(root, rows):
+    for row in rows:
+        path = root / 'journal' / row['book'] / '2026-10-10.jsonl'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('a', encoding='utf-8') as handle:
+            handle.write(json.dumps(row) + '\n')
+
+
+class HighFrequencyJournalTests(unittest.TestCase):
+    def test_hf_closes_are_lab_trades_deduped_by_book_config_and_seq_with_fee_bucket_gaps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'strategy_lab_hf'
+            rows = []
+            for seq in range(1, 31):
+                pool = f'HFPOOL{seq % 5}'
+                fee = 30.0 if seq % 2 else 70.0
+                rows.append(hf_close('HF_RND_E95', seq, -3.7, pool=pool, fee_bps=fee))
+                rows.append(hf_close('HF_QUIET_E95', 100 + seq, -3.5 if fee == 30.0 else -3.9, pool=pool,
+                                     fee_bps=fee, at=START + seq * MINUTE))
+            write_hf_journal(root, rows + rows[:4])             # a copied tail: duplicates
+            write_hf_journal(root / 'archive' / 'reset-1', [hf_close('HF_RND_E95', 999, 50.0)])
+            with (root / 'journal' / 'HF_RND_E95' / '2026-10-10.jsonl').open('a', encoding='utf-8') as handle:
+                handle.write('{"v":1,"seq"\n')
+            collector = edge.LedgerCollector()
+            collector.add_hf_journal(root)
+            report = edge.build_report(collector, iterations=50, seed=3)
+            self.assertEqual(report['lab']['unique_closed_trades'], 60)
+            self.assertEqual(collector.duplicates, 4)
+            self.assertEqual(collector.rejected['malformed'], 1)
+            self.assertEqual(report['lab']['by_book']['HF_RND_E95']['closed_trades'], 30)
+            hf = report['high_frequency']
+            self.assertEqual(hf['unique_closed_trades'], 60)
+            gap = hf['gaps']['HF_QUIET_E95']
+            self.assertEqual(gap['control'], 'HF_RND_E95')
+            self.assertAlmostEqual(gap['gap_net50_pct'], 0.0, places=6)
+            self.assertAlmostEqual(gap['within_fee_bucket']['fee<=50']['gap_net50_pct'], 0.2, places=6)
+            self.assertAlmostEqual(gap['within_fee_bucket']['fee55-95']['gap_net50_pct'], -0.2, places=6)
+            self.assertEqual(len(gap['gap_ci95_pair_bootstrap']), 2)
+            self.assertIn('High-frequency books', edge.render_markdown(report))
+            self.assertEqual(collector.sources[0]['kind'], 'lab_hf')
+
+    def test_an_archived_and_the_current_session_read_together_keep_both_trades(self):
+        # Review finding: seq restarts at 1 after an HF reset, so an archived close and a current
+        # close shared book:cfg:seq; read together, both were excluded as a conflict. The journal
+        # epoch (new at every reset, on every row) is part of the identity.
+        with tempfile.TemporaryDirectory() as tmp:
+            current = Path(tmp) / 'strategy_lab_hf'
+            archived = current / 'archive' / 'reset-1-abcd'
+            write_hf_journal(archived, [dict(hf_close('HF_RND_E95', 7, -3.7, at=START), epoch='a' * 16)])
+            write_hf_journal(current, [dict(hf_close('HF_RND_E95', 7, -3.1, at=START + DAY), epoch='b' * 16)])
+            collector = edge.LedgerCollector()
+            collector.add_hf_journal(current)
+            collector.add_hf_journal(archived)
+            report = edge.build_report(collector, iterations=20, seed=3)
+            self.assertEqual(report['dedupe']['unique_closed_trades'], 2)
+            self.assertEqual(report['dedupe']['conflicting_ids_excluded'], 0)
+            self.assertEqual(report['high_frequency']['unique_closed_trades'], 2)
+            self.assertIn('epoch', report['high_frequency']['dedupe_key'])
+            # A copy of the same session is still one trade per close.
+            collector.add_hf_journal(current)
+            self.assertEqual((collector.duplicates, collector.conflicts), (1, set()))
+        self.assertEqual(edge.hf_trade_id('HF_RND_E95', 'c', 'a' * 16, 7), f"HF:HF_RND_E95:c:{'a' * 16}:7")
+        self.assertEqual(edge.hf_trade_id('HF_RND_E95', 'c', None, 7), 'HF:HF_RND_E95:c:7')
+
+    def test_cli_reads_a_lab_hf_copy_and_refuses_a_missing_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'copy' / 'strategy_lab_hf'
+            write_hf_journal(root, [hf_close('HF_RND_E95', seq, -3.7) for seq in range(1, 4)])
+            out = Path(tmp) / 'reports' / 'edge'
+            with patch('sys.stdout', new_callable=io.StringIO), patch('sys.stderr', new_callable=io.StringIO):
+                self.assertEqual(edge.main(['--lab-hf', str(root), '--output', str(out), '--bootstrap', '20']), 0)
+            report = json.loads(out.with_name('edge.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['lab']['by_book']['HF_RND_E95']['closed_trades'], 3)
+            with patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit):
+                edge.main(['--lab-hf', str(Path(tmp) / 'absent')])
+
+    def test_archive_dir_skips_hf_checkpoints_and_still_reads_the_ledgers(self):
+        # Review finding: reset-all archives strategy_lab_hf/ (with its state.json checkpoint) next to
+        # the engine ledgers, and an HF Lab reset archives it inside strategy_lab_hf/archive/. The
+        # documented --archive-dir scan sent those checkpoints to the engine reader and exited 2.
+        checkpoint = {'version': 'HF_CHECKPOINT_V1', 'family': 'LAB_HIGH_FREQUENCY_V1', 'seq': 7,
+                      'books': {'HF_RND_E95': {'start_balance': 1000.0, 'balance': 999.3}}}
+        with tempfile.TemporaryDirectory() as tmp:
+            backup = Path(tmp) / 'ledgers' / 'archive'
+            write(backup / 'reset-1' / 'state.json', engine_state('S1', [engine_trade('S1', 1, -1.0)]))
+            hf_root = backup / 'reset-2' / 'strategy_lab_hf'
+            write(hf_root / 'state.json', checkpoint)
+            write_hf_journal(hf_root, [hf_close('HF_RND_E95', 1, -3.7)])
+            write(hf_root / 'archive' / 'reset-9-abcd' / 'state.json', checkpoint)
+            # A checkpoint copied out of its directory is still recognised by its version.
+            write(backup / 'loose' / 'state.json', checkpoint)
+            output = Path(tmp) / 'out' / 'edge'
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--output', str(output), '--bootstrap', '5',
+                                 '--quiet'])
+            self.assertEqual(code, 0, err)
+            self.assertIn('skipped 3 LAB_HIGH_FREQUENCY_V1 checkpoint(s)', err)
+            self.assertIn('--lab-hf', err)
+            report = json.loads(output.with_name('edge.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['engine']['by_account']['main']['closed_trades'], 1)
+            self.assertEqual(report['lab']['unique_closed_trades'], 0)
+            self.assertEqual(sorted(item['file'] for item in report['skipped_inputs']),
+                             ['loose/state.json', 'reset-2/strategy_lab_hf/archive/reset-9-abcd/state.json',
+                              'reset-2/strategy_lab_hf/state.json'])
+            self.assertIn('Skipped reset-2/strategy_lab_hf/state.json',
+                          output.with_name('edge.md').read_text(encoding='utf-8'))
+            # The HF journal of that archive is read with --lab-hf, as the note says.
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--lab-hf', str(hf_root), '--quiet'])
+            self.assertEqual(code, 0, err)
+            # Anything else that is not an engine ledger still fails the scan.
+            write(backup / 'other' / 'state.json', {'version': 'SOMETHING_ELSE'})
+            code, err = run_cli(['--archive-dir', f'main={backup}', '--quiet'])
+            self.assertEqual(code, 2)
+            self.assertIn('not an engine ledger', err)
+
+
 class LabAndCliTests(unittest.TestCase):
     def test_lab_books_are_deduped_and_measured_separately(self):
         with tempfile.TemporaryDirectory() as tmp:

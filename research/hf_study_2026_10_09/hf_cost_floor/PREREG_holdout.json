@@ -1,0 +1,21 @@
+{
+  "written": "2026-10-09, after the TRAIN grid (p04_base/rules/heatoff) and p05_checks, BEFORE any holdout run",
+  "train_window": "entries in [t0, t0 + 0.6 * span) = 2026-10-07 08:41 .. 2026-10-08 10:29 UTC (25.8 h)",
+  "holdout_window": "entries in [cut, t1) = 2026-10-08 10:29 .. 2026-10-09 03:41 UTC (17.2 h)",
+  "common": "random entries (H.hashed_coin p=0.2 salt 'hf') on scan points of PumpSwap SOL pools passing the engine STRUCTURAL_RUG_GUARD_V1 (H.rug_guard_v1 + fake-cap 2% + ticker reuse by a different mint + missing ticker) AND the HEAT_VETO_STACK_V1 (incl. warm-up); one position per pool; slot busy from decision to exit; harness_final fills (next refresh), feed-gap closes, calibrated net50.",
+  "selection_rules": {
+    "HF1": "least net50 $ lost per hour among R0 (immediate re-entry) train configs with 45-80 trades/h per book",
+    "HF2": "least net50 $ lost per hour among CD300 (300 s per-pool cooldown) train configs with 45-80 trades/h per book",
+    "HF3": "HF2 plus POOL_LOSS_MEMORY_V1 (2 consecutive losing closes on usdcal -> pool blocked 6 h), i.e. HF2 under the Lab default defensive layer; registered to test the rate cap out of sample"
+  },
+  "configs": {
+    "HF1_CHEAPEST_REENTRY": {"univ": "a (fee<=50 bps, liq>=$250k)", "exit": "time 120 s", "slots": 5, "notional": 25, "rule": "R0",
+      "train": {"tph": 45.45, "net50": -3.174, "net0": -0.895, "usd50_per_h": -36.07, "pairs": 8, "top_pair_share": 0.242,
+                "note": "train mean flattered by one +292% single-print HOLD exit on HMzvsEEm (contributes about +0.25 pp); trimmed gross mean -0.006%, median net50 -3.37%"}},
+    "HF2_CHEAPEST_COOLDOWN300": {"univ": "c (all guarded PumpSwap, liq>=$50k)", "exit": "time 120 s", "slots": 3, "notional": 25, "rule": "CD300",
+      "train": {"tph": 46.27, "net50": -3.973, "net0": -1.893, "usd50_per_h": -45.96, "pairs": 29, "top_pair_share": 0.063}},
+    "HF3_HF2_WITH_POOL_LOSS_MEMORY": {"univ": "c", "exit": "time 120 s", "slots": 3, "notional": 25, "rule": "LM+CD300",
+      "train": {"tph": 4.65, "net50": -4.07, "usd50_per_h": -4.7}}
+  },
+  "sensitivity_not_selected": "HF1 and HF2 entries re-priced at $10/$50/$100/$200 (same decisions; cost scaling only), exact $500 cash-limited survival, UTC-day loss caps $25 and $50 on booked (usdcal) P&L"
+}

@@ -93,6 +93,71 @@ class PaperResetTests(unittest.TestCase):
             self.assertIsNone(lab['position'])
             self.assertFalse(lab['history'])
 
+    def test_reset_all_archives_and_recreates_the_high_frequency_books(self):
+        # LAB_HIGH_FREQUENCY_V1 keeps its journal and checkpoint in strategy_lab_hf/ next to the Lab
+        # ledger: a reset moves the whole tree into a checksummed archive and starts it empty.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'strategy_lab.json').write_text(json.dumps({'books':{'SCALPER':{'starting_balance':100,'balance':80}}}))
+            hf=root/'strategy_lab_hf';(hf/'journal'/'HF_RND_E95').mkdir(parents=True)
+            journal=hf/'journal'/'HF_RND_E95'/'2026-10-10.jsonl'
+            journal.write_text('{"v":1,"seq":1,"kind":"close","pnl_usd":-0.7}\n',encoding='utf-8')
+            (hf/'state.json').write_text('{"version":"HF_CHECKPOINT_V1","seq":1}',encoding='utf-8')
+            digest=hashlib.sha256(journal.read_bytes()).hexdigest()
+            result=reset_all_offline(root)
+            self.assertTrue(hf.is_dir())
+            self.assertEqual(list(hf.iterdir()),[])
+            archive=Path(next(path for path in result['archives'] if (Path(path)/'strategy_lab_hf').is_dir()))
+            manifest=json.loads((archive/'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(manifest['directory'],'strategy_lab_hf')
+            self.assertEqual(manifest['files']['journal/HF_RND_E95/2026-10-10.jsonl']['sha256'],digest)
+            self.assertEqual(hashlib.sha256((archive/'strategy_lab_hf'/'journal'/'HF_RND_E95'/'2026-10-10.jsonl')
+                                            .read_bytes()).hexdigest(),digest)
+            self.assertIn('state.json',manifest['files'])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state=root/'state.json';state.write_text('{"demo_balance_usd":800}')
+            (root/'strategy_lab_hf').write_text('not a directory')
+            before=state.read_bytes()
+            with self.assertRaises(ValueError):reset_all_offline(root)
+            self.assertEqual(state.read_bytes(),before)
+
+    def test_the_high_frequency_reset_archive_restores_with_the_documented_command(self):
+        # Review finding: the reset-all archive of strategy_lab_hf/ has nested manifest paths
+        # (journal/<BOOK>/<day>.jsonl), which restore_archive refused ('unsafe manifest filename').
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);hf=root/'strategy_lab_hf'
+            journal=hf/'journal'/'HF_RND_E95'/'2026-10-10.jsonl';journal.parent.mkdir(parents=True)
+            journal.write_bytes(b'{"v":1,"seq":1,"kind":"close","pnl_usd":-0.7}\n')
+            (hf/'state.json').write_bytes(b'{"version":"HF_CHECKPOINT_V1","seq":1}')
+            originals={path.relative_to(hf).as_posix():path.read_bytes() for path in hf.rglob('*') if path.is_file()}
+            result=reset_all_offline(root)
+            archive=Path(next(path for path in result['archives'] if (Path(path)/'strategy_lab_hf').is_dir()))
+            # The books ran again after the reset: that state is preserved by the restore, not lost.
+            (hf/'journal'/'HF_RND_E95').mkdir(parents=True)
+            newer=hf/'journal'/'HF_RND_E95'/'2026-10-11.jsonl';newer.write_bytes(b'{"v":1,"seq":1,"kind":"order"}\n')
+            restored=restore_archive(archive,root)
+            self.assertEqual(restored['restored_directory'],'strategy_lab_hf')
+            self.assertEqual(restored['restored_files'],sorted(originals))
+            self.assertEqual({path.relative_to(hf).as_posix():path.read_bytes() for path in hf.rglob('*')
+                              if path.is_file()},originals)
+            preserved=Path(restored['previous_state_archive'])
+            self.assertEqual((preserved/'strategy_lab_hf'/'journal'/'HF_RND_E95'/'2026-10-11.jsonl').read_bytes(),
+                             b'{"v":1,"seq":1,"kind":"order"}\n')
+            # The archive itself stays intact and can be restored again.
+            self.assertTrue((archive/'strategy_lab_hf'/'state.json').is_file())
+            self.assertEqual(sorted(path.name for path in root.iterdir() if '.restore-' in path.name),[])
+            # A tampered file or an escaping manifest path refuses before anything changes.
+            manifest=json.loads((archive/'manifest.json').read_text(encoding='utf-8'))
+            (archive/'strategy_lab_hf'/'state.json').write_bytes(b'{"tampered":true}')
+            with self.assertRaisesRegex(ValueError,'checksum mismatch'):restore_archive(archive,root)
+            self.assertEqual((hf/'state.json').read_bytes(),originals['state.json'])
+            for unsafe in ('../state.json','journal/../../x','/etc/x','C:/x','journal\\x'):
+                with self.subTest(unsafe=unsafe):
+                    bad=dict(manifest,files={unsafe:{'sha256':'0'*64,'bytes':0}})
+                    (archive/'manifest.json').write_text(json.dumps(bad),encoding='utf-8')
+                    with self.assertRaisesRegex(ValueError,'unsafe manifest'):restore_archive(archive,root)
+            self.assertEqual((hf/'state.json').read_bytes(),originals['state.json'])
+
     def test_unknown_legacy_schema_refuses_before_any_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);state=root/'state.json';state.write_text('{"demo_balance_usd":800}')

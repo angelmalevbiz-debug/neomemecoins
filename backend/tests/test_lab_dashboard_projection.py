@@ -169,6 +169,25 @@ class StrategyLabDashboardProjection(unittest.TestCase):
         self.assertEqual(legacy['position']['symbol'], 'OLD')
         self.assertNotIn('entry_features', legacy['position'])
 
+    def test_passes_the_high_frequency_view_through_unchanged(self):
+        # LAB_HIGH_FREQUENCY_V1: the HF container builds its own bounded view (<= 16 KB);
+        # the projection passes it through and never invents one.
+        view = {'version': 'LAB_HIGH_FREQUENCY_V1', 'badge': 'ЕКСПЕРИМЕНТ · ОЧАКВА СЕ ЗАГУБА',
+                'books': [{'id': 'HF_RND_E95', 'status': 'active', 'last_closes': [{'pnl_usd': -0.7}]}]}
+        state = compact_strategy_lab({'books': {}, 'high_frequency': view})
+        self.assertEqual(state['high_frequency'], view)
+        self.assertNotIn('high_frequency', compact_strategy_lab({'books': {}}))
+        self.assertNotIn('high_frequency', compact_strategy_lab({'books': {}, 'high_frequency': ['bad']}))
+
+    def test_passes_the_current_hf_error_through_to_get_state(self):
+        # Review finding: strategy_lab wrote hf_error into the full ledger only; main's GET /state
+        # serves this projection, so an HF failure was invisible there.
+        state = compact_strategy_lab({'books': {}, 'hf_error': 'on_refresh: KeyError: x'})
+        self.assertEqual(state['hf_error'], 'on_refresh: KeyError: x')
+        self.assertEqual(len(compact_strategy_lab({'books': {}, 'hf_error': 'e' * 2000})['hf_error']), 600)
+        for absent in ({'books': {}}, {'books': {}, 'hf_error': ''}, {'books': {}, 'hf_error': {'x': 1}}):
+            self.assertNotIn('hf_error', compact_strategy_lab(absent))
+
 
 if __name__ == '__main__':
     unittest.main()

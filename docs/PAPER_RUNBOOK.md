@@ -312,6 +312,163 @@ The primary replay is only a measurement instrument if it books the trades the l
 
 Limits: recorded sell quotes exist only while the live engine held the position and stop at the live exit, so a variant that holds longer than the live exit ends with an unvalued position (unknown risk, `liquidation_unavailable` for later entries); only variants that exit no later than the live exit can be valued, and non-entered candidates have no quotes at all. Three closes on one pool in 14 hours are not a sample; no variant result is a profitability claim.
 
+## Lab high-frequency books (LAB_HIGH_FREQUENCY_V1)
+
+The Lab process also runs three PAPER books that trade about 50 times an hour each:
+`HF_RND_E95` (random control), `HF_QUIET_E95` and `HF_DIP15_E95`. The full design is in
+[LAB_HIGH_FREQUENCY.md](LAB_HIGH_FREQUENCY.md). They are **expected to lose** about 3.6% net50
+per trade (about $37-44 per hour per book while they trade). Each has its own $1,000, a $100
+booked loss cap per UTC day and a kill rule. They are a measurement and never a promotion
+candidate. They are not Lab books: they are absent from `strategy_lab.json`, the lifecycle
+and the promotion migration, and they take no tape seat.
+
+**Enable and disable.**
+
+- `NEO_LAB_HF_ENABLED` is `1` by default. Deploy the family only from main: the owner's merge
+  is the acceptance of its POOL_LOSS_MEMORY_V1 replacement (DEFENSIVE_ENTRY_LAYER.md).
+- Set it to `0` and restart the Lab to stop the family. The journal and the checkpoint stay
+  on disk, and the next enabled start resumes from them.
+- To retire individual books for good, set `NEO_LAB_HF_RETIRE=HF_QUIET_E95,HF_DIP15_E95`
+  (comma-separated ids). Open slots still run to their exits. The control retires on its own
+  once both hypotheses are retired. A retirement is journaled, so it survives every restart.
+- **Set every `NEO_LAB_HF_*` variable at User scope, never only in a shell.**
+  `start_local_paper.ps1` passes the calling process's environment to the Lab, but the
+  watchdog's scheduled task restarts the Lab (`-WatchdogRecovery`) with the task's
+  environment, not the operator's shell. A value set with `$env:NEO_LAB_HF_ENABLED='0'` is
+  lost at the next watchdog recovery: HF resumes trading, and a shell-only cap reverts to
+  $100 (a new budget hash).
+
+  ```powershell
+  [Environment]::SetEnvironmentVariable('NEO_LAB_HF_ENABLED', '0', 'User')
+  # remove it again (back to the default, enabled):
+  [Environment]::SetEnvironmentVariable('NEO_LAB_HF_ENABLED', $null, 'User')
+  ```
+
+  Then open a new shell and Stop/Start. After every Start and every watchdog recovery, check
+  on `GET /state` that `strategy_lab.activity_config.lab_high_frequency.running` (false when
+  disabled) and `budget_hash` are what you set. If a watchdog-started Lab still shows the old
+  value, the task did not see the new User environment yet: sign out and in (or restart
+  Windows), then check again.
+
+**Budget** (budget hash only; a change never starts a new evidence sample):
+
+- `NEO_LAB_HF_START_BALANCE_USD`, default 1000. It applies to a fresh `strategy_lab_hf/`; an
+  existing checkpoint keeps its balances.
+- `NEO_LAB_HF_DAILY_CAP_USD`, default 100.
+
+An invalid value keeps the default and is listed in
+`strategy_lab.activity_config.lab_high_frequency.budget_env_errors`. New orders start each
+UTC day d from hour (7 x d) mod 24 (`hf_session_not_open` before): Oct 10 opens at 00:00,
+Oct 11 at 07:00, Oct 12 at 14:00. Never change the strategy rules through the environment:
+the Lab's `NEO_LAB_*` cost knobs change the HF config hashes, and the books then refuse
+every order (`hf_cost_model_mismatch`), as the forward-test books do.
+
+**Files**, next to `strategy_lab.json` (override with `NEO_STRATEGY_LAB_HF_DIR`):
+
+- `strategy_lab_hf/journal/<BOOK>/<YYYY-MM-DD>.jsonl`: an append-only journal, one row per
+  state change. Row kinds:
+  - `order` (`side` entry or exit);
+  - `fill`;
+  - `cancel`;
+  - `close`;
+  - `cap`, `session`, `retire`.
+
+  The Lab flushes and fsyncs each touched file once per loop, at the end of the loop
+  (`hf_end_loop`), before the checkpoint; a kill checkpoint (every 250 closes) flushes once
+  more. Expect about 0.7 MB per hour of 3 x 50 trades, and with the daily cap about 3 trading
+  hours per book per day.
+- `strategy_lab_hf/state.json`: the checkpoint. It is written atomically every 15 s when
+  anything changed and on every clean stop, always after the journal. It is skipped while a
+  journaled row is not fully applied (a stop landing inside one), so that row is replayed.
+  After a crash or a stop the Lab replays the journal rows above the checkpoint's `seq`
+  exactly once. Then:
+  - ORDERED entries are cancelled with reason `restart`;
+  - open positions resume, and when a slot's first observation after the restart is at most
+    10 minutes after its last mark, an exit due during the outage is ordered there
+    (`late_exit_restart`);
+  - after a longer gap (in practice an outage of about 10 minutes or more) the slot closes as
+    `FEED_GAP` at min(pre-gap price, return price), or as `VANISHED` if the pool does not come
+    back, flagged `restart_gap` with `restart_outage_ms` and `gap_ms`. That valuation is
+    conservative by construction, and the closes count in the cap and the kill rule like any
+    other.
+- **Deploy, rollback and redeploy:** each one stops the Lab, so keep the HF outage (Stop to
+  Start) under 10 minutes where you can. Record the stop and start times and the `trade_no`s of
+  the rows with `reason: restart` or `restart_gap` in the deploy notes. A rollback to a
+  release without HF leaves `strategy_lab_hf/` on disk untouched; the next release with HF
+  resumes from it under the same outage rule.
+- `strategy_lab_hf/archive/reset-*/`: a Lab reset (`strategy_lab.reset` flag) moves the
+  journal and the checkpoint here. `paper_runtime.py reset-all` moves the whole
+  `strategy_lab_hf/` into the reset archive (sha256 manifest with `directory:
+  strategy_lab_hf`) and recreates it empty. Nothing is deleted.
+- **Restore** with the Lab stopped:
+  - A reset-all archive restores with the command in
+    [Reset every PAPER account and restore](#reset-every-paper-account-and-restore), using
+    that archive's folder. Every sha256 is checked first, the current `strategy_lab_hf/` is
+    moved into a new reset archive, and the archived tree is copied back; the archive stays
+    intact.
+  - A Lab-reset archive (`strategy_lab_hf/archive/reset-<ms>-<id>/`, no manifest): move the
+    current `journal/` and `state.json` into a new folder under `strategy_lab_hf/archive/`,
+    then move the archived `journal/` and `state.json` back into `strategy_lab_hf/`.
+
+**Read** (main's `GET /state`, read-only):
+
+- `strategy_lab.high_frequency`: the dashboard view, also shown in the Strategies section
+  under `Висока честота (HF)`;
+- `strategy_lab.activity_config.lab_high_frequency`: `config_hashes`, `budget_hash`,
+  `cost_model_mismatches` and `running`;
+- `strategy_lab.persistence.hf`: loop milliseconds, `degraded` and `time_budget`
+  (`degraded_since`, `degraded_cleared_at`, `degraded_episodes`), `refresh.at` (the last HF
+  refresh), `refresh_60s` (`refreshes`, `events`, `universe`, `refreshes_with_universe` and
+  `last_universe_at` over the last 60 s), `orders_last_60m`, the journal and checkpoint
+  writes (`checkpoint.skipped_in_flight`), `errors` (`count`, `last`, `last_at`,
+  `consecutive_loops`), `price_audit.checks_last_60s` (at most 2), the journal `epoch`,
+  `mark_feed` (HF's own exact-pair feed, at most one request every 2 s) and `build`
+  (`attempts`, `failures`, `last_error`, `next_attempt_at`, `built_at`);
+- `strategy_lab.hf_error`: the failing HF calls of the latest loop (it disappears after the
+  first clean loop; `persistence.hf.errors` keeps the count). The Lab keeps running, and the
+  dashboard shows the failure above the HF books for 10 minutes. A failed HF start shows as
+  `build: <error>` and is retried every minute while HF is enabled; the dashboard then says
+  `HF не стартира: <error>` instead of `Няма HF данни`.
+
+After a deploy, check that `config_hashes` equal the table in LAB_HIGH_FREQUENCY.md and
+`lab_high_frequency.config_hashes` in `strategy-lock.json`, that `strategy_lab.hf_error` is
+absent, `persistence.hf.errors.consecutive_loops` is 0 and `persistence.hf.build.failures`
+is 0, that `persistence.hf.refresh.at` is current (a few seconds old: a stale value means HF
+decisions stopped, even while `running` is true), and that `refresh_60s.universe` is above 0
+with a recent `refresh_60s.last_universe_at`. Do not judge the universe by
+`refresh.universe`: it is the last 2 s refresh only, and main rescans every 3 s, so it is 0
+about one read in three on a healthy runtime. After the 15-minute heat warm-up, and while a
+book's session is open and its cap is not tripped, expect 40-50 orders an hour per book.
+`hf_degraded` (time budget) lasts at least 5 minutes once tripped.
+
+**Rescore** from a **copy** of the folder (never the live one), outside the runtime:
+
+```powershell
+$work = Join-Path $env:TEMP 'neo-hf'
+Copy-Item -Recurse -Path RUNTIME\accounts\strategy_lab_hf -Destination (Join-Path $work 'strategy_lab_hf')
+.venv/Scripts/python.exe scripts/paper_edge_report.py --lab-hf "$work\strategy_lab_hf" --output "$work\reports\hf"
+.venv/Scripts/python.exe scripts/evaluate_paper_lab.py --hf-dir "$work\strategy_lab_hf" --output "$work\reports\hf-metrics.json"
+```
+
+- `paper_edge_report.py --lab-hf` counts journal closes as Lab trades, deduplicated by
+  (book, config hash, journal epoch, journal seq). Archived resets inside the folder are
+  skipped. Its `high_frequency` section reports each hypothesis against the same-period
+  control, with a pair-bootstrap CI and the gap within each fee bucket.
+- `paper_edge_report.py --archive-dir` skips HF checkpoints (`strategy_lab_hf/state.json`,
+  also inside reset archives): they are not engine ledgers. They are listed in the report's
+  `skipped_inputs` and on stderr. Pass an archived `strategy_lab_hf` folder (or its
+  `archive/reset-<ms>-<id>` folder) with another `--lab-hf` to include its closes. After a
+  reset `seq` restarts at 1, but every row carries its journal `epoch` (new at each reset),
+  so the archived and the current sessions read together never collide.
+- `evaluate_paper_lab.py --hf-dir` reports orders, closes and cancels per hour per (book,
+  config hash), with the most slots held at once (per epoch) and `journal_epochs`.
+- A journal line torn by a crash (also inside a multi-byte character of a symbol) is counted
+  as one malformed line and skipped; it never stops the Lab's load or these reports, so the
+  journal is never edited by hand.
+- Compare a day's closes with the research simulator
+  (`research/hf_study_2026_10_09/hf_synthesis/syn_lib.py`) for the same window when the scan
+  log is available.
+
 ## Reset every PAPER account and restore
 
 Explicit latest user authorization covers all PAPER accounts. Stop **all** main/per-user/training/Lab/Astra/paired writers before offline reset. The all-account operation enumerates the known registry/user state formats, preserves each starting balance (Fast Scalper $100, the four `PROMOTED_PAPER` cohort books $250, other Lab books normally $500), resets main/per-user $1,000 and nine training books $500 each, creates SHA256 archives and new sessions, and keeps raw market data. Unknown schemas abort before known-account changes. A multi-account reset is not one filesystem transaction; disk failure can leave a partial reset, so retain the output/archive manifests and recover from them.
@@ -336,7 +493,7 @@ Restore a particular checksum archive with stopped writers:
 .venv/Scripts/python.exe scripts/paper_runtime.py restore --root .runtime/accounts --archive .runtime/accounts/archive/RESET_DIRECTORY --offline
 ```
 
-Main and nested training archives are separate: restore each to its matching directory. Restore also archives the current files. Hash mismatch refuses replacement. For code rollback, select the prior reviewed commit and restore its matching saved PAPER account/config archive; do not reuse future-version state blindly. Training rollback is automatic within LEARNER and recorded in version history; it never changes production code.
+Main and nested training archives are separate: restore each to its matching directory. The `strategy_lab_hf/` archive of the HF books is a separate archive folder too (its manifest names `directory: strategy_lab_hf` and nested paths); restoring it with `--root` set to the accounts folder brings the whole directory back. Restore also archives the current files. Hash mismatch refuses replacement. For code rollback, select the prior reviewed commit and restore its matching saved PAPER account/config archive; do not reuse future-version state blindly. Training rollback is automatic within LEARNER and recorded in version history; it never changes production code.
 
 ## Executed result register
 

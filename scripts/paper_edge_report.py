@@ -327,6 +327,139 @@ def _lab_trade(row: dict[str, Any], book_id: str, group: str, source: str) -> di
     }
 
 
+HF_GROUP = 'HF_EXPERIMENT'
+HF_CONTROL = 'HF_RND_E95'
+HF_HYPOTHESES = ('HF_QUIET_E95', 'HF_DIP15_E95')
+HF_NOTIONAL_USD = 25.0
+# The HF books' own directory and checkpoint version: an HF checkpoint is also named state.json,
+# but it is not an engine ledger (--archive-dir skips it; --lab-hf reads the journal).
+HF_DIRECTORY = 'strategy_lab_hf'
+HF_CHECKPOINT_VERSION = 'HF_CHECKPOINT_V1'
+
+
+def is_hf_checkpoint_file(path: Path) -> bool:
+    """Whether ``path`` holds a LAB_HIGH_FREQUENCY_V1 checkpoint (version HF_CHECKPOINT_V1)."""
+    try:
+        data = load_json(path)[0]
+    except ValueError:
+        return False
+    return isinstance(data, dict) and data.get('version') == HF_CHECKPOINT_VERSION
+
+
+def _hf_fee_bucket(fee_bps: Any) -> str:
+    fee = finite(fee_bps)
+    if fee is None:
+        return 'unknown'
+    return 'fee<=50' if fee <= 50 else 'fee55-95' if fee <= 95 else 'fee100-125'
+
+
+def hf_trade_id(book: str, cfg: str, epoch: Any, seq: int) -> str:
+    """The HF journal identity: book, config hash, epoch (journal lineage) and seq.
+
+    seq restarts at 1 when the HF root is reset, so two sessions' closes share (book, cfg, seq);
+    the epoch (new at every fresh root or reset, on every row) keeps them apart. A row without
+    an epoch keeps the plain book:cfg:seq identity.
+    """
+    if isinstance(epoch, str) and epoch:
+        return f'HF:{book}:{cfg}:{epoch}:{seq}'
+    return f'HF:{book}:{cfg}:{seq}'
+
+
+def _hf_trade(row: dict[str, Any], source: str) -> dict[str, Any] | None:
+    """A LAB_HIGH_FREQUENCY_V1 journal close as a Lab trade; id = book:cfg:epoch:seq (journal identity)."""
+    book, cfg, seq = row.get('book'), row.get('cfg'), row.get('seq')
+    opened = finite(row.get('decision_at'))
+    closed = finite(row.get('closed_at')) or finite(row.get('at'))
+    pnl = finite(row.get('pnl_usd'))
+    mint, pool = row.get('address'), row.get('pairAddress')
+    if (not isinstance(book, str) or not isinstance(cfg, str) or not isinstance(seq, int) or isinstance(seq, bool)
+            or opened is None or closed is None or pnl is None or opened <= 0 or closed < opened
+            or not isinstance(mint, str) or not mint or not isinstance(pool, str) or not pool):
+        return None
+    notional = HF_NOTIONAL_USD  # FIXED_NOTIONAL_NO_BACKOFF
+    pct = finite(row.get('pnl_pct'))
+    entry_mark, exit_mark = finite(row.get('entry_fill_price')), finite(row.get('exit_fill_price'))
+    gross = notional * (exit_mark / entry_mark - 1) if entry_mark and exit_mark and notional else None
+    trade_no = row.get('trade_no')
+    return {
+        'family': 'LAB', 'account': f'LAB:{HF_GROUP}', 'source': source,
+        'id': hf_trade_id(book, cfg, row.get('epoch'), seq),
+        'book': book, 'session': 'LAB', 'hf': True, 'config_hash': cfg,
+        'epoch': row.get('epoch') if isinstance(row.get('epoch'), str) else None,
+        'trade_no': trade_no if isinstance(trade_no, int) and not isinstance(trade_no, bool) else None,
+        'balance_after': finite(row.get('balance_after')),
+        'policy': ' | '.join([f'LAB:{HF_GROUP}', 'entry=' + str(row.get('entry_policy_version') or 'legacy_unknown')]),
+        'exit_reason': str(row.get('close_kind') or row.get('exit_reason') or 'UNKNOWN'),
+        'mint': mint, 'pool': pool,
+        'opened_at': opened, 'closed_at': closed, 'hold_s': (closed - opened) / 1000,
+        'notional_usd': notional, 'pnl_usd': pnl,
+        'pnl_pct': pct if pct is not None else pnl / HF_NOTIONAL_USD * 100,
+        'net50_pct': finite(row.get('net50_pct')), 'net50_usd': finite(row.get('net50_usd')),
+        'fee_bucket': _hf_fee_bucket(row.get('fee_bps')),
+        'zero_capital': False, 'balance_effect_usd': pnl,
+        'gross_mark_usd': gross, 'entry_roundtrip_pct': None, 'entry_roundtrip_cost_usd': None,
+        'entry_fixed_usd': 0.0, 'exit_fees_usd': 0.0, 'exit_impact_usd': None, 'exit_leg_usd': None,
+        'has_partials': False,
+    }
+
+
+def _hf_pair_gap_ci(hyp: list[dict[str, Any]], ctrl: list[dict[str, Any]], *, iterations: int, seed: int):
+    def groups(rows):
+        out: dict[str, list[float]] = defaultdict(list)
+        for row in rows:
+            if row.get('net50_pct') is not None:
+                out[row['pool']].append(row['net50_pct'])
+        return [(sum(values), len(values)) for values in out.values()]
+    a, b = groups(hyp), groups(ctrl)
+    if len(a) < 3 or len(b) < 3:
+        return None
+    rng = random.Random(seed)
+
+    def mean(items):
+        total = count = 0
+        for _ in items:
+            value, n = items[rng.randrange(len(items))]
+            total += value
+            count += n
+        return total / count
+    gaps = sorted(mean(a) - mean(b) for _ in range(iterations))
+    return [round(gaps[int(0.025 * (iterations - 1))], 6), round(gaps[int(math.ceil(0.975 * (iterations - 1)))], 6)]
+
+
+def hf_gap_report(trades: list[dict[str, Any]], *, iterations: int, seed: int) -> dict[str, Any]:
+    """Hypothesis minus same-period control mean net50 % per trade, overall and within fee buckets."""
+    by_book: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for trade in trades:
+        if trade.get('hf'):
+            by_book[trade['book']].append(trade)
+    out: dict[str, Any] = {}
+    for hypothesis in HF_HYPOTHESES:
+        hyp = [trade for trade in by_book.get(hypothesis, []) if trade.get('net50_pct') is not None]
+        if not hyp:
+            continue
+        start = min(trade['closed_at'] for trade in hyp)
+        end = max(trade['closed_at'] for trade in hyp)
+        ctrl = [trade for trade in by_book.get(HF_CONTROL, [])
+                if trade.get('net50_pct') is not None and start <= trade['closed_at'] <= end]
+        entry: dict[str, Any] = {'control': HF_CONTROL, 'hypothesis_closes': len(hyp), 'control_closes_same_period': len(ctrl),
+                                 'hypothesis_mean_net50_pct': _round(_mean(t['net50_pct'] for t in hyp)),
+                                 'control_mean_net50_pct': _round(_mean(t['net50_pct'] for t in ctrl)),
+                                 'gap_net50_pct': None, 'gap_ci95_pair_bootstrap': None, 'within_fee_bucket': {}}
+        if ctrl:
+            entry['gap_net50_pct'] = _round(entry['hypothesis_mean_net50_pct'] - entry['control_mean_net50_pct'])
+            entry['gap_ci95_pair_bootstrap'] = _hf_pair_gap_ci(hyp, ctrl, iterations=iterations, seed=seed)
+        for bucket in ('fee<=50', 'fee55-95'):
+            a = [t['net50_pct'] for t in hyp if t['fee_bucket'] == bucket]
+            b = [t['net50_pct'] for t in ctrl if t['fee_bucket'] == bucket]
+            entry['within_fee_bucket'][bucket] = {
+                'n': [len(a), len(b)],
+                'gap_net50_pct': _round(_mean(a) - _mean(b)) if a and b else None}
+        out[hypothesis] = entry
+    return {'basis': ('net50 % per trade; control closes restricted to the hypothesis close period; pair (pool) '
+                      'bootstrap CI; within-fee-bucket gaps remove the pool-cost selection effect'),
+            'gaps': out}
+
+
 def _peek_session(path: Path) -> str | None:
     data, _digest, _size = load_json(path)
     return str(data.get('demo_session_id') or '') if isinstance(data, dict) else None
@@ -341,6 +474,8 @@ class LedgerCollector:
         self.trades: dict[str, dict[str, Any]] = {}
         self.conflicts: set[str] = set()
         self.sources: list[dict[str, Any]] = []
+        # Files an --archive-dir scan recognised but did not read as ledgers (HF checkpoints).
+        self.skipped: list[dict[str, Any]] = []
         self.rejected: dict[str, int] = defaultdict(int)
         self.duplicates = 0
         self.filtered_by_window = 0
@@ -466,12 +601,68 @@ class LedgerCollector:
         self.sources.append({'kind': 'lab', 'file': scrub(path.name), 'sha256': digest, 'bytes': size,
                              'closed_rows': admitted, 'books': len(data['books'])})
 
+    def add_hf_journal(self, root: Path) -> None:
+        """LAB_HIGH_FREQUENCY_V1 journal closes (strategy_lab_hf/ or its journal/; archived resets skipped)."""
+        if not root.is_dir():
+            raise ValueError(f'{display_path(root)} is not a directory')
+        files = sorted(path for path in root.rglob('*.jsonl') if 'archive' not in path.relative_to(root).parts)
+        digest = hashlib.sha256()
+        admitted = size = 0
+        checkpoint = root / 'state.json'
+        if checkpoint.is_file():
+            try:
+                stored = json.loads(checkpoint.read_text(encoding='utf-8'))
+                for book_id, book in (stored.get('books') or {}).items():
+                    start = finite((book or {}).get('start_balance'))
+                    if start and start > 0:
+                        self.starting_balances.setdefault(f'LAB_BOOK:{book_id}', start)
+            except (OSError, ValueError, AttributeError):
+                pass
+        for path in files:
+            data = path.read_bytes()
+            digest.update(data)
+            size += len(data)
+            for line in data.decode('utf-8', errors='replace').splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    self.rejected['malformed'] += 1
+                    continue
+                if not isinstance(row, dict) or row.get('kind') != 'close':
+                    continue
+                trade = _hf_trade(row, path.name)
+                if trade is None:
+                    self.rejected['invalid_closed_record'] += 1
+                    continue
+                self._admit(trade)
+                admitted += 1
+        self.sources.append({'kind': 'lab_hf', 'file': scrub(root.name), 'sha256': digest.hexdigest(), 'bytes': size,
+                             'closed_rows': admitted, 'books': len({f.parent.name for f in files}),
+                             'journal_files': len(files)})
+
+    def _skip_hf_checkpoint(self, root: Path, path: Path) -> None:
+        relative = path.relative_to(root).as_posix() if path.is_relative_to(root) else path.name
+        self.skipped.append({'kind': 'hf_checkpoint', 'file': scrub(relative),
+                             'reason': 'LAB_HIGH_FREQUENCY_V1 checkpoint, not an engine ledger; '
+                                       'read its strategy_lab_hf directory with --lab-hf'})
+
     def add_archive_dir(self, root: Path, label: str | None = None) -> int:
         """Scan for ledger copies. ``label`` applies to engine ledgers that are not under
-        ``users/<account-uuid>/``; those keep the account named by their directory."""
+        ``users/<account-uuid>/``; those keep the account named by their directory.
+
+        A LAB_HIGH_FREQUENCY_V1 checkpoint (``strategy_lab_hf/state.json``, also in reset
+        archives) is skipped and listed in ``skipped``: its trades are journal rows, read
+        with ``--lab-hf``.
+        """
         found = 0
         for path in sorted(root.rglob('*.json')):
             if path.name == 'state.json':
+                if HF_DIRECTORY in (root.name, *path.relative_to(root).parent.parts):
+                    self._skip_hf_checkpoint(root, path)
+                    continue
                 derived = derive_account_label(path.resolve())
                 explicit = label if label is not None and derived == 'main' else None
                 if explicit is not None:
@@ -480,7 +671,14 @@ class LedgerCollector:
                     if owner is not None and owner != explicit:
                         raise ValueError(f'{display_path(path)}: --archive-dir label "{explicit}" conflicts with its '
                                          f'demo_session_id owner "{owner}"; give that file its own --state label')
-                self.add_engine_ledger(path, explicit)
+                try:
+                    self.add_engine_ledger(path, explicit)
+                except ValueError:
+                    # An HF checkpoint copied outside a strategy_lab_hf directory is still not a ledger.
+                    if not is_hf_checkpoint_file(path):
+                        raise
+                    self._skip_hf_checkpoint(root, path)
+                    continue
                 found += 1
             elif path.name == 'strategy_lab.json':
                 self.add_lab_ledger(path)
@@ -818,6 +1016,7 @@ def build_report(collector: LedgerCollector, *, iterations: int, seed: int) -> d
         'window': {'since': iso(collector.since), 'until': iso(collector.until),
                    'filtered_out_by_window': collector.filtered_by_window},
         'sources': collector.sources,
+        'skipped_inputs': collector.skipped,
         'dedupe': {'unique_closed_trades': len(trades), 'duplicate_copies_skipped': collector.duplicates,
                    'conflicting_ids_excluded': len(collector.conflicts),
                    'rejected_rows': dict(collector.rejected),
@@ -841,6 +1040,13 @@ def build_report(collector: LedgerCollector, *, iterations: int, seed: int) -> d
             'note': ('Each Lab book owns its capital; by_book rows are measured separately, with drawdown segmented at '
                      "book resets. by_policy_version and by_exit_reason rows pool the books listed in each row's 'books' "
                      'field and are cross-book aggregates, not the result of any one book.'),
+        },
+        # LAB_HIGH_FREQUENCY_V1 journal closes (--lab-hf), also measured as Lab books above.
+        'high_frequency': {
+            'unique_closed_trades': sum(1 for trade in lab if trade.get('hf')),
+            'dedupe_key': ('book:cfg:epoch:seq (journal identity; the epoch is new at every fresh HF root or reset, '
+                           'where seq restarts at 1)'),
+            **hf_gap_report(lab, iterations=iterations, seed=seed),
         },
         'limitations': [
             DISCLAIMER,
@@ -931,6 +1137,8 @@ def render_markdown(report: dict[str, Any]) -> str:
     for source in report['sources']:
         who = source.get('account') if source['kind'] == 'engine' else f"{source.get('books')} books"
         out.append(f"| {source['kind']} | {scrub(who)} | {scrub(source['file'])} | {source['closed_rows']} | {source['sha256'][:16]}... |\n")
+    for skipped in report.get('skipped_inputs') or []:
+        out.append(f"\nSkipped {scrub(skipped['file'])}: {scrub(skipped['reason'])}.\n")
     out.append('\n## Engine accounts\n')
     out.append(_table('By account', report['engine']['by_account']))
     out.append('\n' + report['engine']['note'] + '\n')
@@ -942,6 +1150,18 @@ def render_markdown(report: dict[str, Any]) -> str:
     out.append('\n' + report['lab']['note'] + '\n')
     out.append(_table('By entry policy version (pooled across the listed books)', report['lab']['by_policy_version']))
     out.append(_table('By exit reason (pooled across the listed books)', report['lab']['by_exit_reason']))
+    hf = report.get('high_frequency') or {}
+    if hf.get('unique_closed_trades'):
+        out.append('\n## High-frequency books (LAB_HIGH_FREQUENCY_V1): gap vs the random control\n\n')
+        out.append(hf['basis'] + '\n\n| hypothesis | n (hyp/ctrl) | mean net50 % hyp | ctrl | gap pp | gap CI95 | '
+                   'gap fee<=50 | gap fee55-95 |\n|---|---|---|---|---|---|---|---|\n')
+        for name, gap in hf['gaps'].items():
+            ci = gap['gap_ci95_pair_bootstrap']
+            within = gap['within_fee_bucket']
+            out.append(f"| {name} | {gap['hypothesis_closes']}/{gap['control_closes_same_period']} | "
+                       f"{_fmt(gap['hypothesis_mean_net50_pct'], 3)} | {_fmt(gap['control_mean_net50_pct'], 3)} | "
+                       f"{_fmt(gap['gap_net50_pct'], 3)} | {('[%.3f, %.3f]' % tuple(ci)) if ci else 'n/a'} | "
+                       f"{_fmt(within['fee<=50']['gap_net50_pct'], 3)} | {_fmt(within['fee55-95']['gap_net50_pct'], 3)} |\n")
     out.append('\n## Limitations\n\n' + ''.join(f'- {line}\n' for line in report['limitations']))
     return ''.join(out)
 
@@ -957,6 +1177,10 @@ def build_parser() -> argparse.ArgumentParser:
                              '(users/<account-uuid>/... is that user, anything else is main; ambiguous inputs are refused)')
     parser.add_argument('--lab', action='append', default=[], metavar='PATH', type=Path,
                         help='full strategy_lab.json copy (repeatable)')
+    parser.add_argument('--lab-hf', action='append', default=[], metavar='DIR', type=Path,
+                        help='LAB_HIGH_FREQUENCY_V1 strategy_lab_hf directory copy (journal closes as Lab trades, '
+                             'deduplicated by book, config hash, journal epoch and seq, so archived and '
+                             'current sessions can be read together; repeatable)')
     parser.add_argument('--archive-dir', action='append', default=[], metavar='[LABEL=]DIR',
                         help='directory scanned recursively for state.json / strategy_lab.json copies; an optional '
                              'label applies to engine ledgers that are not under users/<account-uuid>/')
@@ -984,8 +1208,8 @@ def main(argv: list[str] | None = None) -> int:
     def fail(message: Any) -> None:
         parser.error(scrub(message))
 
-    if not (args.state or args.lab or args.archive_dir):
-        fail('give at least one --state, --lab or --archive-dir')
+    if not (args.state or args.lab or args.archive_dir or args.lab_hf):
+        fail('give at least one --state, --lab, --archive-dir or --lab-hf')
     if args.bootstrap < 1:
         fail('--bootstrap must be at least 1')
     try:
@@ -1001,8 +1225,11 @@ def main(argv: list[str] | None = None) -> int:
     for _label, root in archives:
         if not root.is_dir():
             fail(f'{display_path(root)} is not a directory')
+    for root in args.lab_hf:
+        if not root.is_dir():
+            fail(f'{display_path(root)} is not a directory')
     inputs: list[Path] = ([path.resolve() for _label, path in states] + [path.resolve() for path in args.lab]
-                          + [root.resolve() for _label, root in archives])
+                          + [root.resolve() for _label, root in archives] + [root.resolve() for root in args.lab_hf])
     outputs = list(output_paths(args.output)) if args.output else []
 
     # Every path check happens before any ledger is opened.
@@ -1031,11 +1258,16 @@ def main(argv: list[str] | None = None) -> int:
             collector.add_engine_ledger(path, label)
         for path in args.lab:
             collector.add_lab_ledger(path)
+        for root in args.lab_hf:
+            collector.add_hf_journal(root)
         for label, root in archives:
             if collector.add_archive_dir(root, label) == 0:
                 print(f'warning: no state.json or strategy_lab.json under {display_path(root)}', file=sys.stderr)
     except (OSError, ValueError) as exc:
         fail(exc)
+    if collector.skipped:
+        print(f'note: skipped {len(collector.skipped)} LAB_HIGH_FREQUENCY_V1 checkpoint(s) (not engine ledgers); '
+              'pass their strategy_lab_hf directory with --lab-hf to include HF journal closes', file=sys.stderr)
 
     report = build_report(collector, iterations=args.bootstrap, seed=args.seed)
     markdown = render_markdown(report)

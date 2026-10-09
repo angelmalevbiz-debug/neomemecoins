@@ -1,0 +1,38 @@
+{
+ "defense": {
+  "pair_history": {
+   "pairs": 90,
+   "samples": 17098
+  },
+  "observe_ms_per_refresh_90_coins": 0.332,
+  "evaluate_us_per_candidate": 38.6,
+  "evaluate_ms_per_refresh_90x8_unshared": 27.81,
+  "evaluate_ms_per_refresh_90_shared": 3.42,
+  "pool_loss_memory_index_ms_50_rows": 0.033,
+  "pool_loss_memory_index_ms_10k_rows": 6.14
+ },
+ "storage": {
+  "forward_like_close_bytes": 4345,
+  "hf_close_row_bytes": 899,
+  "whole_ledger_1200_closes": {
+   "mb": 5.2,
+   "dumps_s": 0.033,
+   "write_fsync_s": 0.006,
+   "share_of_2s_poll": 0.019
+  },
+  "whole_ledger_9600_closes": {
+   "mb": 41.8,
+   "dumps_s": 0.271,
+   "write_fsync_s": 0.078,
+   "share_of_2s_poll": 0.174
+  },
+  "hf_state_file": {
+   "kb": 720.0,
+   "dumps_ms": 4.83,
+   "write_fsync_ms": 1.7
+  },
+  "jsonl_append_2_rows_fsync_ms": 0.83,
+  "jsonl_replay_1200_rows_ms": 13.0,
+  "jsonl_mb_per_book_day_at_50ph": 1.08
+ }
+}

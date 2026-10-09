@@ -1,0 +1,153 @@
+train full hours 25, live hours (>=3 eligible pools) 19
+grid rows 162 secs 24.8
+eligible configs 92
+CHOSEN v2: h120_s3_cd120_gov50_nogb
+h120_s3_cd60_gov50_gb-3
+  control(5 salts)               tph  34.3 live  45.4 p10L 35.6 medL 48.4 ge40L 0.84 max 50.0 net50 -3.896 bk -2.930 net0 -1.817 gr +0.001 $/tr -0.974 bk$/h -25.14 50$/h -33.44 pairs 23.6 top 0.105 le50 0.22 re60 0.00 re300 0.35 cyc 159 mddbk 649
+  QUIET                          tph  32.6 live  43.0 p10L   30 medL   45 ge40L 0.68 max  50 net50 -3.748 bk -2.780 net0 -1.592 gr -0.073 $/tr -0.937 bk$/h -22.65 50$/h -30.54 pairs 20.0 top 0.162 le50 0.54 re60 0.00 re300 0.45 cyc 150 mddbk 585
+  NEAR15LOW                      tph  32.4 live  42.8 p10L   30 medL   46 ge40L 0.74 max  50 net50 -3.785 bk -2.818 net0 -1.680 gr +0.051 $/tr -0.946 bk$/h -22.79 50$/h -30.62 pairs 24.0 top 0.097 le50 0.33 re60 0.00 re300 0.36 cyc 150 mddbk 588
+h120_s3_cd120_gov50_nogb
+  control(5 salts)               tph  34.3 live  45.3 p10L 36.0 medL 48.4 ge40L 0.80 max 50.0 net50 -3.902 bk -2.936 net0 -1.823 gr +0.002 $/tr -0.976 bk$/h -25.15 50$/h -33.43 pairs 23.6 top 0.105 le50 0.23 re60 0.00 re300 0.28 cyc 159 mddbk 649
+  QUIET                          tph  31.5 live  41.6 p10L   28 medL   45 ge40L 0.68 max  50 net50 -3.745 bk -2.776 net0 -1.588 gr -0.071 $/tr -0.936 bk$/h -21.87 50$/h -29.49 pairs 20.0 top 0.156 le50 0.54 re60 0.00 re300 0.40 cyc 156 mddbk 564
+  NEAR15LOW                      tph  32.0 live  42.3 p10L   26 medL   46 ge40L 0.63 max  50 net50 -3.802 bk -2.834 net0 -1.697 gr +0.038 $/tr -0.950 bk$/h -22.68 50$/h -30.42 pairs 24.0 top 0.087 le50 0.32 re60 0.00 re300 0.32 cyc 141 mddbk 585
+h120_s3_cd60_gov50_gb-5
+  control(5 salts)               tph  34.5 live  45.5 p10L 36.0 medL 48.2 ge40L 0.84 max 50.0 net50 -3.902 bk -2.935 net0 -1.824 gr +0.003 $/tr -0.975 bk$/h -25.28 50$/h -33.61 pairs 23.0 top 0.112 le50 0.22 re60 0.00 re300 0.35 cyc 159 mddbk 652
+  QUIET                          tph  32.6 live  43.0 p10L   30 medL   45 ge40L 0.74 max  50 net50 -3.746 bk -2.778 net0 -1.589 gr -0.069 $/tr -0.936 bk$/h -22.66 50$/h -30.56 pairs 20.0 top 0.160 le50 0.54 re60 0.00 re300 0.44 cyc 150 mddbk 585
+  NEAR15LOW                      tph  32.6 live  43.2 p10L   30 medL   46 ge40L 0.74 max  50 net50 -3.789 bk -2.821 net0 -1.684 gr +0.050 $/tr -0.947 bk$/h -23.01 50$/h -30.91 pairs 24.0 top 0.096 le50 0.32 re60 0.00 re300 0.36 cyc 150 mddbk 594
+h120_s3_cd60_gov50_nogb
+  control(5 salts)               tph  34.5 live  45.6 p10L 36.0 medL 48.4 ge40L 0.84 max 50.0 net50 -3.910 bk -2.943 net0 -1.833 gr -0.001 $/tr -0.978 bk$/h -25.38 50$/h -33.71 pairs 23.2 top 0.116 le50 0.22 re60 0.00 re300 0.35 cyc 159 mddbk 655
+  QUIET                          tph  32.7 live  43.1 p10L   30 medL   45 ge40L 0.74 max  50 net50 -3.741 bk -2.772 net0 -1.583 gr -0.065 $/tr -0.935 bk$/h -22.64 50$/h -30.55 pairs 20.0 top 0.165 le50 0.54 re60 0.00 re300 0.45 cyc 150 mddbk 584
+  NEAR15LOW                      tph  32.6 live  43.2 p10L   30 medL   46 ge40L 0.74 max  50 net50 -3.789 bk -2.821 net0 -1.684 gr +0.052 $/tr -0.947 bk$/h -23.01 50$/h -30.90 pairs 24.0 top 0.096 le50 0.32 re60 0.00 re300 0.36 cyc 150 mddbk 594
+h120_s4_cd120_gov50_gb-3
+  control(5 salts)               tph  35.0 live  46.2 p10L 37.6 medL 48.6 ge40L 0.91 max 50.0 net50 -3.905 bk -2.938 net0 -1.823 gr -0.013 $/tr -0.976 bk$/h -25.69 50$/h -34.14 pairs 23.4 top 0.099 le50 0.23 re60 0.00 re300 0.33 cyc 160 mddbk 663
+  QUIET                          tph  32.5 live  42.8 p10L   30 medL   45 ge40L 0.68 max  50 net50 -3.730 bk -2.762 net0 -1.575 gr -0.054 $/tr -0.933 bk$/h -22.45 50$/h -30.32 pairs 20.0 top 0.145 le50 0.53 re60 0.00 re300 0.41 cyc 154 mddbk 579
+  NEAR15LOW                      tph  32.8 live  43.4 p10L   29 medL   46 ge40L 0.79 max  50 net50 -3.786 bk -2.819 net0 -1.682 gr +0.052 $/tr -0.947 bk$/h -23.13 50$/h -31.07 pairs 24.0 top 0.087 le50 0.32 re60 0.00 re300 0.34 cyc 154 mddbk 597
+h120_s5_cd120_gov50_gb-3
+  control(5 salts)               tph  35.2 live  46.5 p10L 38.4 medL 48.2 ge40L 0.92 max 50.0 net50 -3.901 bk -2.934 net0 -1.820 gr -0.009 $/tr -0.975 bk$/h -25.82 50$/h -34.32 pairs 23.2 top 0.100 le50 0.23 re60 0.00 re300 0.34 cyc 162 mddbk 666
+  QUIET                          tph  32.6 live  42.9 p10L   30 medL   46 ge40L 0.68 max  50 net50 -3.738 bk -2.770 net0 -1.583 gr -0.061 $/tr -0.935 bk$/h -22.56 50$/h -30.45 pairs 20.0 top 0.145 le50 0.53 re60 0.00 re300 0.41 cyc 151 mddbk 582
+  NEAR15LOW                      tph  33.1 live  43.7 p10L   30 medL   46 ge40L 0.84 max  50 net50 -3.789 bk -2.821 net0 -1.686 gr +0.051 $/tr -0.947 bk$/h -23.34 50$/h -31.35 pairs 24.0 top 0.082 le50 0.32 re60 0.00 re300 0.35 cyc 156 mddbk 602
+h120_s4_cd120_gov50_gb-5
+  control(5 salts)               tph  35.2 live  46.5 p10L 39.2 medL 48.6 ge40L 0.93 max 50.0 net50 -3.904 bk -2.937 net0 -1.824 gr -0.004 $/tr -0.976 bk$/h -25.88 50$/h -34.39 pairs 23.0 top 0.103 le50 0.23 re60 0.00 re300 0.33 cyc 160 mddbk 668
+  QUIET                          tph  32.5 live  42.8 p10L   30 medL   45 ge40L 0.68 max  50 net50 -3.729 bk -2.760 net0 -1.573 gr -0.053 $/tr -0.932 bk$/h -22.46 50$/h -30.34 pairs 20.0 top 0.145 le50 0.53 re60 0.00 re300 0.41 cyc 154 mddbk 580
+  NEAR15LOW                      tph  32.9 live  43.5 p10L   29 medL   46 ge40L 0.79 max  50 net50 -3.786 bk -2.818 net0 -1.682 gr +0.056 $/tr -0.946 bk$/h -23.20 50$/h -31.17 pairs 24.0 top 0.086 le50 0.32 re60 0.00 re300 0.34 cyc 154 mddbk 599
+h120_s4_cd120_gov50_nogb
+  control(5 salts)               tph  35.3 live  46.6 p10L 39.2 medL 48.4 ge40L 0.93 max 50.0 net50 -3.908 bk -2.942 net0 -1.830 gr -0.005 $/tr -0.977 bk$/h -25.95 50$/h -34.47 pairs 23.0 top 0.105 le50 0.22 re60 0.00 re300 0.33 cyc 161 mddbk 670
+  QUIET                          tph  32.5 live  42.8 p10L   30 medL   45 ge40L 0.68 max  50 net50 -3.726 bk -2.757 net0 -1.570 gr -0.051 $/tr -0.931 bk$/h -22.44 50$/h -30.32 pairs 20.0 top 0.150 le50 0.54 re60 0.00 re300 0.41 cyc 154 mddbk 579
+  NEAR15LOW                      tph  32.9 live  43.5 p10L   29 medL   46 ge40L 0.79 max  50 net50 -3.786 bk -2.818 net0 -1.682 gr +0.056 $/tr -0.946 bk$/h -23.20 50$/h -31.17 pairs 24.0 top 0.086 le50 0.32 re60 0.00 re300 0.34 cyc 154 mddbk 599
+h120_s4_cd60_gov50_gb-3
+  control(5 salts)               tph  35.3 live  46.5 p10L 38.8 medL 48.6 ge40L 0.93 max 50.0 net50 -3.912 bk -2.945 net0 -1.833 gr -0.017 $/tr -0.978 bk$/h -25.96 50$/h -34.48 pairs 23.4 top 0.102 le50 0.23 re60 0.00 re300 0.38 cyc 163 mddbk 670
+  QUIET                          tph  33.3 live  44.0 p10L   32 medL   47 ge40L 0.84 max  50 net50 -3.739 bk -2.771 net0 -1.583 gr -0.065 $/tr -0.935 bk$/h -23.08 50$/h -31.15 pairs 20.0 top 0.149 le50 0.54 re60 0.00 re300 0.45 cyc 149 mddbk 596
+  NEAR15LOW                      tph  33.5 live  44.3 p10L   33 medL   47 ge40L 0.84 max  50 net50 -3.791 bk -2.823 net0 -1.688 gr +0.052 $/tr -0.948 bk$/h -23.63 50$/h -31.73 pairs 24.0 top 0.091 le50 0.32 re60 0.00 re300 0.39 cyc 154 mddbk 610
+h120_s4_cd60_gov50_gb-5
+  control(5 salts)               tph  35.4 live  46.7 p10L 40.2 medL 48.4 ge40L 0.94 max 50.0 net50 -3.902 bk -2.936 net0 -1.825 gr +0.002 $/tr -0.976 bk$/h -25.99 50$/h -34.55 pairs 23.4 top 0.110 le50 0.22 re60 0.00 re300 0.38 cyc 165 mddbk 671
+  QUIET                          tph  33.4 live  44.0 p10L   32 medL   47 ge40L 0.84 max  50 net50 -3.738 bk -2.770 net0 -1.583 gr -0.063 $/tr -0.935 bk$/h -23.10 50$/h -31.18 pairs 20.0 top 0.148 le50 0.53 re60 0.00 re300 0.45 cyc 149 mddbk 596
+  NEAR15LOW                      tph  33.6 live  44.3 p10L   33 medL   47 ge40L 0.84 max  50 net50 -3.797 bk -2.829 net0 -1.695 gr +0.049 $/tr -0.949 bk$/h -23.73 50$/h -31.85 pairs 24.0 top 0.090 le50 0.31 re60 0.00 re300 0.39 cyc 154 mddbk 612
+h120_s5_cd120_gov50_gb-5
+  control(5 salts)               tph  35.4 live  46.8 p10L 39.6 medL 48.6 ge40L 0.93 max 50.0 net50 -3.913 bk -2.946 net0 -1.834 gr -0.013 $/tr -0.978 bk$/h -26.08 50$/h -34.63 pairs 23.2 top 0.103 le50 0.23 re60 0.00 re300 0.34 cyc 163 mddbk 673
+  QUIET                          tph  32.6 live  43.0 p10L   30 medL   46 ge40L 0.68 max  50 net50 -3.739 bk -2.771 net0 -1.585 gr -0.061 $/tr -0.935 bk$/h -22.60 50$/h -30.50 pairs 20.0 top 0.144 le50 0.53 re60 0.00 re300 0.41 cyc 151 mddbk 583
+  NEAR15LOW                      tph  33.2 live  43.8 p10L   30 medL   46 ge40L 0.84 max  50 net50 -3.783 bk -2.816 net0 -1.681 gr +0.059 $/tr -0.946 bk$/h -23.35 50$/h -31.37 pairs 24.0 top 0.082 le50 0.31 re60 0.00 re300 0.34 cyc 156 mddbk 603
+h120_s4_cd60_gov50_nogb
+  control(5 salts)               tph  35.5 live  46.8 p10L 41.6 medL 48.4 ge40L 0.95 max 50.0 net50 -3.906 bk -2.939 net0 -1.828 gr +0.001 $/tr -0.977 bk$/h -26.09 50$/h -34.66 pairs 23.4 top 0.111 le50 0.22 re60 0.00 re300 0.39 cyc 159 mddbk 673
+  QUIET                          tph  33.4 live  44.0 p10L   32 medL   47 ge40L 0.84 max  50 net50 -3.730 bk -2.762 net0 -1.573 gr -0.057 $/tr -0.933 bk$/h -23.04 50$/h -31.11 pairs 20.0 top 0.152 le50 0.54 re60 0.00 re300 0.44 cyc 149 mddbk 594
+  NEAR15LOW                      tph  33.6 live  44.3 p10L   33 medL   47 ge40L 0.84 max  50 net50 -3.793 bk -2.825 net0 -1.691 gr +0.055 $/tr -0.948 bk$/h -23.70 50$/h -31.82 pairs 24.0 top 0.090 le50 0.31 re60 0.00 re300 0.39 cyc 154 mddbk 612
+h60_s3_cd120_gov50_gb-3
+  control(5 salts)               tph  35.4 live  46.8 p10L 40.4 medL 48.2 ge40L 0.93 max 50.0 net50 -3.912 bk -2.945 net0 -1.833 gr -0.014 $/tr -0.978 bk$/h -26.10 50$/h -34.67 pairs 22.8 top 0.106 le50 0.23 re60 0.00 re300 0.32 cyc 99 mddbk 674
+  QUIET                          tph  33.5 live  44.2 p10L   33 medL   47 ge40L 0.79 max  50 net50 -3.662 bk -2.693 net0 -1.503 gr +0.010 $/tr -0.916 bk$/h -22.57 50$/h -30.69 pairs 20.0 top 0.156 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 582
+  NEAR15LOW                      tph  33.6 live  44.3 p10L   34 medL   45 ge40L 0.84 max  50 net50 -3.836 bk -2.868 net0 -1.735 gr +0.003 $/tr -0.959 bk$/h -24.06 50$/h -32.18 pairs 23.0 top 0.085 le50 0.31 re60 0.00 re300 0.34 cyc 87 mddbk 621
+h120_s5_cd60_gov50_gb-3
+  control(5 salts)               tph  35.5 live  46.9 p10L 40.2 medL 48.2 ge40L 0.94 max 50.0 net50 -3.910 bk -2.943 net0 -1.830 gr -0.013 $/tr -0.978 bk$/h -26.14 50$/h -34.73 pairs 23.0 top 0.102 le50 0.23 re60 0.00 re300 0.41 cyc 159 mddbk 675
+  QUIET                          tph  33.5 live  44.3 p10L   32 medL   48 ge40L 0.84 max  50 net50 -3.739 bk -2.771 net0 -1.582 gr -0.065 $/tr -0.935 bk$/h -23.22 50$/h -31.33 pairs 20.0 top 0.153 le50 0.54 re60 0.00 re300 0.46 cyc 149 mddbk 599
+  NEAR15LOW                      tph  33.7 live  44.5 p10L   31 medL   47 ge40L 0.84 max  50 net50 -3.809 bk -2.841 net0 -1.706 gr +0.030 $/tr -0.952 bk$/h -23.92 50$/h -32.07 pairs 24.0 top 0.091 le50 0.32 re60 0.00 re300 0.39 cyc 157 mddbk 617
+h120_s5_cd120_gov50_nogb
+  control(5 salts)               tph  35.5 live  46.8 p10L 39.8 medL 48.4 ge40L 0.93 max 50.0 net50 -3.917 bk -2.951 net0 -1.839 gr -0.013 $/tr -0.979 bk$/h -26.15 50$/h -34.72 pairs 23.4 top 0.105 le50 0.22 re60 0.00 re300 0.34 cyc 163 mddbk 675
+  QUIET                          tph  32.6 live  43.0 p10L   30 medL   46 ge40L 0.68 max  50 net50 -3.737 bk -2.768 net0 -1.581 gr -0.060 $/tr -0.934 bk$/h -22.58 50$/h -30.48 pairs 20.0 top 0.148 le50 0.53 re60 0.00 re300 0.41 cyc 151 mddbk 583
+  NEAR15LOW                      tph  33.2 live  43.8 p10L   30 medL   46 ge40L 0.84 max  50 net50 -3.783 bk -2.816 net0 -1.681 gr +0.059 $/tr -0.946 bk$/h -23.35 50$/h -31.37 pairs 24.0 top 0.082 le50 0.31 re60 0.00 re300 0.34 cyc 156 mddbk 603
+h60_s3_cd60_gov50_gb-3
+  control(5 salts)               tph  35.8 live  47.1 p10L 42.2 medL 48.6 ge40L 0.94 max 50.0 net50 -3.896 bk -2.929 net0 -1.818 gr +0.013 $/tr -0.974 bk$/h -26.20 50$/h -34.85 pairs 23.0 top 0.111 le50 0.22 re60 0.00 re300 0.38 cyc 100 mddbk 676
+  QUIET                          tph  34.5 live  45.5 p10L   38 medL   48 ge40L 0.90 max  50 net50 -3.651 bk -2.682 net0 -1.487 gr +0.012 $/tr -0.913 bk$/h -23.15 50$/h -31.52 pairs 20.0 top 0.176 le50 0.56 re60 0.00 re300 0.44 cyc 89 mddbk 597
+  NEAR15LOW                      tph  34.6 live  45.6 p10L   33 medL   48 ge40L 0.84 max  50 net50 -3.821 bk -2.853 net0 -1.720 gr +0.023 $/tr -0.955 bk$/h -24.71 50$/h -33.09 pairs 24.0 top 0.094 le50 0.31 re60 0.00 re300 0.42 cyc 87 mddbk 638
+h60_s4_cd120_gov50_gb-3
+  control(5 salts)               tph  35.6 live  47.0 p10L 40.6 medL 48.2 ge40L 0.94 max 50.0 net50 -3.908 bk -2.941 net0 -1.829 gr -0.009 $/tr -0.977 bk$/h -26.21 50$/h -34.83 pairs 23.0 top 0.105 le50 0.23 re60 0.00 re300 0.34 cyc 97 mddbk 677
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.667 bk -2.697 net0 -1.508 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.843 bk -2.876 net0 -1.742 gr -0.006 $/tr -0.961 bk$/h -24.27 50$/h -32.43 pairs 23.0 top 0.088 le50 0.31 re60 0.00 re300 0.35 cyc 91 mddbk 626
+h60_s5_cd120_gov50_gb-3
+  control(5 salts)               tph  35.7 live  47.0 p10L 40.6 medL 48.2 ge40L 0.94 max 50.0 net50 -3.908 bk -2.941 net0 -1.829 gr -0.010 $/tr -0.977 bk$/h -26.24 50$/h -34.86 pairs 23.2 top 0.105 le50 0.23 re60 0.00 re300 0.34 cyc 97 mddbk 677
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.666 bk -2.697 net0 -1.507 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.851 bk -2.883 net0 -1.749 gr -0.014 $/tr -0.963 bk$/h -24.33 50$/h -32.49 pairs 23.0 top 0.088 le50 0.32 re60 0.00 re300 0.35 cyc 91 mddbk 628
+h120_s5_cd60_gov50_gb-5
+  control(5 salts)               tph  35.7 live  47.0 p10L 41.6 medL 48.2 ge40L 0.95 max 50.0 net50 -3.909 bk -2.942 net0 -1.830 gr -0.005 $/tr -0.977 bk$/h -26.24 50$/h -34.87 pairs 23.0 top 0.107 le50 0.22 re60 0.00 re300 0.41 cyc 160 mddbk 677
+  QUIET                          tph  33.6 live  44.3 p10L   32 medL   48 ge40L 0.84 max  50 net50 -3.738 bk -2.769 net0 -1.582 gr -0.063 $/tr -0.934 bk$/h -23.23 50$/h -31.36 pairs 20.0 top 0.152 le50 0.54 re60 0.00 re300 0.45 cyc 149 mddbk 600
+  NEAR15LOW                      tph  33.8 live  44.6 p10L   32 medL   47 ge40L 0.84 max  50 net50 -3.823 bk -2.855 net0 -1.721 gr +0.019 $/tr -0.956 bk$/h -24.09 50$/h -32.25 pairs 24.0 top 0.090 le50 0.32 re60 0.00 re300 0.39 cyc 157 mddbk 622
+h120_s5_cd60_gov50_nogb
+  control(5 salts)               tph  35.7 live  47.1 p10L 42.2 medL 48.2 ge40L 0.95 max 50.0 net50 -3.915 bk -2.948 net0 -1.837 gr -0.008 $/tr -0.979 bk$/h -26.33 50$/h -34.97 pairs 23.0 top 0.108 le50 0.22 re60 0.00 re300 0.41 cyc 160 mddbk 680
+  QUIET                          tph  33.6 live  44.3 p10L   32 medL   48 ge40L 0.84 max  50 net50 -3.733 bk -2.764 net0 -1.576 gr -0.059 $/tr -0.933 bk$/h -23.19 50$/h -31.32 pairs 20.0 top 0.157 le50 0.54 re60 0.00 re300 0.45 cyc 149 mddbk 599
+  NEAR15LOW                      tph  33.8 live  44.6 p10L   32 medL   47 ge40L 0.84 max  50 net50 -3.821 bk -2.854 net0 -1.720 gr +0.024 $/tr -0.955 bk$/h -24.08 50$/h -32.24 pairs 24.0 top 0.090 le50 0.31 re60 0.00 re300 0.39 cyc 157 mddbk 621
+h60_s3_cd120_gov50_gb-5
+  control(5 salts)               tph  35.6 live  46.9 p10L 41.6 medL 48.0 ge40L 0.95 max 50.0 net50 -3.933 bk -2.967 net0 -1.856 gr -0.028 $/tr -0.983 bk$/h -26.37 50$/h -34.96 pairs 23.0 top 0.110 le50 0.22 re60 0.00 re300 0.32 cyc 100 mddbk 681
+  QUIET                          tph  33.5 live  44.2 p10L   33 medL   47 ge40L 0.79 max  50 net50 -3.662 bk -2.693 net0 -1.503 gr +0.010 $/tr -0.916 bk$/h -22.57 50$/h -30.69 pairs 20.0 top 0.156 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 582
+  NEAR15LOW                      tph  33.6 live  44.3 p10L   34 medL   45 ge40L 0.84 max  50 net50 -3.833 bk -2.866 net0 -1.733 gr +0.010 $/tr -0.958 bk$/h -24.04 50$/h -32.16 pairs 23.0 top 0.085 le50 0.31 re60 0.00 re300 0.33 cyc 87 mddbk 620
+h60_s3_cd60_gov50_gb-5
+  control(5 salts)               tph  35.9 live  47.3 p10L 42.4 medL 48.6 ge40L 0.94 max 50.0 net50 -3.907 bk -2.941 net0 -1.831 gr +0.008 $/tr -0.977 bk$/h -26.38 50$/h -35.06 pairs 23.0 top 0.118 le50 0.21 re60 0.00 re300 0.39 cyc 99 mddbk 681
+  QUIET                          tph  34.5 live  45.5 p10L   38 medL   48 ge40L 0.90 max  50 net50 -3.655 bk -2.686 net0 -1.491 gr +0.008 $/tr -0.914 bk$/h -23.18 50$/h -31.55 pairs 20.0 top 0.176 le50 0.56 re60 0.00 re300 0.44 cyc 89 mddbk 598
+  NEAR15LOW                      tph  34.6 live  45.6 p10L   33 medL   48 ge40L 0.84 max  50 net50 -3.836 bk -2.868 net0 -1.737 gr +0.015 $/tr -0.959 bk$/h -24.84 50$/h -33.22 pairs 24.0 top 0.094 le50 0.30 re60 0.00 re300 0.42 cyc 87 mddbk 641
+h60_s3_cd120_gov50_nogb
+  control(5 salts)               tph  35.6 live  46.9 p10L 41.8 medL 48.0 ge40L 0.95 max 50.0 net50 -3.934 bk -2.967 net0 -1.856 gr -0.027 $/tr -0.983 bk$/h -26.39 50$/h -34.98 pairs 23.0 top 0.111 le50 0.22 re60 0.00 re300 0.32 cyc 100 mddbk 681
+  QUIET                          tph  33.5 live  44.2 p10L   33 medL   47 ge40L 0.79 max  50 net50 -3.662 bk -2.693 net0 -1.503 gr +0.010 $/tr -0.916 bk$/h -22.57 50$/h -30.69 pairs 20.0 top 0.156 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 582
+  NEAR15LOW                      tph  33.6 live  44.3 p10L   34 medL   45 ge40L 0.84 max  50 net50 -3.833 bk -2.866 net0 -1.733 gr +0.010 $/tr -0.958 bk$/h -24.04 50$/h -32.16 pairs 23.0 top 0.085 le50 0.31 re60 0.00 re300 0.33 cyc 87 mddbk 620
+h60_s4_cd60_gov50_gb-3
+  control(5 salts)               tph  36.1 live  47.4 p10L 44.0 medL 48.6 ge40L 0.95 max 50.0 net50 -3.900 bk -2.933 net0 -1.822 gr +0.010 $/tr -0.975 bk$/h -26.44 50$/h -35.15 pairs 23.0 top 0.112 le50 0.22 re60 0.00 re300 0.40 cyc 96 mddbk 682
+  QUIET                          tph  34.8 live  45.8 p10L   39 medL   48 ge40L 0.90 max  50 net50 -3.657 bk -2.688 net0 -1.494 gr +0.006 $/tr -0.914 bk$/h -23.36 50$/h -31.78 pairs 20.0 top 0.178 le50 0.56 re60 0.00 re300 0.46 cyc 85 mddbk 603
+  NEAR15LOW                      tph  34.7 live  45.7 p10L   35 medL   48 ge40L 0.84 max  50 net50 -3.826 bk -2.859 net0 -1.725 gr +0.011 $/tr -0.957 bk$/h -24.82 50$/h -33.21 pairs 24.0 top 0.093 le50 0.31 re60 0.00 re300 0.43 cyc 91 mddbk 640
+h60_s4_cd120_gov50_gb-5
+  control(5 salts)               tph  35.7 live  47.1 p10L 41.8 medL 48.0 ge40L 0.95 max 50.0 net50 -3.926 bk -2.960 net0 -1.848 gr -0.022 $/tr -0.981 bk$/h -26.44 50$/h -35.07 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 682
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.667 bk -2.697 net0 -1.508 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.841 bk -2.874 net0 -1.741 gr -0.001 $/tr -0.960 bk$/h -24.25 50$/h -32.41 pairs 23.0 top 0.088 le50 0.31 re60 0.00 re300 0.35 cyc 91 mddbk 626
+h60_s4_cd120_gov50_nogb
+  control(5 salts)               tph  35.7 live  47.1 p10L 42.0 medL 48.0 ge40L 0.95 max 50.0 net50 -3.928 bk -2.962 net0 -1.850 gr -0.023 $/tr -0.982 bk$/h -26.47 50$/h -35.10 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 683
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.667 bk -2.697 net0 -1.508 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.841 bk -2.874 net0 -1.741 gr -0.001 $/tr -0.960 bk$/h -24.25 50$/h -32.41 pairs 23.0 top 0.088 le50 0.31 re60 0.00 re300 0.35 cyc 91 mddbk 626
+h60_s5_cd60_gov50_gb-3
+  control(5 salts)               tph  36.1 live  47.5 p10L 43.8 medL 48.6 ge40L 0.95 max 50.0 net50 -3.902 bk -2.935 net0 -1.823 gr +0.005 $/tr -0.975 bk$/h -26.48 50$/h -35.20 pairs 22.8 top 0.110 le50 0.22 re60 0.00 re300 0.41 cyc 95 mddbk 683
+  QUIET                          tph  34.8 live  45.8 p10L   39 medL   48 ge40L 0.90 max  50 net50 -3.659 bk -2.690 net0 -1.496 gr +0.004 $/tr -0.915 bk$/h -23.37 50$/h -31.80 pairs 20.0 top 0.178 le50 0.56 re60 0.00 re300 0.46 cyc 82 mddbk 603
+  NEAR15LOW                      tph  34.7 live  45.7 p10L   36 medL   48 ge40L 0.84 max  50 net50 -3.826 bk -2.858 net0 -1.724 gr +0.012 $/tr -0.956 bk$/h -24.81 50$/h -33.21 pairs 24.0 top 0.094 le50 0.31 re60 0.00 re300 0.43 cyc 91 mddbk 640
+h60_s3_cd60_gov50_nogb
+  control(5 salts)               tph  35.9 live  47.3 p10L 42.4 medL 48.6 ge40L 0.94 max 50.0 net50 -3.918 bk -2.951 net0 -1.842 gr -0.003 $/tr -0.980 bk$/h -26.48 50$/h -35.16 pairs 23.2 top 0.119 le50 0.21 re60 0.00 re300 0.39 cyc 99 mddbk 683
+  QUIET                          tph  34.5 live  45.5 p10L   38 medL   48 ge40L 0.90 max  50 net50 -3.655 bk -2.686 net0 -1.491 gr +0.008 $/tr -0.914 bk$/h -23.18 50$/h -31.55 pairs 20.0 top 0.176 le50 0.56 re60 0.00 re300 0.44 cyc 89 mddbk 598
+  NEAR15LOW                      tph  34.6 live  45.6 p10L   33 medL   48 ge40L 0.84 max  50 net50 -3.836 bk -2.868 net0 -1.737 gr +0.015 $/tr -0.959 bk$/h -24.84 50$/h -33.22 pairs 24.0 top 0.094 le50 0.30 re60 0.00 re300 0.42 cyc 87 mddbk 641
+h60_s5_cd120_gov50_gb-5
+  control(5 salts)               tph  35.8 live  47.1 p10L 41.8 medL 48.0 ge40L 0.95 max 50.0 net50 -3.930 bk -2.964 net0 -1.852 gr -0.026 $/tr -0.982 bk$/h -26.50 50$/h -35.14 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 684
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.666 bk -2.697 net0 -1.507 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.848 bk -2.880 net0 -1.747 gr -0.007 $/tr -0.962 bk$/h -24.30 50$/h -32.46 pairs 23.0 top 0.088 le50 0.31 re60 0.00 re300 0.35 cyc 91 mddbk 627
+h60_s5_cd120_gov50_nogb
+  control(5 salts)               tph  35.8 live  47.2 p10L 42.0 medL 48.0 ge40L 0.95 max 50.0 net50 -3.933 bk -2.966 net0 -1.855 gr -0.028 $/tr -0.983 bk$/h -26.53 50$/h -35.18 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 685
+  QUIET                          tph  33.6 live  44.4 p10L   33 medL   48 ge40L 0.79 max  50 net50 -3.666 bk -2.697 net0 -1.507 gr +0.006 $/tr -0.917 bk$/h -22.68 50$/h -30.83 pairs 20.0 top 0.154 le50 0.54 re60 0.00 re300 0.40 cyc 86 mddbk 585
+  NEAR15LOW                      tph  33.8 live  44.5 p10L   33 medL   46 ge40L 0.84 max  50 net50 -3.848 bk -2.880 net0 -1.747 gr -0.007 $/tr -0.962 bk$/h -24.30 50$/h -32.46 pairs 23.0 top 0.088 le50 0.31 re60 0.00 re300 0.35 cyc 91 mddbk 627
+--- landscape: hold 60, slots 4, all cooldown/gov/brake
+  h60_s4_cd60_nogov_nogb         tph  58.1 live  76.9 p10L 49.6 medL 76.6 ge40L 0.95 max 104.6 net50 -3.950 bk -2.984 net0 -1.874 gr -0.044 $/tr -0.988 bk$/h -43.31 50$/h -57.33 pairs 23.8 top 0.108 le50 0.22 re60 0.00 re300 0.49 cyc 96 mddbk 1118 | Q live 59.3 N live 63.4
+  h60_s4_cd60_nogov_gb-3         tph  56.6 live  74.9 p10L 48.2 medL 75.8 ge40L 0.95 max 103.2 net50 -3.940 bk -2.974 net0 -1.862 gr -0.042 $/tr -0.985 bk$/h -42.08 50$/h -55.76 pairs 24.0 top 0.103 le50 0.23 re60 0.00 re300 0.49 cyc 96 mddbk 1086 | Q live 58.7 N live 63.1
+  h60_s4_cd60_nogov_gb-5         tph  57.7 live  76.5 p10L 49.6 medL 76.6 ge40L 0.95 max 103.8 net50 -3.949 bk -2.983 net0 -1.873 gr -0.044 $/tr -0.988 bk$/h -43.06 50$/h -57.01 pairs 23.8 top 0.109 le50 0.22 re60 0.00 re300 0.49 cyc 96 mddbk 1111 | Q live 58.8 N live 63.1
+  h60_s4_cd60_gov50_nogb         tph  36.1 live  47.5 p10L 43.8 medL 48.6 ge40L 0.95 max 50.0 net50 -3.912 bk -2.945 net0 -1.835 gr +0.001 $/tr -0.978 bk$/h -26.60 50$/h -35.33 pairs 23.0 top 0.116 le50 0.22 re60 0.00 re300 0.41 cyc 96 mddbk 686 | Q live 45.8 N live 45.7
+  h60_s4_cd60_gov50_gb-3         tph  36.1 live  47.4 p10L 44.0 medL 48.6 ge40L 0.95 max 50.0 net50 -3.900 bk -2.933 net0 -1.822 gr +0.010 $/tr -0.975 bk$/h -26.44 50$/h -35.15 pairs 23.0 top 0.112 le50 0.22 re60 0.00 re300 0.40 cyc 96 mddbk 682 | Q live 45.8 N live 45.7
+  h60_s4_cd60_gov50_gb-5         tph  36.1 live  47.5 p10L 43.8 medL 48.6 ge40L 0.95 max 50.0 net50 -3.912 bk -2.945 net0 -1.835 gr +0.002 $/tr -0.978 bk$/h -26.60 50$/h -35.33 pairs 22.8 top 0.117 le50 0.22 re60 0.00 re300 0.41 cyc 96 mddbk 686 | Q live 45.8 N live 45.7
+  h60_s4_cd60_gov60_nogb         tph  42.4 live  56.0 p10L 48.4 medL 58.0 ge40L 0.95 max 60.0 net50 -3.912 bk -2.945 net0 -1.836 gr +0.002 $/tr -0.978 bk$/h -31.25 50$/h -41.51 pairs 23.2 top 0.116 le50 0.21 re60 0.00 re300 0.43 cyc 97 mddbk 807 | Q live 52.5 N live 52.4
+  h60_s4_cd60_gov60_gb-3         tph  42.2 live  55.8 p10L 47.2 medL 58.0 ge40L 0.95 max 60.0 net50 -3.908 bk -2.941 net0 -1.831 gr -0.001 $/tr -0.977 bk$/h -31.05 50$/h -41.26 pairs 23.0 top 0.111 le50 0.22 re60 0.00 re300 0.42 cyc 98 mddbk 801 | Q live 52.5 N live 52.4
+  h60_s4_cd60_gov60_gb-5         tph  42.4 live  56.0 p10L 48.4 medL 58.0 ge40L 0.95 max 60.0 net50 -3.913 bk -2.947 net0 -1.837 gr -0.000 $/tr -0.978 bk$/h -31.26 50$/h -41.52 pairs 23.2 top 0.117 le50 0.21 re60 0.00 re300 0.43 cyc 98 mddbk 807 | Q live 52.5 N live 52.4
+  h60_s4_cd120_nogov_nogb        tph  53.1 live  70.3 p10L 42.2 medL 70.2 ge40L 0.95 max 97.2 net50 -3.949 bk -2.982 net0 -1.871 gr -0.049 $/tr -0.987 bk$/h -39.58 50$/h -52.40 pairs 24.0 top 0.102 le50 0.22 re60 0.00 re300 0.41 cyc 97 mddbk 1021 | Q live 52.8 N live 56.6
+  h60_s4_cd120_nogov_gb-3        tph  51.9 live  68.7 p10L 41.2 medL 68.6 ge40L 0.94 max 94.2 net50 -3.947 bk -2.980 net0 -1.868 gr -0.054 $/tr -0.987 bk$/h -38.65 50$/h -51.19 pairs 24.0 top 0.098 le50 0.23 re60 0.00 re300 0.41 cyc 98 mddbk 998 | Q live 52.8 N live 56.3
+  h60_s4_cd120_nogov_gb-5        tph  52.7 live  69.9 p10L 42.2 medL 70.0 ge40L 0.95 max 96.4 net50 -3.945 bk -2.979 net0 -1.867 gr -0.047 $/tr -0.986 bk$/h -39.28 50$/h -52.02 pairs 24.0 top 0.102 le50 0.23 re60 0.00 re300 0.41 cyc 98 mddbk 1014 | Q live 52.8 N live 56.4
+  h60_s4_cd120_gov50_nogb        tph  35.7 live  47.1 p10L 42.0 medL 48.0 ge40L 0.95 max 50.0 net50 -3.928 bk -2.962 net0 -1.850 gr -0.023 $/tr -0.982 bk$/h -26.47 50$/h -35.10 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 683 | Q live 44.4 N live 44.5
+  h60_s4_cd120_gov50_gb-3        tph  35.6 live  47.0 p10L 40.6 medL 48.2 ge40L 0.94 max 50.0 net50 -3.908 bk -2.941 net0 -1.829 gr -0.009 $/tr -0.977 bk$/h -26.21 50$/h -34.83 pairs 23.0 top 0.105 le50 0.23 re60 0.00 re300 0.34 cyc 97 mddbk 677 | Q live 44.4 N live 44.5
+  h60_s4_cd120_gov50_gb-5        tph  35.7 live  47.1 p10L 41.8 medL 48.0 ge40L 0.95 max 50.0 net50 -3.926 bk -2.960 net0 -1.848 gr -0.022 $/tr -0.981 bk$/h -26.44 50$/h -35.07 pairs 23.2 top 0.109 le50 0.22 re60 0.00 re300 0.34 cyc 96 mddbk 682 | Q live 44.4 N live 44.5
+  h60_s4_cd120_gov60_nogb        tph  41.7 live  55.0 p10L 42.2 medL 58.0 ge40L 0.95 max 60.0 net50 -3.913 bk -2.946 net0 -1.834 gr -0.010 $/tr -0.978 bk$/h -30.69 50$/h -40.76 pairs 23.2 top 0.107 le50 0.23 re60 0.00 re300 0.35 cyc 97 mddbk 792 | Q live 50.0 N live 50.6
+  h60_s4_cd120_gov60_gb-3        tph  41.4 live  54.7 p10L 41.2 medL 58.2 ge40L 0.94 max 60.0 net50 -3.917 bk -2.951 net0 -1.838 gr -0.020 $/tr -0.979 bk$/h -30.56 50$/h -40.56 pairs 23.4 top 0.103 le50 0.23 re60 0.00 re300 0.35 cyc 100 mddbk 789 | Q live 50.0 N live 50.6
+  h60_s4_cd120_gov60_gb-5        tph  41.6 live  55.0 p10L 42.2 medL 58.0 ge40L 0.95 max 60.0 net50 -3.909 bk -2.943 net0 -1.830 gr -0.009 $/tr -0.977 bk$/h -30.63 50$/h -40.69 pairs 23.4 top 0.108 le50 0.23 re60 0.00 re300 0.35 cyc 97 mddbk 790 | Q live 50.0 N live 50.6
+  h60_s4_cd300_nogov_nogb        tph  42.6 live  56.4 p10L 33.8 medL 56.4 ge40L 0.88 max 77.4 net50 -3.908 bk -2.942 net0 -1.827 gr -0.016 $/tr -0.977 bk$/h -31.30 50$/h -41.59 pairs 24.0 top 0.092 le50 0.23 re60 0.00 re300 0.00 cyc 95 mddbk 808 | Q live 40.4 N live 43.7
+  h60_s4_cd300_nogov_gb-3        tph  41.8 live  55.5 p10L 33.6 medL 56.4 ge40L 0.86 max 76.8 net50 -3.909 bk -2.943 net0 -1.827 gr -0.021 $/tr -0.977 bk$/h -30.78 50$/h -40.89 pairs 24.0 top 0.090 le50 0.24 re60 0.00 re300 0.00 cyc 96 mddbk 794 | Q live 40.3 N live 43.5
+  h60_s4_cd300_nogov_gb-5        tph  42.4 live  56.2 p10L 33.8 medL 56.4 ge40L 0.87 max 77.2 net50 -3.906 bk -2.940 net0 -1.825 gr -0.015 $/tr -0.977 bk$/h -31.18 50$/h -41.44 pairs 24.0 top 0.092 le50 0.23 re60 0.00 re300 0.00 cyc 95 mddbk 805 | Q live 40.4 N live 43.7
+  h60_s4_cd300_gov50_nogb        tph  34.4 live  45.4 p10L 33.8 medL 47.8 ge40L 0.85 max 50.0 net50 -3.919 bk -2.952 net0 -1.838 gr -0.025 $/tr -0.980 bk$/h -25.36 50$/h -33.66 pairs 23.8 top 0.101 le50 0.24 re60 0.00 re300 0.00 cyc 97 mddbk 654 | Q live 39.5 N live 40.6
+  h60_s4_cd300_gov50_gb-3        tph  34.1 live  45.1 p10L 33.6 medL 47.8 ge40L 0.82 max 50.0 net50 -3.919 bk -2.952 net0 -1.837 gr -0.029 $/tr -0.980 bk$/h -25.18 50$/h -33.43 pairs 23.8 top 0.097 le50 0.24 re60 0.00 re300 0.00 cyc 97 mddbk 650 | Q live 39.5 N live 40.5
+  h60_s4_cd300_gov50_gb-5        tph  34.3 live  45.4 p10L 33.8 medL 47.8 ge40L 0.84 max 50.0 net50 -3.917 bk -2.951 net0 -1.836 gr -0.024 $/tr -0.979 bk$/h -25.33 50$/h -33.62 pairs 23.8 top 0.100 le50 0.24 re60 0.00 re300 0.00 cyc 97 mddbk 654 | Q live 39.5 N live 40.6
+  h60_s4_cd300_gov60_nogb        tph  38.7 live  51.1 p10L 33.8 medL 54.8 ge40L 0.88 max 60.0 net50 -3.918 bk -2.952 net0 -1.838 gr -0.024 $/tr -0.980 bk$/h -28.52 50$/h -37.86 pairs 24.0 top 0.096 le50 0.23 re60 0.00 re300 0.00 cyc 96 mddbk 736 | Q live 40.4 N live 43.1
+  h60_s4_cd300_gov60_gb-3        tph  38.3 live  50.7 p10L 33.6 medL 55.0 ge40L 0.86 max 60.0 net50 -3.919 bk -2.952 net0 -1.837 gr -0.030 $/tr -0.980 bk$/h -28.30 50$/h -37.57 pairs 24.0 top 0.093 le50 0.24 re60 0.00 re300 0.00 cyc 97 mddbk 730 | Q live 40.3 N live 43.0
+  h60_s4_cd300_gov60_gb-5        tph  38.6 live  51.0 p10L 33.8 medL 54.4 ge40L 0.87 max 60.0 net50 -3.911 bk -2.944 net0 -1.830 gr -0.019 $/tr -0.978 bk$/h -28.41 50$/h -37.74 pairs 24.0 top 0.096 le50 0.23 re60 0.00 re300 0.00 cyc 96 mddbk 733 | Q live 40.4 N live 43.1
+secs 24.8

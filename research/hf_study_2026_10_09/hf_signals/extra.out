@@ -1,0 +1,32 @@
+== HF_A_QUIET_E95_HEAT holdout
+   gap net50 +0.248 pair-CI95 (0.081, 0.403) | gap gross +0.052 pair-CI95 (-0.002, 0.128)
+   $ drawdown no cap 7741 (start capital $1000) | with 10%/day cap 216 | full-hour trade counts min 55 p10 58 median 80 max 124 (hours 16)
+   fee mix book {'fee<=50': 0.68, 'fee55-95': 0.32} median liq $513509 | random {'fee<=50': 0.445, 'fee55-95': 0.555} median liq $326516
+   top pairs [('HMzvsEEm', 190), ('FnzKY6x7', 162), ('2DVbU5h8', 141), ('4w2cysot', 135), ('5wNu5Qhd', 131)]
+== HF_B_NEAR15LOW_E95_NOHEAT holdout
+   gap net50 +0.200 pair-CI95 (0.065, 0.325) | gap gross +0.063 pair-CI95 (-0.03, 0.172)
+   $ drawdown no cap 8081 (start capital $1000) | with 10%/day cap 261 | full-hour trade counts min 45 p10 59 median 72 max 101 (hours 16)
+   fee mix book {'fee<=50': 0.509, 'fee55-95': 0.491} median liq $462731 | random {'fee<=50': 0.433, 'fee55-95': 0.567} median liq $354511
+   top pairs [('FGdGihHZ', 103), ('6e3jZLtf', 102), ('2DVbU5h8', 100), ('4w2cysot', 93), ('HMzvsEEm', 93)]
+== HF_C_QUIET_E95_NOHEAT_3SLOT holdout
+   gap net50 +0.250 pair-CI95 (0.04, 0.412) | gap gross +0.024 pair-CI95 (-0.09, 0.151)
+   $ drawdown no cap 6444 (start capital $600) | with 10%/day cap 154 | full-hour trade counts min 48 p10 54 median 68 max 80 (hours 16)
+   fee mix book {'fee<=50': 0.7, 'fee55-95': 0.3} median liq $1838076 | random {'fee<=50': 0.424, 'fee55-95': 0.576} median liq $348801
+   top pairs [('HMzvsEEm', 170), ('4w2cysot', 160), ('FnzKY6x7', 131), ('5wNu5Qhd', 121), ('6e3jZLtf', 89)]
+== heat veto on/off, TRAIN stage-1 engine-guard grid (5 slots, time exits)
+   E95 hold  60 RANDOM_hfA     heat ON n  1998 tph  77.4 net50 -3.296 | OFF n  3227 tph 125.0 net50 -3.351
+   E95 hold 120 RANDOM_hfA     heat ON n  1580 tph  61.2 net50 -3.354 | OFF n  2254 tph  87.3 net50 -3.408
+   E95 hold  60 MOM_STEP_0.3   heat ON n  2269 tph  87.9 net50 -3.411 | OFF n  3373 tph 130.7 net50 -3.415
+   E95 hold 120 MOM_STEP_0.3   heat ON n  1704 tph  66.0 net50 -3.414 | OFF n  2125 tph  82.3 net50 -3.500
+   E95 hold  60 MOM_STEP_0.5   heat ON n  2046 tph  79.3 net50 -3.408 | OFF n  3149 tph 122.0 net50 -3.426
+   E95 hold 120 MOM_STEP_0.5   heat ON n  1574 tph  61.0 net50 -3.447 | OFF n  2047 tph  79.3 net50 -3.504
+   E95 hold  60 MOM_2STEP_0.5  heat ON n  1705 tph  66.1 net50 -3.388 | OFF n  3183 tph 123.3 net50 -3.450
+   E95 hold 120 MOM_2STEP_0.5  heat ON n  1382 tph  53.5 net50 -3.427 | OFF n  2214 tph  85.8 net50 -3.515
+   E95 hold  60 BUYJUMP_2      heat ON n  1551 tph  60.1 net50 -3.401 | OFF n  3172 tph 122.9 net50 -3.420
+   E95 hold 120 BUYJUMP_2      heat ON n  1282 tph  49.7 net50 -3.384 | OFF n  2219 tph  86.0 net50 -3.540
+   E95 hold  60 AT_15M_HIGH    heat ON n   793 tph  30.7 net50 -3.214 | OFF n  1672 tph  64.8 net50 -3.322
+   E95 hold 120 AT_15M_HIGH    heat ON n   678 tph  26.3 net50 -3.261 | OFF n  1296 tph  50.2 net50 -3.315
+   E95 hold  60 REV_STEP_0.3   heat ON n  2477 tph  96.0 net50 -3.288 | OFF n  3683 tph 142.7 net50 -3.342
+   E95 hold 120 REV_STEP_0.3   heat ON n  1814 tph  70.3 net50 -3.376 | OFF n  2391 tph  92.7 net50 -3.336
+   E95 hold  60 QUIET          heat ON n  1409 tph  54.6 net50 -3.001 | OFF n  1976 tph  76.6 net50 -3.011
+   E95 hold 120 QUIET          heat ON n  1164 tph  45.1 net50 -2.929 | OFF n  1544 tph  59.8 net50 -2.964

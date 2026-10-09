@@ -1,0 +1,95 @@
+== burst strength (no chase filter off), hold 60 / 120, net>=1 SOL, top<0.5
+le95 off f30 h60 | ALL n2390 -3.27 | ub2:n579 tph22.4 -3.53 ub3:n579 tph22.4 -3.53 ub4:n574 tph22.2 -3.53 ub6:n556 tph21.5 -3.55 ub8:n539 tph20.9 -3.54 ub12:n470 tph18.2 -3.44
+le95 off f30 h120 | ALL n1541 -3.39 | ub2:n414 tph16.0 -3.68 ub3:n414 tph16.0 -3.68 ub4:n410 tph15.9 -3.68 ub6:n392 tph15.2 -3.73 ub8:n384 tph14.9 -3.71 ub12:n333 tph12.9 -3.70
+le95 off f60 h60 | ALL n2390 -3.27 | ub2:n632 tph24.5 -3.48 ub3:n632 tph24.5 -3.48 ub4:n627 tph24.3 -3.48 ub6:n611 tph23.7 -3.52 ub8:n592 tph22.9 -3.52 ub12:n562 tph21.8 -3.56
+le95 off f60 h120 | ALL n1541 -3.39 | ub2:n451 tph17.5 -3.52 ub3:n451 tph17.5 -3.52 ub4:n446 tph17.3 -3.53 ub6:n431 tph16.7 -3.59 ub8:n414 tph16.0 -3.61 ub12:n390 tph15.1 -3.62
+le95 veto f30 h60 | ALL n1247 -3.10 | ub2:n16 tph0.6 -2.88 ub3:n16 tph0.6 -2.88 ub4:n15 tph0.6 -2.73 ub6:n9 tph0.3 -2.93 ub8:n9 tph0.3 -2.97 ub12:-
+le95 veto f30 h120 | ALL n851 -3.14 | ub2:n15 tph0.6 -2.93 ub3:n15 tph0.6 -2.93 ub4:n14 tph0.5 -2.68 ub6:n8 tph0.3 -3.01 ub8:n8 tph0.3 -2.91 ub12:-
+le95 veto f60 h60 | ALL n1247 -3.10 | ub2:n24 tph0.9 -2.89 ub3:n24 tph0.9 -2.89 ub4:n22 tph0.8 -2.82 ub6:n17 tph0.7 -2.88 ub8:n12 tph0.5 -2.85 ub12:n7 tph0.3 -2.88
+le95 veto f60 h120 | ALL n851 -3.14 | ub2:n23 tph0.9 -2.88 ub3:n23 tph0.9 -2.88 ub4:n21 tph0.8 -2.83 ub6:n16 tph0.6 -2.89 ub8:n11 tph0.4 -2.84 ub12:n6 tph0.2 -1.86
+le50 off f30 h60 | ALL n979 -2.94 | ub2:n195 tph7.6 -2.73 ub3:n195 tph7.6 -2.73 ub4:n195 tph7.6 -2.73 ub6:n192 tph7.4 -2.72 ub8:n190 tph7.4 -2.71 ub12:n184 tph7.1 -2.66
+le50 off f30 h120 | ALL n619 -3.05 | ub2:n126 tph4.9 -3.20 ub3:n126 tph4.9 -3.20 ub4:n126 tph4.9 -3.20 ub6:n123 tph4.8 -3.20 ub8:n122 tph4.7 -3.20 ub12:n121 tph4.7 -3.33
+le50 off f60 h60 | ALL n979 -2.94 | ub2:n184 tph7.1 -2.76 ub3:n184 tph7.1 -2.76 ub4:n184 tph7.1 -2.76 ub6:n182 tph7.0 -2.75 ub8:n180 tph7.0 -2.75 ub12:n178 tph6.9 -2.81
+le50 off f60 h120 | ALL n619 -3.05 | ub2:n117 tph4.5 -2.96 ub3:n117 tph4.5 -2.96 ub4:n117 tph4.5 -2.96 ub6:n115 tph4.5 -2.96 ub8:n113 tph4.4 -2.96 ub12:n111 tph4.3 -2.96
+le50 veto f30 h60 | ALL n642 -2.96 | ub2:- ub3:- ub4:- ub6:- ub8:- ub12:-
+le50 veto f30 h120 | ALL n429 -3.04 | ub2:- ub3:- ub4:- ub6:- ub8:- ub12:-
+le50 veto f60 h60 | ALL n642 -2.96 | ub2:- ub3:- ub4:- ub6:- ub8:- ub12:-
+le50 veto f60 h120 | ALL n429 -3.04 | ub2:- ub3:- ub4:- ub6:- ub8:- ub12:-
+55_95 off f30 h60 | ALL n1465 -3.46 | ub2:n386 tph15.0 -3.94 ub3:n386 tph15.0 -3.94 ub4:n381 tph14.8 -3.94 ub6:n366 tph14.2 -3.99 ub8:n351 tph13.6 -3.99 ub12:n287 tph11.1 -3.93
+55_95 off f30 h120 | ALL n1048 -3.53 | ub2:n289 tph11.2 -3.88 ub3:n289 tph11.2 -3.88 ub4:n285 tph11.0 -3.89 ub6:n270 tph10.5 -3.97 ub8:n263 tph10.2 -3.95 ub12:n213 tph8.2 -3.90
+55_95 off f60 h60 | ALL n1465 -3.46 | ub2:n450 tph17.4 -3.77 ub3:n450 tph17.4 -3.77 ub4:n445 tph17.2 -3.78 ub6:n431 tph16.7 -3.84 ub8:n414 tph16.0 -3.85 ub12:n386 tph15.0 -3.91
+55_95 off f60 h120 | ALL n1048 -3.53 | ub2:n335 tph13.0 -3.72 ub3:n335 tph13.0 -3.72 ub4:n330 tph12.8 -3.73 ub6:n317 tph12.3 -3.83 ub8:n302 tph11.7 -3.86 ub12:n281 tph10.9 -3.88
+55_95 veto f30 h60 | ALL n609 -3.24 | ub2:n14 tph0.5 -2.81 ub3:n14 tph0.5 -2.81 ub4:n13 tph0.5 -2.64 ub6:n9 tph0.3 -2.93 ub8:n9 tph0.3 -2.97 ub12:-
+55_95 veto f30 h120 | ALL n472 -3.20 | ub2:n13 tph0.5 -2.95 ub3:n13 tph0.5 -2.95 ub4:n12 tph0.5 -2.65 ub6:n8 tph0.3 -3.01 ub8:n8 tph0.3 -2.91 ub12:-
+55_95 veto f60 h60 | ALL n609 -3.24 | ub2:n21 tph0.8 -2.84 ub3:n21 tph0.8 -2.84 ub4:n19 tph0.7 -2.75 ub6:n16 tph0.6 -2.86 ub8:n11 tph0.4 -2.82 ub12:n7 tph0.3 -2.88
+55_95 veto f60 h120 | ALL n472 -3.20 | ub2:n20 tph0.8 -2.86 ub3:n20 tph0.8 -2.86 ub4:n18 tph0.7 -2.81 ub6:n15 tph0.6 -2.88 ub8:n10 tph0.4 -2.84 ub12:n6 tph0.2 -1.86
+
+== best strict-burst rows (ub>=4, top<0.5, net>=1) by train net50, any rate, n>=100
+{"fee": "le50", "heat": "off", "sig": "f30_ub12_net1.0_top0.5", "hold": 60, "n_cand": 2540, "n": 184, "tph": 7.13, "mean_net50": -2.657, "mean_net0": -1.027, "pairs": 1, "top_pair_share": 1.0}
+{"fee": "le50", "heat": "off", "sig": "f30_ub8_net1.0_top0.5", "hold": 60, "n_cand": 2590, "n": 190, "tph": 7.36, "mean_net50": -2.711, "mean_net0": -1.082, "pairs": 1, "top_pair_share": 1.0}
+{"fee": "le50", "heat": "off", "sig": "f30_ub6_net1.0_top0.5", "hold": 60, "n_cand": 2595, "n": 192, "tph": 7.44, "mean_net50": -2.716, "mean_net0": -1.086, "pairs": 2, "top_pair_share": 0.995}
+{"fee": "le50", "heat": "off", "sig": "f30_ub4_net1.0_top0.5", "hold": 60, "n_cand": 2603, "n": 195, "tph": 7.56, "mean_net50": -2.728, "mean_net0": -1.099, "pairs": 5, "top_pair_share": 0.979}
+{"fee": "le50", "heat": "off", "sig": "f60_ub8_net1.0_top0.5", "hold": 60, "n_cand": 3515, "n": 180, "tph": 6.97, "mean_net50": -2.751, "mean_net0": -1.122, "pairs": 3, "top_pair_share": 0.989}
+{"fee": "le50", "heat": "off", "sig": "f30_ub12_net1.0_top0.5_nochase", "hold": 60, "n_cand": 1761, "n": 160, "tph": 6.2, "mean_net50": -2.753, "mean_net0": -1.124, "pairs": 1, "top_pair_share": 1.0}
+{"fee": "le50", "heat": "off", "sig": "f60_ub6_net1.0_top0.5", "hold": 60, "n_cand": 3526, "n": 182, "tph": 7.05, "mean_net50": -2.754, "mean_net0": -1.125, "pairs": 4, "top_pair_share": 0.978}
+{"fee": "le50", "heat": "off", "sig": "f60_ub4_net1.0_top0.5", "hold": 60, "n_cand": 3535, "n": 184, "tph": 7.13, "mean_net50": -2.76, "mean_net0": -1.132, "pairs": 6, "top_pair_share": 0.967}
+{"fee": "le50", "heat": "off", "sig": "f30_ub6_net1.0_top0.5_nochase", "hold": 60, "n_cand": 1808, "n": 165, "tph": 6.39, "mean_net50": -2.766, "mean_net0": -1.138, "pairs": 1, "top_pair_share": 1.0}
+{"fee": "le50", "heat": "off", "sig": "f30_ub8_net1.0_top0.5_nochase", "hold": 60, "n_cand": 1807, "n": 165, "tph": 6.39, "mean_net50": -2.772, "mean_net0": -1.144, "pairs": 1, "top_pair_share": 1.0}
+{"fee": "le50", "heat": "off", "sig": "f30_ub4_net1.0_top0.5_nochase", "hold": 60, "n_cand": 1815, "n": 168, "tph": 6.51, "mean_net50": -2.779, "mean_net0": -1.151, "pairs": 4, "top_pair_share": 0.982}
+{"fee": "55_95", "heat": "off", "sig": "f30_ub12_net1.0_top0.5_nochase", "hold": 300, "n_cand": 1314, "n": 109, "tph": 4.22, "mean_net50": -2.796, "mean_net0": -1.406, "pairs": 8, "top_pair_share": 0.422}
+
+== C1_burst60_loose_noveto le95 off hold 60 universe 31194 cands 12937 density 0.415
+  SIGNAL B2 {"n": 1652, "tph": 64.01, "mean_net50": -3.252, "mean_net0": -1.763, "mean_netcal": -2.28, "mean_usd50": -3.252, "usd50_per_h": -208.18, "sum_usd50": -5372.49, "win50": 1.9, "win0": 5.1, "pairs": 36, "top_pair_share": 0.201, "maxdd_pct": 537.2, "fb_share": 0.035, "gap_share": 0.0, "avg_hold_s": 64.5, "ci95_net50_pair": [-3.533, -3.031]} {'pool_open': 11250, 'slots_full': 35}
+  SIGNAL B5 {"n": 1580, "tph": 61.22, "mean_net50": -3.27, "mean_net0": -1.782, "mean_netcal": -2.298, "mean_usd50": -3.27, "usd50_per_h": -200.23, "sum_usd50": -5167.35, "win50": 2.0, "win0": 5.3, "pairs": 36, "top_pair_share": 0.198, "maxdd_pct": 516.7, "fb_share": 0.049, "gap_share": 0.0, "avg_hold_s": 71.0, "ci95_net50_pair": [-3.522, -3.057]} {'pool_open': 11325, 'slots_full': 32}
+  SIGNAL A {"n": 1365, "tph": 52.89, "mean_net50": -3.237, "mean_net0": -1.75, "mean_netcal": -2.264, "mean_usd50": -3.237, "usd50_per_h": -171.2, "sum_usd50": -4418.14, "win50": 3.4, "win0": 7.6, "pairs": 36, "top_pair_share": 0.191, "maxdd_pct": 441.8, "fb_share": 0.0, "gap_share": 0.004, "avg_hold_s": 101.2, "ci95_net50_pair": [-3.481, -3.033]} {'pool_open': 11460, 'no_fill': 13, 'slots_full': 99}
+  RANDOM r1 B2 {"n": 2121, "tph": 82.19, "mean_net50": -3.301, "mean_net0": -1.822, "mean_netcal": -2.329, "mean_usd50": -3.301, "usd50_per_h": -271.26, "sum_usd50": -7000.37, "win50": 2.6, "win0": 7.0, "pairs": 42, "top_pair_share": 0.146, "maxdd_pct": 700.0, "fb_share": 0.054, "gap_share": 0.0, "avg_hold_s": 66.6, "ci95_net50_pair": [-3.537, -3.077]}
+  RANDOM r2 B2 {"n": 2117, "tph": 82.03, "mean_net50": -3.273, "mean_net0": -1.794, "mean_netcal": -2.301, "mean_usd50": -3.273, "usd50_per_h": -268.46, "sum_usd50": -6928.17, "win50": 2.5, "win0": 6.8, "pairs": 42, "top_pair_share": 0.148, "maxdd_pct": 692.8, "fb_share": 0.056, "gap_share": 0.0, "avg_hold_s": 66.6, "ci95_net50_pair": [-3.508, -3.062]}
+  RANDOM r3 B2 {"n": 2106, "tph": 81.61, "mean_net50": -3.271, "mean_net0": -1.792, "mean_netcal": -2.299, "mean_usd50": -3.271, "usd50_per_h": -266.96, "sum_usd50": -6889.29, "win50": 2.1, "win0": 6.3, "pairs": 41, "top_pair_share": 0.15, "maxdd_pct": 688.9, "fb_share": 0.057, "gap_share": 0.0, "avg_hold_s": 65.6, "ci95_net50_pair": [-3.526, -3.048]}
+  slots 2 n 1374 tph 53.24 net50 -3.332 {'pool_open': 9696, 'slots_full': 1867}
+  slots 8 n 1659 tph 64.29 net50 -3.251 {'pool_open': 11278}
+  slots 16 n 1659 tph 64.29 net50 -3.251 {'pool_open': 11278}
+  cooldown 30 n 1379 tph 53.44 net50 -3.235
+  cooldown 60 n 1195 tph 46.31 net50 -3.261
+  cooldown 120 n 969 tph 37.55 net50 -3.276
+
+== C1b_burst30_loose_noveto le95 off hold 60 universe 31194 cands 12225 density 0.392
+  SIGNAL B2 {"n": 1676, "tph": 64.94, "mean_net50": -3.296, "mean_net0": -1.808, "mean_netcal": -2.324, "mean_usd50": -3.296, "usd50_per_h": -214.07, "sum_usd50": -5524.41, "win50": 1.7, "win0": 5.0, "pairs": 35, "top_pair_share": 0.186, "maxdd_pct": 552.4, "fb_share": 0.035, "gap_share": 0.0, "avg_hold_s": 64.5, "ci95_net50_pair": [-3.565, -3.064]} {'pool_open': 10520, 'slots_full': 29}
+  SIGNAL B5 {"n": 1601, "tph": 62.04, "mean_net50": -3.273, "mean_net0": -1.785, "mean_netcal": -2.301, "mean_usd50": -3.273, "usd50_per_h": -203.05, "sum_usd50": -5240.02, "win50": 2.2, "win0": 5.1, "pairs": 35, "top_pair_share": 0.187, "maxdd_pct": 524.0, "fb_share": 0.045, "gap_share": 0.0, "avg_hold_s": 70.9, "ci95_net50_pair": [-3.538, -3.046]} {'pool_open': 10583, 'slots_full': 41}
+  SIGNAL A {"n": 1368, "tph": 53.01, "mean_net50": -3.257, "mean_net0": -1.773, "mean_netcal": -2.285, "mean_usd50": -3.257, "usd50_per_h": -172.66, "sum_usd50": -4455.79, "win50": 3.5, "win0": 8.2, "pairs": 35, "top_pair_share": 0.183, "maxdd_pct": 445.6, "fb_share": 0.0, "gap_share": 0.005, "avg_hold_s": 108.0, "ci95_net50_pair": [-3.49, -3.056]} {'pool_open': 10639, 'no_fill': 8, 'slots_full': 210}
+  RANDOM r1 B2 {"n": 2095, "tph": 81.18, "mean_net50": -3.313, "mean_net0": -1.834, "mean_netcal": -2.341, "mean_usd50": -3.313, "usd50_per_h": -268.94, "sum_usd50": -6940.36, "win50": 2.7, "win0": 7.1, "pairs": 42, "top_pair_share": 0.146, "maxdd_pct": 694.0, "fb_share": 0.054, "gap_share": 0.0, "avg_hold_s": 67.0, "ci95_net50_pair": [-3.566, -3.083]}
+  RANDOM r2 B2 {"n": 2086, "tph": 80.83, "mean_net50": -3.273, "mean_net0": -1.795, "mean_netcal": -2.301, "mean_usd50": -3.273, "usd50_per_h": -264.56, "sum_usd50": -6827.48, "win50": 2.5, "win0": 6.9, "pairs": 42, "top_pair_share": 0.147, "maxdd_pct": 682.7, "fb_share": 0.057, "gap_share": 0.0, "avg_hold_s": 66.6, "ci95_net50_pair": [-3.509, -3.062]}
+  RANDOM r3 B2 {"n": 2079, "tph": 80.56, "mean_net50": -3.305, "mean_net0": -1.826, "mean_netcal": -2.333, "mean_usd50": -3.305, "usd50_per_h": -266.24, "sum_usd50": -6870.75, "win50": 2.1, "win0": 6.2, "pairs": 41, "top_pair_share": 0.152, "maxdd_pct": 687.1, "fb_share": 0.056, "gap_share": 0.0, "avg_hold_s": 65.6, "ci95_net50_pair": [-3.551, -3.078]}
+  slots 2 n 1381 tph 53.51 net50 -3.384 {'pool_open': 9217, 'slots_full': 1627}
+  slots 8 n 1685 tph 65.29 net50 -3.292 {'pool_open': 10540}
+  slots 16 n 1685 tph 65.29 net50 -3.292 {'pool_open': 10540}
+  cooldown 30 n 1408 tph 54.56 net50 -3.313
+  cooldown 60 n 1214 tph 47.04 net50 -3.284
+  cooldown 120 n 980 tph 37.97 net50 -3.299
+
+== C3_all_veto le95 veto hold 60 universe 6975 cands 6975 density 1.0
+  SIGNAL B2 {"n": 1247, "tph": 48.32, "mean_net50": -3.096, "mean_net0": -1.588, "mean_netcal": -2.122, "mean_usd50": -3.096, "usd50_per_h": -149.59, "sum_usd50": -3860.49, "win50": 0.6, "win0": 1.2, "pairs": 32, "top_pair_share": 0.289, "maxdd_pct": 386.0, "fb_share": 0.052, "gap_share": 0.0, "avg_hold_s": 66.5, "ci95_net50_pair": [-3.204, -3.024]} {'pool_open': 5669, 'slots_full': 59}
+  SIGNAL B5 {"n": 1192, "tph": 46.19, "mean_net50": -3.069, "mean_net0": -1.563, "mean_netcal": -2.095, "mean_usd50": -3.069, "usd50_per_h": -141.77, "sum_usd50": -3658.7, "win50": 0.7, "win0": 1.5, "pairs": 32, "top_pair_share": 0.286, "maxdd_pct": 365.9, "fb_share": 0.069, "gap_share": 0.0, "avg_hold_s": 81.1, "ci95_net50_pair": [-3.171, -3.004]} {'pool_open': 5633, 'slots_full': 150}
+  SIGNAL A {"n": 1011, "tph": 39.18, "mean_net50": -3.235, "mean_net0": -1.735, "mean_netcal": -2.263, "mean_usd50": -3.235, "usd50_per_h": -126.73, "sum_usd50": -3270.57, "win50": 0.7, "win0": 1.4, "pairs": 32, "top_pair_share": 0.273, "maxdd_pct": 327.1, "fb_share": 0.0, "gap_share": 0.007, "avg_hold_s": 118.6, "ci95_net50_pair": [-3.422, -3.088]} {'pool_open': 5763, 'no_fill': 19, 'slots_full': 182}
+  RANDOM r1 B2 {"n": 1247, "tph": 48.32, "mean_net50": -3.096, "mean_net0": -1.588, "mean_netcal": -2.122, "mean_usd50": -3.096, "usd50_per_h": -149.59, "sum_usd50": -3860.49, "win50": 0.6, "win0": 1.2, "pairs": 32, "top_pair_share": 0.289, "maxdd_pct": 386.0, "fb_share": 0.052, "gap_share": 0.0, "avg_hold_s": 66.5, "ci95_net50_pair": [-3.204, -3.024]}
+  RANDOM r2 B2 {"n": 1247, "tph": 48.32, "mean_net50": -3.096, "mean_net0": -1.588, "mean_netcal": -2.122, "mean_usd50": -3.096, "usd50_per_h": -149.59, "sum_usd50": -3860.49, "win50": 0.6, "win0": 1.2, "pairs": 32, "top_pair_share": 0.289, "maxdd_pct": 386.0, "fb_share": 0.052, "gap_share": 0.0, "avg_hold_s": 66.5, "ci95_net50_pair": [-3.204, -3.024]}
+  RANDOM r3 B2 {"n": 1247, "tph": 48.32, "mean_net50": -3.096, "mean_net0": -1.588, "mean_netcal": -2.122, "mean_usd50": -3.096, "usd50_per_h": -149.59, "sum_usd50": -3860.49, "win50": 0.6, "win0": 1.2, "pairs": 32, "top_pair_share": 0.289, "maxdd_pct": 386.0, "fb_share": 0.052, "gap_share": 0.0, "avg_hold_s": 66.5, "ci95_net50_pair": [-3.204, -3.024]}
+  slots 2 n 1022 tph 39.6 net50 -3.098 {'pool_open': 4622, 'slots_full': 1331}
+  slots 8 n 1254 tph 48.59 net50 -3.094 {'pool_open': 5721}
+  slots 16 n 1254 tph 48.59 net50 -3.094 {'pool_open': 5721}
+  cooldown 30 n 1066 tph 41.31 net50 -3.08
+  cooldown 60 n 914 tph 35.42 net50 -3.058
+  cooldown 120 n 755 tph 29.26 net50 -3.163
+
+== C2_strict_best le50 off hold 60 universe 12260 cands 2540 density 0.207
+  SIGNAL B2 {"n": 184, "tph": 7.13, "mean_net50": -2.657, "mean_net0": -1.027, "mean_netcal": -1.679, "mean_usd50": -2.657, "usd50_per_h": -18.95, "sum_usd50": -488.93, "win50": 4.9, "win0": 24.5, "pairs": 1, "top_pair_share": 1.0, "maxdd_pct": 49.0, "fb_share": 0.011, "gap_share": 0.0, "avg_hold_s": 64.2, "ci95_net50_pair": [null, null]} {'pool_open': 2356}
+  SIGNAL B5 {"n": 170, "tph": 6.59, "mean_net50": -2.713, "mean_net0": -1.083, "mean_netcal": -1.735, "mean_usd50": -2.713, "usd50_per_h": -17.87, "sum_usd50": -461.14, "win50": 5.3, "win0": 22.9, "pairs": 1, "top_pair_share": 1.0, "maxdd_pct": 46.1, "fb_share": 0.024, "gap_share": 0.0, "avg_hold_s": 70.3, "ci95_net50_pair": [null, null]} {'pool_open': 2370}
+  SIGNAL A {"n": 146, "tph": 5.66, "mean_net50": -2.888, "mean_net0": -1.261, "mean_netcal": -1.912, "mean_usd50": -2.888, "usd50_per_h": -16.34, "sum_usd50": -421.65, "win50": 8.2, "win0": 27.4, "pairs": 1, "top_pair_share": 1.0, "maxdd_pct": 42.2, "fb_share": 0.0, "gap_share": 0.007, "avg_hold_s": 112.7, "ci95_net50_pair": [null, null]} {'pool_open': 2394}
+  RANDOM r1 B2 {"n": 706, "tph": 27.36, "mean_net50": -2.975, "mean_net0": -1.35, "mean_netcal": -2.0, "mean_usd50": -2.975, "usd50_per_h": -81.38, "sum_usd50": -2100.24, "win50": 1.7, "win0": 7.4, "pairs": 19, "top_pair_share": 0.353, "maxdd_pct": 210.0, "fb_share": 0.042, "gap_share": 0.0, "avg_hold_s": 64.7, "ci95_net50_pair": [-3.073, -2.852]}
+  RANDOM r2 B2 {"n": 697, "tph": 27.01, "mean_net50": -2.97, "mean_net0": -1.345, "mean_netcal": -1.995, "mean_usd50": -2.97, "usd50_per_h": -80.23, "sum_usd50": -2070.36, "win50": 2.3, "win0": 7.5, "pairs": 18, "top_pair_share": 0.353, "maxdd_pct": 207.0, "fb_share": 0.043, "gap_share": 0.0, "avg_hold_s": 64.6, "ci95_net50_pair": [-3.061, -2.841]}
+  RANDOM r3 B2 {"n": 687, "tph": 26.62, "mean_net50": -2.972, "mean_net0": -1.347, "mean_netcal": -1.997, "mean_usd50": -2.972, "usd50_per_h": -79.12, "sum_usd50": -2041.95, "win50": 2.0, "win0": 7.4, "pairs": 18, "top_pair_share": 0.365, "maxdd_pct": 204.2, "fb_share": 0.045, "gap_share": 0.0, "avg_hold_s": 64.7, "ci95_net50_pair": [-3.061, -2.839]}
+  slots 2 n 184 tph 7.13 net50 -2.657 {'pool_open': 2356}
+  slots 8 n 184 tph 7.13 net50 -2.657 {'pool_open': 2356}
+  slots 16 n 184 tph 7.13 net50 -2.657 {'pool_open': 2356}
+  cooldown 30 n 145 tph 5.62 net50 -2.858
+  cooldown 60 n 121 tph 4.69 net50 -2.788
+  cooldown 120 n 92 tph 3.56 net50 -2.738

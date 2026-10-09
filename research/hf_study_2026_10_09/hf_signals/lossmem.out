@@ -1,0 +1,3 @@
+HF_A_QUIET_E95_HEAT holdout: regression OK (n 1374) | with POOL_LOSS_MEMORY_V1: n 60 tph 3.5 net50 -2.994 pairs 18, blocked signals 2486
+HF_B_NEAR15LOW_E95_NOHEAT holdout: regression OK (n 1291) | with POOL_LOSS_MEMORY_V1: n 71 tph 4.1 net50 -3.388 pairs 21, blocked signals 3077
+HF_C_QUIET_E95_NOHEAT_3SLOT holdout: regression OK (n 1150) | with POOL_LOSS_MEMORY_V1: n 61 tph 3.5 net50 -3.091 pairs 19, blocked signals 3723

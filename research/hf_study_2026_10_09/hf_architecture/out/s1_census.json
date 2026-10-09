@@ -1,0 +1,130 @@
+{
+ "meta": {
+  "rows": 6598553,
+  "points": 2328685,
+  "pairs": 3756,
+  "t0": 1791362460712.0,
+  "t1": 1791517300498.0
+ },
+ "cut": 1791455364583.6,
+ "notional": 50.0,
+ "caps": [
+  1.5,
+  2.5
+ ],
+ "pumpswap_sol_pairs": 2851,
+ "pumpswap_sol_points": 1686713,
+ "pairs_ever_eligible_cap2.5": 35,
+ "A_heat0_train": {
+  "pools_per_minute_mean": 3.9,
+  "pools_per_minute_p10_p50_p90": [
+   0,
+   6,
+   7
+  ],
+  "minutes_with_zero": 443,
+  "minutes": 1548,
+  "distinct_pools_per_hour_mean": 4.7,
+  "distinct_pools_total": 12
+ },
+ "A_heat0_holdout": {
+  "pools_per_minute_mean": 6.64,
+  "pools_per_minute_p10_p50_p90": [
+   6,
+   7,
+   8
+  ],
+  "minutes_with_zero": 3,
+  "minutes": 1033,
+  "distinct_pools_per_hour_mean": 7.3,
+  "distinct_pools_total": 12
+ },
+ "A_heat1_train": {
+  "pools_per_minute_mean": 2.3,
+  "pools_per_minute_p10_p50_p90": [
+   0,
+   2,
+   5
+  ],
+  "minutes_with_zero": 479,
+  "minutes": 1548,
+  "distinct_pools_per_hour_mean": 3.6,
+  "distinct_pools_total": 8
+ },
+ "A_heat1_holdout": {
+  "pools_per_minute_mean": 4.52,
+  "pools_per_minute_p10_p50_p90": [
+   3,
+   5,
+   6
+  ],
+  "minutes_with_zero": 3,
+  "minutes": 1033,
+  "distinct_pools_per_hour_mean": 6.9,
+  "distinct_pools_total": 12
+ },
+ "B_heat0_train": {
+  "pools_per_minute_mean": 12.72,
+  "pools_per_minute_p10_p50_p90": [
+   0,
+   17,
+   21
+  ],
+  "minutes_with_zero": 165,
+  "minutes": 1548,
+  "distinct_pools_per_hour_mean": 14.7,
+  "distinct_pools_total": 31
+ },
+ "B_heat0_holdout": {
+  "pools_per_minute_mean": 13.88,
+  "pools_per_minute_p10_p50_p90": [
+   13,
+   14,
+   15
+  ],
+  "minutes_with_zero": 3,
+  "minutes": 1033,
+  "distinct_pools_per_hour_mean": 14.7,
+  "distinct_pools_total": 22
+ },
+ "B_heat1_train": {
+  "pools_per_minute_mean": 7.86,
+  "pools_per_minute_p10_p50_p90": [
+   0,
+   10,
+   14
+  ],
+  "minutes_with_zero": 458,
+  "minutes": 1548,
+  "distinct_pools_per_hour_mean": 12.2,
+  "distinct_pools_total": 23
+ },
+ "B_heat1_holdout": {
+  "pools_per_minute_mean": 9.53,
+  "pools_per_minute_p10_p50_p90": [
+   7,
+   10,
+   12
+  ],
+  "minutes_with_zero": 3,
+  "minutes": 1033,
+  "distinct_pools_per_hour_mean": 14.3,
+  "distinct_pools_total": 21
+ },
+ "fill_lag_s_p10_p50_p90_mean": [
+  4.099,
+  14.445,
+  41.836,
+  18.7
+ ],
+ "fill_status_counts": {
+  "next_refresh": 161166,
+  "quiet": 63660,
+  "none": 70
+ },
+ "price_change_interval_s_p10_p50_p90": [
+  26.842,
+  32.163,
+  91.722
+ ]
+}

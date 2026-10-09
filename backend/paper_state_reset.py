@@ -77,6 +77,40 @@ def archive_files(root, names, *, move_names=()):
     return destination
 
 
+def archive_directory(root, name):
+    """Move ``root/name`` (a whole directory tree) into a checksummed reset archive and recreate it empty.
+
+    Used for the LAB_HIGH_FREQUENCY_V1 books (strategy_lab_hf/: journal and checkpoint).
+    Nothing is deleted: every file is hashed before the move and its size checked after it.
+    Returns the archive directory, or None when there was no directory to archive.
+    """
+    root = Path(root).resolve()
+    source = root / name
+    if source.exists() and not source.is_dir():
+        raise ValueError(f'{name} is not a directory; reset refused')
+    if not source.is_dir():
+        source.mkdir(parents=True, exist_ok=True, mode=0o700)
+        return None
+    files = {}
+    for path in sorted(source.rglob('*')):
+        if path.is_file():
+            digest, size = _hash_file(path)
+            files[path.relative_to(source).as_posix()] = {'sha256': digest, 'bytes': size}
+    destination = root / 'archive' / f'reset-{time.time_ns()}-{uuid.uuid4().hex[:8]}'
+    destination.mkdir(parents=True, mode=0o700)
+    target = destination / name
+    os.replace(source, target)
+    for relative, metadata in files.items():
+        if (target / relative).stat().st_size != metadata['bytes']:
+            raise OSError('archive size mismatch; reset refused')
+    atomic_json(destination / 'manifest.json', {
+        'schema_version': 1, 'mode': 'PAPER', 'archived_at': int(time.time()*1000),
+        'reason': 'User explicitly requested history and capital reset', 'directory': name, 'files': files,
+    })
+    source.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return destination
+
+
 def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
     root = Path(root).resolve()
     if not math.isfinite(starting_balance) or starting_balance <= 0:
@@ -209,9 +243,73 @@ def reset_training_offline(training_root, *, training_balance=500.0):
             flock(lock, LOCK_UN)
 
 
+def _safe_relative(name):
+    """A manifest path of a directory archive: relative, '/'-separated, no '..', no drive or root."""
+    if not isinstance(name, str) or not name or '\\' in name or ':' in name or name.startswith('/'):
+        return None
+    parts = name.split('/')
+    if any(part in ('', '.', '..') for part in parts):
+        return None
+    return Path(*parts)
+
+
+def restore_directory_archive(archive, root):
+    """Restore a directory archive (archive_directory, e.g. strategy_lab_hf/) into ``root``.
+
+    Every file is checked against the manifest before anything changes. The directory now in
+    ``root`` is first moved into its own checksummed reset archive (nothing is deleted); the
+    restored tree is copied (the archive stays intact) into a staging directory, verified, and
+    then put in place. The writers (the Lab) must be stopped.
+    """
+    archive, root = Path(archive).resolve(), Path(root).resolve()
+    manifest = json.loads((archive / 'manifest.json').read_text(encoding='utf-8'))
+    name = manifest.get('directory')
+    if not isinstance(name, str) or not name or Path(name).name != name or name in ('.', '..'):
+        raise ValueError('unsafe manifest directory')
+    source_root = (archive / name).resolve()
+    if source_root.parent != archive or not source_root.is_dir():
+        raise ValueError('archive directory missing; restore refused')
+    verified = {}
+    for relative, metadata in manifest['files'].items():
+        path = _safe_relative(relative)
+        if path is None:
+            raise ValueError('unsafe manifest filename')
+        source = (source_root / path).resolve()
+        if not source.is_relative_to(source_root) or not source.is_file():
+            raise ValueError('unsafe manifest filename')
+        digest, size = _hash_file(source)
+        if digest != metadata['sha256'] or size != metadata['bytes']:
+            raise ValueError('archive checksum mismatch; restore refused')
+        verified[relative] = (source, path, metadata)
+    target = root / name
+    if target.exists() and not target.is_dir():
+        raise ValueError(f'{name} is not a directory; restore refused')
+    staging = root / f'{name}.restore-{uuid.uuid4().hex[:8]}'
+    staging.mkdir(parents=True, mode=0o700)
+    for relative, (source, path, metadata) in verified.items():
+        destination = staging / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        digest, size = _copy_file_checked(source, destination)
+        if digest != metadata['sha256'] or size != metadata['bytes']:
+            raise OSError('restore checksum mismatch; restore refused')
+    # Preserve the current directory: anything in it moves whole into a new reset archive
+    # (archive_directory recreates it empty); only the empty directory itself is removed.
+    preserved = None
+    if target.is_dir():
+        if any(target.iterdir()):
+            preserved = archive_directory(root, name)
+        target.rmdir()
+    os.replace(staging, target)
+    return {'restored_directory': name, 'restored_files': sorted(verified),
+            'previous_state_archive': None if preserved is None else str(preserved)}
+
+
 def restore_archive(archive, root):
     archive, root = Path(archive).resolve(), Path(root).resolve()
     manifest = json.loads((archive / 'manifest.json').read_text(encoding='utf-8'))
+    if 'directory' in manifest:
+        # A whole-directory archive (archive_directory: the LAB_HIGH_FREQUENCY_V1 strategy_lab_hf/).
+        return restore_directory_archive(archive, root)
     verified = {}
     for name, metadata in manifest['files'].items():
         if Path(name).name != name:
@@ -264,6 +362,8 @@ def reset_all_offline(root, *, paired_root=None):
             else:
                 for book in data[field].values() if field == 'books' else [data[field]]:
                     valid_capital(book)
+    if (root / 'strategy_lab_hf').exists() and not (root / 'strategy_lab_hf').is_dir():
+        raise ValueError('strategy_lab_hf is not a directory; reset refused')
     if paired_root is not None and (Path(paired_root)/'paired_state.json').exists():
         paired = json.loads((Path(paired_root)/'paired_state.json').read_text(encoding='utf-8'))
         if not isinstance(paired.get('groups'),dict):
@@ -307,6 +407,10 @@ def reset_all_offline(root, *, paired_root=None):
         atomic_json(lab,data)
         from lab_dashboard_projection import compact_strategy_lab
         atomic_json(root/'strategy_lab_compact.json',compact_strategy_lab(data))
+    # LAB_HIGH_FREQUENCY_V1 books keep their journal and checkpoint next to the Lab ledger.
+    hf_archive = archive_directory(root, 'strategy_lab_hf')
+    if hf_archive is not None:
+        archives.append(str(hf_archive))
     astra = root / 'astra_6_brain.json'
     if astra.exists():
         data = json.loads(astra.read_text(encoding='utf-8'))

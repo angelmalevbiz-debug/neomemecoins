@@ -1,0 +1,5 @@
+chain mid vs DexScreener pnative at same moment, %: [-2.902, -0.772, -0.173, 0.459, 2.206] n 4000
+chain mid now vs DexScreener 20 s later, %: [-1.82, -0.615, -0.208, 0.334, 1.387]
+gross chain-mid move over 62 s, %: [-2.964, -0.615, 0.002, 0.641, 2.656] mean -0.054 mean |g| 1.151 share |g|>1% 0.355
+zero-move round trip at $100, le50 n 1546 net0 -1.245 netcal -1.895 net50 -2.871
+zero-move round trip at $100, 55_95 n 2454 net0 -2.294 netcal -2.704 net50 -3.672

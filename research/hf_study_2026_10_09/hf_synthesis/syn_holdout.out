@@ -1,0 +1,22 @@
+holdout 17.20 h, full hours 16, live hours 16
+== HF_RND_E95: n - tph 47.9 live 47.9 (p10 44.8, median 48.6, ge40 1.00, max 50.0) net50 -3.708 (median -3.615) booked -2.739 net0 -1.575 gross +0.015 dp50 -3.685 | $/trade net50 -0.927 booked -0.685 | $/h net50 -44.43 booked -32.83 net0 -18.88 | win50 1.48 win0 4.88 | pairs 20.0 top 0.115 le50 0.43 re300 0.31 cycle 145s entry lag 24.3s exit lag 21.5s | mdd booked $565
+   salts net50 [-3.694, -3.672, -3.765, -3.771, -3.637] tph [48.24, 47.31, 48.59, 48.19, 47.31] ci net50 (hfA) [-3.862, -3.492] ci usd50 (hfA) [-0.965, -0.873]
+   fee split {'fee<=50': {'n': 349, 'mean_net50': -3.327, 'mean_gross': 0.135}, 'fee55-95': {'n': 481, 'mean_net50': -3.96, 'mean_gross': -0.028}}
+   per day {'20734': {'n': 650, 'booked_usd': -443.55, 'usd50': -600.98, 'active_h': 13.44}, '20735': {'n': 180, 'booked_usd': -121.86, 'usd50': -165.47, 'active_h': 3.68}}
+== HF_QUIET_E95: n 768 tph 44.6 live 44.6 (p10 37, median 47, ge40 0.81, max 50) net50 -3.566 (median -3.453) booked -2.596 net0 -1.377 gross +0.037 dp50 -3.573 | $/trade net50 -0.892 booked -0.649 | $/h net50 -39.80 booked -28.97 net0 -15.37 | win50 0.00 win0 1.56 | pairs 18 top 0.141 le50 0.66 re300 0.36 cycle 143s entry lag 19.6s exit lag 18.5s | mdd booked $498
+   ci net50 [-3.744, -3.432] ci usd50 [-0.936, -0.858] best pair removed -3.567 exits {'HOLD': 766, 'FEED_GAP/GAP': 1, 'OPEN_AT_END/END': 1}
+   fee split {'fee<=50': {'n': 507, 'mean_net50': -3.387, 'mean_gross': 0.033}, 'fee55-95': {'n': 261, 'mean_net50': -3.916, 'mean_gross': 0.045}}
+   per day {'20734': {'n': 590, 'booked_usd': -386.16, 'usd50': -529.22, 'active_h': 13.49}, '20735': {'n': 178, 'booked_usd': -112.33, 'usd50': -155.53, 'active_h': 3.67}}
+== HF_DIP15_E95: n 696 tph 40.5 live 40.4 (p10 34, median 43, ge40 0.62, max 50) net50 -3.634 (median -3.532) booked -2.665 net0 -1.483 gross +0.067 dp50 -3.500 | $/trade net50 -0.909 booked -0.666 | $/h net50 -36.76 booked -26.95 net0 -15.00 | win50 1.01 win0 4.02 | pairs 20 top 0.103 le50 0.51 re300 0.36 cycle 141s entry lag 23.2s exit lag 17.7s | mdd booked $464
+   ci net50 [-3.829, -3.409] ci usd50 [-0.957, -0.852] best pair removed -3.633 exits {'HOLD': 694, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 1}
+   fee split {'fee<=50': {'n': 353, 'mean_net50': -3.324, 'mean_gross': 0.134}, 'fee55-95': {'n': 343, 'mean_net50': -3.953, 'mean_gross': -0.001}}
+   per day {'20734': {'n': 541, 'booked_usd': -361.15, 'usd50': -492.26, 'active_h': 13.46}, '20735': {'n': 155, 'booked_usd': -102.53, 'usd50': -140.11, 'active_h': 3.67}}
+GAP HF_QUIET_E95 vs HF_RND_E95: {"net50_point_vs_salt_mean": 0.142, "gross_point_vs_salt_mean": 0.022, "net50_ci_vs_hfA": [-0.127, 0.356], "gross_ci_vs_hfA": [-0.15, 0.108], "within_fee_bucket": {"fee<=50": {"gap_net50": -0.059, "ci": [-0.422, 0.128], "n": [507, 349]}, "fee55-95": {"gap_net50": 0.044, "ci": [-0.164, 0.228], "n": [261, 481]}}}
+GAP HF_DIP15_E95 vs HF_RND_E95: {"net50_point_vs_salt_mean": 0.074, "gross_point_vs_salt_mean": 0.052, "net50_ci_vs_hfA": [-0.214, 0.332], "gross_ci_vs_hfA": [-0.17, 0.214], "within_fee_bucket": {"fee<=50": {"gap_net50": 0.003, "ci": [-0.387, 0.346], "n": [353, 349]}, "fee55-95": {"gap_net50": 0.006, "ci": [-0.24, 0.297], "n": [343, 481]}}}
+CAP $100/UTC day HF_RND_E95: n 286, days {'20734': {'n': 137, 'booked_usd': -101.98, 'usd50': -135.08, 'active_h': 2.83}, '20735': {'n': 149, 'booked_usd': -101.58, 'usd50': -137.67, 'active_h': 3.09}}, booked -203.57 net50 -272.75 mdd booked 203.57
+CAP $100/UTC day HF_QUIET_E95: n 311, days {'20734': {'n': 152, 'booked_usd': -100.93, 'usd50': -137.78, 'active_h': 3.39}, '20735': {'n': 159, 'booked_usd': -101.14, 'usd50': -139.73, 'active_h': 3.21}}, booked -202.08 net50 -277.50 mdd booked 202.08
+CAP $100/UTC day HF_DIP15_E95: n 301, days {'20734': {'n': 148, 'booked_usd': -101.96, 'usd50': -137.79, 'active_h': 3.21}, '20735': {'n': 153, 'booked_usd': -100.93, 'usd50': -138.02, 'active_h': 3.51}}, booked -202.88 net50 -275.81 mdd booked 202.88
+POOL_LOSS_MEMORY_V1 emulation HF_RND_E95: n 66 tph 3.84 net50 -4.007 blocked 2385
+POOL_LOSS_MEMORY_V1 emulation HF_QUIET_E95: n 60 tph 3.49 net50 -3.74 blocked 2435
+POOL_LOSS_MEMORY_V1 emulation HF_DIP15_E95: n 68 tph 3.95 net50 -3.54 blocked 1936
+secs 1.4

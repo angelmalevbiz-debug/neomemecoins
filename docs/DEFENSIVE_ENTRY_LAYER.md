@@ -490,7 +490,42 @@ Streak rules:
 | Every Strategy Lab book | `strategy_lab.maybe_open`, right after the book's rule or universe match | Before the cost estimate, flow promotion, RugCheck, Jupiter price probes and modeled fills. Loss memory uses that book's own history. It is checked again at commit, on the commit clock and the book's history at that moment (`commit_recheck_blocked`). The Lab has no observation newer than its refresh, so this catches a stale pair history, a moved 5-min reference or a new loss; a pool that turns hot after the refresh is refused at the next refresh. |
 | Tape scheduler (all seat groups, including `COST_FIRST_UNIVERSE`) | `TapePoolScheduler.select`, per candidate pool | A pool the structural guard blocks gets no entry or exploration seat; a hot pool gets no new seat (a running lease runs out). The tape's own heat warm-up is log-only and no loss memory applies (see below). Pins of held positions are never screened. |
 | Training quote probe | `schedule_training_quote_probe` before the price and RugCheck calls; `run_training_quote_probe` again before `collect_exact_pool_quotes` | Loss memory uses the main account's history. |
+| `LAB_HIGH_FREQUENCY_V1` books (`HF_RND_E95`, `HF_QUIET_E95`, `HF_DIP15_E95`) | `lab_high_frequency.HighFrequencyLab.on_refresh`, one `evaluate(coin, now, blocked_pools={}, heat_log_only=False)` per pool per refresh, before the order | The structural guard and heat are enforced. The structural guard is checked again on the entry fill observation (`hf_structural_block_at_fill`). Loss memory runs as a shadow only (`plm_v1_would_block`), replaced by `HF_POOL_RULE_V1`; see below. |
 | Engine RugCheck prewarm | `prewarm_entry_checks` (`PREWARM_V2_DEFENSIVE_POPULATION`) | Warms only pools the layer can allow: pair age ≥ 720 min at now, the active strategy's market screen, liquidity ≥ $4k and an allowed layer decision; at most 4 per scan, by 5-min activity then score. The old population (`ageMinutes` ≤ 360) was entirely blocked by the young-pool rule, so an allowed pool's first RugCheck happened at entry and returned `pending` (`risk_check_pending`, one scan lost). |
+
+### Lab high-frequency books (LAB_HIGH_FREQUENCY_V1)
+
+The three HF PAPER books ([LAB_HIGH_FREQUENCY.md](LAB_HIGH_FREQUENCY.md)) trade about 50
+times an hour each at $25 and are expected to lose about the round-trip cost on every trade.
+Their defensive modes are part of every HF config hash:
+
+- **STRUCTURAL_RUG_GUARD_V1: enforced**, at the decision through this layer and again on the
+  entry fill observation (`hf_structural_block_at_fill`). The guard fails closed: an error, or
+  a registry that cannot vouch, blocks the fill.
+- **HEAT_VETO_STACK_V1: enforced**, warm-up included. No HF book is in
+  `heat_veto.LOG_ONLY_BOOK_IDS`.
+- **POOL_LOSS_MEMORY_V1: shadow** (`SHADOW_REPLACED_BY_HF_POOL_RULE_V1`).
+  - The layer is called with `blocked_pools={}`.
+  - Every HF order and close records `plm_v1_would_block`, computed by
+    `pool_loss_memory.index` over the book's in-memory closes of the last 6 h.
+  - The book's own rule is `HF_POOL_RULE_V1`: a 120 s per-pool cooldown after its exit fill
+    or cancel, with no loss brake.
+  - Reason: about 99% of HF closes lose by construction (the round trip costs more than a
+    2-minute move), so 2 losses in a pool are the normal case, not a signal. With the memory
+    enforced, the HF books traded 3.5-4.0 times an hour on the holdout
+    (`research/hf_study_2026_10_09`).
+  - **Acceptance record.** The owner accepts this replacement by merging this change into
+    main; GitHub records who merged it and when, and that merge is the written acceptance of
+    the wording here. No agent can accept it, and an agent never merges to main. The HF books
+    are deployed only from main.
+    - What it accepts: POOL_LOSS_MEMORY_V1 runs as a shadow for the three
+      `LAB_HIGH_FREQUENCY_V1` books only and is replaced there by `HF_POOL_RULE_V1`.
+    - Basis: the owner's request of 2026-10-09, verbatim "it has to trade more often like 50
+      trades per hour for each strategy". The request asks for the rate and does not itself
+      mention POOL_LOSS_MEMORY_V1. The replacement was proposed on 2026-10-09 by the Claude
+      Code workflow that built the family, because the rate cannot be met with the memory
+      enforced (3.5-4.0 trades an hour on the holdout).
+  - Every other account, Lab book and the training probe keeps enforcing it unchanged.
 
 ### Tape seats: structural guard and heat for new seats
 

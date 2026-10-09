@@ -1,0 +1,14 @@
+C:\Users\Chavd\AppData\Local\Temp\claude\C--Users-Chavd-Documents-ChatGPT-memcoin\c0ef97d9-7323-486d-8d3d-c013406e7ed0\scratchpad\hf\hf_cost_floor\p02_coverage.py:17: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  print('dataset UTC', datetime.datetime.utcfromtimestamp(meta['t0'] / 1000), '->', datetime.datetime.utcfromtimestamp(meta['t1'] / 1000),
+C:\Users\Chavd\AppData\Local\Temp\claude\C--Users-Chavd-Documents-ChatGPT-memcoin\c0ef97d9-7323-486d-8d3d-c013406e7ed0\scratchpad\hf\hf_cost_floor\p02_coverage.py:18: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  'cut', datetime.datetime.utcfromtimestamp(CUT / 1000))
+C:\Users\Chavd\AppData\Local\Temp\claude\C--Users-Chavd-Documents-ChatGPT-memcoin\c0ef97d9-7323-486d-8d3d-c013406e7ed0\scratchpad\hf\hf_cost_floor\p02_coverage.py:30: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+  print('feed gap', datetime.datetime.utcfromtimestamp(a * 60), '->', datetime.datetime.utcfromtimestamp(b * 60), b - a, 'min')
+dataset UTC 2026-10-07 08:41:00.712000 -> 2026-10-09 03:41:40.498000 cut 2026-10-08 10:29:24.583600
+train minutes 1548 covered 1479
+holdout minutes 1033 covered 1030
+feed gap 2026-10-07 11:28:00 -> 2026-10-07 11:40:00 12 min
+feed gap 2026-10-07 22:43:00 -> 2026-10-07 23:37:00 54 min
+univ a refresh interval s p10/p50/p90 28.026 32.935 125.147 n 13071 | point spacing s p50/p90 4.661 7.36
+univ b refresh interval s p10/p50/p90 27.329 32.499 95.43 n 39714 | point spacing s p50/p90 4.782 7.234
+univ c refresh interval s p10/p50/p90 26.705 32.185 92.326 n 53768 | point spacing s p50/p90 4.835 7.208

@@ -143,3 +143,109 @@ class LabMeasurementTests(unittest.TestCase):
         self.assertEqual(wilson_interval(0, 100)[0], 0)
         self.assertEqual(wilson_interval(100, 100)[1], 100)
         self.assertLess(wilson_interval(100, 100)[0], 100)
+
+
+class HighFrequencyMeasurementTests(unittest.TestCase):
+    """LAB_HIGH_FREQUENCY_V1 journal rows: three slots per book, so orders and closes are counted per row."""
+
+    def rows(self):
+        cfg = 'c' * 64
+        out = []
+        seq = 0
+
+        def row(kind, at, **fields):
+            nonlocal seq
+            seq += 1
+            out.append({'v': 1, 'seq': seq, 'kind': kind, 'book': 'HF_RND_E95', 'cfg': cfg, 'at': at, **fields})
+        # Three overlapping slots, then a cancel and two closes.
+        for trade_no in (1, 2, 3):
+            row('order', START + trade_no * 1000, side='entry', trade_no=trade_no)
+        row('fill', START + 5000, side='entry', trade_no=1)
+        row('cancel', START + 6000, trade_no=2, reason='hf_entry_no_next_observation')
+        row('close', START + 150_000, trade_no=1, pnl_usd=-0.7, net50_usd=-0.9, net0_usd=-0.4,
+            close_kind='HF_TIME_120')
+        row('close', START + 160_000, trade_no=3, pnl_usd=0.2, net50_usd=-0.05, net0_usd=0.4,
+            close_kind='VANISHED')
+        row('order', START + 3_600_000, side='entry', trade_no=4)
+        return out
+
+    def test_multi_slot_rates_and_dedupe_by_book_config_and_seq(self):
+        from paper_lab_metrics import measure_hf_rows
+        rows = self.rows()
+        report = measure_hf_rows(rows + [dict(rows[0])], as_of=START + 3_600_000)
+        book = report['books']['HF_RND_E95:' + 'c' * 12]
+        self.assertEqual(report['rejected_rows']['duplicate'], 1)
+        self.assertEqual((book['orders'], book['closes'], book['fills']), (4, 2, 1))
+        self.assertEqual(book['max_concurrent_slots'], 3)
+        self.assertEqual(book['cancels'], {'hf_entry_no_next_observation': 1})
+        self.assertEqual(book['close_kinds'], {'HF_TIME_120': 1, 'VANISHED': 1})
+        self.assertEqual(book['open_at_end'], 1)
+        self.assertAlmostEqual(book['opened_per_hour'], 4 / ((3_600_000 - 1000) / 3_600_000), places=6)
+        self.assertAlmostEqual(book['booked_usd'], -0.5)
+        self.assertAlmostEqual(book['net50_usd_per_close'], -0.475)
+        self.assertEqual(book['win_rate_booked_pct'], 50.0)
+        self.assertEqual(book['win_rate_net50_pct'], 0.0)
+        self.assertTrue(report['paper_only'] and report['read_only'])
+
+    def test_two_sessions_with_the_same_seq_are_both_measured(self):
+        # Review finding: seq and trade_no restart at 1 after an HF reset; keyed by (book, cfg, seq)
+        # the second session's rows were dropped as duplicates. The journal epoch keeps them apart.
+        from paper_lab_metrics import measure_hf_rows
+        first = [dict(row, epoch='a' * 16) for row in self.rows()]
+        second = [dict(row, epoch='b' * 16, at=row['at'] + 2 * 3_600_000) for row in self.rows()]
+        report = measure_hf_rows(first + second + [dict(second[0])], as_of=START + 6 * 3_600_000)
+        book = report['books']['HF_RND_E95:' + 'c' * 12]
+        self.assertEqual(report['rejected_rows']['duplicate'], 1)
+        self.assertEqual((book['orders'], book['closes'], book['fills']), (8, 4, 2))
+        self.assertEqual(book['max_concurrent_slots'], 3)       # per session, never 3 + 3
+        self.assertEqual(book['open_at_end'], 2)
+        self.assertEqual(book['journal_epochs'], 2)
+        self.assertAlmostEqual(book['booked_usd'], -1.0)
+
+    def test_a_line_torn_inside_a_multibyte_symbol_is_one_malformed_line(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from paper_lab_metrics import read_hf_journal
+        order = json.dumps({'v': 1, 'seq': 2, 'kind': 'order', 'book': 'HF_RND_E95', 'cfg': 'c', 'at': START,
+                            'symbol': 'ПЕПЕ🐸'}, ensure_ascii=False).encode('utf-8')
+        torn = order[:order.index('🐸'.encode('utf-8')) + 2]
+        good = [json.dumps({'v': 1, 'seq': seq, 'kind': 'order', 'book': 'HF_RND_E95', 'cfg': 'c',
+                            'at': START, 'symbol': 'ПЕПЕ'}, ensure_ascii=False).encode('utf-8') for seq in (1, 3)]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'journal' / 'HF_RND_E95'
+            folder.mkdir(parents=True)
+            (folder / '2026-10-10.jsonl').write_bytes(good[0] + b'\n' + torn + b'\n' + good[1] + b'\n')
+            rows, malformed = read_hf_journal(Path(tmp))
+        self.assertEqual(malformed, 1)
+        self.assertEqual([row['seq'] for row in rows], [1, 3])
+        self.assertEqual(rows[1]['symbol'], 'ПЕПЕ')
+
+    def test_malformed_and_future_rows_are_counted_not_measured(self):
+        from paper_lab_metrics import measure_hf_rows
+        rows = self.rows()
+        report = measure_hf_rows(rows + [{'kind': 'close'}, {'v': 1, 'seq': True, 'kind': 'order', 'book': 'X',
+                                                             'cfg': 'c', 'at': START}],
+                                 as_of=START + 200_000)
+        self.assertEqual(report['rejected_rows']['malformed'], 2)
+        self.assertEqual(report['rejected_rows']['future'], 1)
+        self.assertEqual(report['books']['HF_RND_E95:' + 'c' * 12]['orders'], 3)
+
+    def test_the_journal_reader_skips_archives_and_torn_lines(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from paper_lab_metrics import read_hf_journal
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            live = root / 'journal' / 'HF_RND_E95'
+            live.mkdir(parents=True)
+            (live / '2026-10-10.jsonl').write_text(
+                json.dumps({'v': 1, 'seq': 1, 'kind': 'order', 'book': 'HF_RND_E95', 'cfg': 'c', 'at': START})
+                + '\n{"v":1,"seq"\n', encoding='utf-8')
+            old = root / 'archive' / 'reset-1' / 'journal' / 'HF_RND_E95'
+            old.mkdir(parents=True)
+            (old / '2026-10-09.jsonl').write_text('{"v":1,"seq":1}\n', encoding='utf-8')
+            rows, malformed = read_hf_journal(root)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(malformed, 1)

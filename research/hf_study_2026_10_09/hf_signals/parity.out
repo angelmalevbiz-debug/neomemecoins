@@ -1,0 +1,4 @@
+decision points 1501
+hold 120: matched 1500, presence mismatches 0, max |dnet50| 0.00e+00, max |dnet0| 0.00e+00, n>1e-9 0
+hold 300: matched 1500, presence mismatches 0, max |dnet50| 0.00e+00, max |dnet0| 0.00e+00, n>1e-9 0
+secs 3.5

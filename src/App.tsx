@@ -1,4 +1,6 @@
 import LabPairedPanel, { type LabPairedSnapshot } from './components/LabPairedPanel';
+import LabHighFrequencyPanel from './components/LabHighFrequencyPanel';
+import type { LabHighFrequencyConfig, LabHighFrequencySnapshot } from './lib/labHighFrequencyView';
 import PaperTrainingPanel, { type PaperTrainingSnapshot } from './components/PaperTrainingPanel';
 import AstraBrainPanel, { type AstraSnapshot } from './components/AstraBrainPanel';
 import PaperPortfolioHistory from './components/PaperPortfolioHistory';
@@ -80,7 +82,7 @@ type LabEntryDiagnostics = { signal_candidates?: number; matched_candidates?: nu
 type LabForwardDiagnostics = { universe_candidates?: number; signals?: number; config_hash?: string; regime?: { med15_pct?: number | null; pools?: number; dipping?: boolean } };
 type LabBook = { id: string; name: string; starting_balance: number; balance: number; portfolio_group?: 'PROMOTED_PAPER' | 'PROMOTION_DRAINING' | 'TEST'; promotion_pending?: boolean; runtime_compatibility?: { status?: string }; strategy_lifecycle?: StrategyLifecycle; allocation_usd?: number; max_position_fraction?: number; position: LabPosition | null; history: LabTrade[]; entry_diagnostics?: LabEntryDiagnostics };
 type LabStats = { trades: number; wins: number; losses: number; win_rate: number; profit_factor: number | null; realized_pnl: number; unrealized_pnl?: number; total_pnl?: number; equity: number; return_pct: number; open: boolean; valuation_stale?: boolean; mark_age_ms?: number };
-type StrategyLab = { paired?: LabPairedSnapshot; astra?: AstraSnapshot; execution_basis?: string; execution_note?: string; portfolio_setup?: { version?: string; status?: string; total_allocated_capital_usd?: number; allocation_per_strategy_usd?: number; max_position_fraction?: number; strategies?: string[]; historical_simulations?: number; unique_market_episodes_30m?: number; legacy_draining_books?: Record<string, LegacyLabBook>; legacy_open_position_count?: number; legacy_open_positions?: string[]; evidence_note?: string; promotion_error?: string }; status: string; updated_at: number; started_at: number; books: Record<string, LabBook>; stats: Record<string, LabStats>; error?: string };
+type StrategyLab = { paired?: LabPairedSnapshot; high_frequency?: LabHighFrequencySnapshot; hf_error?: string; activity_config?: { lab_high_frequency?: LabHighFrequencyConfig }; astra?: AstraSnapshot; execution_basis?: string; execution_note?: string; portfolio_setup?: { version?: string; status?: string; total_allocated_capital_usd?: number; allocation_per_strategy_usd?: number; max_position_fraction?: number; strategies?: string[]; historical_simulations?: number; unique_market_episodes_30m?: number; legacy_draining_books?: Record<string, LegacyLabBook>; legacy_open_position_count?: number; legacy_open_positions?: string[]; evidence_note?: string; promotion_error?: string }; status: string; updated_at: number; started_at: number; books: Record<string, LabBook>; stats: Record<string, LabStats>; error?: string };
 type LiveTrade = { ts: number; direction: 'BUY' | 'SELL'; token_amount: number; usd_amount: number; wallet: string; note: string; address: string; pairAddress: string; symbol: string; signature: string; slot: number };
 type FlowStats = { seconds: number; trades: number; buys: number; sells: number; buy_usd: number; sell_usd: number; buy_sell_usd_ratio: number; unique_wallets: number; max_buy_usd: number; max_sell_usd: number };
 type TapeStatus = { status?: string; tracked_pairs?: number; updated_at?: number; source?: string; error?: string | null };
@@ -557,6 +559,7 @@ export default function App() {
               : <>Отделна PAPER сметка: сигнал {state.config.signal_strategy ?? '—'} · стоп −{state.config.stop_loss_pct}% нето · цел +{state.config.take_profit_pct}% нето · trailing {state.config.trailing_pct}% · max hold {state.config.max_hold_minutes}m.</>) : 'Настройките още не са заредени.'}
           </div>
         </div>}
+        <LabHighFrequencyPanel data={state?.strategy_lab?.high_frequency} error={state?.strategy_lab?.hf_error} config={state?.strategy_lab?.activity_config?.lab_high_frequency} />
         <div className="border-b border-white/[0.06] px-4 py-3 text-[10px] leading-5 text-slate-400">
           <p>Първо са четирите стратегии с отделен PAPER капитал. Това е разпределение на сметката, а не класация на доказани печалби. При нула затворени сделки доходността още не е проверена.</p>
           <div className="mt-2 flex flex-wrap gap-2">

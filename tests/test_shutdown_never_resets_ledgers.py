@@ -87,6 +87,45 @@ class RunnerShutdown(unittest.TestCase):
         recorder.close.assert_called_once_with()
 
 
+class HighFrequencyShutdown(unittest.TestCase):
+    """LAB_HIGH_FREQUENCY_V1 keeps its own checkpoint (strategy_lab_hf/state.json)."""
+
+    def stand_in(self):
+        container = MagicMock()
+        container.loaded = True
+        container.config.return_value = {'version': 'LAB_HIGH_FREQUENCY_V1'}
+        container.metrics.return_value = {'version': 'LAB_HIGH_FREQUENCY_V1'}
+        container.dashboard_view.return_value = {'version': 'LAB_HIGH_FREQUENCY_V1', 'books': []}
+        return container
+
+    def test_a_stopped_lab_forces_the_hf_checkpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            for status, forced in (('online', False), ('stopped', True)):
+                container = self.stand_in()
+                with patch.object(lab, 'STATE_PATH', Path(tmp) / 'strategy_lab.json'), \
+                        patch.object(lab, 'COMPACT_PATH', Path(tmp) / 'strategy_lab_compact.json'), \
+                        patch.object(lab, 'HF', container):
+                    lab.persist(status)
+                container.checkpoint_if_due.assert_called_once()
+                self.assertIs(container.checkpoint_if_due.call_args.kwargs['force'], forced)
+            ledger = json.loads((Path(tmp) / 'strategy_lab.json').read_text(encoding='utf-8'))
+            self.assertNotIn('high_frequency', ledger)
+            compact = json.loads((Path(tmp) / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+            self.assertEqual(compact['high_frequency']['version'], 'LAB_HIGH_FREQUENCY_V1')
+
+    def test_an_unloaded_hf_container_never_writes_a_checkpoint(self):
+        import lab_high_frequency as hf
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'strategy_lab_hf'
+            root.mkdir()
+            (root / 'state.json').write_text('{"version":"HF_CHECKPOINT_V1","seq":42}', encoding='utf-8')
+            container = hf.HighFrequencyLab(root, cost=hf.cost_functions(lab), defense=MagicMock(),
+                                            clock=lambda: 1_791_594_000_000, environ={})
+            self.assertFalse(container.checkpoint_if_due(1_791_594_000_000, force=True))
+            self.assertEqual((root / 'state.json').read_text(encoding='utf-8'),
+                             '{"version":"HF_CHECKPOINT_V1","seq":42}')
+
+
 class LoadFlags(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix='neo-load-flag-')

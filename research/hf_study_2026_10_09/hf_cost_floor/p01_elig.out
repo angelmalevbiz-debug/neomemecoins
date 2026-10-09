@@ -1,0 +1,30 @@
+loaded {'rows': 6598553, 'points': 2328685, 'pairs': 3756, 't0': 1791362460712.0, 't1': 1791517300498.0} 0.7 s
+pumpswap SOL points 1686713 stored liq>=50k 1201979 G1 parity checks 12790 mismatches 0 secs 7.2
+a_fee50_liq250k   nofilter       train   points  228678 pairs   67  pools/min mean 13.13 p10 0 median 20 max 33  refresh share 0.099
+a_fee50_liq250k   nofilter       holdout points  286382 pairs   52  pools/min mean 24.27 p10 23 median 24 max 27  refresh share 0.102
+a_fee50_liq250k   guardV1        train   points  140318 pairs   28  pools/min mean 7.97 p10 0 median 10 max 20  refresh share 0.099
+a_fee50_liq250k   guardV1        holdout points  154283 pairs   30  pools/min mean 13.12 p10 11 median 13 max 16  refresh share 0.104
+a_fee50_liq250k   guardEng       train   points   72905 pairs   12  pools/min mean 4.12 p10 0 median 6 max 9  refresh share 0.084
+a_fee50_liq250k   guardEng       holdout points   78339 pairs   12  pools/min mean 6.62 p10 6 median 7 max 8  refresh share 0.089
+a_fee50_liq250k   guardEng+heat  train   points   35841 pairs    8  pools/min mean 2.25 p10 0 median 2 max 6  refresh share 0.073
+a_fee50_liq250k   guardEng+heat  holdout points   48550 pairs   12  pools/min mean 4.44 p10 3 median 4 max 8  refresh share 0.086
+b_fee95_liq100k   nofilter       train   points  452096 pairs  131  pools/min mean 25.95 p10 3 median 37 max 51  refresh share 0.112
+b_fee95_liq100k   nofilter       holdout points  470340 pairs   96  pools/min mean 39.76 p10 38 median 40 max 44  refresh share 0.112
+b_fee95_liq100k   guardV1        train   points  356150 pairs   57  pools/min mean 20.32 p10 1 median 25 max 38  refresh share 0.114
+b_fee95_liq100k   guardV1        holdout points  330961 pairs   48  pools/min mean 27.95 p10 25 median 28 max 33  refresh share 0.115
+b_fee95_liq100k   guardEng       train   points  226231 pairs   33  pools/min mean 12.89 p10 1 median 17 max 23  refresh share 0.103
+b_fee95_liq100k   guardEng       holdout points  162749 pairs   22  pools/min mean 13.89 p10 13 median 14 max 17  refresh share 0.101
+b_fee95_liq100k   guardEng+heat  train   points  121747 pairs   24  pools/min mean 7.72 p10 0 median 9 max 19  refresh share 0.096
+b_fee95_liq100k   guardEng+heat  holdout points   99669 pairs   20  pools/min mean 9.45 p10 7 median 9 max 14  refresh share 0.096
+c_all_liq50k      nofilter       train   points  615561 pairs  377  pools/min mean 35.58 p10 7 median 49 max 65  refresh share 0.121
+c_all_liq50k      nofilter       holdout points  586418 pairs  255  pools/min mean 49.75 p10 48 median 50 max 55  refresh share 0.120
+c_all_liq50k      guardV1        train   points  485578 pairs   71  pools/min mean 27.86 p10 6 median 35 max 48  refresh share 0.121
+c_all_liq50k      guardV1        holdout points  402553 pairs   59  pools/min mean 34.30 p10 30 median 34 max 42  refresh share 0.120
+c_all_liq50k      guardEng       train   points  299732 pairs   43  pools/min mean 17.21 p10 5 median 21 max 28  refresh share 0.112
+c_all_liq50k      guardEng       holdout points  194095 pairs   27  pools/min mean 16.58 p10 15 median 16 max 21  refresh share 0.105
+c_all_liq50k      guardEng+heat  train   points  144695 pairs   30  pools/min mean 9.29 p10 0 median 12 max 21  refresh share 0.098
+c_all_liq50k      guardEng+heat  holdout points  111460 pairs   24  pools/min mean 10.66 p10 8 median 11 max 16  refresh share 0.098
+heat shares train a_fee50_liq250k guarded points 72905 {'HB': 0.293, 'HC': 0.008, 'HR': 0.03, 'HT': 0.018, 'HV': 0.171, 'HW': 0.042, 'HX': 0.192, 'any': 0.508}
+heat shares train b_fee95_liq100k guarded points 226231 {'HB': 0.24, 'HC': 0.005, 'HR': 0.06, 'HT': 0.025, 'HV': 0.178, 'HW': 0.038, 'HX': 0.12, 'any': 0.462}
+heat shares train c_all_liq50k guarded points 299732 {'HA': 0.002, 'HB': 0.23, 'HC': 0.009, 'HR': 0.087, 'HT': 0.062, 'HV': 0.18, 'HW': 0.05, 'HX': 0.177, 'any': 0.517}
+done secs 15.4

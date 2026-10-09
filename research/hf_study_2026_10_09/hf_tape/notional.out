@@ -1,0 +1,14 @@
+== C3_le95_veto holdout points sampled 3000
+  $  10  net0  -1.42%  netcal  -3.97%  net50  -4.93%  -> $ loss/trade net50 0.493 (net0 0.142); trades allowed by a $100/day cap: 202; $/hour at 50 trades/h: 24.7
+  $  25  net0  -1.30%  netcal  -2.58%  net50  -3.55%  -> $ loss/trade net50 0.886 (net0 0.326); trades allowed by a $100/day cap: 112; $/hour at 50 trades/h: 44.3
+  $  50  net0  -1.29%  netcal  -2.13%  net50  -3.10%  -> $ loss/trade net50 1.552 (net0 0.645); trades allowed by a $100/day cap: 64; $/hour at 50 trades/h: 77.6
+  $ 100  net0  -1.33%  netcal  -1.95%  net50  -2.93%  -> $ loss/trade net50 2.927 (net0 1.330); trades allowed by a $100/day cap: 34; $/hour at 50 trades/h: 146.3
+  $ 200  net0  -1.44%  netcal  -1.95%  net50  -2.93%  -> $ loss/trade net50 5.856 (net0 2.881); trades allowed by a $100/day cap: 17; $/hour at 50 trades/h: 292.8
+  $ 500  net0  -1.80%  netcal  -2.24%  net50  -3.21%  -> $ loss/trade net50 16.072 (net0 8.990); trades allowed by a $100/day cap: 6; $/hour at 50 trades/h: 803.6
+== C4_le50_veto holdout points sampled 3000
+  $  10  net0  -1.36%  netcal  -3.95%  net50  -4.90%  -> $ loss/trade net50 0.490 (net0 0.136); trades allowed by a $100/day cap: 203; $/hour at 50 trades/h: 24.5
+  $  25  net0  -1.25%  netcal  -2.55%  net50  -3.52%  -> $ loss/trade net50 0.879 (net0 0.312); trades allowed by a $100/day cap: 113; $/hour at 50 trades/h: 44.0
+  $  50  net0  -1.23%  netcal  -2.10%  net50  -3.07%  -> $ loss/trade net50 1.537 (net0 0.616); trades allowed by a $100/day cap: 65; $/hour at 50 trades/h: 76.9
+  $ 100  net0  -1.27%  netcal  -1.92%  net50  -2.90%  -> $ loss/trade net50 2.896 (net0 1.270); trades allowed by a $100/day cap: 34; $/hour at 50 trades/h: 144.8
+  $ 200  net0  -1.38%  netcal  -1.92%  net50  -2.89%  -> $ loss/trade net50 5.789 (net0 2.756); trades allowed by a $100/day cap: 17; $/hour at 50 trades/h: 289.5
+  $ 500  net0  -1.73%  netcal  -2.20%  net50  -3.17%  -> $ loss/trade net50 15.868 (net0 8.639); trades allowed by a $100/day cap: 6; $/hour at 50 trades/h: 793.4

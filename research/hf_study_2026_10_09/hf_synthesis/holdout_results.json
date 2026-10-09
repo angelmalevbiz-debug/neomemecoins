@@ -1,0 +1,784 @@
+{
+ "meta": {
+  "cut": 1791455364583.6,
+  "t1": 1791517300498.0,
+  "shared": {
+   "slots": 3,
+   "hold_s": 120,
+   "cooldown_s": 120,
+   "pacing": [
+    "roll",
+    3600,
+    50
+   ],
+   "size": 25.0,
+   "heat_on": true
+  }
+ },
+ "books": {
+  "HF_RND_E95": {
+   "mean_of_salts": {
+    "tph": 47.928,
+    "tph_live": 47.9,
+    "live_hour_p10": 44.8,
+    "live_hour_median": 48.6,
+    "live_hours_ge40": 1.0,
+    "max_hour": 50.0,
+    "mean_net50": -3.708,
+    "median_net50": -3.615,
+    "mean_booked": -2.739,
+    "mean_net0": -1.575,
+    "mean_gross": 0.015,
+    "mean_dp50": -3.685,
+    "usd50_per_trade": -0.927,
+    "booked_usd_per_trade": -0.685,
+    "usd50_per_hour": -44.434,
+    "booked_usd_per_hour": -32.828,
+    "usd0_per_hour": -18.88,
+    "win50": 1.482,
+    "win_booked": 2.404,
+    "win0": 4.88,
+    "pairs": 20.0,
+    "top_pair_share": 0.115,
+    "fee_le50_share": 0.435,
+    "median_liq": 324880.2,
+    "reentry_le60s_share": 0.0,
+    "reentry_le300s_share": 0.306,
+    "mean_cycle_s": 145.12,
+    "mean_entry_lag_s": 24.34,
+    "mean_exit_lag_s": 21.5,
+    "entry_quiet_share": 0.28,
+    "mdd_booked_usd": 564.784,
+    "mdd_net50_usd": 764.478
+   },
+   "per_salt": [
+    {
+     "n": 830,
+     "hours": 17.2,
+     "tph": 48.24,
+     "hour_p10": 46,
+     "hour_median": 49,
+     "hours_ge40": 1.0,
+     "hours_ge45": 1.0,
+     "pairs": 20,
+     "top_pair_share": 0.116,
+     "best_pair_removed_net50": -3.739,
+     "mean_net50": -3.694,
+     "median_net50": -3.672,
+     "mean_booked": -2.725,
+     "mean_net0": -1.564,
+     "mean_gross": 0.04,
+     "mean_dp50": -3.714,
+     "usd50_per_trade": -0.923,
+     "booked_usd_per_trade": -0.681,
+     "usd50_per_hour": -44.55,
+     "booked_usd_per_hour": -32.86,
+     "usd0_per_hour": -18.86,
+     "win50": 1.08,
+     "win_booked": 1.81,
+     "win0": 4.94,
+     "fee_le50_share": 0.42,
+     "median_liq": 316524,
+     "reentry_le60s_share": 0.0,
+     "reentry_le300s_share": 0.336,
+     "entry_quiet_share": 0.281,
+     "mean_entry_lag_s": 24.3,
+     "mean_exit_lag_s": 19.5,
+     "mean_cycle_s": 143.9,
+     "mdd_booked_usd": 565.41,
+     "end_equity_booked": 434.59,
+     "mdd_net50_usd": 766.45,
+     "end_equity_net50": 233.55,
+     "exits": {
+      "HOLD": 828,
+      "OPEN_AT_END/VANISHED": 1,
+      "OPEN_AT_END/END": 1
+     },
+     "live_hours": 16,
+     "tph_live": 48.12,
+     "live_hour_p10": 46,
+     "live_hour_median": 49,
+     "live_hours_ge40": 1.0,
+     "max_hour": 50,
+     "ci95_net50_pct_pair": [
+      -3.862,
+      -3.492
+     ],
+     "ci95_usd50_pair": [
+      -0.965,
+      -0.873
+     ],
+     "counters": {
+      "signals": 2510,
+      "cap": 0,
+      "held": 468,
+      "cool": 498,
+      "brake": 0,
+      "gbrake": 0,
+      "slots": 389,
+      "pace": 214,
+      "refresh": 111,
+      "nofill": 0
+     }
+    },
+    {
+     "n": 814,
+     "hours": 17.2,
+     "tph": 47.31,
+     "hour_p10": 44,
+     "hour_median": 48,
+     "hours_ge40": 1.0,
+     "hours_ge45": 0.812,
+     "pairs": 20,
+     "top_pair_share": 0.118,
+     "best_pair_removed_net50": -3.672,
+     "mean_net50": -3.672,
+     "median_net50": -3.57,
+     "mean_booked": -2.703,
+     "mean_net0": -1.535,
+     "mean_gross": 0.039,
+     "mean_dp50": -3.694,
+     "usd50_per_trade": -0.918,
+     "booked_usd_per_trade": -0.676,
+     "usd50_per_hour": -43.43,
+     "booked_usd_per_hour": -31.97,
+     "usd0_per_hour": -18.16,
+     "win50": 1.35,
+     "win_booked": 2.46,
+     "win0": 5.04,
+     "fee_le50_share": 0.448,
+     "median_liq": 331724,
+     "reentry_le60s_share": 0.0,
+     "reentry_le300s_share": 0.299,
+     "entry_quiet_share": 0.271,
+     "mean_entry_lag_s": 24.5,
+     "mean_exit_lag_s": 25.9,
+     "mean_cycle_s": 149.9,
+     "mdd_booked_usd": 550.05,
+     "end_equity_booked": 449.95,
+     "mdd_net50_usd": 747.26,
+     "end_equity_net50": 252.74,
+     "exits": {
+      "HOLD": 813,
+      "FEED_GAP/GAP": 1
+     },
+     "live_hours": 16,
+     "tph_live": 47.25,
+     "live_hour_p10": 44,
+     "live_hour_median": 48,
+     "live_hours_ge40": 1.0,
+     "max_hour": 50,
+     "ci95_net50_pct_pair": [
+      -3.875,
+      -3.509
+     ],
+     "ci95_usd50_pair": [
+      -0.969,
+      -0.877
+     ],
+     "counters": {
+      "signals": 2375,
+      "cap": 0,
+      "held": 397,
+      "cool": 454,
+      "brake": 0,
+      "gbrake": 0,
+      "slots": 454,
+      "pace": 157,
+      "refresh": 99,
+      "nofill": 0
+     }
+    },
+    {
+     "n": 836,
+     "hours": 17.2,
+     "tph": 48.59,
+     "hour_p10": 45,
+     "hour_median": 49,
+     "hours_ge40": 1.0,
+     "hours_ge45": 1.0,
+     "pairs": 19,
+     "top_pair_share": 0.122,
+     "best_pair_removed_net50": -3.766,
+     "mean_net50": -3.765,
+     "median_net50": -3.626,
+     "mean_booked": -2.797,
+     "mean_net0": -1.633,
+     "mean_gross": -0.04,
+     "mean_dp50": -3.723,
+     "usd50_per_trade": -0.941,
+     "booked_usd_per_trade": -0.699,
+     "usd50_per_hour": -45.74,
+     "booked_usd_per_hour": -33.98,
+     "usd0_per_hour": -19.84,
+     "win50": 1.08,
+     "win_booked": 2.39,
+     "win0": 4.31,
+     "fee_le50_share": 0.437,
+     "median_liq": 319018,
+     "reentry_le60s_share": 0.0,
+     "reentry_le300s_share": 0.295,
+     "entry_quiet_share": 0.3,
+     "mean_entry_lag_s": 23.9,
+     "mean_exit_lag_s": 18.3,
+     "mean_cycle_s": 142.1,
+     "mdd_booked_usd": 584.54,
+     "end_equity_booked": 415.46,
+     "mdd_net50_usd": 786.87,
+     "end_equity_net50": 213.13,
+     "exits": {
+      "HOLD": 834,
+      "OPEN_AT_END/END": 2
+     },
+     "live_hours": 16,
+     "tph_live": 48.44,
+     "live_hour_p10": 45,
+     "live_hour_median": 49,
+     "live_hours_ge40": 1.0,
+     "max_hour": 50,
+     "ci95_net50_pct_pair": [
+      -3.953,
+      -3.607
+     ],
+     "ci95_usd50_pair": [
+      -0.988,
+      -0.902
+     ],
+     "counters": {
+      "signals": 2424,
+      "cap": 0,
+      "held": 427,
+      "cool": 443,
+      "brake": 0,
+      "gbrake": 0,
+      "slots": 380,
+      "pace": 223,
+      "refresh": 113,
+      "nofill": 2
+     }
+    },
+    {
+     "n": 829,
+     "hours": 17.2,
+     "tph": 48.19,
+     "hour_p10": 46,
+     "hour_median": 49,
+     "hours_ge40": 1.0,
+     "hours_ge45": 1.0,
+     "pairs": 21,
+     "top_pair_share": 0.106,
+     "best_pair_removed_net50": -3.773,
+     "mean_net50": -3.771,
+     "median_net50": -3.663,
+     "mean_booked": -2.803,
+     "mean_net0": -1.643,
+     "mean_gross": -0.041,
+     "mean_dp50": -3.693,
+     "usd50_per_trade": -0.943,
+     "booked_usd_per_trade": -0.701,
+     "usd50_per_hour": -45.43,
+     "booked_usd_per_hour": -33.77,
+     "usd0_per_hour": -19.79,
+     "win50": 1.69,
+     "win_booked": 2.41,
+     "win0": 4.58,
+     "fee_le50_share": 0.425,
+     "median_liq": 324935,
+     "reentry_le60s_share": 0.0,
+     "reentry_le300s_share": 0.286,
+     "entry_quiet_share": 0.27,
+     "mean_entry_lag_s": 24.8,
+     "mean_exit_lag_s": 18.2,
+     "mean_cycle_s": 141.2,
+     "mdd_booked_usd": 581.02,
+     "end_equity_booked": 418.98,
+     "mdd_net50_usd": 781.64,
+     "end_equity_net50": 218.36,
+     "exits": {
+      "HOLD": 823,
+      "OPEN_AT_END/VANISHED": 3,
+      "OPEN_AT_END/END": 3
+     },
+     "live_hours": 16,
+     "tph_live": 48.25,
+     "live_hour_p10": 46,
+     "live_hour_median": 49,
+     "live_hours_ge40": 1.0,
+     "max_hour": 50,
+     "ci95_net50_pct_pair": [
+      -3.958,
+      -3.604
+     ],
+     "ci95_usd50_pair": [
+      -0.989,
+      -0.901
+     ],
+     "counters": {
+      "signals": 2385,
+      "cap": 0,
+      "held": 445,
+      "cool": 440,
+      "brake": 0,
+      "gbrake": 0,
+      "slots": 387,
+      "pace": 183,
+      "refresh": 101,
+      "nofill": 0
+     }
+    },
+    {
+     "n": 814,
+     "hours": 17.2,
+     "tph": 47.31,
+     "hour_p10": 43,
+     "hour_median": 48,
+     "hours_ge40": 1.0,
+     "hours_ge45": 0.812,
+     "pairs": 20,
+     "top_pair_share": 0.113,
+     "best_pair_removed_net50": -3.637,
+     "mean_net50": -3.637,
+     "median_net50": -3.544,
+     "mean_booked": -2.668,
+     "mean_net0": -1.501,
+     "mean_gross": 0.079,
+     "mean_dp50": -3.603,
+     "usd50_per_trade": -0.909,
+     "booked_usd_per_trade": -0.667,
+     "usd50_per_hour": -43.02,
+     "booked_usd_per_hour": -31.56,
+     "usd0_per_hour": -17.75,
+     "win50": 2.21,
+     "win_booked": 2.95,
+     "win0": 5.53,
+     "fee_le50_share": 0.443,
+     "median_liq": 332200,
+     "reentry_le60s_share": 0.0,
+     "reentry_le300s_share": 0.312,
+     "entry_quiet_share": 0.276,
+     "mean_entry_lag_s": 24.2,
+     "mean_exit_lag_s": 25.6,
+     "mean_cycle_s": 148.5,
+     "mdd_booked_usd": 542.9,
+     "end_equity_booked": 457.1,
+     "mdd_net50_usd": 740.17,
+     "end_equity_net50": 259.83,
+     "exits": {
+      "HOLD": 810,
+      "FEED_GAP/GAP": 1,
+      "OPEN_AT_END/VANISHED": 1,
+      "OPEN_AT_END/END": 2
+     },
+     "live_hours": 16,
+     "tph_live": 47.44,
+     "live_hour_p10": 43,
+     "live_hour_median": 48,
+     "live_hours_ge40": 1.0,
+     "max_hour": 50,
+     "ci95_net50_pct_pair": [
+      -3.798,
+      -3.495
+     ],
+     "ci95_usd50_pair": [
+      -0.949,
+      -0.874
+     ],
+     "counters": {
+      "signals": 2505,
+      "cap": 0,
+      "held": 425,
+      "cool": 460,
+      "brake": 0,
+      "gbrake": 0,
+      "slots": 458,
+      "pace": 232,
+      "refresh": 115,
+      "nofill": 1
+     }
+    }
+   ],
+   "fee_split_hfA": {
+    "fee<=50": {
+     "n": 349,
+     "mean_net50": -3.327,
+     "mean_gross": 0.135
+    },
+    "fee55-95": {
+     "n": 481,
+     "mean_net50": -3.96,
+     "mean_gross": -0.028
+    }
+   },
+   "per_day_hfA": {
+    "20734": {
+     "n": 650,
+     "booked_usd": -443.55,
+     "usd50": -600.98,
+     "active_h": 13.44
+    },
+    "20735": {
+     "n": 180,
+     "booked_usd": -121.86,
+     "usd50": -165.47,
+     "active_h": 3.68
+    }
+   }
+  },
+  "HF_QUIET_E95": {
+   "stats": {
+    "n": 768,
+    "hours": 17.2,
+    "tph": 44.64,
+    "hour_p10": 37,
+    "hour_median": 47,
+    "hours_ge40": 0.812,
+    "hours_ge45": 0.625,
+    "pairs": 18,
+    "top_pair_share": 0.141,
+    "best_pair_removed_net50": -3.567,
+    "mean_net50": -3.566,
+    "median_net50": -3.453,
+    "mean_booked": -2.596,
+    "mean_net0": -1.377,
+    "mean_gross": 0.037,
+    "mean_dp50": -3.573,
+    "usd50_per_trade": -0.892,
+    "booked_usd_per_trade": -0.649,
+    "usd50_per_hour": -39.8,
+    "booked_usd_per_hour": -28.97,
+    "usd0_per_hour": -15.37,
+    "win50": 0.0,
+    "win_booked": 0.13,
+    "win0": 1.56,
+    "fee_le50_share": 0.66,
+    "median_liq": 509859,
+    "reentry_le60s_share": 0.0,
+    "reentry_le300s_share": 0.363,
+    "entry_quiet_share": 0.487,
+    "mean_entry_lag_s": 19.6,
+    "mean_exit_lag_s": 18.5,
+    "mean_cycle_s": 142.9,
+    "mdd_booked_usd": 498.49,
+    "end_equity_booked": 501.51,
+    "mdd_net50_usd": 684.75,
+    "end_equity_net50": 315.25,
+    "exits": {
+     "HOLD": 766,
+     "FEED_GAP/GAP": 1,
+     "OPEN_AT_END/END": 1
+    },
+    "live_hours": 16,
+    "tph_live": 44.62,
+    "live_hour_p10": 37,
+    "live_hour_median": 47,
+    "live_hours_ge40": 0.812,
+    "max_hour": 50,
+    "ci95_net50_pct_pair": [
+     -3.744,
+     -3.432
+    ],
+    "ci95_usd50_pair": [
+     -0.936,
+     -0.858
+    ],
+    "counters": {
+     "signals": 2587,
+     "cap": 0,
+     "held": 689,
+     "cool": 640,
+     "brake": 0,
+     "gbrake": 0,
+     "slots": 253,
+     "pace": 134,
+     "refresh": 103,
+     "nofill": 0
+    }
+   },
+   "fee_split": {
+    "fee<=50": {
+     "n": 507,
+     "mean_net50": -3.387,
+     "mean_gross": 0.033
+    },
+    "fee55-95": {
+     "n": 261,
+     "mean_net50": -3.916,
+     "mean_gross": 0.045
+    }
+   },
+   "per_day": {
+    "20734": {
+     "n": 590,
+     "booked_usd": -386.16,
+     "usd50": -529.22,
+     "active_h": 13.49
+    },
+    "20735": {
+     "n": 178,
+     "booked_usd": -112.33,
+     "usd50": -155.53,
+     "active_h": 3.67
+    }
+   }
+  },
+  "HF_DIP15_E95": {
+   "stats": {
+    "n": 696,
+    "hours": 17.2,
+    "tph": 40.45,
+    "hour_p10": 34,
+    "hour_median": 43,
+    "hours_ge40": 0.625,
+    "hours_ge45": 0.125,
+    "pairs": 20,
+    "top_pair_share": 0.103,
+    "best_pair_removed_net50": -3.633,
+    "mean_net50": -3.634,
+    "median_net50": -3.532,
+    "mean_booked": -2.665,
+    "mean_net0": -1.483,
+    "mean_gross": 0.067,
+    "mean_dp50": -3.5,
+    "usd50_per_trade": -0.909,
+    "booked_usd_per_trade": -0.666,
+    "usd50_per_hour": -36.76,
+    "booked_usd_per_hour": -26.95,
+    "usd0_per_hour": -15.0,
+    "win50": 1.01,
+    "win_booked": 1.58,
+    "win0": 4.02,
+    "fee_le50_share": 0.507,
+    "median_liq": 448659,
+    "reentry_le60s_share": 0.0,
+    "reentry_le300s_share": 0.359,
+    "entry_quiet_share": 0.338,
+    "mean_entry_lag_s": 23.2,
+    "mean_exit_lag_s": 17.7,
+    "mean_cycle_s": 141.4,
+    "mdd_booked_usd": 463.69,
+    "end_equity_booked": 536.31,
+    "mdd_net50_usd": 632.37,
+    "end_equity_net50": 367.63,
+    "exits": {
+     "HOLD": 694,
+     "OPEN_AT_END/VANISHED": 1,
+     "OPEN_AT_END/END": 1
+    },
+    "live_hours": 16,
+    "tph_live": 40.38,
+    "live_hour_p10": 34,
+    "live_hour_median": 43,
+    "live_hours_ge40": 0.625,
+    "max_hour": 50,
+    "ci95_net50_pct_pair": [
+     -3.829,
+     -3.409
+    ],
+    "ci95_usd50_pair": [
+     -0.957,
+     -0.852
+    ],
+    "counters": {
+     "signals": 2114,
+     "cap": 0,
+     "held": 616,
+     "cool": 529,
+     "brake": 0,
+     "gbrake": 0,
+     "slots": 193,
+     "pace": 2,
+     "refresh": 78,
+     "nofill": 0
+    }
+   },
+   "fee_split": {
+    "fee<=50": {
+     "n": 353,
+     "mean_net50": -3.324,
+     "mean_gross": 0.134
+    },
+    "fee55-95": {
+     "n": 343,
+     "mean_net50": -3.953,
+     "mean_gross": -0.001
+    }
+   },
+   "per_day": {
+    "20734": {
+     "n": 541,
+     "booked_usd": -361.15,
+     "usd50": -492.26,
+     "active_h": 13.46
+    },
+    "20735": {
+     "n": 155,
+     "booked_usd": -102.53,
+     "usd50": -140.11,
+     "active_h": 3.67
+    }
+   }
+  }
+ },
+ "gaps": {
+  "HF_QUIET_E95": {
+   "net50_point_vs_salt_mean": 0.142,
+   "gross_point_vs_salt_mean": 0.022,
+   "net50_ci_vs_hfA": [
+    -0.127,
+    0.356
+   ],
+   "gross_ci_vs_hfA": [
+    -0.15,
+    0.108
+   ],
+   "within_fee_bucket": {
+    "fee<=50": {
+     "gap_net50": -0.059,
+     "ci": [
+      -0.422,
+      0.128
+     ],
+     "n": [
+      507,
+      349
+     ]
+    },
+    "fee55-95": {
+     "gap_net50": 0.044,
+     "ci": [
+      -0.164,
+      0.228
+     ],
+     "n": [
+      261,
+      481
+     ]
+    }
+   }
+  },
+  "HF_DIP15_E95": {
+   "net50_point_vs_salt_mean": 0.074,
+   "gross_point_vs_salt_mean": 0.052,
+   "net50_ci_vs_hfA": [
+    -0.214,
+    0.332
+   ],
+   "gross_ci_vs_hfA": [
+    -0.17,
+    0.214
+   ],
+   "within_fee_bucket": {
+    "fee<=50": {
+     "gap_net50": 0.003,
+     "ci": [
+      -0.387,
+      0.346
+     ],
+     "n": [
+      353,
+      349
+     ]
+    },
+    "fee55-95": {
+     "gap_net50": 0.006,
+     "ci": [
+      -0.24,
+      0.297
+     ],
+     "n": [
+      343,
+      481
+     ]
+    }
+   }
+  }
+ },
+ "cap_overlay": {
+  "HF_RND_E95": {
+   "n": 286,
+   "cap_blocked": 1668,
+   "days": {
+    "20734": {
+     "n": 137,
+     "booked_usd": -101.98,
+     "usd50": -135.08,
+     "active_h": 2.83
+    },
+    "20735": {
+     "n": 149,
+     "booked_usd": -101.58,
+     "usd50": -137.67,
+     "active_h": 3.09
+    }
+   },
+   "booked_total": -203.57,
+   "net50_total": -272.75,
+   "mdd_booked_usd": 203.57,
+   "tph": 16.62
+  },
+  "HF_QUIET_E95": {
+   "n": 311,
+   "cap_blocked": 1457,
+   "days": {
+    "20734": {
+     "n": 152,
+     "booked_usd": -100.93,
+     "usd50": -137.78,
+     "active_h": 3.39
+    },
+    "20735": {
+     "n": 159,
+     "booked_usd": -101.14,
+     "usd50": -139.73,
+     "active_h": 3.21
+    }
+   },
+   "booked_total": -202.08,
+   "net50_total": -277.5,
+   "mdd_booked_usd": 202.08,
+   "tph": 18.08
+  },
+  "HF_DIP15_E95": {
+   "n": 301,
+   "cap_blocked": 1210,
+   "days": {
+    "20734": {
+     "n": 148,
+     "booked_usd": -101.96,
+     "usd50": -137.79,
+     "active_h": 3.21
+    },
+    "20735": {
+     "n": 153,
+     "booked_usd": -100.93,
+     "usd50": -138.02,
+     "active_h": 3.51
+    }
+   },
+   "booked_total": -202.88,
+   "net50_total": -275.81,
+   "mdd_booked_usd": 202.88,
+   "tph": 17.5
+  }
+ },
+ "plm_overlay": {
+  "HF_RND_E95": {
+   "n": 66,
+   "tph": 3.84,
+   "mean_net50": -4.007,
+   "blocked": 2385
+  },
+  "HF_QUIET_E95": {
+   "n": 60,
+   "tph": 3.49,
+   "mean_net50": -3.74,
+   "blocked": 2435
+  },
+  "HF_DIP15_E95": {
+   "n": 68,
+   "tph": 3.95,
+   "mean_net50": -3.54,
+   "blocked": 1936
+  }
+ }
+}

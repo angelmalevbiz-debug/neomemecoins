@@ -1,0 +1,29 @@
+tape pairs 377 events 274712
+tape span 1791333252000 1791517368000 dataset 1791362460712.0 1791517300498.0
+U50 pairs 39 with tape 32 events share covered 0.99
+   AGZjpu5v ev  3357 tape   4833 span 27.1 h
+   BcRQvcFg ev  2605 tape   2608 span 18.3 h
+   EpugLBw1 ev  2476 tape    993 span 26.9 h
+   5GaCcKLd ev  2272 tape    320 span 13.4 h
+   HMzvsEEm ev  2163 tape   1496 span 36.5 h
+   7wCarEYc ev  1670 tape    915 span 16.1 h
+   ERFmQZQU ev  1657 tape    190 span 7.5 h
+   8ZMkMgWM ev  1599 tape    246 span 9.6 h
+   FGdGihHZ ev  1529 tape   3462 span 19.6 h
+   2DVbU5h8 ev  1490 tape   1236 span 28.1 h
+   69fyvgoT ev  1450 tape  27459 span 15.3 h
+   HJ72PgqL ev  1419 tape   1053 span 11.7 h
+U95 pairs 69 with tape 59 events share covered 0.99
+   8ewuF2o8 ev  3836 tape   1499 span 31.0 h
+   2B8tftZ5 ev  3600 tape   1419 span 32.0 h
+   AGZjpu5v ev  3499 tape   4833 span 27.1 h
+   867dKvaC ev  3289 tape   5104 span 35.1 h
+   CyJwKnLi ev  3243 tape    860 span 31.2 h
+   3NBq9zyn ev  3102 tape   1484 span 16.1 h
+   4R8CiMnJ ev  2673 tape    811 span 36.1 h
+   4JAnKFdd ev  2613 tape    301 span 31.5 h
+   BcRQvcFg ev  2605 tape   2608 span 18.3 h
+   EpugLBw1 ev  2476 tape    993 span 26.9 h
+   DA4pM4xS ev  2272 tape   1177 span 36.0 h
+   5GaCcKLd ev  2272 tape    320 span 13.4 h
+secs 0.9

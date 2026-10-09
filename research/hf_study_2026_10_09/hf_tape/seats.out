@@ -1,0 +1,35 @@
+universe state built 2452 minutes 2.3 s
+
+== ALL_heatoff calibration (TRAIN seated pool-minutes): trades per pool-minute by txns5 bucket
+   txns5 [0, 5): pool-minutes 37  trades/pool-min 0.838
+   txns5 [5, 15): pool-minutes 208  trades/pool-min 0.678
+   txns5 [15, 30): pool-minutes 1574  trades/pool-min 0.698
+   txns5 [30, 60): pool-minutes 283  trades/pool-min 0.714
+   txns5 [60, 120): pool-minutes 144  trades/pool-min 0.708
+   txns5 [120, 1e+18): pool-minutes 1113  trades/pool-min 0.770
+   projection trades/hour (60 s hold, slots = seats):
+   TRAIN   {"top4": 152.2, "top8": 273.9, "top16": 503.1, "top32": 848.7, "seated_pred": 94.4, "seated_achieved_unlimited_slots": 94.4, "mean_eligible_pools": {"eligible": 20.26, "txns5>=15": 13.63, "txns5>=60": 3.53}}
+   HOLDOUT {"top4": 176.0, "top8": 345.3, "top16": 679.6, "top32": 1202.4, "seated_pred": 169.1, "seated_achieved_unlimited_slots": 176.2, "mean_eligible_pools": {"eligible": 27.93, "txns5>=15": 19.7, "txns5>=60": 3.81}}
+
+== ALL_heatveto calibration (TRAIN seated pool-minutes): trades per pool-minute by txns5 bucket
+   txns5 [0, 5): pool-minutes 22  trades/pool-min 0.727
+   txns5 [5, 15): pool-minutes 119  trades/pool-min 0.605
+   txns5 [15, 30): pool-minutes 1408  trades/pool-min 0.683
+   txns5 [30, 60): pool-minutes 163  trades/pool-min 0.656
+   txns5 [60, 120): pool-minutes 23  trades/pool-min 0.696
+   txns5 [120, 1e+18): pool-minutes 19  trades/pool-min 0.579
+   projection trades/hour (60 s hold, slots = seats):
+   TRAIN   {"top4": 115.0, "top8": 225.1, "top16": 402.2, "top32": 493.9, "seated_pred": 46.0, "seated_achieved_unlimited_slots": 46.0, "mean_eligible_pools": {"eligible": 12.26, "txns5>=15": 8.08, "txns5>=60": 0.37}}
+   HOLDOUT {"top4": 160.3, "top8": 323.6, "top16": 634.2, "top32": 765.6, "seated_pred": 135.3, "seated_achieved_unlimited_slots": 144.6, "mean_eligible_pools": {"eligible": 18.96, "txns5>=15": 13.52, "txns5>=60": 0.79}}
+
+== C1_burst_heatoff calibration (TRAIN seated pool-minutes): trades per pool-minute by txns5 bucket
+   txns5 [0, 5): pool-minutes 37  trades/pool-min 0.162
+   txns5 [5, 15): pool-minutes 208  trades/pool-min 0.197
+   txns5 [15, 30): pool-minutes 1574  trades/pool-min 0.539
+   txns5 [30, 60): pool-minutes 283  trades/pool-min 0.396
+   txns5 [60, 120): pool-minutes 144  trades/pool-min 0.444
+   txns5 [120, 1e+18): pool-minutes 1113  trades/pool-min 0.517
+   projection trades/hour (60 s hold, slots = seats):
+   TRAIN   {"top4": 100.2, "top8": 180.6, "top16": 343.4, "top32": 485.2, "seated_pred": 63.9, "seated_achieved_unlimited_slots": 64.0, "mean_eligible_pools": {"eligible": 20.26, "txns5>=15": 13.63, "txns5>=60": 3.53}}
+   HOLDOUT {"top4": 113.4, "top8": 222.3, "top16": 475.4, "top32": 688.0, "seated_pred": 111.0, "seated_achieved_unlimited_slots": 118.7, "mean_eligible_pools": {"eligible": 27.93, "txns5>=15": 19.7, "txns5>=60": 3.81}}
+done 3.8 s

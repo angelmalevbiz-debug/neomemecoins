@@ -1,5 +1,33 @@
 # Owner-requested PAPER holding profiles
 
+## Fast-scalping continuation
+
+New Momentum entries use `PAPER_MOMENTUM_SCALP_EXIT_V1_15`: SCALP, maximum
+15 minutes, $6 net target, $2 protection arm and $5 net stop. Other profiles
+below are unchanged. Existing V1 horizon positions keep their frozen exits,
+original timestamps and observed profit protection. No holding lot is sold
+just to create a scalp and no capital or daily loss limit is reset.
+
+Momentum already has an independent entry path: physical PumpSwap/SOL market
+screen plus fresh exact-pool confirmed 30-second buy pressure (at least six
+swaps, four wallets, $300 buys, $100 net buys and 1.5 buy/sell ratio). The
+existing full defense, safety, independent price and 1.5% round-trip cost cap
+remain mandatory. This change does not claim a newly validated entry edge.
+
+The shared bounded market feed now retains candidates for these four funded
+books as well as main. Previously the retention predicate consulted only main;
+therefore a valid funded candidate could fall below the 90-row cut. This is a
+coverage repair, not evidence that it caused a particular missed trade. Main's
+quote prewarm/entry predicates remain unchanged. Selection is still bounded;
+it does not guarantee retention of every candidate when more than 90 qualify.
+
+The UI reports the next UTC risk day when daily losses block entries. Open
+marks remain part of the next day's risk too. A clock rollover is not capital
+replenishment or permission to skip signals. No new entry, higher win rate or
+faster profit is guaranteed. Losing timeouts and gaps/slippage remain possible.
+
+## Original V1 horizons (retained on existing V1 lots)
+
 `PAPER_HORIZON_EXIT_V1_60_240_720` separates fast trades from longer holds.
 This is an owner-authorized experimental change, NOT promotion of the two/six
 favorable shadow exits, an optimized win probability or a faster-profit claim.

@@ -29,7 +29,7 @@ export default function PaperExitResearchPanel({ data, error, connected }: {
   return <section data-testid="paper-exit-research" className="border-b border-cyan-300/10 px-4 py-4 text-[10px] leading-5 text-slate-300">
     <h3 className="font-black text-cyan-200">Развитие на изходите · търсене на по-бърза нетна печалба</h3>
     <p className="mt-1 text-amber-100">Сравнение, не сделки или допълнителен баланс. Трите варианта наблюдават еднакви входове и бъдещи цени с такси, impact и забавяне. Няма автоматично включване и няма доказана печалба.</p>
-    <p className="mt-1 text-slate-400">Нетно е сбор в USD, не процент печалба на портфейла. Моделните изходи не са реално отворени позиции за затваряне. Референтният v5 е замразен; текущите QUICK / SWING / HOLDER финансови правила са показани при всяка стратегия и не се сменят от това сравнение.</p>
+    <p className="mt-1 text-slate-400">Нетно е сбор в USD, не процент печалба на портфейла. Моделните изходи не са реално отворени позиции за затваряне. Референтният v5 е замразен; текущите SCALP / QUICK / SWING / HOLDER финансови правила са показани при всяка стратегия и не се сменят от това сравнение.</p>
     {!connected && <p className="mt-2 text-amber-200">Backend не е свързан: показаните наблюдения не са актуални.</p>}
     {(error || data?.error) && <p className="mt-2 text-red-300">Изследването е спряно или има пропуски: {error || data?.error}. Това не разрешава нови сделки.</p>}
     {data && <>

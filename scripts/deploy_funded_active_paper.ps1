@@ -6,7 +6,7 @@ $ErrorActionPreference='Stop'
 $sourceRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $targetRoot=[IO.Path]::GetFullPath($RuntimeRepository)
 if ($sourceRoot -eq $targetRoot) { throw 'Source and runtime must be different checkouts.' }
-$files=@('backend/funded_active_paper.py','backend/paper_horizon_exits.py','backend/paper_exit_research.py','backend/lab_capacity_test.py','backend/strategy_lab.py','backend/live_tape.py','backend/funded_market_candidates.py',
+$files=@('backend/market_monitor.py','backend/funded_active_paper.py','backend/paper_horizon_exits.py','backend/paper_exit_research.py','backend/lab_capacity_test.py','backend/strategy_lab.py','backend/live_tape.py','backend/funded_market_candidates.py',
     'backend/entry_defense.py','backend/tape_pool_scheduler.py','backend/lab_dashboard_projection.py',
     'scripts/start_local_paper.ps1','scripts/build_funded_heat_seed.py','scripts/audit_lab_outcomes.py',
     'src/lib/labStrategyView.ts','src/components/PaperExitResearchPanel.tsx',
@@ -23,11 +23,13 @@ foreach($relative in $files) {
     $target=Join-Path $targetRoot $relative
     if (!(Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing release file: $relative" }
     $oldHash=$liveLock.support_files_sha256.$relative
+    if ($relative -eq $liveLock.strategy_file) { $oldHash=$liveLock.sha256 }
     if ($oldHash -and (Test-Path -LiteralPath $target) -and (TextHash $target) -ne $oldHash) {
         throw "Runtime has unrelated edits in $relative; nothing deployed."
     }
-    if ($incomingLock.support_files_sha256.$relative -and
-        (TextHash $source) -ne $incomingLock.support_files_sha256.$relative) { throw "Incoming lock mismatch: $relative" }
+    $incomingHash=$incomingLock.support_files_sha256.$relative
+    if ($relative -eq $incomingLock.strategy_file) { $incomingHash=$incomingLock.sha256 }
+    if ($incomingHash -and (TextHash $source) -ne $incomingHash) { throw "Incoming lock mismatch: $relative" }
     if (!$oldHash -and $relative -ne 'strategy-lock.json' -and (Test-Path -LiteralPath $target) -and
         (TextHash $target) -ne (TextHash $source)) { throw "Unrecognized runtime file: $relative" }
 }

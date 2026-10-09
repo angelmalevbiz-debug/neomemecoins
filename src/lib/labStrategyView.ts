@@ -395,6 +395,7 @@ export type FundedActiveStats = {
   legacy_open_positions?: number; legacy_closed_trades?: number; legacy_net_pnl_usd?: number;
   open_net_pnl_usd?: number;
   daily_net_usd?: number; blocked_reason?: string | null; adaptive_open_positions?: number;
+  daily_window_basis?: string; daily_window_ends_at?: number; next_day_guarantees_entry?: boolean;
   exit_policy?: { version: string; take_profit_net_usd: number; stop_loss_net_usd: number;
     max_hold_minutes?: number | null; holding_profile?: string;
     profit_protection_arm_net_usd?: number; profit_giveback_fraction?: number; minimum_profit_giveback_usd?: number };
@@ -428,6 +429,10 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const exits = stats.exit_policy ? ` · ${stats.quality_mode ? 'нови позиции: ' : ''}цел +${usd(stats.exit_policy.take_profit_net_usd)} нето / стоп −${usd(stats.exit_policy.stop_loss_net_usd)} нето · ${trail}; праговете не гарантират цена на изхода` : '';
   const quality = stats.quality_mode ? ` · разходи до ${stats.entry_cost_limit_pct?.toFixed(2) ?? '1.50'}% · един токен само в една сметка · стари позиции ${stats.legacy_open_positions ?? 0}${adaptive ? ` · с адаптивен изход ${stats.adaptive_open_positions ?? 0} отворени (промяната е записана)` : ' (запазени изходи)'} · история преди тази политика: ${stats.legacy_closed_trades ?? 0} затворени, нето ${usd(stats.legacy_net_pnl_usd ?? 0)} · отворен PnL ${usd(stats.open_net_pnl_usd ?? 0)} (не е прибрана печалба)` : '';
   const pause = stats.quality_mode && stats.blocked_reason ? ` · Нови входове: ${reasons[stats.blocked_reason] ?? stats.blocked_reason}${finite(stats.daily_net_usd) ? ` · дневен нетен резултат ${usd(stats.daily_net_usd)}` : ''}; изходите продължават да работят` : '';
+  const reset = stats.quality_mode && stats.blocked_reason === 'funded_active_daily_loss_limit'
+    && stats.daily_window_basis === 'UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS'
+    && finite(stats.daily_window_ends_at) && stats.daily_window_ends_at > 0 && stats.daily_window_ends_at < 8.64e15
+    ? ` · Следващ UTC ден: ${new Date(stats.daily_window_ends_at).toLocaleString('bg-BG')} местно време; отворените загуби остават в риска; това не гарантира нов вход` : '';
   const limits = stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
-  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}${quality}${pause}`;
+  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions}${capacity} · ${limits}${quality}${pause}${reset}`;
 }

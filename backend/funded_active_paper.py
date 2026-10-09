@@ -301,7 +301,10 @@ def capacity(book, now):
                 fixed_notional_usd=MAX_NOTIONAL_USD,
                 effective_position_capacity=min(MAX_SLOTS, int(balance*MAX_EXPOSURE_FRACTION//MAX_NOTIONAL_USD)),
                 available_exposure_usd=free, orders_last_60m=orders, target_orders_per_hour=ORDERS_PER_HOUR,
-                daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=daily_budget, blocked_reason=reason)
+                daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=daily_budget, blocked_reason=reason,
+                daily_window_basis='UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS',
+                daily_window_ends_at=(int(now)//86_400_000+1)*86_400_000,
+                next_day_guarantees_entry=False)
 
 
 def exit_parameters(strategy_id):
@@ -372,7 +375,7 @@ def observe_profit_protection(position, net_pct, mark_at):
     """
     exits = position.get('exit_parameters') or {}
     version=exits.get('version')
-    if version not in {ADAPTIVE_EXIT_VERSION,horizons.VERSION}:
+    if version not in {ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS}:
         return
     notional = finite(position.get('notional_usd'), math.nan)
     net_usd = finite(net_pct, math.nan)*notional/100
@@ -426,16 +429,16 @@ def apply_horizon_exit_policy(books, now):
             if carried:
                 peak=previous['peak_net_usd']
                 floor=finite(previous.get('floor_net_usd'),None) if previous.get('armed') is True else None
-            event=dict(id=horizons.VERSION,at=int(now),reason='OWNER_REQUEST_QUICK_SWING_HOLDER_PAPER',
+            event=dict(id=exits['version'],at=int(now),reason='OWNER_REQUEST_QUICK_SWING_HOLDER_PAPER',
                 previous_parameters=dict(old),new_parameters=dict(exits),
                 original_opened_at=p.get('opened_at'),observed_protection_carried=carried,
                 previous_profit_protection=dict(previous) if isinstance(previous,dict) else None,
                 historical_peak_reused=False,entry_and_capital_unchanged=True)
             p['exit_policy_changes']=[*(p.get('exit_policy_changes') or []),event]
-            p.update(exit_parameters=exits,exit_policy_label=horizons.VERSION,
+            p.update(exit_parameters=exits,exit_policy_label=exits['version'],
                 stop_loss_net_pct=exits['stop_loss_net_pct'],
                 stop_headroom_pct=max(0.0,exits['stop_loss_net_pct']+finite(p.get('entry_roundtrip_pnl_pct'))),
-                profit_protection=dict(version=horizons.VERSION,
+                profit_protection=dict(version=exits['version'],
                     activated_at=previous['activated_at'] if carried else int(now),
                     last_mark_at=previous['last_mark_at'] if carried else None,
                     peak_net_usd=peak,floor_net_usd=floor,armed=floor is not None,
@@ -494,7 +497,7 @@ def apply_capacity_exit_policy(books, now):
 
 def exit_reason(position, net_pct, hold_minutes):
     exits = position['exit_parameters']
-    if exits.get('version') in {CAPACITY_EXIT_VERSION, QUALITY_EXIT_VERSION, ADAPTIVE_EXIT_VERSION,horizons.VERSION}:
+    if exits.get('version') in {CAPACITY_EXIT_VERSION, QUALITY_EXIT_VERSION, ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS}:
         # Dollar target, not a gross price move or a percentage of a changed
         # account balance. Protection may exit before target; only the new
         # explicit horizon policy uses elapsed ORIGINAL holding time as well.
@@ -502,18 +505,18 @@ def exit_reason(position, net_pct, hold_minutes):
         net_usd = finite(net_pct, math.nan) * notional / 100
         if not math.isfinite(net_usd) or notional <= 0:
             return None
-        prefix = ('ADAPTIVE' if exits['version'] in {ADAPTIVE_EXIT_VERSION,horizons.VERSION} else
+        prefix = ('ADAPTIVE' if exits['version'] in {ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS} else
                   'QUALITY' if exits['version'] == QUALITY_EXIT_VERSION else 'CAPACITY_TEST')
         if net_usd <= -exits['stop_loss_net_usd']:
             return prefix+'_STOP_NET_USD'
         if net_usd >= exits['take_profit_net_usd']:
             return prefix+'_TAKE_PROFIT_NET_USD'
         protection = position.get('profit_protection') or {}
-        if (exits['version'] in {ADAPTIVE_EXIT_VERSION,horizons.VERSION} and protection.get('version') == exits['version']
+        if (exits['version'] in {ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS} and protection.get('version') == exits['version']
                 and protection.get('armed') is True
                 and net_usd <= finite(protection.get('floor_net_usd'), -math.inf)):
             return 'ADAPTIVE_PROFIT_PROTECTION_NET_USD'
-        if (exits['version']==horizons.VERSION
+        if (exits['version'] in horizons.VERSIONS
                 and finite(hold_minutes,-math.inf)>=exits['max_hold_minutes']):
             return f"PAPER_HORIZON_MAX_HOLD_{exits['max_hold_minutes']}"
         return None
@@ -542,7 +545,7 @@ def performance(book, now):
             'legacy_net_pnl_usd':round(sum(finite(t.get('pnl_usd')) for t in book.get('history',[])
                                          if t.get('entry_policy_version')!=reporting_version()),4),
             'open_net_pnl_usd':round(sum(finite(p.get('open_pnl_usd')) for p in positions(book)),4),
-            'adaptive_open_positions':sum((p.get('exit_parameters') or {}).get('version') in {ADAPTIVE_EXIT_VERSION,horizons.VERSION}
+            'adaptive_open_positions':sum((p.get('exit_parameters') or {}).get('version') in {ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS}
                                           for p in positions(book)),
             'capacity_test':capacity_test_enabled(), 'strategy_validation':False,
             'risk_limits_shadow_only':capacity_test_enabled(),
@@ -576,6 +579,8 @@ def config():
                     'market_flow_defense_safety_price_cost_and_daily_limits_required':True,
                     'force_fill':False,'exits_apply_to_new_lots_only':False,
                     'open_exit_amendment':horizons.VERSION,'history_and_entry_receipts_unchanged':True,
+                    'momentum_scalp_exit_version':horizons.SCALP_VERSION,
+                    'momentum_scalp_changes_existing_horizon_lots':False,
                     'evidence_status':'PROSPECTIVE_UNVALIDATED_NOT_FITTED_TO_WINNERS'},
                 capacity_test_enabled=capacity_test_enabled(),capacity_test_version=CAPACITY_TEST_VERSION,
                 capacity_test_exits=capacity_exit_parameters(),

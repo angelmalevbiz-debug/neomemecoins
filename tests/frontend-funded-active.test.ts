@@ -117,3 +117,21 @@ test('per-lot protection distinguishes waiting, unarmed, armed and stale without
   assert.match(profitProtectionSummary(armed,'fresh')!,/не е гарантирана печалба/);
   assert.match(profitProtectionSummary(armed,'stale')!,/Котировката не е прясна/);
 });
+
+test('holding profile summary reports original clock, losing timeouts and actual target', () => {
+  const text=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100',quality_mode:true,
+    exit_policy:{version:'PAPER_HORIZON_EXIT_V1_60_240_720',holding_profile:'QUICK',max_hold_minutes:60,
+      take_profit_net_usd:6,stop_loss_net_usd:5,profit_protection_arm_net_usd:2,
+      profit_giveback_fraction:.2,minimum_profit_giveback_usd:.75},
+    trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,
+    open_positions:1,max_positions:4,target_orders_per_hour:50,exposure_usd:100,daily_loss_limit_usd:50});
+  for(const part of ['QUICK','максимум 60 мин от оригиналния вход','затваря и на загуба',
+    'рестартът не удължава срока','цел +$6.00','защита от +$2.00','може да затвори преди +$6.00']) assert.ok(text!.includes(part));
+  assert.doesNotMatch(text!,/без фиксиран времеви изход|преди \+\$30/);
+});
+
+test('quick per-lot unarmed protection does not claim a four dollar threshold', () => {
+  const text=profitProtectionSummary({version:'horizon',activated_at:1,last_mark_at:2,
+    peak_net_usd:1,floor_net_usd:null,armed:false,arm_net_usd:2},'fresh');
+  assert.match(text!,/\+\$2.00/);assert.doesNotMatch(text!,/\+\$4.00/);
+});

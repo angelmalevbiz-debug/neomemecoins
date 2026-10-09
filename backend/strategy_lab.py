@@ -760,6 +760,7 @@ def load_state():
     funding=active_paper.apply_authorized_funding(books,now_ms()) if cohort_active or not stored_books else []
     exit_changes=active_paper.apply_capacity_exit_policy(books,now_ms())
     exit_changes+=active_paper.apply_adaptive_exit_policy(books,now_ms())
+    exit_changes+=active_paper.apply_horizon_exit_policy(books,now_ms())
     setup=dict(raw.get('portfolio_setup') or {})
     if all(books[sid].get('starting_balance')==1000 for sid in PROMOTED_STRATEGIES):
         setup.update(total_allocated_capital_usd=4000.0,allocation_per_strategy_usd=1000.0)

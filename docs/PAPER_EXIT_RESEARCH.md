@@ -1,5 +1,11 @@
 # Prospective profit-speed comparison — PAPER_EXIT_RESEARCH_V1
 
+Subsequent owner-authorized financial exits are now QUICK/SWING/HOLDER under
+[PAPER_HORIZON_EXIT_V1_60_240_720](PAPER_HORIZON_EXITS.md). The experiment below
+keeps its ORIGINAL frozen profiles/hash and samples; v5 is a REFERENCE, not the
+current financial policy. Shadow net dollars are not portfolio return percent
+or open financial positions that can be closed again. No automated promotion.
+
 The owner requested a more developed program and faster net profit. The live
 V5 admission/exits have only minutes of evidence; rewriting them again would
 not establish improvement. The archived 2026-10-08 edge study found no robust

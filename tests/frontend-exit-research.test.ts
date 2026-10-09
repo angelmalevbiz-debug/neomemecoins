@@ -15,7 +15,8 @@ const snapshot: PaperExitResearchSnapshot = {version:'PAPER_EXIT_RESEARCH_V1',st
 
 test('exit research shows paired frozen alternatives without calling them trades or profits', () => {
   const html=renderToStaticMarkup(createElement(PaperExitResearchPanel,{data:snapshot,connected:true}));
-  for (const text of ['Бърз вариант','Сегашен изход','Следване на движението','Сравнение, не сделки',
+  for (const text of ['Бърз вариант','Референтен изход v5','Следване на движението','Сравнение, не сделки',
+    'сбор в USD, не процент','не са реално отворени позиции','QUICK / SWING / HOLDER',
     'не с изпълнима wallet котировка','изключени от оценката','0/150','0/25','0/5','WR —']) assert.ok(html.includes(text));
   assert.doesNotMatch(html,/100.0% WR/);
 });

@@ -84,7 +84,7 @@ class QualityTests(unittest.TestCase):
         p=positions[0]
         self.assertEqual(p['entry_policy_version'],active.QUALITY_VERSION)
         self.assertEqual(p['notional_usd'],100)
-        self.assertEqual(p['exit_parameters'],active.quality_exit_parameters())
+        self.assertEqual(p['exit_parameters'],active.exit_parameters(p['strategy_id']))
         self.assertLess(p['open_pnl_usd'],0)
         self.assertEqual(p['entry_cost_cap_pct'],1.5)
         for sid,b in self.books.items():

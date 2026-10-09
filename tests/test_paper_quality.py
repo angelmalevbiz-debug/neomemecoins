@@ -149,9 +149,9 @@ class QualityTests(unittest.TestCase):
         p={'notional_usd':100,'exit_parameters':active.quality_exit_parameters(),'peak_net_pct':4}
         for net in (2,4,29.999,-4.999):
             self.assertIsNone(active.exit_reason(p,net,240))
-        self.assertEqual(active.exit_reason(p,30,1),'QUALITY_TAKE_PROFIT_NET_USD')
-        self.assertEqual(active.exit_reason(p,-5,1),'QUALITY_STOP_NET_USD')
-        self.assertEqual(active.exit_reason(p,-9,1),'QUALITY_STOP_NET_USD')
+        self.assertEqual(active.exit_reason(p,30,1),'ADAPTIVE_TAKE_PROFIT_NET_USD')
+        self.assertEqual(active.exit_reason(p,-5,1),'ADAPTIVE_STOP_NET_USD')
+        self.assertEqual(active.exit_reason(p,-9,1),'ADAPTIVE_STOP_NET_USD')
 
     def test_actual_gap_close_books_full_loss_not_the_new_stop_threshold(self):
         lab.maybe_open([self.c],strong_flows([self.c]))
@@ -162,7 +162,7 @@ class QualityTests(unittest.TestCase):
         with patch.object(lab.POSITION_MARK_FEED,'resolve',return_value=fallen):
             lab.update_positions({},[fallen])
         self.assertFalse(active.positions(b))
-        self.assertEqual(b['history'][0]['exit_reason'],'QUALITY_STOP_NET_USD')
+        self.assertEqual(b['history'][0]['exit_reason'],'ADAPTIVE_STOP_NET_USD')
         self.assertLess(b['history'][0]['pnl_usd'],-10)
         self.assertAlmostEqual(b['balance'],1000+b['history'][0]['pnl_usd'],places=4)
 

@@ -385,11 +385,12 @@ export function labEntryStatus(book: EntryViewBook, backendAvailable = true) {
 export type FundedActiveStats = {
   version: string; trades: number; wins: number; win_rate: number | null; net_pnl_usd: number;
   orders_last_60m: number; closed_last_60m: number; open_positions: number; max_positions: number;
-  target_orders_per_hour: number; exposure_usd: number; daily_loss_limit_usd: number;
+  target_orders_per_hour: number; exposure_usd: number; daily_loss_limit_usd: number; fixed_notional_usd?: number;
 };
 
 export function fundedActiveSummary(stats?: FundedActiveStats) {
   if (!stats) return null;
   const win = stats.win_rate == null ? 'няма затворени сделки' : `${stats.win_rate.toFixed(1)}% печеливши`;
-  return `Нова PAPER политика · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions} · цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
+  const size = stats.fixed_notional_usd == null ? '' : ` · вход ${usd(stats.fixed_notional_usd)}, без намаляване`;
+  return `Нова PAPER политика${size} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions} · цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd)}`;
 }

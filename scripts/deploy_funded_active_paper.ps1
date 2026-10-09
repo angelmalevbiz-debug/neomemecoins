@@ -6,7 +6,7 @@ $ErrorActionPreference='Stop'
 $sourceRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $targetRoot=[IO.Path]::GetFullPath($RuntimeRepository)
 if ($sourceRoot -eq $targetRoot) { throw 'Source and runtime must be different checkouts.' }
-$files=@('backend/funded_active_paper.py','backend/strategy_lab.py','backend/funded_market_candidates.py',
+$files=@('backend/funded_active_paper.py','backend/strategy_lab.py','backend/live_tape.py','backend/funded_market_candidates.py',
     'backend/entry_defense.py','backend/tape_pool_scheduler.py','backend/lab_dashboard_projection.py',
     'scripts/start_local_paper.ps1','scripts/build_funded_heat_seed.py',
     'src/lib/labStrategyView.ts','docs/FUNDED_ACTIVE_PAPER.md','strategy-lock.json')
@@ -110,5 +110,5 @@ if ($LASTEXITCODE -ne 0) { throw "Post-sync lock failed; services remain stopped
 if ($LASTEXITCODE -ne 0) { throw "Start failed. Ledgers were not reset; backup: $backup" }
 $after=Invoke-RestMethod -Uri 'http://127.0.0.1:8878/state' -TimeoutSec 10
 [pscustomobject]@{deployed=$true;backup=$backup;scratch=$scratch;ledger_reset=$false;
-    live_enabled=$false;policy_expected='FUNDED_ACTIVE_PAPER_V1';requires_fresh_snapshot_verification=$true} | ConvertTo-Json
+    live_enabled=$false;policy_expected='FUNDED_ACTIVE_PAPER_V2_FIXED_100';requires_fresh_snapshot_verification=$true} | ConvertTo-Json
 $digest.Dispose()

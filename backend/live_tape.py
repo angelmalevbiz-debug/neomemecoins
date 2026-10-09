@@ -318,6 +318,50 @@ def _token_account_closed_in_transaction(tx,account):
     return False
 
 
+def authenticated_cpi_swap_indexes(tx, keys):
+    """Supported swaps invoked by a successful program, not independent wallets.
+
+    Pump's IDL requires user Signer even during CPI; invoke_signed may supply a
+    PDA authority absent from message signers. Keep those events flagged and
+    excluded from all entry flow/wallet counts, but a fully matched known swap
+    need not poison coverage of the independent, transaction-signer swaps.
+    Missing/contradictory CPI context remains unclassified, just as before.
+    """
+    message = tx['transaction']['message']
+    top = message.get('instructions') or []
+    successful = set()
+    stack = []
+    for line in (tx.get('meta') or {}).get('logMessages') or []:
+        invoke = re.match(r'^Program (\w+) invoke \[(\d+)\]$', line)
+        if invoke:
+            depth = int(invoke.group(2))
+            stack = stack[:depth-1] + [invoke.group(1)]
+        elif re.match(r'^Program \w+ success$', line):
+            program = line.split()[1]
+            if stack and stack[-1] == program:
+                if program == PUMP_AMM and len(stack) >= 2:
+                    successful.add((stack[0], len(stack)))
+                stack.pop()
+        elif re.match(r'^Program \w+ failed', line):
+            stack = []
+    def program(instruction):
+        if instruction.get('programId'):
+            return str(instruction['programId'])
+        index = instruction.get('programIdIndex')
+        return keys[index] if type(index) is int and 0 <= index < len(keys) else None
+    out, flattened = set(), len(top)
+    for group in (tx.get('meta') or {}).get('innerInstructions') or []:
+        parent = group.get('index')
+        caller = program(top[parent]) if type(parent) is int and 0 <= parent < len(top) else None
+        for instruction in group.get('instructions') or []:
+            depth = instruction.get('stackHeight')
+            if (caller and caller != PUMP_AMM and program(instruction) == PUMP_AMM
+                    and type(depth) is int and depth >= 2 and (caller, depth) in successful):
+                out.add(flattened)
+            flattened += 1
+    return out
+
+
 def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
     """Returns classification, every distinct swap, reason. No delta guessing."""
     observed = now_ms() if observed_at is None else int(observed_at)
@@ -336,6 +380,7 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
     signers={key_of(key) for key in message.get('accountKeys') or [] if isinstance(key,dict) and key.get('signer')}
     if not signers and type((message.get('header') or {}).get('numRequiredSignatures')) is int:
         signers=set(keys[:message['header']['numRequiredSignatures']])
+    cpi_indexes = authenticated_cpi_swap_indexes(tx, keys) if signers else set()
     swaps,unknown = [],False
     for index,program,accounts,data in instructions:
         if metadata['pair'] not in accounts:
@@ -478,6 +523,8 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                         'onchain_direction':direction,'onchain_base_mint':base_mint,'onchain_quote_mint':quote_mint,
                         'onchain_base_raw_amount':str(base_raw),'onchain_quote_raw_amount':str(quote_raw),
                         'decoder_version':decoder_version,'decoder_validated':decoder_validated,
+                        'actor_authority':('TRANSACTION_SIGNER' if wallet in signers else
+                                           'PROGRAM_SIGNED_CPI' if matches[0][0] in cpi_indexes else 'UNPROVEN'),
                         'cash_leg_balance_metadata':'PRESENT' if cash_info else 'WRAPPED_ACCOUNT_CLOSED_IN_TRANSACTION' if reversed_pool else 'ABSENT',
                         'provider':metadata.get('provider','solana-rpc'),'note':token_direction,'confirmed_swap':True})
         fee_evidence=decode_fee_evidence(payload,matches[0][3])
@@ -491,6 +538,12 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
     if len(decoded)!=len(swaps):
         return 'unclassified',decoded,'SWAP_EVENT_COVERAGE_INCOMPLETE'
     flags = {flag for event in decoded for flag in event['quality_flags']}
+    if (flags == {'SWAP_ACTOR_NOT_TRANSACTION_SIGNER'}
+            and all(e.get('actor_authority') == 'PROGRAM_SIGNED_CPI'
+                    for e in decoded if 'SWAP_ACTOR_NOT_TRANSACTION_SIGNER' in e['quality_flags'])):
+        # Events are still flagged: every consumer excludes them from entry
+        # evidence. Only their terminal classification/coverage is repaired.
+        return 'processed',decoded,'VERIFIED_CPI_SWAP_EXCLUDED_FROM_WALLET_FLOW'
     if flags:
         # Preserve the coverage failure and the raw event, while naming the
         # actual defect. Missing signer evidence is not a missing FX quote.

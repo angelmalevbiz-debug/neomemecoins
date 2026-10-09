@@ -8,11 +8,15 @@ outcomes, with discretion over risk. The Windows launcher now selects
 **FUNDED_ACTIVE_PAPER_V4_QUALITY_100**. Quality takes precedence if both flags
 are inherited. Neither opt-in can select its policy in LIVE mode.
 
-The read-only [outcome audit](PAPER_OUTCOME_AUDIT_20261009.md) found 106 load-test
+The initial read-only [outcome audit](PAPER_OUTCOME_AUDIT_20261009.md) found 106 load-test
 closes, zero winners, -$290.0473 net, and zero passes of the shadow confirmed
 flow gate. This supports ending forced fills, not an assertion that any
 replacement strategy has positive expectancy. The five older winning rows
 are too few and too correlated to train a reliable winner classifier.
+While preparing this release, QI subsequently closed +$30.6503 net under the
+existing capacity exit policy: 1 winner/107 test closes, -$259.3970 net. This
+winner also failed the shadow signal/flow/defense gates; excluding entries
+does not establish that the new selection has a higher win rate.
 
 For NEW lots only, V4 keeps the four distinct physical market screens but
 requires all the original market/structural/heat/pool-loss, fresh confirmed

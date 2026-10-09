@@ -1,5 +1,9 @@
 # Recorded PAPER outcomes — 2026-10-09, before quality mode
 
+Initial snapshot: **18:03:18.784 UTC / 21:03:18.784 Europe/Kiev**. See the
+subsequent genuine winning close below; the initial zero-win count is not
+presented as the latest live outcome.
+
 Read-only source: the running Windows runtime's `.runtime/accounts/strategy_lab.json`,
 not the source checkout's older account files. Reproduce with:
 
@@ -51,6 +55,23 @@ not sufficient for an edge. Two winning USDF rows copied the same market event.
 Other winners were VSOF +$0.713, TDF +$0.5421 and swordinu +$12.8094; these are
 not a stable 80% strategy. Small positive unrealized marks in today's UI are
 not those historical closes and must not be counted as wins.
+
+### Subsequent pre-deployment result — 18:04:16.871 UTC
+
+Early trade 27, QI, closed **+$30.6503 net / +30.6503%** on the existing
+`PAPER_CAPACITY_EXIT_V2_NET30_STOP10` target. Entry spot $0.001144, exit spot
+$0.001536; $100 notional, recorded net peak +30.65027%, exit reason
+`CAPACITY_TEST_TAKE_PROFIT_NET_USD`. This is an actual PAPER ledger close,
+not a synthetic replay or an open green mark, and not a wallet fill.
+
+The updated capacity cohort is **107 closes, 1 win (0.93%), -$259.3970 net**;
+all-primary history is 144 closes, 6 wins, -$343.2006 net. This confirms that
+the existing $30 net exit can trigger, not that the entry strategy is profitable.
+QI also failed its shadow strategy market screen, confirmed flow and defense.
+The proposed mandatory gates would have refused this winner too. They exclude
+unconfirmed exposure, not demonstrably distinguish winners from losers.
+No new cutoff was fitted to QI after seeing its result. The later local snapshot
+is `.runtime/paper-quality-predeploy.json`, with its own source SHA-256.
 
 ## Scoped prospective change, not a fitted promise
 

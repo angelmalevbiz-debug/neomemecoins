@@ -110,5 +110,5 @@ if ($LASTEXITCODE -ne 0) { throw "Post-sync lock failed; services remain stopped
 if ($LASTEXITCODE -ne 0) { throw "Start failed. Ledgers were not reset; backup: $backup" }
 $after=Invoke-RestMethod -Uri 'http://127.0.0.1:8878/state' -TimeoutSec 10
 [pscustomobject]@{deployed=$true;backup=$backup;scratch=$scratch;ledger_reset=$false;
-    live_enabled=$false;policy_expected='FUNDED_ACTIVE_PAPER_V2_FIXED_100';requires_fresh_snapshot_verification=$true} | ConvertTo-Json
+    live_enabled=$false;policy_expected='FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100';requires_fresh_snapshot_verification=$true} | ConvertTo-Json
 $digest.Dispose()

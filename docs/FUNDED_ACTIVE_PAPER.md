@@ -4,7 +4,7 @@ The owner authorized a prospective PAPER-only repair, retaining fees, all
 historical outcomes and balances. MONEY.zip was inspected, not restored.
 
 `NEO_LAB_FUNDED_ACTIVE_ENABLED=1` opts the four PROMOTED_PAPER books and the
-observation scheduler into `FUNDED_ACTIVE_PAPER_V2_FIXED_100`. Windows launcher and the
+observation scheduler into `FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100`. Windows launcher and the
 Lab/tape systemd units explicitly enable it. Other engines/TEST books do not
 use its admission or exits. Turning the flag off prevents new active entries;
 the position list and frozen active exits remain managed until flat.
@@ -27,8 +27,8 @@ and at most 50% of the current book balance per entry. At most four concurrent
 exact-pool positions and 50% total committed exposure, no leverage. With the
 existing $201–250 balances this normally means **one $100 position**, not four.
 Insufficient remaining exposure blocks entry instead of buying a small remainder.
-V1 positions retain frozen exits; V1 losses and orders still consume V2 daily/hourly
-risk limits and losing-run cooldown. V2 performance is reported separately.
+V1/V2 positions retain frozen exits; prior active losses and orders still consume
+daily/hourly risk limits and losing-run cooldown. V3 performance is reported separately.
 Existing positions
 consume capacity; duplicate mint entries in a book are prohibited. Each book
 has a rolling cap of 50 new orders/hour (not a minimum). Four-minute maximum
@@ -38,10 +38,20 @@ coverage, safety, cost and risk gates can still yield fewer entries.
 Fresh confirmed exact-pool flow, fresh completed full same-pool safety and
 independent price identity are required at admission and rechecked before
 commit. Fees/network/slippage/impact assumptions are unchanged. Early permits
-2.75% modeled roundtrip cost against a 6% NET stop; other books retain the
-1.5% cost cap with 4% / 4% / 3% NET stops. No gap loss is clamped to the stop.
+2.75% modeled roundtrip cost against a 6% NET stop; Momentum permits 2% against
+a 4% NET stop. Precision and Ultra retain a 1.5% cap with 4% / 3% NET stops.
+No gap loss is clamped to the stop.
 These are cost-aware hypotheses, not a validated profitable strategy or
 evidence of equivalence to on-chain fills.
+
+V3 prospectively changes **only Momentum's physical candidate screen**: m5
+0–15% rather than 0.5–15%, h1 −10–40% rather than 0–40%, five-minute buy/sell
+ratio >=1 rather than >=1.2. It still needs independently observed, fresh
+30-second flow with >=3 swaps, >=2 transaction-signing wallets and buy USD
+>=1.2x sell USD, plus full same-pool safety, price, heat and risk checks. The
+2% cost ceiling is half the unchanged 4% net stop, not a removal of fees.
+This recognizes emerging buy pulses before a lagged candle confirms; it is
+not calibrated against winners, and no profitable expectancy is claimed.
 
 ### CPI coverage repair
 

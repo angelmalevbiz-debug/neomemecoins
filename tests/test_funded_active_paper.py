@@ -84,6 +84,25 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertIn('rug_ticker_registry_warming',rug.check(c,NOW,self.layer.registry,
             params=active.structural_parameters('EARLY'))['reasons'])
 
+    def test_momentum_pulse_can_precede_a_five_minute_candle_without_relaxing_other_books(self):
+        c=coin(priceChange={'m5':.1,'h1':-2},txns={'m5':{'buys':20,'sells':20}})
+        self.assertTrue(active.matches('MOMENTUM',c))
+        self.assertFalse(active.matches('PRECISION',c))
+        self.assertFalse(active.matches('ULTRA_PRECISION',c))
+        self.assertEqual(active.RULES['MOMENTUM']['cost'],2)
+        self.assertEqual(active.RULES['MOMENTUM']['stop'],4)
+        self.assertFalse(active.matches('MOMENTUM',{**c,'priceChange':{'m5':-1,'h1':-2}}))
+
+    def test_pulse_candidate_without_fresh_verified_flow_still_cannot_enter(self):
+        strategy=next(s for s in lab.STRATEGIES if s['id']=='MOMENTUM') if any(
+            s['id']=='MOMENTUM' for s in lab.STRATEGIES) else {'id':'MOMENTUM','name':'Momentum'}
+        book=lab.empty_book(strategy);book['portfolio_group']='PROMOTED_PAPER'
+        c=coin(priceChange={'m5':.1,'h1':-2},txns={'m5':{'buys':20,'sells':20}})
+        with patch.object(lab,'STATE',{'books':{'MOMENTUM':book}}),patch.object(lab,'STRATEGIES',[strategy]):
+            lab.maybe_open([c],{})
+        self.assertEqual(active.positions(book),[])
+        self.assertEqual(book['entry_diagnostics']['blocked_reason'],'promoted_verified_flow_unavailable')
+
     def test_real_history_seed_replays_only_recorded_prices_and_preserves_gaps(self):
         from heat_veto import PairHistory
         rows=[{'available_at':t,'coin':{**coin(), 'updatedAt':t,

@@ -11,8 +11,8 @@ from dataclasses import replace
 
 import structural_rug_guard as rug
 
-VERSION = 'FUNDED_ACTIVE_PAPER_V2_FIXED_100'
-MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', VERSION})
+VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
+MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 MAX_SLOTS = 4
 MAX_NOTIONAL_USD = 100.0
@@ -26,8 +26,10 @@ SOL = 'So11111111111111111111111111111111111111112'
 RULES = {
     'EARLY': dict(age=(2, 120), liquidity=50_000, move=(1, 20), hour=(-10, 100),
                   buy_sell=1.0, liquidity_cap=.02, turnover=(.05, 8), stop=6.0, cost=2.75),
-    'MOMENTUM': dict(age=(2, 10_000_000), liquidity=100_000, move=(.5, 15), hour=(0, 40),
-                     buy_sell=1.2, liquidity_cap=.015, turnover=(.03, 6), stop=4.0, cost=1.5),
+    # The fresh confirmed 30-second buy pulse remains the actual admission
+    # signal. Don't wait for a lagging five-minute +0.5% candle to see it.
+    'MOMENTUM': dict(age=(2, 10_000_000), liquidity=100_000, move=(0, 15), hour=(-10, 40),
+                     buy_sell=1.0, liquidity_cap=.015, turnover=(.03, 6), stop=4.0, cost=2.0),
     'PRECISION': dict(age=(5, 10_000_000), liquidity=150_000, move=(.5, 8), hour=(0, 20),
                       buy_sell=1.5, liquidity_cap=.02, turnover=(.03, 3), stop=4.0, cost=1.5),
     'ULTRA_PRECISION': dict(age=(10, 10_000_000), liquidity=250_000, move=(.5, 6), hour=(0, 15),

@@ -17,6 +17,7 @@ import lab_forward_tests as lab_forward
 import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
 import funded_active_paper as active_paper
+import paper_exit_research as exit_research
 import lab_capacity_test
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -771,7 +772,8 @@ def load_state():
             'activity_version':raw.get('activity_version'),
             'activity_started_at':raw.get('activity_started_at'),
             'portfolio_setup':setup or None, '_funding_requires_persist':bool(funding),
-            '_exit_policy_requires_persist':bool(exit_changes)}
+            '_exit_policy_requires_persist':bool(exit_changes),
+            **({'exit_research':raw['exit_research']} if 'exit_research' in raw else {})}
 
 STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
@@ -973,6 +975,7 @@ def update_positions(flows,feed):
             # The exits this position was opened with (its stored exit_parameters).
             reason=lab_forward.exit_reason(pos,model_live_pct,hold)
         elif active_paper.is_active_position(pos):
+            record_exit_research_mark(book,pos,coin,total_live_pnl,decision_at)
             active_paper.observe_profit_protection(pos,total_live_pct,
                 num(coin.get('mark_received_at'),num(coin.get('updatedAt'))))
             reason=active_paper.exit_reason(pos,total_live_pct,hold)
@@ -1013,6 +1016,61 @@ def update_positions(flows,feed):
     # LAB_FORWARD_FILL_BASIS_V4: research fills of recent forward closes (their exit legs
     # resolve after the close); booked results are never changed.
     advance_forward_research_fills(prices,now_ms())
+    advance_exit_research(prices,now_ms())
+
+
+def research_state(now):
+    if not active_paper.quality_enabled():
+        return None
+    try:
+        return exit_research.ensure(STATE,forward_cost_model(),now)
+    except Exception as error:
+        STATE['exit_research_error']=str(error)[:300]
+        return None
+
+
+def research_error(state,error):
+    state['observation_errors']+=1
+    state['error']=f'{type(error).__name__}: {error}'[:300]
+
+
+def record_exit_research_mark(book,position,coin,net_usd,now,*,new_entry=False):
+    # Measuring exits never grants entry permission, creates a tape seat, fetches
+    # a quote or changes an existing position/cash/exit. Failures are published.
+    if not active_paper.applies(book) or book.get('promotion_pending'):
+        return
+    state=research_state(now)
+    if state is None:
+        return
+    try:
+        episode=exit_research.start(state,position,now,new_entry=new_entry)
+        if episode is not None:
+            exit_research.observe(episode,coin,net_usd,now)
+    except Exception as error:
+        research_error(state,error)
+
+
+def advance_exit_research(prices,now):
+    # Continue shadow paths AFTER the real lot exits, using the shared exact-pool
+    # feed only. Missing markets remain censored, never filled at old prices/zero.
+    state=research_state(now)
+    if state is None:
+        return
+    for episode in state['episodes']:
+        if exit_research.finished(episode):
+            continue
+        exit_research.expire(episode,now)
+        coin=prices.get((episode['address'],episode['pairAddress']))
+        stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
+        if (not coin or not 0<=now-stamp<=POSITION_STALE_AFTER_MS
+                or stamp<=num(episode.get('last_mark_at')) or sol_usd_from_coin(coin)<=0):
+            continue
+        try:
+            quote=exit_execution(coin,episode['quantity'])
+            net=episode['partial_realized_pnl']+quote['net_proceeds_usd']-episode['remaining_cost_basis_usd']
+            exit_research.observe(episode,coin,net,now)
+        except Exception as error:
+            research_error(state,error)
 def cost_feasibility_summary(rows,cap):
     """Fee-and-buffer planning floor of the matched candidates; never an admission."""
     return {
@@ -1714,6 +1772,7 @@ def maybe_open(feed,flows):
             position['quality_mode']=active_paper.quality_enabled()
             position['peak_net_pct']=proposed['initial_pnl_pct']
             active_paper.attach(book,position)
+            record_exit_research_mark(book,position,coin,proposed['initial_pnl_usd'],stamp,new_entry=True)
             book['entry_diagnostics']['funded_active']=active_paper.performance(book,stamp)
         else:
             book['position']=position
@@ -1910,6 +1969,15 @@ def persist(status='online',error=None):
         }
         for key,book in STATE['books'].items()
     }
+    research=research_state(now_ms())
+    if research is not None:
+        try:
+            summary=STATE.get('exit_research_summary') or {}
+            if now_ms()-num(summary.get('updated_at'))>=10_000:
+                STATE['exit_research_summary']=exit_research.view(research,now_ms())
+        except Exception as research_failure:
+            research_error(research,research_failure)
+            STATE['exit_research_error']=research['error']
     STATE['data_integrity_note']='Историята съдържа непотвърдени цени, включително XFUN. Не е доказателство за реална доходност. Новите входове минават независима проверка.'
     STATE['execution_basis']=EXECUTION_MODEL_VERSION
     STATE['execution_note']='DEX exact-pool spot marks with modeled fees, impact, slippage and latency; paper estimate only, no transaction is built, signed, or sent.'

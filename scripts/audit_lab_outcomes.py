@@ -58,6 +58,41 @@ def summarize(rows):
     return result
 
 
+def cohort_audit(rows):
+    """Do not confuse forced fills or fee erosion with an evaluated edge."""
+    policies = defaultdict(list)
+    reasons = defaultdict(list)
+    for row in rows:
+        policies[row.get('entry_policy_version', 'LEGACY_UNKNOWN')].append(row)
+        reasons[row.get('exit_reason', 'UNKNOWN')].append(row)
+    comparable = []
+    fee_fields = ('entry_dex_fee_usd', 'entry_network_fee_usd',
+                  'exit_dex_fee_usd', 'exit_network_fee_usd')
+    fees = []
+    for row in rows:
+        values = [number(row.get(k)) for k in fee_fields]
+        if all(v is not None and v >= 0 for v in values):
+            fees.append(sum(values))
+        entry, exit_price, notional, net = [number(row.get(k)) for k in
+            ('entry_price', 'exit_price', 'notional_usd', 'pnl_usd')]
+        if (not row.get('partial_exits') and all(v is not None for v in (entry,exit_price,notional,net))
+                and min(entry,exit_price,notional)>0):
+            gross = notional*(exit_price/entry-1)
+            comparable.append((gross, net))
+    forced = [r for r in rows if r.get('capacity_test') is True]
+    return dict(by_entry_policy={k:summarize(v) for k,v in sorted(policies.items())},
+        by_exit_reason={k:summarize(v) for k,v in sorted(reasons.items())},
+        forced_closes=len(forced), forced_without_market_signal=sum(
+            (r.get('capacity_test_shadow') or {}).get('strategy_market_signal') is not True for r in forced),
+        fee_complete_closes=len(fees), recorded_dex_and_network_fees_usd=round(sum(fees),6),
+        comparable_unpartial_closes=len(comparable),
+        gross_quote_move_benchmark_usd=round(sum(g for g,n in comparable),6),
+        comparable_actual_net_usd=round(sum(n for g,n in comparable),6),
+        gross_green_but_net_nonpositive=sum(g>0 and n<=0 for g,n in comparable),
+        benchmark_is_not_an_alternative_fill=True,
+        benchmark_gap_includes_fees_slippage_impact_and_rounding=True)
+
+
 def audit(ledger):
     books = ledger.get('books') or {}
     rows = [r for sid in BOOKS for r in (books.get(sid) or {}).get('history', [])]
@@ -104,6 +139,7 @@ def audit(ledger):
     return dict(kind='READ_ONLY_RECORDED_PAPER_OUTCOMES_NOT_A_BACKTEST',
         updated_at=ledger.get('updated_at'), primary_total=summarize(rows),
         by_book={sid:summarize((books.get(sid) or {}).get('history', [])) for sid in BOOKS},
+        by_book_cohorts={sid:cohort_audit((books.get(sid) or {}).get('history', [])) for sid in BOOKS},
         by_entry_policy={name:summarize(group) for name, group in sorted(policy.items())},
         by_exit_policy={name:summarize(group) for name, group in sorted(exit_policy.items())},
         capacity_test={**summarize(test), 'shadow_admission_counts':shadow,

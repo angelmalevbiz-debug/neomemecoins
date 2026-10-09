@@ -743,7 +743,7 @@ def load_state():
         elif s['id'] in PROMOTED_STRATEGIES and (cohort_active or existing is None):
             b['portfolio_group']='PROMOTED_PAPER'
             b['allocation_usd']=num(b.get('starting_balance'),PROMOTED_ALLOCATION)
-            b['max_position_fraction']=PROMOTED_MAX_POSITION_FRACTION
+            b['max_position_fraction']=1.0 if active_paper.soft_limits_removed(b) else PROMOTED_MAX_POSITION_FRACTION
         elif s['id'] in PROMOTED_STRATEGIES:
             b['portfolio_group']='TEST'
             b['allocation_usd']=num(b.get('starting_balance'),START_BALANCE)
@@ -1150,7 +1150,7 @@ def maybe_open(feed,flows):
                 'balance_usd':round(num(book.get('balance')),4),
             }
             continue
-        if book.get('portfolio_group')=='PROMOTED_PAPER':
+        if book.get('portfolio_group')=='PROMOTED_PAPER' and not active_paper.soft_limits_removed(book):
             pause_ms=promoted_pause_remaining_ms(book,now)
             if pause_ms>0:
                 book['entry_diagnostics']={
@@ -1167,11 +1167,11 @@ def maybe_open(feed,flows):
         if strategy['id'] in PROMOTED_STRATEGIES:
             entry_limit=min(entry_limit,balance*PROMOTED_MAX_POSITION_FRACTION)
         if is_active:
-            entry_limit=min(entry_limit,active_paper.MAX_NOTIONAL_USD,
-                            balance*active_paper.MAX_POSITION_FRACTION,
-                            active_capacity['available_exposure_usd'])
+            # Active fixed size supersedes the generic legacy $150 budget.
+            entry_limit=min(active_paper.entry_notional(), active_capacity['available_exposure_usd'],
+                            balance*(1.0 if active_paper.soft_limits_removed(book) else active_paper.MAX_POSITION_FRACTION))
         min_notional=activity.entry_minimum_notional(strategy['id'])
-        if is_active: min_notional=active_paper.MIN_NOTIONAL_USD
+        if is_active: min_notional=active_paper.entry_notional()
         # Admission cap: the Lab's one rule, 0.5 x net stop (<= 2.75%). A forward-test book
         # applies it to its own pre-registered stop and buys a fixed $200, never a smaller size.
         admission_cap=lab_forward.admission_cost_cap_pct(strategy['id']) if is_forward else cost_cap
@@ -1768,7 +1768,7 @@ def maybe_open(feed,flows):
                     capital_mode=capital_mode),
             })
         if is_active:
-            position['exit_parameters']=active_paper.exit_parameters(strategy['id'])
+            position['exit_parameters']=active_paper.exit_parameters(strategy['id'],notional)
             position['exit_policy_label']=position['exit_parameters']['version']
             position['quality_mode']=active_paper.quality_enabled()
             position['peak_net_pct']=proposed['initial_pnl_pct']

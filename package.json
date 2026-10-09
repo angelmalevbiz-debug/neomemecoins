@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "lint": "tsc --noEmit",
     "check:strategy": "node scripts/verify-strategy-lock.mjs",
-    "check:frontend": "node --import tsx --test tests/frontend-dashboard.test.ts tests/frontend-training.test.ts tests/frontend-strategies.test.ts tests/frontend-high-frequency.test.ts tests/frontend-funded-active.test.ts"
+    "check:frontend": "node --import tsx --test tests/frontend-dashboard.test.ts tests/frontend-training.test.ts tests/frontend-strategies.test.ts tests/frontend-high-frequency.test.ts tests/frontend-funded-active.test.ts tests/frontend-exit-research.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

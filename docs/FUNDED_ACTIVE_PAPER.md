@@ -1,5 +1,17 @@
 # Named strategy PAPER repair — 2026-10-09
 
+## Continuous comparison of profit-speed hypotheses
+
+The subsequent request for a more developed program adds
+[PAPER_EXIT_RESEARCH_V1](PAPER_EXIT_RESEARCH.md): three frozen same-entry exit
+alternatives observed prospectively with unchanged modeled costs and delayed
+changed-price marks. It continues observing after a real exit and records
+missing paths instead of inventing fills. New full-entry paths and resumed
+old lots are separated. Only a sufficiently broad, complete, stressed paired
+sample can become a MANUAL-REVIEW candidate; nothing automatically changes
+financial trades or cash. No more profitable alternative has been established.
+V5 protection/admission and every financial risk limit below remain unchanged.
+
 ## Adaptive net-profit protection (current Windows mode, supersedes fixed-only exits)
 
 The owner's latest request explicitly asks to protect +$10–15 instead of

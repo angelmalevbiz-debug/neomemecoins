@@ -159,6 +159,18 @@ test('main PAPER totals and history use the same selected cohort, excluding TEST
   assert.deepEqual(portfolio.history.map(trade => [trade.symbol, trade.strategy_name]), [['GAMMA', 'Strategy C'], ['ALPHA', 'Strategy A'], ['BETA', 'Strategy B']]);
 });
 
+test('multi-slot portfolio counts every position without duplicating the first-position alias', () => {
+  const base = promotedFixture();
+  const first = base.books.a.position!;
+  const snapshot = {...base, books: {...base.books, a: {...base.books.a,
+    positions: [first, {...first, notional_usd:25, open_pnl_usd:-3, quote_status:'stale'}]}}};
+  const result = promotedPaperPortfolio(snapshot)!;
+  assert.equal(result.openPositions, 2);
+  assert.equal(result.reserved, 75);
+  assert.equal(result.available, 935);
+  assert.equal(result.valuationStale, true);
+});
+
 test('cohort aggregation refuses an incomplete active portfolio and does not count duplicate IDs twice', () => {
   const lab = promotedFixture();
   lab.portfolio_setup.strategies.push('missing');

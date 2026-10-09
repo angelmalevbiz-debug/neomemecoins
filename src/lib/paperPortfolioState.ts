@@ -2,11 +2,17 @@ type PortfolioPosition = { notional_usd: number; open_pnl_usd?: number; quote_st
 type PortfolioTrade = { opened_at: number; closed_at?: number; pnl_usd?: number };
 type PortfolioBook = {
   name: string; starting_balance: number; balance: number; portfolio_group?: string;
-  position: PortfolioPosition | null; history: PortfolioTrade[];
+  position: PortfolioPosition | null; positions?: PortfolioPosition[]; history: PortfolioTrade[];
 };
 type PortfolioStats = {
   equity: number; trades: number; wins: number; valuation_stale?: boolean;
 };
+
+export function portfolioBookPositions<Position extends PortfolioPosition>(book: {
+  position: Position | null; positions?: Position[];
+}): Position[] {
+  return book.positions?.length ? book.positions : book.position ? [book.position] : [];
+}
 
 // Only this explicitly selected cohort belongs to the main PAPER account.
 // TEST strategies and legacy exits keep their separate capital and histories.
@@ -23,8 +29,8 @@ export function promotedPaperPortfolio<Book extends PortfolioBook>(lab?: {
     || !Number.isFinite(book.balance) || (stats && !Number.isFinite(stats.equity)))) return null;
   const startingBalance = books.reduce((sum, { book }) => sum + book.starting_balance, 0);
   const balance = books.reduce((sum, { book }) => sum + book.balance, 0);
-  const equity = books.reduce((sum, { book, stats }) => sum + (stats?.equity ?? (book.balance + (book.position?.open_pnl_usd ?? 0))), 0);
-  const reserved = books.reduce((sum, { book }) => sum + (book.position?.notional_usd ?? 0), 0);
+  const equity = books.reduce((sum, { book, stats }) => sum + (stats?.equity ?? (book.balance + portfolioBookPositions(book).reduce((pnl, p) => pnl + (p.open_pnl_usd ?? 0), 0))), 0);
+  const reserved = books.reduce((sum, { book }) => sum + portfolioBookPositions(book).reduce((value, p) => value + p.notional_usd, 0), 0);
   const trades = books.reduce((sum, { book, stats }) => sum + (stats?.trades ?? book.history.length), 0);
   const wins = books.reduce((sum, { book, stats }) => sum + (stats?.wins ?? book.history.filter(trade => (trade.pnl_usd ?? 0) > 0).length), 0);
   const history = books.flatMap(({ id, book }) => book.history.map(trade => ({
@@ -36,9 +42,9 @@ export function promotedPaperPortfolio<Book extends PortfolioBook>(lab?: {
     realizedPnl: balance - startingBalance,
     unrealizedPnl: equity - balance,
     returnPct: ((equity - startingBalance) / startingBalance) * 100,
-    openPositions: books.filter(({ book }) => Boolean(book.position)).length,
+    openPositions: books.reduce((count, {book}) => count + portfolioBookPositions(book).length, 0),
     trades, wins, winRate: trades ? (wins / trades) * 100 : 0,
     valuationStale: books.some(({ book, stats }) => Boolean(stats?.valuation_stale)
-      || Boolean(book.position && book.position.quote_status !== 'fresh')),
+      || portfolioBookPositions(book).some(position => position.quote_status !== 'fresh')),
   };
 }

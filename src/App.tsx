@@ -334,7 +334,7 @@ export default function App() {
   const portfolioRealizedPnl = promotedPortfolio?.realizedPnl ?? state?.stats.realized_total_usd;
   const portfolioUnrealizedPnl = promotedPortfolio?.unrealizedPnl ?? state?.stats.unrealized_pnl_usd;
   const portfolioOpenPositions = promotedPortfolio?.openPositions ?? state?.stats.open_positions;
-  const portfolioMaxPositions = promotedPortfolio?.books.length ?? state?.config.max_positions;
+  const portfolioMaxPositions = promotedPortfolio?.books.reduce((count, {id}) => count + (state?.strategy_lab?.stats[id]?.funded_active?.max_positions ?? 1), 0) ?? state?.config.max_positions;
   const portfolioClosedTrades = promotedPortfolio?.trades ?? state?.stats.closed_trades;
   const portfolioWinRate = promotedPortfolio?.winRate ?? state?.stats.win_rate;
   const portfolioRunning = promotedPortfolio ? state?.strategy_lab?.status === 'online' : state?.running;
@@ -507,8 +507,7 @@ export default function App() {
             <div className="mt-4 space-y-2">
               {promotedPortfolio ? <>
                 {promotedPortfolio.openPositions === 0 && <div className="rounded-xl border border-dashed border-white/[0.08] p-4 text-center text-[10px] leading-5 text-slate-600">Няма отворени позиции.</div>}
-                {promotedPortfolio.books.filter(({ book }) => Boolean(book.position)).map(({ id, book }) => {
-                  const position = book.position!;
+                {promotedPortfolio.books.flatMap(({ id, book }) => (book.positions?.length ? book.positions : book.position ? [book.position] : []).map(position => ({id, book, position}))).map(({ id, book, position }) => {
                   return <div key={`${id}-${position.opened_at}`} className="rounded-2xl border border-white/[0.07] bg-white/[0.02] p-3">
                     <button onClick={() => setSelectedAddress(position.address)} className="w-full text-left hover:opacity-80"><div className="flex items-center justify-between gap-2"><div><div className="text-xs font-black text-white">${position.symbol} · {book.name}</div><div className="mt-0.5 text-[9px] text-slate-600">вход {fmtPrice(position.execution_entry_price ?? position.entry_price ?? 0)} · ${position.notional_usd.toFixed(0)}</div></div><div className={`text-sm font-black ${position.quote_status === 'fresh' ? (position.pnl_pct >= 0 ? 'text-emerald-300' : 'text-red-300') : 'text-amber-200'}`}>{position.quote_status === 'fresh' ? `${position.pnl_pct >= 0 ? '+' : ''}${position.pnl_pct.toFixed(2)}%` : 'STALE'}</div></div></button>
                     <div className="mt-2 flex items-center justify-between text-[9px] text-slate-600"><span>{position.open_pnl_usd != null ? `${position.open_pnl_usd >= 0 ? '+' : ''}$${position.open_pnl_usd.toFixed(2)}` : 'PnL —'}</span><span>{Math.max(0, Math.round((Date.now() - position.opened_at) / 60000))}m open</span></div>

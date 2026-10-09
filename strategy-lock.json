@@ -283,7 +283,7 @@
     "backend/paper_horizon_exits.py": "92aac7f676819b1e3db4a058030015eab9d781d1ce16bb1df4d068a7ce38c97c",
     "docs/PAPER_HORIZON_EXITS.md": "3cb15472560c97fa4f3a6992bb2587d9ce0997e88cac2465cc2b4d01a61f6fa7",
     "backend/paper_exit_research.py": "1bae9fe6f3d8686028f917fadeb7c25756d9dc663796abb0debd8801997a7483",
-    "src/components/PaperExitResearchPanel.tsx": "e76b83ea80692fa950c47e7845edc4825a772593a0c1bfad864a92f6a3ab97a2",
+    "src/components/PaperExitResearchPanel.tsx": "0bc088d0929b540b055db59989da19e4c3139ab8880c6bb6c2164e450637f9a4",
     "docs/PAPER_EXIT_RESEARCH.md": "cb754a0e6c399d294cae69fe103ffbfd7701792edf5381b39d7d0e92c2a910cf",
     "scripts/build_funded_heat_seed.py": "64e98aa7c0d45f6081d95c31b026227cd915920f4cb2b028a6d5771416476bc9",
     "scripts/audit_lab_outcomes.py": "f935542dcd4055f47718a7d787ab61dd6dc14d6ea669dea84a36a6f10ff99245",

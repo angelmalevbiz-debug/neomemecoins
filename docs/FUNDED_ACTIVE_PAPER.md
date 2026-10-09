@@ -1,5 +1,38 @@
 # Named strategy PAPER repair — 2026-10-09
 
+## Owner-requested capacity test (current Windows mode)
+
+The owner explicitly requested 15–16 of the 16 slots filled at all times for
+testing, independently of strategic signals. The Windows launcher now opts
+into `NEO_LAB_CAPACITY_TEST_ENABLED=1` together with `NEO_ENGINE_MODE=PAPER`.
+This selects **PAPER_CAPACITY_TEST_V1_FIXED_100**, not the strategy admission
+described below. Each named book is visibly suffixed `ТЕСТ ЗАПЪЛВАНЕ`.
+
+The test tries to fill all four slots per book in a bounded event-loop refresh,
+then refills vacancies after ordinary frozen net exits (four-minute max hold).
+It uses fresh real PumpSwap/SOL market observations, >=$50k observed liquidity,
+full fresh exact-pool safety, independent exact-pool price checks, and the
+unchanged fee/network/impact/slippage model at exactly $100. Four slots, unique
+mints within a book, 50% contributed-cash exposure and no leverage remain hard.
+Missing/stale market or failed/pending safety/price evidence still leave gaps.
+No synthetic prices, forced wallet orders, capital refills or invented fills.
+
+Original market signal, verified flow admission, defensive/heat/loss-memory
+decision, original cost cap, account/address cooldown and daily/hourly limits
+are **recorded as shadow evidence**, not enforced in this opt-in load test.
+Consequently this test can lose more than the ordinary $50/day PAPER budget
+and place more than 50 orders/hour. All real modeled losses reduce its finite
+PAPER cash. Original-policy admissions and all main/personal account gates are
+unchanged. Switching off the opt-in restores the ordinary policy; existing test
+lots retain their stored exits and are still managed. No old close is rewritten.
+
+Test entry and close rows carry `capacity_test`, `strategy_validation=False`,
+their own policy version and `capacity_test_shadow`. Current-policy metrics
+separate these fills from V3 strategic trades; all-time cash/P&L includes both.
+The same pool can appear across four books: 16 slots are not necessarily 16
+independent market exposures. High utilization does not prove strategic entry
+quality, profitable expectancy, realistic wallet fills or 80% win rate.
+
 The owner authorized a prospective PAPER-only repair, retaining fees, all
 historical outcomes and balances. MONEY.zip was inspected, not restored.
 

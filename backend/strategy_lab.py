@@ -17,6 +17,7 @@ import lab_forward_tests as lab_forward
 import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
 import funded_active_paper as active_paper
+import lab_capacity_test
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
 from lab_position_marks import POSITION_MARK_FEED
@@ -1051,6 +1052,9 @@ def maybe_open(feed,flows):
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
         active_paper.synchronize_alias(book)
+        if lab_capacity_test.applies(book):
+            lab_capacity_test.fill(book,candidates,now,sys.modules[__name__])
+            continue
         is_active=active_paper.applies(book)
         active_capacity=active_paper.capacity(book,now) if is_active else None
         book_stop=active_paper.RULES[strategy['id']]['stop'] if is_active else STOP_LOSS
@@ -1905,7 +1909,7 @@ def persist(status='online',error=None):
         STOP_LOSS,promoted_candidate_config())
     if active_paper.enabled():
         STATE['activity_config']['promoted_entry_policy'].update({
-            'version':active_paper.VERSION,'candidate_policy_source':active_paper.VERSION,
+            'version':active_paper.reporting_version(),'candidate_policy_source':active_paper.reporting_version(),
             'per_strategy_parameters':active_paper.config(),'maximum_roundtrip_cost_pct':None})
     STATE['activity_config']['cost_first_established']=cost_first.config()
     STATE['activity_config']['funded_active_paper']=active_paper.config()

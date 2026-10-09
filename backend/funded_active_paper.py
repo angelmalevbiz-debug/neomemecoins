@@ -12,7 +12,10 @@ from dataclasses import replace
 import structural_rug_guard as rug
 
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
-MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION})
+CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
+CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
+MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
+                              CAPACITY_TEST_VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
 FUNDING_VERSION = 'USER_AUTHORIZED_PAPER_CAPITAL_1000_20261009'
@@ -41,6 +44,16 @@ RULES = {
 
 def enabled():
     return os.getenv(ENV) == '1'
+
+
+def capacity_test_enabled():
+    # Never selected implicitly or in LIVE, even if a shell inherits the flag.
+    return (enabled() and os.getenv(CAPACITY_TEST_ENV)=='1' and os.getenv('NEO_ENGINE_MODE')=='PAPER'
+            and os.getenv('NEO_EXECUTION_MODE','PAPER')=='PAPER')
+
+
+def reporting_version():
+    return CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
 
 
 def applies(book):
@@ -206,7 +219,7 @@ def remove(book, position):
 
 
 def current_trades(book):
-    return [t for t in book.get('history', []) if t.get('entry_policy_version') == VERSION]
+    return [t for t in book.get('history', []) if t.get('entry_policy_version') == reporting_version()]
 
 
 def is_active_position(position):
@@ -263,7 +276,13 @@ def exit_reason(position, net_pct, hold_minutes):
 def performance(book, now):
     trades = current_trades(book)
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
-    return {**capacity(book, now), 'version': VERSION, 'fixed_notional_usd': MAX_NOTIONAL_USD,
+    policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
+    return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': MAX_NOTIONAL_USD,
+            'capacity_test':capacity_test_enabled(), 'strategy_validation':False,
+            'risk_limits_shadow_only':capacity_test_enabled(),
+            'strategy_policy_version':VERSION,
+            'strategy_policy_closed_trades':sum(t.get('entry_policy_version')==VERSION for t in book.get('history',[])),
+            'orders_last_60m':sum(0<=now-finite(p.get('opened_at'))<3_600_000 for p in policy_opens),
             'trades': len(trades), 'wins': wins,
             'win_rate': round(wins / len(trades) * 100, 1) if trades else None,
             'net_pnl_usd': round(sum(finite(t.get('pnl_usd')) for t in trades), 4),
@@ -277,7 +296,14 @@ def candidate_config():
 
 
 def config():
-    return dict(version=VERSION, enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
+    return dict(version=reporting_version(), enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
+                capacity_test_enabled=capacity_test_enabled(),capacity_test_version=CAPACITY_TEST_VERSION,
+                capacity_test_rules={'target_total_slots':16,'notional_usd':100,'minimum_liquidity_usd':50_000,
+                    'strategy_signal_required':False,'fresh_full_safety_required':True,
+                    'independent_exact_pool_price_required':True,'max_observation_age_ms':12_000,
+                    'flow_and_defense_and_cost_caps_and_loss_rate_limits':'RECORDED_SHADOW_ONLY',
+                    'cash_and_exposure_enforced':True,'synthetic_ticks_or_fills':False,
+                    'profitable_strategy_validation':False},
                 maximum_notional_usd=MAX_NOTIONAL_USD, max_position_fraction=MAX_POSITION_FRACTION,
                 minimum_notional_usd=MIN_NOTIONAL_USD, entry_size_rule='FIXED_NOTIONAL_NO_BACKOFF',
                 max_exposure_fraction=MAX_EXPOSURE_FRACTION, target_orders_per_hour=ORDERS_PER_HOUR,

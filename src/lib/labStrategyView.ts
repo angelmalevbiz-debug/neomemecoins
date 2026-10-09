@@ -396,11 +396,12 @@ export type FundedActiveStats = {
   open_net_pnl_usd?: number;
   daily_net_usd?: number; blocked_reason?: string | null; adaptive_open_positions?: number;
   exit_policy?: { version: string; take_profit_net_usd: number; stop_loss_net_usd: number;
+    max_hold_minutes?: number | null; holding_profile?: string;
     profit_protection_arm_net_usd?: number; profit_giveback_fraction?: number; minimum_profit_giveback_usd?: number };
 };
 
 export type ProfitProtection = { version: string; activated_at: number; last_mark_at: number | null;
-  peak_net_usd: number | null; floor_net_usd: number | null; armed: boolean };
+  peak_net_usd: number | null; floor_net_usd: number | null; armed: boolean; arm_net_usd?: number };
 
 export function profitProtectionSummary(state?: ProfitProtection, quoteStatus?: string) {
   if (!state) return null;
@@ -408,7 +409,7 @@ export function profitProtectionSummary(state?: ProfitProtection, quoteStatus?: 
   const stale = quoteStatus !== 'fresh' ? ' Котировката не е прясна; прагът не потвърждава изпълним изход.' : '';
   return state.armed && finite(state.peak_net_usd) && finite(state.floor_net_usd)
     ? `Защита включена · нетен връх от включването +${usd(state.peak_net_usd)} · праг за изход +${usd(state.floor_net_usd)} (не е гарантирана печалба).${stale}`
-    : `Защитата още не е включена · чака нетна печалба +$4.00; старият връх не е използван.${stale}`;
+    : `Защитата още не е включена · чака нетна печалба +${usd(state.arm_net_usd ?? 4)}; старият връх не е използван.${stale}`;
 }
 
 export function fundedActiveSummary(stats?: FundedActiveStats) {
@@ -420,7 +421,9 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const mode = stats.quality_mode ? 'PAPER КАЧЕСТВО — само потвърдени сигнали; без принудително запълване; печалба не е доказана'
     : stats.capacity_test ? 'ТЕСТ ЗАПЪЛВАНЕ — не е вход по стратегически сигнал; не доказва печалба' : 'Нова PAPER политика';
   const adaptive = stats.exit_policy?.profit_protection_arm_net_usd != null;
-  const trail = adaptive ? `без фиксиран времеви изход · защита от +${usd(stats.exit_policy!.profit_protection_arm_net_usd!)} нето, отстъпление max(${usd(stats.exit_policy!.minimum_profit_giveback_usd!)}, ${((stats.exit_policy!.profit_giveback_fraction ?? 0)*100).toFixed(0)}% от нетния връх); може да затвори преди +$30`
+  const horizon = stats.exit_policy?.max_hold_minutes;
+  const clock = horizon != null ? `${stats.exit_policy?.holding_profile ?? 'PAPER'} · максимум ${horizon} мин от оригиналния вход; при прясна валидна цена затваря и на загуба, рестартът не удължава срока` : 'без фиксиран времеви изход';
+  const trail = adaptive ? `${clock} · защита от +${usd(stats.exit_policy!.profit_protection_arm_net_usd!)} нето, отстъпление max(${usd(stats.exit_policy!.minimum_profit_giveback_usd!)}, ${((stats.exit_policy!.profit_giveback_fraction ?? 0)*100).toFixed(0)}% от нетния връх); може да затвори преди +${usd(stats.exit_policy!.take_profit_net_usd)}`
     : 'без кратък таймер и trailing';
   const exits = stats.exit_policy ? ` · ${stats.quality_mode ? 'нови позиции: ' : ''}цел +${usd(stats.exit_policy.take_profit_net_usd)} нето / стоп −${usd(stats.exit_policy.stop_loss_net_usd)} нето · ${trail}; праговете не гарантират цена на изхода` : '';
   const quality = stats.quality_mode ? ` · разходи до ${stats.entry_cost_limit_pct?.toFixed(2) ?? '1.50'}% · един токен само в една сметка · стари позиции ${stats.legacy_open_positions ?? 0}${adaptive ? ` · с адаптивен изход ${stats.adaptive_open_positions ?? 0} отворени (промяната е записана)` : ' (запазени изходи)'} · история преди тази политика: ${stats.legacy_closed_trades ?? 0} затворени, нето ${usd(stats.legacy_net_pnl_usd ?? 0)} · отворен PnL ${usd(stats.open_net_pnl_usd ?? 0)} (не е прибрана печалба)` : '';

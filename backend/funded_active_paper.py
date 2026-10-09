@@ -10,6 +10,7 @@ import json
 from dataclasses import replace
 
 import structural_rug_guard as rug
+import paper_horizon_exits as horizons
 
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
 PREVIOUS_QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V4_QUALITY_100'
@@ -305,7 +306,7 @@ def capacity(book, now):
 
 def exit_parameters(strategy_id):
     if quality_enabled():
-        return quality_exit_parameters()
+        return horizons.parameters(strategy_id)
     return dict(version=VERSION, stop_loss_net_pct=RULES[strategy_id]['stop'],
                 take_profit_net_pct=6.0 if strategy_id == 'EARLY' else 4.0,
                 max_hold_minutes=4.0, profit_trail_arm_net_pct=2.0, profit_trail_drawdown_pct=1.0)
@@ -370,7 +371,8 @@ def observe_profit_protection(position, net_pct, mark_at):
     The historical peak_net_pct is a separate observation, never a fill claim.
     """
     exits = position.get('exit_parameters') or {}
-    if exits.get('version') != ADAPTIVE_EXIT_VERSION:
+    version=exits.get('version')
+    if version not in {ADAPTIVE_EXIT_VERSION,horizons.VERSION}:
         return
     notional = finite(position.get('notional_usd'), math.nan)
     net_usd = finite(net_pct, math.nan)*notional/100
@@ -378,16 +380,68 @@ def observe_profit_protection(position, net_pct, mark_at):
     if not all(math.isfinite(v) for v in (notional, net_usd, stamp)) or notional <= 0 or stamp <= 0:
         return
     state = position.get('profit_protection')
-    if not isinstance(state, dict) or state.get('version') != ADAPTIVE_EXIT_VERSION:
-        state = dict(version=ADAPTIVE_EXIT_VERSION, activated_at=int(stamp), last_mark_at=None,
+    if not isinstance(state, dict) or state.get('version') != version:
+        state = dict(version=version, activated_at=int(stamp), last_mark_at=None,
                      peak_net_usd=None, floor_net_usd=None, armed=False)
     if stamp < max(finite(state.get('activated_at')), finite(state.get('last_mark_at'))):
         return
     peak = max(finite(state.get('peak_net_usd'), net_usd), net_usd)
     armed = peak >= exits['profit_protection_arm_net_usd']
     floor = peak-max(exits['minimum_profit_giveback_usd'], peak*exits['profit_giveback_fraction']) if armed else None
+    if floor is not None:
+        floor=max(floor,finite(state.get('floor_net_usd'),-math.inf))
     position['profit_protection'] = {**state, 'last_mark_at':int(stamp), 'peak_net_usd':peak,
-                                     'floor_net_usd':floor, 'armed':armed}
+                                     'floor_net_usd':floor, 'armed':armed,
+                                     'arm_net_usd':exits['profit_protection_arm_net_usd']}
+
+
+def apply_horizon_exit_policy(books, now):
+    """Audited owner-requested open-lot amendment; original holding clock survives.
+
+    Preserve only an already observed, versioned adaptive peak/floor, never
+    peak_net_pct, displayed PnL or a historical best price. No balance mutation.
+    """
+    if not quality_enabled():
+        return []
+    changed=[]
+    known={ADAPTIVE_EXIT_VERSION,QUALITY_EXIT_VERSION,CAPACITY_EXIT_VERSION,CAPACITY_TEST_VERSION,
+           VERSION,'FUNDED_ACTIVE_PAPER_V1','FUNDED_ACTIVE_PAPER_V2_FIXED_100'}
+    for book in books.values():
+        if not applies(book) or book.get('promotion_pending'):
+            continue
+        synchronize_alias(book)
+        for p in positions(book):
+            old=p.get('exit_parameters') or {}
+            if (not is_active_position(p) or p.get('strategy_id')!=book['id']
+                    or old.get('version') not in known
+                    or p.get('execution_mode') not in {'PAPER',
+                        'DEX_SPOT_MODELED_COSTS_V3_VERIFIED_SOL_DENOMINATION'}):
+                continue
+            exits=horizons.parameters(book['id'],p.get('notional_usd'))
+            previous=p.get('profit_protection')
+            peak=floor=None
+            carried=(isinstance(previous,dict) and previous.get('version')==ADAPTIVE_EXIT_VERSION
+                     and 0<finite(previous.get('activated_at'))<=finite(previous.get('last_mark_at'))<=now
+                     and math.isfinite(finite(previous.get('peak_net_usd'),math.nan)))
+            if carried:
+                peak=previous['peak_net_usd']
+                floor=finite(previous.get('floor_net_usd'),None) if previous.get('armed') is True else None
+            event=dict(id=horizons.VERSION,at=int(now),reason='OWNER_REQUEST_QUICK_SWING_HOLDER_PAPER',
+                previous_parameters=dict(old),new_parameters=dict(exits),
+                original_opened_at=p.get('opened_at'),observed_protection_carried=carried,
+                previous_profit_protection=dict(previous) if isinstance(previous,dict) else None,
+                historical_peak_reused=False,entry_and_capital_unchanged=True)
+            p['exit_policy_changes']=[*(p.get('exit_policy_changes') or []),event]
+            p.update(exit_parameters=exits,exit_policy_label=horizons.VERSION,
+                stop_loss_net_pct=exits['stop_loss_net_pct'],
+                stop_headroom_pct=max(0.0,exits['stop_loss_net_pct']+finite(p.get('entry_roundtrip_pnl_pct'))),
+                profit_protection=dict(version=horizons.VERSION,
+                    activated_at=previous['activated_at'] if carried else int(now),
+                    last_mark_at=previous['last_mark_at'] if carried else None,
+                    peak_net_usd=peak,floor_net_usd=floor,armed=floor is not None,
+                    arm_net_usd=exits['profit_protection_arm_net_usd']))
+            changed.append(dict(strategy_id=book['id'],trade_no=p.get('trade_no'),**event))
+    return changed
 
 
 def capacity_exit_parameters(notional_usd=MAX_NOTIONAL_USD):
@@ -440,25 +494,28 @@ def apply_capacity_exit_policy(books, now):
 
 def exit_reason(position, net_pct, hold_minutes):
     exits = position['exit_parameters']
-    if exits.get('version') in {CAPACITY_EXIT_VERSION, QUALITY_EXIT_VERSION, ADAPTIVE_EXIT_VERSION}:
+    if exits.get('version') in {CAPACITY_EXIT_VERSION, QUALITY_EXIT_VERSION, ADAPTIVE_EXIT_VERSION,horizons.VERSION}:
         # Dollar target, not a gross price move or a percentage of a changed
-        # account balance. Only the separately observed adaptive protection can
-        # exit early; historical peaks and elapsed time never do so here.
+        # account balance. Protection may exit before target; only the new
+        # explicit horizon policy uses elapsed ORIGINAL holding time as well.
         notional = finite(position.get('notional_usd'), math.nan)
         net_usd = finite(net_pct, math.nan) * notional / 100
         if not math.isfinite(net_usd) or notional <= 0:
             return None
-        prefix = ('ADAPTIVE' if exits['version'] == ADAPTIVE_EXIT_VERSION else
+        prefix = ('ADAPTIVE' if exits['version'] in {ADAPTIVE_EXIT_VERSION,horizons.VERSION} else
                   'QUALITY' if exits['version'] == QUALITY_EXIT_VERSION else 'CAPACITY_TEST')
         if net_usd <= -exits['stop_loss_net_usd']:
             return prefix+'_STOP_NET_USD'
         if net_usd >= exits['take_profit_net_usd']:
             return prefix+'_TAKE_PROFIT_NET_USD'
         protection = position.get('profit_protection') or {}
-        if (exits['version'] == ADAPTIVE_EXIT_VERSION and protection.get('version') == ADAPTIVE_EXIT_VERSION
+        if (exits['version'] in {ADAPTIVE_EXIT_VERSION,horizons.VERSION} and protection.get('version') == exits['version']
                 and protection.get('armed') is True
                 and net_usd <= finite(protection.get('floor_net_usd'), -math.inf)):
             return 'ADAPTIVE_PROFIT_PROTECTION_NET_USD'
+        if (exits['version']==horizons.VERSION
+                and finite(hold_minutes,-math.inf)>=exits['max_hold_minutes']):
+            return f"PAPER_HORIZON_MAX_HOLD_{exits['max_hold_minutes']}"
         return None
     if net_pct <= -exits['stop_loss_net_pct']:
         return 'FUNDED_ACTIVE_STOP_NET'
@@ -477,7 +534,7 @@ def performance(book, now):
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
     policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
     return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': MAX_NOTIONAL_USD,
-            **({'exit_policy':quality_exit_parameters()} if quality_enabled() else
+            **({'exit_policy':horizons.parameters(book['id'])} if quality_enabled() else
                {'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
             'quality_mode':quality_enabled(), 'entry_cost_limit_pct':entry_cost_limit(book['id']),
             'legacy_open_positions':sum(p.get('entry_policy_version')!=reporting_version() for p in positions(book)),
@@ -485,7 +542,7 @@ def performance(book, now):
             'legacy_net_pnl_usd':round(sum(finite(t.get('pnl_usd')) for t in book.get('history',[])
                                          if t.get('entry_policy_version')!=reporting_version()),4),
             'open_net_pnl_usd':round(sum(finite(p.get('open_pnl_usd')) for p in positions(book)),4),
-            'adaptive_open_positions':sum((p.get('exit_parameters') or {}).get('version') == ADAPTIVE_EXIT_VERSION
+            'adaptive_open_positions':sum((p.get('exit_parameters') or {}).get('version') in {ADAPTIVE_EXIT_VERSION,horizons.VERSION}
                                           for p in positions(book)),
             'capacity_test':capacity_test_enabled(), 'strategy_validation':False,
             'risk_limits_shadow_only':capacity_test_enabled(),
@@ -518,7 +575,7 @@ def config():
                     'cohort_duplicate_mint_or_pool_allowed':False,'cohort_loss_pause_minutes':30,
                     'market_flow_defense_safety_price_cost_and_daily_limits_required':True,
                     'force_fill':False,'exits_apply_to_new_lots_only':False,
-                    'open_exit_amendment':ADAPTIVE_EXIT_VERSION,'history_and_entry_receipts_unchanged':True,
+                    'open_exit_amendment':horizons.VERSION,'history_and_entry_receipts_unchanged':True,
                     'evidence_status':'PROSPECTIVE_UNVALIDATED_NOT_FITTED_TO_WINNERS'},
                 capacity_test_enabled=capacity_test_enabled(),capacity_test_version=CAPACITY_TEST_VERSION,
                 capacity_test_exits=capacity_exit_parameters(),

@@ -1,5 +1,17 @@
 # Named strategy PAPER repair — 2026-10-09
 
+## Current: owner-requested separate holding horizons
+
+[PAPER_HORIZON_EXIT_V1_60_240_720](PAPER_HORIZON_EXITS.md) supersedes the uniform
+v5 no-timer exits below. Early/Momentum: net target $6, arm $2, maximum 60 min;
+Precision: target $15, arm $4, maximum 240 min; Ultra: target $30, arm $4,
+maximum 720 min. All retain $5 net stops and observed-peak protection. Original
+entry clocks and already observed protection survive the audited amendment.
+Timeouts also close losing lots, but require fresh valid modeled quotes. No
+replacement order is forced; funding, admission and daily risk gates unchanged.
+This is an owner-authorized PAPER hypothesis, not proven faster profit. The
+research panel's fixed v5 reference is no longer the current financial policy.
+
 ## Continuous comparison of profit-speed hypotheses
 
 The subsequent request for a more developed program adds

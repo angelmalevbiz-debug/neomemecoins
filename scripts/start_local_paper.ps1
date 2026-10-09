@@ -155,6 +155,7 @@ $settings = @{
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
     NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');
     NEO_STRATEGY_LAB_COMPACT_PATH=(Join-Path $runtime 'strategy_lab_compact.json');
+    NEO_LAB_FUNDED_ACTIVE_ENABLED='1';
     NEO_RISK_CACHE_DIR=(Join-Path $runtime 'risk'); NEO_PRICE_CHECK_DIR=(Join-Path $runtime 'price-check');
     NEO_ENGINE_BLOCKLIST_PATH=(Join-Path $runtime 'token_blocklist.json');
     NEO_STRATEGY_LAB_RESET_FLAG=(Join-Path $runtime 'strategy_lab.reset');

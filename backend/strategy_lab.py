@@ -16,6 +16,7 @@ import pool_loss_memory
 import lab_forward_tests as lab_forward
 import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
+import funded_active_paper as active_paper
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
 from lab_position_marks import POSITION_MARK_FEED
@@ -89,6 +90,13 @@ def defensive_entry_decision(coin,now,*,blocked_pools,heat_log_only=False):
     the reserved surge/dip hypothesis arms); asked before flow, safety, price probes and fills."""
     return entry_defense_layer().evaluate(coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only)
 
+def funded_defensive_decision(book,coin,now,*,blocked_pools,heat_log_only=False):
+    if active_paper.applies(book):
+        return entry_defense_layer().evaluate(
+            coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only,
+            structural_parameters=active_paper.structural_parameters(book['id']))
+    return defensive_entry_decision(coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only)
+
 def heat_log_only_book(book_id):
     """HEAT_VETO_STACK_V1 records flags without blocking: heat_veto's reserved surge/dip
     hypothesis arms and, for LAB_FORWARD_TESTS_V1, their random controls (same universe)."""
@@ -160,6 +168,8 @@ def promoted_pause_remaining_ms(book,now):
     """Temporarily pause funded PAPER entries after a recent losing run."""
     trades=[t for t in book.get('history',[])
             if t.get('closed_at') and t.get('promotion_eligible') is not False]
+    if active_paper.applies(book):
+        trades=[t for t in trades if t.get('entry_policy_version')==active_paper.VERSION]
     trades.sort(key=lambda t:num(t.get('closed_at')),reverse=True)
     if not trades: return 0
     streak=0
@@ -738,6 +748,7 @@ def load_state():
             b['portfolio_group']='TEST'
             b['allocation_usd']=b.get('allocation_usd',b.get('starting_balance',START_BALANCE))
             b['max_position_fraction']=activity.RUSH_MAX_BALANCE_FRACTION if s['id']==rush_brain.STRATEGY_ID else 1.0
+        active_paper.synchronize_alias(b)
         books[s['id']]=b
     compatibility=registry_compatibility(books)
     return {'started_at':now_ms() if reset_requested else (raw.get('started_at') or now_ms()),
@@ -805,7 +816,9 @@ def close_position(book,pos,coin,reason):
         trade['balance_effect_usd']=0.0 if zero_capital else round(final_pnl,4)
         # LAB_FORWARD_FILL_BASIS_V4: a VANISHED close has no exit fill, so its shadow may be complete now.
         complete_forward_research_fill(trade)
-    book['history'].insert(0,trade); book['position']=None
+    book['history'].insert(0,trade)
+    if isinstance(book.get('positions'),list): active_paper.remove(book,pos)
+    else: book['position']=None
 
 def realize_partial(book,pos,coin,fraction,label):
     market_price=num(coin.get('priceUsd'))
@@ -867,14 +880,14 @@ def update_positions(flows,feed):
     exit_only_books=(portfolio_setup.get('legacy_draining_books') or {}).values()
     registered={s['id'] for s in STRATEGIES}
     managed_books=[book for key,book in STATE['books'].items() if key in registered]
+    for book in [*managed_books,*exit_only_books]: active_paper.synchronize_alias(book)
     # LAB_FORWARD_CLOSE_POLICY_V1: a held pool may be declared vanished only while
     # the shared feed itself is alive (a feed outage is not a vanished pool).
     forward_feed_alive=lab_forward.feed_alive(feed,now_ms())
-    for book in [*managed_books, *exit_only_books]:
-        pos=book.get('position')
-        if not pos: continue
+    for book,pos in [(b,p) for b in [*managed_books,*exit_only_books] for p in active_paper.positions(b)]:
         decision_at=now_ms()
         is_rush=pos.get('strategy_id',book.get('id'))==rush_brain.STRATEGY_ID
+        is_active_position=pos.get('entry_policy_version')==active_paper.VERSION
         forward=lab_forward.is_forward_position(pos)
         coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
         if forward:
@@ -887,7 +900,7 @@ def update_positions(flows,feed):
                          and coin.get('pairAddress')==pos.get('pairAddress')
                          and num(coin.get('priceUsd'))>0 and mark_stamp>0
                          and 0<=decision_at-mark_stamp<=POSITION_STALE_AFTER_MS)
-        if not coin or (is_rush and not rush_mark_fresh):
+        if not coin or ((is_rush or is_active_position) and not rush_mark_fresh):
             age=max(0,now_ms()-int(num(pos.get('updated_at'))))
             pos['quote_status']='stale' if age>POSITION_STALE_AFTER_MS else 'refreshing'
             pos['quote_age_ms']=age
@@ -945,6 +958,8 @@ def update_positions(flows,feed):
         if forward:
             # The exits this position was opened with (its stored exit_parameters).
             reason=lab_forward.exit_reason(pos,model_live_pct,hold)
+        elif pos.get('entry_policy_version')==active_paper.VERSION:
+            reason=active_paper.exit_reason(pos,total_live_pct,hold)
         elif cost_first_exits is not None:
             reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)
         elif total_live_pct<=-STOP_LOSS:
@@ -976,7 +991,7 @@ def update_positions(flows,feed):
                     'mark_source':coin.get('mark_source','SHARED_LIVE_FEED_EXACT_POOL'),
                     'quote_status':'fresh' if quote_age<=POSITION_STALE_AFTER_MS else 'stale',
                     'quote_age_ms':quote_age,'quote_unavailable_reason':None})
-        if is_rush: pos['peak_net_pct']=peak_net
+        if is_rush or is_active_position: pos['peak_net_pct']=peak_net
         if forward: pos['model_pnl_pct']=round(model_live_pct,3)
         if reason: close_position(book,pos,coin,reason)
     # LAB_FORWARD_FILL_BASIS_V4: research fills of recent forward closes (their exit legs
@@ -1025,6 +1040,10 @@ def maybe_open(feed,flows):
     }
     for strategy in STRATEGIES:
         book=STATE['books'][strategy['id']]
+        active_paper.synchronize_alias(book)
+        is_active=active_paper.applies(book)
+        active_capacity=active_paper.capacity(book,now) if is_active else None
+        book_stop=active_paper.RULES[strategy['id']]['stop'] if is_active else STOP_LOSS
         is_forward=strategy['id'] in lab_forward.BOOK_IDS
         forward_carry=lab_forward_signal_carry() if is_forward else None
         if is_forward:
@@ -1039,7 +1058,10 @@ def maybe_open(feed,flows):
                 'balance_usd':round(num(book.get('balance')),4),
             }
             continue
-        if book.get('position'):
+        if is_active and active_capacity['blocked_reason']:
+            book['entry_diagnostics']={'at':now,**active_capacity,'funded_active':active_paper.performance(book,now)}
+            continue
+        if book.get('position') and not is_active:
             continue
         if book.get('promotion_pending'):
             book['entry_diagnostics']={
@@ -1066,12 +1088,17 @@ def maybe_open(feed,flows):
         entry_limit=activity.entry_notional_limit(strategy['id'],balance,TRADE_NOTIONAL)
         if strategy['id'] in PROMOTED_STRATEGIES:
             entry_limit=min(entry_limit,balance*PROMOTED_MAX_POSITION_FRACTION)
+        if is_active:
+            entry_limit=min(entry_limit,active_paper.MAX_NOTIONAL_USD,
+                            balance*active_paper.MAX_POSITION_FRACTION,
+                            active_capacity['available_exposure_usd'])
         min_notional=activity.entry_minimum_notional(strategy['id'])
         # Admission cap: the Lab's one rule, 0.5 x net stop (<= 2.75%). A forward-test book
         # applies it to its own pre-registered stop and buys a fixed $200, never a smaller size.
         admission_cap=lab_forward.admission_cost_cap_pct(strategy['id']) if is_forward else cost_cap
+        if is_active: admission_cap=active_paper.RULES[strategy['id']]['cost']
         # The balance an entry must fit (the book's own, except a zero-capital control entry).
-        funding_balance=balance
+        funding_balance=active_capacity['available_exposure_usd'] if is_active else balance
         capital_mode=lab_forward.FUNDED
         if is_forward:
             entry_limit=min(lab_forward.NOTIONAL_USD,max(0.0,balance))
@@ -1161,6 +1188,8 @@ def maybe_open(feed,flows):
         forward_stage={}
         forward_coins={}
         for coin,features in candidates:
+            if is_active and any(p.get('address')==coin['address'] for p in active_paper.positions(book)):
+                continue
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
             if is_forward:
@@ -1222,7 +1251,7 @@ def maybe_open(feed,flows):
             signal_candidates+=1
             # DEFENSIVE_ENTRY_LAYER_V1 for every book, before the planning
             # estimate, flow promotion, RugCheck, Jupiter price probes and fills.
-            defensive=defensive_entry_decision(coin,now,blocked_pools=blocked_pools,
+            defensive=funded_defensive_decision(book,coin,now,blocked_pools=blocked_pools,
                                                heat_log_only=heat_log_only)
             # Two examples per book keep the 2-second Lab ledger write small.
             entry_defense.record(defensive_summary,defensive,coin,example_limit=2)
@@ -1351,7 +1380,7 @@ def maybe_open(feed,flows):
                     promoted_block_reasons['promoted_cost_headroom_insufficient']=promoted_block_reasons.get('promoted_cost_headroom_insufficient',0)+1
                 continue
             if is_promoted or is_cost_first:
-                cost_gate=promoted_guard.cost_admission(proposed['initial_pnl_pct'],STOP_LOSS)
+                cost_gate=promoted_guard.cost_admission(proposed['initial_pnl_pct'],book_stop)
                 if not cost_gate['allow']:
                     blocked_cost+=1
                     promoted_cost_rejected+=1
@@ -1448,7 +1477,7 @@ def maybe_open(feed,flows):
                     'reentry_cooldown' if blocked_cooldown else 'cost_first_size_below_minimum')
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             book['entry_diagnostics'].update({
-                'promoted_policy_version':promoted_guard.FUNDED_POLICY_VERSION,
+                'promoted_policy_version':active_paper.VERSION if is_active else promoted_guard.FUNDED_POLICY_VERSION,
                 'promoted_evidence_guard_version':promoted_guard.VERSION,
                 'promoted_candidate_policy_source':'FUNDED_MARKET_BRANCHES',
                 'promoted_candidate_policy_version':funded_candidates.VERSION,
@@ -1458,11 +1487,15 @@ def maybe_open(feed,flows):
                 'promoted_price_rejected':promoted_price_rejected,
                 'promoted_cost_rejected':promoted_cost_rejected,
                 'promoted_block_reasons':promoted_block_reasons,
-                'promoted_max_entry_roundtrip_cost_pct':promoted_guard.max_entry_cost_pct(STOP_LOSS),
+                'promoted_max_entry_roundtrip_cost_pct':admission_cap,
                 'promoted_cost_feasibility':cost_feasibility_summary(
-                    cost_examples,promoted_guard.max_entry_cost_pct(STOP_LOSS)),
+                    cost_examples,admission_cap),
                 'profitability_proven':False,
             })
+            if is_active:
+                book['entry_diagnostics'].update({'funded_active':active_paper.performance(book,now),
+                    'entry_policy_version':active_paper.VERSION,'stop_loss_net_pct':book_stop,
+                    'max_entry_roundtrip_cost_pct':admission_cap})
             if signal_candidates==0:
                 book['entry_diagnostics']['blocked_reason']='no_market_signal'
             elif not eligible and promoted_block_reasons:
@@ -1518,7 +1551,7 @@ def maybe_open(feed,flows):
             commit_now=now_ms()
             final_gates=(promoted_guard.flow_admission(coin,features,commit_now),
                          promoted_guard.risk_admission(coin,risk,commit_now,rug_guard.TTL_MS),
-                         promoted_guard.cost_admission(proposed['initial_pnl_pct'],STOP_LOSS))
+                          promoted_guard.cost_admission(proposed['initial_pnl_pct'],book_stop))
             refusal=next((gate['reason'] for gate in final_gates if not gate['allow']),None)
             if refusal:
                 book['entry_diagnostics']['blocked_reason']=refusal
@@ -1529,8 +1562,8 @@ def maybe_open(feed,flows):
         # this refresh, so a pool that turns hot after it is refused at the next refresh;
         # here a stale pair history, a moved 5-minute reference or a new loss refuses it.
         commit_at=now_ms()
-        final_defensive=defensive_entry_decision(
-            coin,commit_at,blocked_pools=pool_loss_memory.index(book.get('history') or [],commit_at),
+        final_defensive=funded_defensive_decision(
+            book,coin,commit_at,blocked_pools=pool_loss_memory.index(book.get('history') or [],commit_at),
             heat_log_only=heat_log_only)
         if not final_defensive['allowed']:
             defensive_summary['commit_recheck_blocked']=int(defensive_summary.get('commit_recheck_blocked') or 0)+1
@@ -1545,7 +1578,7 @@ def maybe_open(feed,flows):
         address=coin['address']; price=num(coin['priceUsd'])
         notional=proposed['notional']; opening=proposed['entry']; mark=proposed['mark']
         position_stop=(cost_first.EXITS[strategy['id']].stop_loss_net_pct if is_cost_first
-                       else lab_forward.EXITS[strategy['id']].stop_loss_net_pct if is_forward else STOP_LOSS)
+                       else lab_forward.EXITS[strategy['id']].stop_loss_net_pct if is_forward else book_stop)
         qty=num(opening['quantity'])
         capital_basis=num(opening['capital_committed_usd'])
         book['trade_seq']=int(book.get('trade_seq',0))+1
@@ -1576,6 +1609,7 @@ def maybe_open(feed,flows):
             'price_crosscheck':validation,
             'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
                                     else lab_forward.ENTRY_POLICY_VERSION if is_forward
+                                     else active_paper.VERSION if is_active
                                     else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
@@ -1643,7 +1677,14 @@ def maybe_open(feed,flows):
                     defensive_flags=defensive.get('log_only_flags'),entry_coin=coin,entry_at=stamp,
                     capital_mode=capital_mode),
             })
-        book['position']=position
+        if is_active:
+            position['exit_parameters']=active_paper.exit_parameters(strategy['id'])
+            position['exit_policy_label']=active_paper.VERSION
+            position['peak_net_pct']=proposed['initial_pnl_pct']
+            active_paper.attach(book,position)
+            book['entry_diagnostics']['funded_active']=active_paper.performance(book,stamp)
+        else:
+            book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp
         if is_forward:
             # LAB_FORWARD_SIGNAL_CARRY_V2: this pool's episode entered; the book's other pending
@@ -1656,35 +1697,39 @@ def maybe_open(feed,flows):
 
 
 ACTIVE_POLICY_VERSIONS=frozenset({activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION,
-                                  cost_first.ENTRY_POLICY_VERSION,lab_forward.ENTRY_POLICY_VERSION})
+                                  cost_first.ENTRY_POLICY_VERSION,lab_forward.ENTRY_POLICY_VERSION,active_paper.VERSION})
 
 def stats(book):
     start=num(book.get('starting_balance'),START_BALANCE)
     h=book.get('history') or []; wins=[t for t in h if num(t.get('pnl_usd'))>0]
     gp=sum(max(0,num(t.get('pnl_usd'))) for t in h); gl=-sum(min(0,num(t.get('pnl_usd'))) for t in h)
     unreal=0.0
+    open_rows=active_paper.positions(book)
     p=book.get('position')
     # A zero-capital control position (LAB_FORWARD_CONTROL_CONTINUITY_V1) never moves equity.
-    if p and not lab_forward.is_zero_capital_position(p): unreal=num(p.get('open_pnl_usd'))
+    unreal=sum(num(p.get('open_pnl_usd')) for p in open_rows if not lab_forward.is_zero_capital_position(p))
     zero_capital=[t for t in h if t.get('capital_mode')==lab_forward.ZERO_CAPITAL]
     marked_at=num((p or {}).get('mark_received_at'),num((p or {}).get('updated_at')))
     mark_age_ms=max(0,now_ms()-int(marked_at)) if p else 0
-    valuation_stale=bool(p and (mark_age_ms>POSITION_STALE_AFTER_MS or p.get('quote_status') in {'stale','unavailable'}))
+    valuation_stale=any(now_ms()-num(row.get('mark_received_at'),num(row.get('updated_at')))>POSITION_STALE_AFTER_MS
+                        or row.get('quote_status') in {'stale','unavailable'} for row in open_rows)
     equity=num(book.get('balance'))+unreal
     partial_count=sum(len(t.get('partial_exits') or []) for t in h)+len((p or {}).get('partial_exits') or [])
     locked_partial=sum(num(t.get('partial_realized_pnl')) for t in h)+num((p or {}).get('partial_realized_pnl'))
-    return {'trades':len(h),'wins':len(wins),'losses':len(h)-len(wins),'win_rate':round(len(wins)/len(h)*100,1) if h else 0,
+    return {**({'funded_active':active_paper.performance(book,now_ms())} if active_paper.applies(book) else {}),
+            'open_positions':len(open_rows),
+            'trades':len(h),'wins':len(wins),'losses':len(h)-len(wins),'win_rate':round(len(wins)/len(h)*100,1) if h else 0,
             'profit_factor':round(gp/gl,2) if gl>0 else None,
             'profit_factor_status':'finite' if gl>0 else ('infinite_no_losses' if gp>0 else 'undefined_no_results'),
             'realized_pnl':round(num(book.get('balance'))-start,2),
             'unrealized_pnl':round(unreal,2),'total_pnl':round(equity-start,2),
-            'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(p),
+            'equity':round(equity,2),'return_pct':round((equity-start)/max(start,1e-18)*100,2),'open':bool(open_rows),
             'valuation_stale':valuation_stale,'mark_age_ms':mark_age_ms,
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),
             'active_policy_trades':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS for t in h),
             'active_policy_wins':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS and num(t.get('pnl_usd'))>0 for t in h),
-            'promoted_policy_trades':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION for t in h),
-            'promoted_policy_wins':sum(t.get('entry_policy_version')==promoted_guard.FUNDED_POLICY_VERSION and num(t.get('pnl_usd'))>0 for t in h),
+            'promoted_policy_trades':sum(t.get('entry_policy_version')==(active_paper.VERSION if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) for t in h),
+            'promoted_policy_wins':sum(t.get('entry_policy_version')==(active_paper.VERSION if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) and num(t.get('pnl_usd'))>0 for t in h),
             # Closes counted in trades/wins but not in the balance (control measurement past its funding).
             'zero_capital_trades':len(zero_capital),
             'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}
@@ -1846,7 +1891,12 @@ def persist(status='online',error=None):
                               'rush_low_cap_max_notional_usd':rush_brain.LOW_CAP_MAX_NOTIONAL_USD}
     STATE['activity_config']['promoted_entry_policy']=promoted_guard.funded_policy_config(
         STOP_LOSS,promoted_candidate_config())
+    if active_paper.enabled():
+        STATE['activity_config']['promoted_entry_policy'].update({
+            'version':active_paper.VERSION,'candidate_policy_source':active_paper.VERSION,
+            'per_strategy_parameters':active_paper.config(),'maximum_roundtrip_cost_pct':None})
     STATE['activity_config']['cost_first_established']=cost_first.config()
+    STATE['activity_config']['funded_active_paper']=active_paper.config()
     STATE['activity_config']['defensive_entry']=entry_defense.config()
     STATE['activity_config']['lab_forward_tests']=lab_forward.config()
     STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),

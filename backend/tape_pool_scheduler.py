@@ -65,6 +65,7 @@ import lab_forward_tests
 import cost_first_established as cost_first
 import entry_defense
 import funded_market_candidates
+import funded_active_paper as active_paper
 import paper_market_feasibility as feasibility
 from shared_snapshot_io import read_shared_text
 import winner_ensemble
@@ -167,12 +168,14 @@ def lab_pin_positions(state):
     rows = books.values() if isinstance(books, dict) else books
     pinned, unpinned = [], 0
     for book in rows:
-        if not isinstance(book, dict) or not isinstance(book.get('position'), dict):
+        if not isinstance(book, dict):
             continue
-        if lab_forward_tests.tape_pin_required(book['position']):
-            pinned.append(book['position'])
-        else:
-            unpinned += 1
+        for position in active_paper.positions(book):
+            if (position.get('entry_policy_version')!=active_paper.VERSION
+                    and lab_forward_tests.tape_pin_required(position)):
+                pinned.append(position)
+            else:
+                unpinned += 1
     return pinned, unpinned
 
 
@@ -479,6 +482,13 @@ class TapePoolScheduler:
         (a seat serves every ledger; each entry path applies its own).
         """
         decision = self.defense.evaluate(coin, now, blocked_pools={}, heat_log_only=True)
+        if (active_paper.enabled() and not decision.get('allowed')
+                and 'rug_young_pool' in decision.get('reasons', [])):
+            matching=[sid for sid in active_paper.RULES if active_paper.matches(sid,coin)]
+            if matching:
+                sid=min(matching,key=lambda name:active_paper.RULES[name]['age'][0])
+                decision=self.defense.evaluate(coin,now,blocked_pools={},heat_log_only=True,
+                    structural_parameters=active_paper.structural_parameters(sid))
         if not decision.get('allowed'):
             return decision
         flags = list(decision.get('log_only_flags') or [])
@@ -601,7 +611,9 @@ class TapePoolScheduler:
             # planning estimate because canonical/noncanonical fees can differ.
             main_cost = feasibility.execution_feasibility(
                 coin, main_cost_cap, base_slippage_bps=0, latency_buffer_bps=0)
-            funded_cost = feasibility.execution_feasibility(coin, 1.5)
+            funded_cap=(max(active_paper.RULES[sid]['cost'] for sid in funded_rules)
+                        if active_paper.enabled() and funded_rules else 1.5)
+            funded_cost = feasibility.execution_feasibility(coin, funded_cap)
             matched = bool(main_rules or funded_rules)
             possible = bool((main_rules and main_cost['model_cost_feasible'] is True)
                             or (funded_rules and funded_cost['model_cost_feasible'] is True))

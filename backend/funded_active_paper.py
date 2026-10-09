@@ -15,6 +15,9 @@ import paper_horizon_exits as horizons
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
 PREVIOUS_QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V4_QUALITY_100'
 QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100'
+SIZED_VERSION = 'FUNDED_ACTIVE_PAPER_V6_COST_AWARE_250'
+SIZED_ENV = 'NEO_LAB_PAPER_250_ENABLED'
+UNCAPPED_BOOKS = frozenset({'MOMENTUM', 'PRECISION'})
 QUALITY_EXIT_VERSION = 'PAPER_QUALITY_EXIT_V1_NET30_STOP5'
 ADAPTIVE_EXIT_VERSION = 'PAPER_ADAPTIVE_EXIT_V1_NET30_STOP5_LOCK80'
 QUALITY_ENV = 'NEO_LAB_QUALITY_ENABLED'
@@ -22,7 +25,7 @@ CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
 CAPACITY_EXIT_VERSION = 'PAPER_CAPACITY_EXIT_V2_NET30_STOP10'
 CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
 MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
-                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION,
+                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION, SIZED_VERSION,
                               CAPACITY_TEST_VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
@@ -67,7 +70,20 @@ def quality_enabled():
 
 
 def reporting_version():
-    return QUALITY_VERSION if quality_enabled() else CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
+    return SIZED_VERSION if sized_enabled() else QUALITY_VERSION if quality_enabled() else CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
+
+
+def sized_enabled():
+    return quality_enabled() and os.getenv(SIZED_ENV) == '1'
+
+
+def entry_notional():
+    return 250.0 if sized_enabled() else MAX_NOTIONAL_USD
+
+
+def soft_limits_removed(book):
+    # Explicit owner request: only these two PAPER books, never LIVE/test mode.
+    return sized_enabled() and applies(book) and book.get('id') in UNCAPPED_BOOKS
 
 
 def entry_cost_limit(strategy_id):
@@ -78,7 +94,7 @@ def quality_admission(coin, features, now, books):
     """Additional prospective guards, never a fitted win-probability score.
 
     Existing market, full defense, exact-pool flow/safety/price and cost gates
-    remain mandatory. Strength of flow is scaled to the fixed $100 order;
+    remain mandatory. Strength of flow is scaled to the actual fixed order;
     four copies of one pool are one exposure, not four independent signals.
     Closed losing pools across the cohort rest for 30 minutes before re-entry.
     """
@@ -89,8 +105,8 @@ def quality_admission(coin, features, now, books):
                                   ('trades', 'unique_wallets', 'buy_usd', 'sell_usd')]
     if (not all(math.isfinite(v) for v in (trades, wallets, buys, sells))
             or trades != int(trades) or wallets != int(wallets) or trades < 6 or wallets < 4
-            or min(buys, sells) < 0 or buys < 3*MAX_NOTIONAL_USD
-            or buys-sells < MAX_NOTIONAL_USD or buys < 1.5*max(sells, 1.0)):
+            or min(buys, sells) < 0 or buys < 3*entry_notional()
+            or buys-sells < entry_notional() or buys < 1.5*max(sells, 1.0)):
         return {'allow': False, 'reason': 'quality_buy_flow_too_small'}
     for book in books.values():
         if not applies(book):
@@ -281,7 +297,9 @@ def capacity(book, now):
     rows = positions(book)
     exposure = sum(finite(p.get('remaining_cost_basis_usd'), finite(p.get('notional_usd'))) for p in rows)
     balance = max(0.0, finite(book.get('balance')))
-    free = max(0.0, balance * MAX_EXPOSURE_FRACTION - exposure)
+    uncapped = soft_limits_removed(book)
+    notional = entry_notional()
+    free = max(0.0, balance * (1.0 if uncapped else MAX_EXPOSURE_FRACTION) - exposure)
     # Changing size must not reset the hourly/daily risk ledger of V1.
     managed_trades = [t for t in book.get('history', []) if is_active_position(t)]
     opened = managed_trades + [p for p in rows if is_active_position(p)]
@@ -291,25 +309,35 @@ def capacity(book, now):
     daily_net = sum(finite(t.get('pnl_usd')) for t in today) + marked_loss
     daily_budget = max(0.0, finite(book.get('starting_balance'))) * DAILY_LOSS_FRACTION
     unpriced=any(p.get('quote_status') in {'stale','unavailable'} for p in rows)
-    reason = ('funded_active_marks_unavailable' if unpriced else
-              'funded_active_daily_loss_limit' if daily_net <= -daily_budget else
-              'funded_active_slots_full' if len(rows) >= MAX_SLOTS else
-              'funded_active_hourly_order_limit' if orders >= ORDERS_PER_HOUR else
-              'funded_active_exposure_limit' if free < MIN_NOTIONAL_USD else None)
-    return dict(open_positions=len(rows), max_positions=MAX_SLOTS, exposure_usd=round(exposure, 6),
+    invalid_capital = sized_enabled() and (not math.isfinite(finite(book.get('balance'),math.nan))
+        or finite(book.get('balance'))<0 or any(not math.isfinite(finite(
+            p.get('remaining_cost_basis_usd',p.get('notional_usd')),math.nan))
+            or finite(p.get('remaining_cost_basis_usd',p.get('notional_usd')))<0 for p in rows))
+    reason = ('funded_active_capital_invalid' if invalid_capital else
+              'funded_active_marks_unavailable' if unpriced else
+              'funded_active_daily_loss_limit' if not uncapped and daily_net <= -daily_budget else
+              'funded_active_slots_full' if not uncapped and len(rows) >= MAX_SLOTS else
+              'funded_active_hourly_order_limit' if not uncapped and orders >= ORDERS_PER_HOUR else
+              'funded_active_cash_unavailable' if uncapped and free < notional else
+              'funded_active_exposure_limit' if free < notional else None)
+    return dict(open_positions=len(rows), max_positions=None if uncapped else MAX_SLOTS, exposure_usd=round(exposure, 6),
                 funded_capital_usd=finite(book.get('starting_balance')),
-                fixed_notional_usd=MAX_NOTIONAL_USD,
-                effective_position_capacity=min(MAX_SLOTS, int(balance*MAX_EXPOSURE_FRACTION//MAX_NOTIONAL_USD)),
-                available_exposure_usd=free, orders_last_60m=orders, target_orders_per_hour=ORDERS_PER_HOUR,
-                daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=daily_budget, blocked_reason=reason,
+                fixed_notional_usd=notional, soft_limits_removed=uncapped,
+                effective_position_capacity=(int(balance//notional) if uncapped else
+                    min(MAX_SLOTS, int(balance*MAX_EXPOSURE_FRACTION//notional))),
+                available_exposure_usd=free, orders_last_60m=orders,
+                target_orders_per_hour=None if uncapped else ORDERS_PER_HOUR,
+                daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=None if uncapped else daily_budget,
+                reference_daily_loss_limit_usd=daily_budget, blocked_reason=reason,
                 daily_window_basis='UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS',
                 daily_window_ends_at=(int(now)//86_400_000+1)*86_400_000,
                 next_day_guarantees_entry=False)
 
 
-def exit_parameters(strategy_id):
+def exit_parameters(strategy_id, notional_usd=None):
     if quality_enabled():
-        return horizons.parameters(strategy_id)
+        notional = entry_notional() if notional_usd is None else notional_usd
+        return horizons.sized_parameters(strategy_id, notional) if sized_enabled() else horizons.parameters(strategy_id, notional)
     return dict(version=VERSION, stop_loss_net_pct=RULES[strategy_id]['stop'],
                 take_profit_net_pct=6.0 if strategy_id == 'EARLY' else 4.0,
                 max_hold_minutes=4.0, profit_trail_arm_net_pct=2.0, profit_trail_drawdown_pct=1.0)
@@ -536,8 +564,8 @@ def performance(book, now):
     trades = current_trades(book)
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
     policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
-    return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': MAX_NOTIONAL_USD,
-            **({'exit_policy':horizons.parameters(book['id'])} if quality_enabled() else
+    return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': entry_notional(),
+            **({'exit_policy':exit_parameters(book['id'])} if quality_enabled() else
                {'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
             'quality_mode':quality_enabled(), 'entry_cost_limit_pct':entry_cost_limit(book['id']),
             'legacy_open_positions':sum(p.get('entry_policy_version')!=reporting_version() for p in positions(book)),
@@ -573,10 +601,11 @@ def config():
     return dict(version=reporting_version(), enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
                 quality_enabled=quality_enabled(),quality_version=QUALITY_VERSION,
                 quality_rules={'maximum_roundtrip_cost_pct':1.5,'minimum_confirmed_30s_trades':6,
-                    'minimum_confirmed_30s_wallets':4,'minimum_confirmed_30s_buy_usd':300,
-                    'minimum_confirmed_30s_net_buy_usd':100,'minimum_buy_sell_usd_ratio':1.5,
+                    'minimum_confirmed_30s_wallets':4,'minimum_confirmed_30s_buy_usd':3*entry_notional(),
+                    'minimum_confirmed_30s_net_buy_usd':entry_notional(),'minimum_buy_sell_usd_ratio':1.5,
                     'cohort_duplicate_mint_or_pool_allowed':False,'cohort_loss_pause_minutes':30,
-                    'market_flow_defense_safety_price_cost_and_daily_limits_required':True,
+                    'market_flow_defense_safety_price_cost_required':True,
+                    'daily_limits_required_except_explicit_soft_limit_exempt_books':True,
                     'force_fill':False,'exits_apply_to_new_lots_only':False,
                     'open_exit_amendment':horizons.VERSION,'history_and_entry_receipts_unchanged':True,
                     'momentum_scalp_exit_version':horizons.SCALP_VERSION,
@@ -590,8 +619,19 @@ def config():
                     'flow_and_defense_and_cost_caps_and_loss_rate_limits':'RECORDED_SHADOW_ONLY',
                     'cash_and_exposure_enforced':True,'synthetic_ticks_or_fills':False,
                     'profitable_strategy_validation':False},
-                maximum_notional_usd=MAX_NOTIONAL_USD, max_position_fraction=MAX_POSITION_FRACTION,
-                minimum_notional_usd=MIN_NOTIONAL_USD, entry_size_rule='FIXED_NOTIONAL_NO_BACKOFF',
+                sized_policy_enabled=sized_enabled(), sized_policy_version=SIZED_VERSION,
+                sized_exits_apply_to_new_lots_only=True,
+                soft_limit_exempt_books=sorted(UNCAPPED_BOOKS) if sized_enabled() else [],
+                removed_soft_limits=['daily_loss','hourly_orders','position_count','fractional_exposure','book_loss_run_pause'] if sized_enabled() else [],
+                available_cash_and_quality_gates_still_required=True,
+                per_book_soft_limits={sid:dict(
+                    max_positions=None if sized_enabled() and sid in UNCAPPED_BOOKS else MAX_SLOTS,
+                    hourly_orders=None if sized_enabled() and sid in UNCAPPED_BOOKS else ORDERS_PER_HOUR,
+                    daily_loss_fraction=None if sized_enabled() and sid in UNCAPPED_BOOKS else DAILY_LOSS_FRACTION,
+                    max_position_and_exposure_fraction=1.0 if sized_enabled() and sid in UNCAPPED_BOOKS else .5)
+                    for sid in RULES},
+                maximum_notional_usd=entry_notional(), max_position_fraction=MAX_POSITION_FRACTION,
+                minimum_notional_usd=entry_notional(), entry_size_rule='FIXED_NOTIONAL_NO_BACKOFF',
                 max_exposure_fraction=MAX_EXPOSURE_FRACTION, target_orders_per_hour=ORDERS_PER_HOUR,
                 target_is_not_a_minimum_or_promise=True, daily_loss_fraction=DAILY_LOSS_FRACTION,
                 ticker_min_continuous_coverage_minutes=60, main_ticker_guard_unchanged=True,

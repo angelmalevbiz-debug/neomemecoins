@@ -1,6 +1,49 @@
 # Named strategy PAPER repair — 2026-10-09
 
-## Current: owner-requested separate holding horizons
+## Current: $250 entries and selected soft-cap removal — 2026-10-10
+
+The owner explicitly selected **all four PAPER strategies** for $250 new
+entries. `NEO_LAB_PAPER_250_ENABLED=1` requires both engine/execution PAPER
+and quality mode. The resulting cohort is `FUNDED_ACTIVE_PAPER_V6_COST_AWARE_250`.
+No main/personal execution policy, LIVE executor, capital contribution or old
+entry receipt changes. Existing open lots keep their original sizes and exits.
+
+For **Momentum and Precision only**, daily-loss, hourly-order, position-count,
+50%-balance/exposure caps and the book-wide losing-run pause no longer stop
+new entries. These disabled ceilings are published as null, not as enormous
+limits or zero losses. Daily loss and legacy history are still reported.
+Available uncommitted cash including entry network costs remains mandatory:
+there is no leverage, negative cash, replenishment or small remainder entry.
+Early and Ultra keep their prior soft caps. Pool-specific repeated-loss pauses,
+one mint/pool across the cohort, full signal/defense/flow/safety/price/cost gates
+and stop-loss/holding/profit-protection exits remain in force. This is not
+permission to buy arbitrary unsafe pools or force continuous fills.
+
+New `PAPER_HORIZON_EXIT_V2_PROPORTIONAL_250` lots preserve V1 percentage geometry
+at the larger size. At $250: all stops are **5% / $12.50 net**; targets are
+Early/Momentum $15, Precision $37.50, Ultra $75. Protection arms at $5/$5/$10/$10
+and gives back max(20% of observed net peak, $1.875/$1.875/$2.50/$2.50).
+Holds remain 60/15/240/720 minutes from original entry. A fixed $5 stop would
+otherwise become 2%, leaving only 0.5 percentage points after the admitted
+1.5% friction. This preserves headroom, **not a proven profitable optimum**;
+absolute loss per stopped new position increases with size and gaps can be worse.
+
+Verified 30-second flow now scales with actual entry size: at least $750 buy
+volume and $250 net buys, six swaps, four wallets and buy/sell USD >=1.5.
+Observation-seat planning checks modeled costs **at $250**, not only the
+notional-independent optimistic fee floor. Entry rechecks remain authoritative.
+Fees, slippage and impact are not removed to manufacture gains.
+
+`scripts/audit_lab_outcomes.py` separates book-by-entry-policy and exit-reason
+cohorts, forced-test signal failures, complete recorded fees, and gross quote
+movement versus actual booked net. The benchmark is not an alternative fill;
+its gap also includes impact/slippage. Partial exits/missing data are not
+invented. Old forced or four-minute timeout outcomes must not be attributed to
+the later quality policy, which had no executed entries at the audit cutoff.
+Forward net expectancy and drawdown, not win rate alone, must validate V6.
+Removing caps and increasing size can accelerate losses; profit is unproven.
+
+## Previous: owner-requested separate holding horizons
 
 [PAPER_HORIZON_EXIT_V1_60_240_720](PAPER_HORIZON_EXITS.md) supersedes the uniform
 v5 no-timer exits below. Early/Momentum: net target $6, arm $2, maximum 60 min;

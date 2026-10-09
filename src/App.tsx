@@ -337,7 +337,8 @@ export default function App() {
   const portfolioRealizedPnl = promotedPortfolio?.realizedPnl ?? state?.stats.realized_total_usd;
   const portfolioUnrealizedPnl = promotedPortfolio?.unrealizedPnl ?? state?.stats.unrealized_pnl_usd;
   const portfolioOpenPositions = promotedPortfolio?.openPositions ?? state?.stats.open_positions;
-  const portfolioMaxPositions = promotedPortfolio?.books.reduce((count, {id}) => count + (state?.strategy_lab?.stats[id]?.funded_active?.max_positions ?? 1), 0) ?? state?.config.max_positions;
+  const portfolioMaxPositions = promotedPortfolio?.books.some(({id}) => state?.strategy_lab?.stats[id]?.funded_active?.soft_limits_removed)
+    ? 'без таван' : promotedPortfolio?.books.reduce((count, {id}) => count + (state?.strategy_lab?.stats[id]?.funded_active?.max_positions ?? 1), 0) ?? state?.config.max_positions;
   const portfolioClosedTrades = promotedPortfolio?.trades ?? state?.stats.closed_trades;
   const portfolioWinRate = promotedPortfolio?.winRate ?? state?.stats.win_rate;
   const portfolioRunning = promotedPortfolio ? state?.strategy_lab?.status === 'online' : state?.running;

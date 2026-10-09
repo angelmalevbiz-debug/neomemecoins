@@ -617,6 +617,19 @@ class TapePoolScheduler:
             funded_cap=(max(active_paper.entry_cost_limit(sid) for sid in funded_rules)
                         if active_paper.enabled() and funded_rules else 1.5)
             funded_cost = feasibility.execution_feasibility(coin, funded_cap)
+            if active_paper.sized_enabled() and funded_rules:
+                # Don't spend scarce transaction bodies on a fee-floor pass
+                # that fails at the owner's actual $250 size after impact.
+                # This is planning only, never an execution/safety receipt.
+                sized_cost = feasibility.modeled_roundtrip(coin, active_paper.entry_notional())
+                if sized_cost['status'] == 'estimate':
+                    cost_pct = max(0.0, -sized_cost['initial_pnl_pct'])
+                    funded_cost = {**funded_cost,
+                        'basis':'PAPER_MODELED_COSTS_AT_FIXED_ENTRY_SIZE',
+                        'planned_notional_usd':active_paper.entry_notional(),
+                        'minimum_model_roundtrip_cost_pct':cost_pct,
+                        'model_cost_feasible':cost_pct <= funded_cap,
+                        'reason':'sized_model_within_cap' if cost_pct <= funded_cap else 'sized_model_cost_above_limit'}
             matched = bool(main_rules or funded_rules)
             possible = bool((main_rules and main_cost['model_cost_feasible'] is True)
                             or (funded_rules and funded_cost['model_cost_feasible'] is True))

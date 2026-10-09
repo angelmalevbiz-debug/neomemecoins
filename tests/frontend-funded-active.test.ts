@@ -2,6 +2,21 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fundedActiveSummary, profitProtectionSummary, labEntryStatus } from '../src/lib/labStrategyView';
 
+test('owner requested 250 policy shows uncapped soft limits, not zero risk or infinite cash', () => {
+  const text=fundedActiveSummary({version:'V6',quality_mode:true,soft_limits_removed:true,
+    fixed_notional_usd:250,trades:0,wins:0,win_rate:null,net_pnl_usd:0,
+    orders_last_60m:0,closed_last_60m:0,open_positions:0,max_positions:null,
+    target_orders_per_hour:null,exposure_usd:0,daily_loss_limit_usd:null,effective_position_capacity:3});
+  assert.match(text!,/вход \$250.00/);
+  assert.match(text!,/позиции 0\/без таван/);
+  assert.match(text!,/капиталов капацитет 3/);
+  assert.match(text!,/без дневен, часов и позиционен таван/);
+  assert.match(text!,/без заем/);
+  assert.doesNotMatch(text!,/null|undefined|дневен лимит загуба|Следващ UTC ден/);
+  assert.match(labEntryStatus({id:'MOMENTUM',balance:200,starting_balance:1000,
+    entry_diagnostics:{blocked_reason:'funded_active_cash_unavailable'}}),/свободен PAPER капитал/);
+});
+
 test('scalp profile displays independent duration and UTC pause without promising an entry', () => {
   const result=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100',quality_mode:true,
     trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,

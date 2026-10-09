@@ -46,6 +46,13 @@ def tearDownModule():
 
 class EngineEntryTests(unittest.TestCase):
     def setUp(self):
+        # These fixture timestamps represent one observation, not separate wall
+        # clock reads. A loaded runner can otherwise put available_at (now-50)
+        # after window_at, failing the preflight freshness gate before the
+        # commit-time flow recheck that the regression intends to exercise.
+        fixture_clock = patch.object(m, 'now_ms', return_value=m.now_ms())
+        fixture_clock.start()
+        self.addCleanup(fixture_clock.stop)
         m.STATE_PATH.unlink(missing_ok=True)
         m.STATE = m.State()
         self.monitor = m.Monitor()
@@ -77,8 +84,19 @@ class EngineEntryTests(unittest.TestCase):
                             'checked_at':m.now_ms(),'metrics':{'decimals':6,'token_account_rent_lamports':1650000}}),
                         patch.object(m.price_integrity,'check',return_value={'status':'pass','version':'TEST'})]
         self.mocks = [p.start() for p in self.patches]
+        fixture_clock.stop()  # Production/quote clocks still advance in the test.
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
         self.addCleanup(self.monitor.stop)
+
+    def test_fixture_timestamps_share_one_observation(self):
+        stamp = self.coin['updatedAt']
+        proof = self.flow['verified_flow']
+        self.assertEqual(proof['window_at'], stamp)
+        self.assertEqual(proof['latest_event_at'], stamp - 100)
+        self.assertEqual(proof['available_at'], stamp - 50)
+        self.assertEqual(self.entry['quoted_at'], stamp)
+        self.assertEqual(self.exit['quoted_at'], stamp)
+        self.assertEqual(self.mocks[5].return_value['checked_at'], stamp)
 
     def test_critical_rug_blocks_before_quote(self):
         self.mocks[5].return_value={'status':'blocked','reasons':['rugcheck_critical']}

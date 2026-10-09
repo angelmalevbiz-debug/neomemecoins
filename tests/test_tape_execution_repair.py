@@ -292,6 +292,25 @@ class RpcAndDurability(unittest.TestCase):
         self.rec.poll([META],rpc)
         self.assertEqual(self.rec.db.execute('SELECT count(*) FROM signatures').fetchone()[0],180)
 
+    def test_inactive_pair_backlog_does_not_starve_active_pair(self):
+        active=dict(META)
+        inactive=dict(META,pair=pubkey(77),address=pubkey(78))
+        self.rec.tx_budget=1
+        with self.rec.db:
+            self.rec.db.execute('INSERT OR IGNORE INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(active['pair'],active['address'],json.dumps(active)))
+            self.rec.db.execute('INSERT OR IGNORE INTO pairs(pair,mint,metadata) VALUES(?,?,?)',(inactive['pair'],inactive['address'],json.dumps(inactive)))
+            for signature,meta,observed,slot in (('inactive-newer',inactive,NOW+1000,2),('active',active,NOW,1)):
+                self.rec.db.execute("INSERT INTO signatures(signature,pair,slot,event_time,observed,metadata,state,attempts,next_retry) VALUES(?,?,?,?,?,?,'pending',0,0)",
+                    (signature,meta['pair'],slot,observed,observed,json.dumps(meta)))
+        requested=[]
+        def rpc(calls):
+            requested.extend(params[0] for method,params in calls if method=='getTransaction')
+            return [{'result':non_swap()} for _ in calls]
+        self.rec.process(rpc,[active['pair']])
+        self.assertEqual(requested,['active'])
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='inactive-newer'").fetchone()[0],'pending')
+        self.assertEqual(self.rec.db.execute("SELECT state FROM signatures WHERE signature='active'").fetchone()[0],'non_swap')
+
     def test_current_pending_signatures_are_processed_before_old_retries(self):
         self.rec.tx_budget=1
         with self.rec.db:

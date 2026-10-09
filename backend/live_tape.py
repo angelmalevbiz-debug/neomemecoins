@@ -422,10 +422,19 @@ class TapeRecorder:
                     next_active.append(metadata)
             active = next_active
 
-    def process(self,rpc):
-        # Drain the freshest actionable signatures first. Historical retries can
-        # remain durable without starving the current five-minute decision window.
-        pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed DESC,slot DESC LIMIT ?",(self.clock(),self.tx_budget)))
+    def process(self,rpc,active_pairs=None):
+        # Drain only pairs in the current scanner feed. Historical retries stay
+        # durable in SQLite but must not starve fresh order-flow evidence.
+        if active_pairs is None:
+            pending = list(self.db.execute("SELECT * FROM signatures WHERE state='pending' AND next_retry<=? ORDER BY observed DESC,slot DESC LIMIT ?",(self.clock(),self.tx_budget)))
+        else:
+            active_pairs = [str(pair) for pair in active_pairs if str(pair)]
+            if not active_pairs:
+                return
+            placeholders = ','.join('?' for _ in active_pairs)
+            pending = list(self.db.execute(
+                f"SELECT * FROM signatures WHERE state='pending' AND next_retry<=? AND pair IN ({placeholders}) ORDER BY observed DESC,slot DESC LIMIT ?",
+                (self.clock(),*active_pairs,self.tx_budget)))
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
@@ -510,7 +519,7 @@ class TapeRecorder:
 
     def poll(self,feed,rpc=rpc_batch):
         self.discover(feed,rpc)
-        self.process(rpc)
+        self.process(rpc,[metadata.get('pair') for metadata in feed])
         return self.snapshot(feed)
 
 

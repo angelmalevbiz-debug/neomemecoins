@@ -232,7 +232,7 @@
     "backend/paper_state_reset.py": "0c48f1f7f0b25b902f19970f9434611c0cdfd181d74f51f263735701025f07b3",
     "backend/paper_training.py": "06d4b67c67bfa6f96bfb47c4ae6a41183378604a73876d1e6cfa3774c15c2598",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "fe203ccc209892e4274d7aa5221da749296d8e6ba8f2d325d90c06e8c483d080",
+    "backend/strategy_lab.py": "e474235645f530babcecf126e6ecb491bc43358977bacc27f25c427fe84d997c",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "eeb383cbc011e9de704aed9a1b255c70227588129a98754290d50e9ba9f40592",

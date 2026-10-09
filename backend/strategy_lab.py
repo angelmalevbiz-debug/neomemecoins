@@ -2013,7 +2013,8 @@ def main():
     if funding_changed or exits_changed:
         # Persist the audited credit before allowing any entry; a failed write
         # restarts fail-closed, never spends an unrecorded virtual contribution.
-        persist('starting','Owner-authorized PAPER capital/exit changes recorded')
+        persist('starting',('Owner-authorized PAPER capital contribution recorded' if funding_changed
+                            else 'Owner-authorized PAPER exit policy change recorded'))
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()

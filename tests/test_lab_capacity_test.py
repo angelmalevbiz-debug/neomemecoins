@@ -30,6 +30,8 @@ def coin(index=1,**changes):
 class CapacityTestTests(unittest.TestCase):
     def setUp(self):
         self.clock=NOW
+        self.temp=tempfile.TemporaryDirectory(prefix='neo-capacity-tests-')
+        self.addCleanup(self.temp.cleanup)
         self.strategies=[s for s in lab.STRATEGIES if s['id'] in active.RULES]
         self.books={s['id']:lab.empty_book(s) for s in self.strategies}
         for book in self.books.values():
@@ -43,6 +45,8 @@ class CapacityTestTests(unittest.TestCase):
         for p in (
             patch.dict(os.environ,{active.ENV:'1',active.CAPACITY_TEST_ENV:'1','NEO_ENGINE_MODE':'PAPER'}),
             patch.object(lab,'STATE',{'books':self.books}),patch.object(lab,'STRATEGIES',self.strategies),
+            patch.object(lab,'DEFENSE',lab.entry_defense.DefensiveEntryLayer(
+                registry_path=Path(self.temp.name)/'ticker.json')),
             patch.object(lab,'now_ms',side_effect=lambda:self.clock),
             patch.object(lab.rug_guard,'check',side_effect=lambda c:{'status':'pass',
                 'mint':c['address'],'pair':c['pairAddress'],'checked_at':self.clock}),

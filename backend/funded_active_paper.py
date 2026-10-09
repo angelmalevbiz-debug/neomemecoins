@@ -11,11 +11,13 @@ from dataclasses import replace
 
 import structural_rug_guard as rug
 
-VERSION = 'FUNDED_ACTIVE_PAPER_V1'
+VERSION = 'FUNDED_ACTIVE_PAPER_V2_FIXED_100'
+MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 MAX_SLOTS = 4
-MAX_NOTIONAL_USD = 25.0
-MAX_POSITION_FRACTION = .1
+MAX_NOTIONAL_USD = 100.0
+MIN_NOTIONAL_USD = 100.0
+MAX_POSITION_FRACTION = .5
 MAX_EXPOSURE_FRACTION = .5
 ORDERS_PER_HOUR = 50
 DAILY_LOSS_FRACTION = .05
@@ -156,14 +158,20 @@ def current_trades(book):
     return [t for t in book.get('history', []) if t.get('entry_policy_version') == VERSION]
 
 
+def is_active_position(position):
+    return position.get('entry_policy_version') in MANAGED_VERSIONS
+
+
 def capacity(book, now):
     rows = positions(book)
     exposure = sum(finite(p.get('remaining_cost_basis_usd'), finite(p.get('notional_usd'))) for p in rows)
     balance = max(0.0, finite(book.get('balance')))
     free = max(0.0, balance * MAX_EXPOSURE_FRACTION - exposure)
-    opened = current_trades(book) + [p for p in rows if p.get('entry_policy_version') == VERSION]
+    # Changing size must not reset the hourly/daily risk ledger of V1.
+    managed_trades = [t for t in book.get('history', []) if is_active_position(t)]
+    opened = managed_trades + [p for p in rows if is_active_position(p)]
     orders = sum(0 <= now - finite(t.get('opened_at')) < 3_600_000 for t in opened)
-    today = [t for t in current_trades(book) if int(finite(t.get('closed_at'))) // 86_400_000 == now // 86_400_000]
+    today = [t for t in managed_trades if int(finite(t.get('closed_at'))) // 86_400_000 == now // 86_400_000]
     marked_loss = sum(finite(p.get('open_pnl_usd')) for p in rows)
     daily_net = sum(finite(t.get('pnl_usd')) for t in today) + marked_loss
     daily_budget = max(0.0, finite(book.get('starting_balance'))) * DAILY_LOSS_FRACTION
@@ -172,7 +180,7 @@ def capacity(book, now):
               'funded_active_daily_loss_limit' if daily_net <= -daily_budget else
               'funded_active_slots_full' if len(rows) >= MAX_SLOTS else
               'funded_active_hourly_order_limit' if orders >= ORDERS_PER_HOUR else
-              'funded_active_exposure_limit' if free < 10 else None)
+              'funded_active_exposure_limit' if free < MIN_NOTIONAL_USD else None)
     return dict(open_positions=len(rows), max_positions=MAX_SLOTS, exposure_usd=round(exposure, 6),
                 available_exposure_usd=free, orders_last_60m=orders, target_orders_per_hour=ORDERS_PER_HOUR,
                 daily_net_usd=round(daily_net, 6), daily_loss_limit_usd=daily_budget, blocked_reason=reason)
@@ -201,7 +209,8 @@ def exit_reason(position, net_pct, hold_minutes):
 def performance(book, now):
     trades = current_trades(book)
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
-    return {**capacity(book, now), 'version': VERSION, 'trades': len(trades), 'wins': wins,
+    return {**capacity(book, now), 'version': VERSION, 'fixed_notional_usd': MAX_NOTIONAL_USD,
+            'trades': len(trades), 'wins': wins,
             'win_rate': round(wins / len(trades) * 100, 1) if trades else None,
             'net_pnl_usd': round(sum(finite(t.get('pnl_usd')) for t in trades), 4),
             'closed_last_60m': sum(0 <= now - finite(t.get('closed_at')) < 3_600_000 for t in trades),
@@ -216,6 +225,7 @@ def candidate_config():
 def config():
     return dict(version=VERSION, enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
                 maximum_notional_usd=MAX_NOTIONAL_USD, max_position_fraction=MAX_POSITION_FRACTION,
+                minimum_notional_usd=MIN_NOTIONAL_USD, entry_size_rule='FIXED_NOTIONAL_NO_BACKOFF',
                 max_exposure_fraction=MAX_EXPOSURE_FRACTION, target_orders_per_hour=ORDERS_PER_HOUR,
                 target_is_not_a_minimum_or_promise=True, daily_loss_fraction=DAILY_LOSS_FRACTION,
                 ticker_min_continuous_coverage_minutes=60, main_ticker_guard_unchanged=True,

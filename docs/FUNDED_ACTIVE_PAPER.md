@@ -4,7 +4,7 @@ The owner authorized a prospective PAPER-only repair, retaining fees, all
 historical outcomes and balances. MONEY.zip was inspected, not restored.
 
 `NEO_LAB_FUNDED_ACTIVE_ENABLED=1` opts the four PROMOTED_PAPER books and the
-observation scheduler into `FUNDED_ACTIVE_PAPER_V1`. Windows launcher and the
+observation scheduler into `FUNDED_ACTIVE_PAPER_V2_FIXED_100`. Windows launcher and the
 Lab/tape systemd units explicitly enable it. Other engines/TEST books do not
 use its admission or exits. Turning the flag off prevents new active entries;
 the position list and frozen active exits remain managed until flat.
@@ -22,8 +22,14 @@ less continuity evidence for bounded PAPER research, not LIVE safety proof. The 
 only applies these scoped age/continuity thresholds for a matching active hypothesis; this supplies
 observations, never permission for main or a personal engine to trade.
 
-Four concurrent exact-pool positions, at most $25 and 10% of current book
-balance each, at most 50% committed exposure, no leverage. Existing positions
+The owner requested larger entries: exactly $100, without a $25 fallback,
+and at most 50% of the current book balance per entry. At most four concurrent
+exact-pool positions and 50% total committed exposure, no leverage. With the
+existing $201–250 balances this normally means **one $100 position**, not four.
+Insufficient remaining exposure blocks entry instead of buying a small remainder.
+V1 positions retain frozen exits; V1 losses and orders still consume V2 daily/hourly
+risk limits and losing-run cooldown. V2 performance is reported separately.
+Existing positions
 consume capacity; duplicate mint entries in a book are prohibited. Each book
 has a rolling cap of 50 new orders/hour (not a minimum). Four-minute maximum
 holding time creates capacity for that order target; market evidence, RPC
@@ -36,6 +42,19 @@ commit. Fees/network/slippage/impact assumptions are unchanged. Early permits
 1.5% cost cap with 4% / 4% / 3% NET stops. No gap loss is clamped to the stop.
 These are cost-aware hypotheses, not a validated profitable strategy or
 evidence of equivalence to on-chain fills.
+
+### CPI coverage repair
+
+Successful PumpSwap CPI can use program-authorized PDA signers, not a message
+signer: [Solana CPI](https://solana.com/docs/core/cpi) and
+[official PumpSwap IDL](https://github.com/pump-fun/pump-public-docs/blob/main/idl/pump_amm.json).
+The recorder previously marked these exact decoded swaps as unclassified,
+invalidating the whole pool's current window. With matching inner instruction,
+parent context, stack height, successful execution, exact event and token legs,
+they now receive a known terminal classification. Their non-wallet quality flag
+is **retained**: they never count as independent wallets or admission flow.
+Unknown actors, missing CPI context, shadow decoders and other defects still
+degrade coverage. Existing terminal database rows are not rewritten.
 
 New entries stop at 5% of starting allocation net daily loss (UTC day),
 including marked open P&L, and retain the 30-minute losing-run pause and the

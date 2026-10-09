@@ -171,7 +171,7 @@ def lab_pin_positions(state):
         if not isinstance(book, dict):
             continue
         for position in active_paper.positions(book):
-            if (position.get('entry_policy_version')!=active_paper.VERSION
+            if (not active_paper.is_active_position(position)
                     and lab_forward_tests.tape_pin_required(position)):
                 pinned.append(position)
             else:

@@ -144,7 +144,7 @@ class ActivePolicyTests(unittest.TestCase):
         p = self.book['position']
         self.assertIsNotNone(p)
         self.assertEqual(p['entry_policy_version'], active.VERSION)
-        self.assertEqual(p['notional_usd'], 25)
+        self.assertEqual(p['notional_usd'], 100)
         self.assertEqual(p['exit_parameters']['max_hold_minutes'], 4)
         self.assertLess(p['open_pnl_usd'], 0)
         self.assertLess(p['entry_roundtrip_pnl_pct'], 0)
@@ -160,6 +160,7 @@ class ActivePolicyTests(unittest.TestCase):
                 self.assertIsNotNone(b['position'], sid)
 
     def test_four_slots_are_real_and_duplicate_mints_never_fill_them(self):
+        self.book['balance'] = 1000
         rows = [coin(i) for i in range(5)]
         for _ in range(5):
             lab.maybe_open(rows, flows(rows))
@@ -167,7 +168,24 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertEqual(len(positions), 4)
         self.assertEqual(len({p['address'] for p in positions}), 4)
         self.assertEqual(active.capacity(self.book, NOW)['blocked_reason'], 'funded_active_slots_full')
-        self.assertLessEqual(sum(p['remaining_cost_basis_usd'] for p in positions), 125)
+        self.assertLessEqual(sum(p['remaining_cost_basis_usd'] for p in positions), 500)
+
+    def test_small_remainder_does_not_open_a_25_dollar_fallback(self):
+        c = coin(); lab.maybe_open([c], flows([c]))
+        other = coin(1); lab.maybe_open([other], flows([other]))
+        self.assertEqual([p['notional_usd'] for p in active.positions(self.book)], [100])
+        self.assertEqual(self.book['entry_diagnostics']['blocked_reason'], 'funded_active_exposure_limit')
+
+    def test_legacy_version_losses_orders_and_cooldown_survive_size_change(self):
+        legacy = {'entry_policy_version':'FUNDED_ACTIVE_PAPER_V1', 'pnl_usd':-5,
+                  'opened_at':NOW-2000, 'closed_at':NOW-1000}
+        self.book['history'] += [dict(legacy) for _ in range(3)]
+        cap = active.capacity(self.book, NOW)
+        self.assertEqual(cap['daily_net_usd'], -15)
+        self.assertEqual(cap['orders_last_60m'], 3)
+        self.assertEqual(cap['blocked_reason'], 'funded_active_daily_loss_limit')
+        self.assertGreater(lab.promoted_pause_remaining_ms(self.book,NOW), 0)
+        self.assertEqual(active.current_trades(self.book), [])
 
     def test_full_legacy_position_consumes_exposure(self):
         self.book['position'] = {'notional_usd': 124, 'remaining_cost_basis_usd': 124,
@@ -177,6 +195,7 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertEqual(self.book['entry_diagnostics']['blocked_reason'], 'funded_active_exposure_limit')
 
     def test_restart_deduplicates_alias_and_close_preserves_other_slots(self):
+        self.book['balance'] = 500
         rows = [coin(i) for i in range(2)]
         for _ in rows: lab.maybe_open(rows, flows(rows))
         restored = json.loads(json.dumps(self.book))
@@ -190,6 +209,7 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertEqual(restored['history'][0]['trade_no'], p['trade_no'])
 
     def test_unrealized_pnl_uses_every_slot_and_projection_keeps_them(self):
+        self.book['balance'] = 500
         rows = [coin(i) for i in range(2)]
         for _ in rows: lab.maybe_open(rows, flows(rows))
         ps = active.positions(self.book); ps[0]['open_pnl_usd'] = -1; ps[1]['open_pnl_usd'] = -2
@@ -235,6 +255,7 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertEqual(self.book['entry_diagnostics']['blocked_reason'], 'rug_ticker_reuse')
 
     def test_active_exits_manage_all_slots_and_survive_flag_off(self):
+        self.book['balance'] = 500
         rows = [coin(i) for i in range(2)]
         for _ in rows: lab.maybe_open(rows, flows(rows))
         self.clock += 240_001
@@ -247,6 +268,19 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertEqual(len(closes), 2)
         self.assertTrue(all(t['exit_reason'] == 'FUNDED_ACTIVE_MAX_HOLD_4' for t in closes))
         self.assertTrue(all(t['pnl_usd'] < 0 for t in closes))
+
+    def test_v1_exit_and_flow_free_pin_survive_v2_size_and_flag_off(self):
+        c=coin(); lab.maybe_open([c],flows([c]))
+        p=self.book['position']; p['entry_policy_version']='FUNDED_ACTIVE_PAPER_V1'
+        p['exit_parameters']['version']='FUNDED_ACTIVE_PAPER_V1'
+        self.assertEqual(lab_pin_positions({'strategy_lab':self.state}),([],1))
+        self.clock += 240_001
+        mark={**c,'updatedAt':self.clock,'mark_received_at':self.clock}
+        with patch.dict(os.environ,{active.ENV:'0'}), patch.object(lab.POSITION_MARK_FEED,'resolve',return_value=mark):
+            lab.update_positions({},[mark])
+        self.assertEqual(active.positions(self.book),[])
+        self.assertEqual(self.book['history'][0]['exit_reason'],'FUNDED_ACTIVE_MAX_HOLD_4')
+        self.assertEqual(self.book['history'][0]['entry_policy_version'],'FUNDED_ACTIVE_PAPER_V1')
 
     def test_stale_mark_never_closes_an_active_position(self):
         c = coin(); lab.maybe_open([c], flows([c])); self.clock += 300_000

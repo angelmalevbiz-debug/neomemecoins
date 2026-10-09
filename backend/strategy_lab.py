@@ -171,7 +171,7 @@ def promoted_pause_remaining_ms(book,now):
     trades=[t for t in book.get('history',[])
             if t.get('closed_at') and t.get('promotion_eligible') is not False]
     if active_paper.applies(book):
-        trades=[t for t in trades if t.get('entry_policy_version')==active_paper.VERSION]
+        trades=[t for t in trades if active_paper.is_active_position(t)]
     trades.sort(key=lambda t:num(t.get('closed_at')),reverse=True)
     if not trades: return 0
     streak=0
@@ -889,7 +889,7 @@ def update_positions(flows,feed):
     for book,pos in [(b,p) for b in [*managed_books,*exit_only_books] for p in active_paper.positions(b)]:
         decision_at=now_ms()
         is_rush=pos.get('strategy_id',book.get('id'))==rush_brain.STRATEGY_ID
-        is_active_position=pos.get('entry_policy_version')==active_paper.VERSION
+        is_active_position=active_paper.is_active_position(pos)
         forward=lab_forward.is_forward_position(pos)
         coin=POSITION_MARK_FEED.resolve(pos,prices,decision_at)
         if forward:
@@ -960,7 +960,7 @@ def update_positions(flows,feed):
         if forward:
             # The exits this position was opened with (its stored exit_parameters).
             reason=lab_forward.exit_reason(pos,model_live_pct,hold)
-        elif pos.get('entry_policy_version')==active_paper.VERSION:
+        elif active_paper.is_active_position(pos):
             reason=active_paper.exit_reason(pos,total_live_pct,hold)
         elif cost_first_exits is not None:
             reason=cost_first_exit_reason(cost_first_exits,total_live_pct,hold)
@@ -1095,6 +1095,7 @@ def maybe_open(feed,flows):
                             balance*active_paper.MAX_POSITION_FRACTION,
                             active_capacity['available_exposure_usd'])
         min_notional=activity.entry_minimum_notional(strategy['id'])
+        if is_active: min_notional=active_paper.MIN_NOTIONAL_USD
         # Admission cap: the Lab's one rule, 0.5 x net stop (<= 2.75%). A forward-test book
         # applies it to its own pre-registered stop and buys a fixed $200, never a smaller size.
         admission_cap=lab_forward.admission_cost_cap_pct(strategy['id']) if is_forward else cost_cap
@@ -1699,7 +1700,8 @@ def maybe_open(feed,flows):
 
 
 ACTIVE_POLICY_VERSIONS=frozenset({activity.POLICY_VERSION,promoted_guard.FUNDED_POLICY_VERSION,
-                                  cost_first.ENTRY_POLICY_VERSION,lab_forward.ENTRY_POLICY_VERSION,active_paper.VERSION})
+                                  cost_first.ENTRY_POLICY_VERSION,lab_forward.ENTRY_POLICY_VERSION,
+                                  *active_paper.MANAGED_VERSIONS})
 
 def stats(book):
     start=num(book.get('starting_balance'),START_BALANCE)

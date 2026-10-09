@@ -59,9 +59,13 @@ sample in the same ledger: the aggregates are kept per (book, config hash).
 
 | Book | `config_hash` |
 |---|---|
-| `HF_RND_E95` | `d4d0a6c29f9dd56d161d86fd12a824546306a43a71463fba1d6d44d74d0872d6` |
-| `HF_QUIET_E95` | `4195a6e1bf7cc3d31d23dac4cf7ac83fd350da7765a8837d05438a44bab9ef06` |
-| `HF_DIP15_E95` | `dc60cdb56c44163e2a38dbaab778edd4a28493e021daf9c64502d8faec8fdb38` |
+| `HF_RND_E95` | `8b830cca4b0e396a8fb9e7472bdd262f73d0a7a5b3568ede8a59f4719cdad492` |
+| `HF_QUIET_E95` | `c4298e9a8174361585f8b64f0d4e05b41ac34e9a9314e5b64b646d74e557907c` |
+| `HF_DIP15_E95` | `11b3934b3d4cc6ab4b358e9c1fd0e8866c4ee1b63a6efc92f0766845bd34fbf6` |
+
+These hashes include the fill basis's mark path (`HF_MARK_FEED_V1`, review fix2). The
+earlier hashes of this branch (`d4d0a6c2...`, `4195a6e1...`, `dc60cdb5...`) were never
+deployed and no HF close exists under them.
 
 Default budget hash ($1,000 start, $100 daily cap, 7-hour session step, 50% floor):
 `d6bf441229424a474e97d18ab2afdc17bca385868d0454a2cea4676bbfd639fa`.
@@ -114,9 +118,10 @@ which is idempotent.
 - **POOL_LOSS_MEMORY_V1: shadow only.** Every order and close records `plm_v1_would_block`,
   computed by `pool_loss_memory.index` over the book's in-memory closes of the last 6 h. With
   it enforced, HF books traded 3.5-4.0 times an hour on the holdout, because about 99% of HF
-  closes lose. For these books it is replaced by HF_POOL_RULE_V1 (see
-  [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#lab-high-frequency-books-lab_high_frequency_v1)
-  for the recorded acceptance).
+  closes lose. For these books it is replaced by HF_POOL_RULE_V1. The owner's request (above)
+  asks for the rate, not for this replacement; the owner accepts the replacement by merging
+  this change into main, and no agent can accept it (see
+  [DEFENSIVE_ENTRY_LAYER.md](DEFENSIVE_ENTRY_LAYER.md#lab-high-frequency-books-lab_high_frequency_v1)).
 - **Toggle guard (HF_PRINT_GUARD_V1):** a pool is ineligible for every HF book for 6 h after
   a TOGGLE. A toggle is a step of |dp| >= 15% between consecutive main-feed observations
   after which the price returns within 2% of the pre-step price within 600 s. It is known at
@@ -160,9 +165,18 @@ window, 30 s grace).
   (`late_next_observation`), as the harness took the next point. So does an exit leg that
   resolved but could not be closed (for example no network price at the fill): the slot never
   stays EXIT_ORDERED with its pool and its $25.10 reservation held.
-- Out-of-feed held pools are marked through the existing
-  `lab_position_marks.POSITION_MARK_FEED.resolve`. At most 9 HF positions can be open, within
-  its limit of 16 pending refreshes.
+- **Out-of-feed held pools (HF_MARK_FEED_V1)** are marked through HF's **own**
+  `lab_position_marks.PositionMarkFeed` (`lab_high_frequency.new_mark_feed()`), never the
+  Lab's `POSITION_MARK_FEED`:
+  - that feed has one worker, a 1 s request interval and a 12 s cache for every Lab book, so
+    up to 9 out-of-feed HF pools would queue refreshes ahead of an existing Lab position,
+    whose mark would then go stale for those loops (no stop, take-profit or hold check);
+  - HF's feed has its own worker, pending set and cache, and requests at most once every
+    2 s (`mark_request_interval_s`, 30 requests a minute), only while an HF pool held is out
+    of the main feed. At most 9 HF positions can be open, within its limit of 16 pending
+    refreshes. The Lab process's exact-pair requests are then at most 60 + 30 a minute;
+  - the container refuses the Lab's `POSITION_MARK_FEED` (`ValueError`), and
+    `persistence.hf.mark_feed` publishes the version and the interval.
 - **VANISHED:** no new usable mark for 10 minutes while the shared feed is alive. This
   process must also have looked for a mark for 60 s, so a restart first retries the
   exact-pair refresh. The close is valued at the last mark minus 10%
@@ -262,6 +276,12 @@ journal are never touched. A book is retired permanently on any of:
     half-width.
 
   Every evaluation also records the within-fee-bucket gap.
+
+  The checkpoint state (`kill.cfg`, `next_checkpoint`, `last`, `checkpoints`) belongs to the
+  current config hash. After a strategy-hash change the new sample gets its own first
+  checkpoint at 500 of its closes and 3 UTC days, never the old sample's next threshold; the
+  old sample's last evaluation is kept as `kill.previous`, and the dashboard shows only the
+  current sample's.
 - **(c) Operator flag:** `NEO_LAB_HF_RETIRE=<comma-separated ids>`.
 
 **Control continuity:**
@@ -276,8 +296,14 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
 ## Storage: HF_JOURNAL_V1 / HF_CHECKPOINT_V1
 
 - **Journal:** append-only `strategy_lab_hf/journal/<BOOK>/<YYYY-MM-DD>.jsonl` (UTC day of
-  the row). Every state change is a row, and each row carries `v`, `seq`, `book`, `cfg`,
-  `budget`, `at` and `entry_policy_version: LAB_HIGH_FREQUENCY_V1`.
+  the row). Every state change is a row, and each row carries `v`, `seq`, `epoch`, `book`,
+  `cfg`, `budget`, `at` and `entry_policy_version: LAB_HIGH_FREQUENCY_V1`.
+- **Journal identity (book, cfg, epoch, seq):** `seq` (and `trade_no`) restart at 1 when the
+  HF root starts empty or is reset. The `epoch` is one id per journal lineage (16 hex
+  characters): new at a fresh root or a reset, kept in `state.json` (or, when that is
+  unreadable, taken from the newest journal row) and written on every row. Reports that read
+  an archived session's journal together with the current one therefore never mistake two
+  trades for one.
 - **One flush + fsync per touched file per Lab loop:** `update` and `on_refresh` only append
   rows; `strategy_lab.hf_end_loop` flushes them once at the end of the loop
   (`HighFrequencyLab.flush_journal`), before `persist()` checkpoints. A kill checkpoint (at
@@ -319,7 +345,9 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   the checkpoint's, in `seq` order and exactly once. It then applies the restart rules above.
   - An unreadable checkpoint is rebuilt from the whole journal.
   - A torn last line (a crash mid-write) is closed with a newline, never removed, and
-    skipped as malformed.
+    skipped as malformed. Journal files are read as bytes, one line at a time, so a line torn
+    inside a multi-byte character of a symbol (Cyrillic, CJK, an emoji) is one malformed line
+    too, never an error that stops the load, the kill checkpoint or the reports.
 - **Aggregates per (book, cfg):**
   - counts, sums and sums of squares of booked, net0 and net50 in $ and %;
   - wins;
@@ -354,8 +382,14 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
 - `HF_ROOT` is `NEO_STRATEGY_LAB_HF_DIR`, defaulting to `strategy_lab_hf/` next to
   `strategy_lab.json`.
 - `main()` builds the container when `NEO_LAB_HF_ENABLED` is `'1'` (the default). It injects
-  the Lab's cost functions, its defensive layer, `POSITION_MARK_FEED` and
-  `pair_price_integrity`.
+  the Lab's cost functions, its defensive layer, HF's own mark feed (`HF_MARK_FEED`, created
+  once per process) and `pair_price_integrity`.
+- **A failed build is retried** every 60 s (`hf_retry_build`, `HF_BUILD_RETRY_MS`) while
+  HF is enabled, instead of leaving HF off until a manual restart. Each failure sets
+  `strategy_lab.hf_error` (`build: <error>`), and `persistence.hf.build` and
+  `activity_config.lab_high_frequency.build` publish `attempts`, `failures`, `last_error`,
+  `last_attempt_at`, `next_attempt_at` and `built_at`. A reset load that already made its
+  archive clears the reset request, so a retry never archives the fresh root again.
 - Each loop the Lab calls:
   - `HF.update` after `update_positions`;
   - `HF.on_refresh` after `maybe_open` when the refresh is due.
@@ -379,8 +413,14 @@ Expected: the hypotheses retire at their first checkpoint, about day 4.
   - It checkpoints, forced on stop. A checkpoint failure is reported as above, and the
     definition, metrics and view are still published.
   - It publishes `activity_config.lab_high_frequency` (definition, hashes, budget, mismatches,
-    `running`) and `persistence.hf` (loop time, journal and checkpoint writes, the refresh's
-    universe counts, price-audit use and orders in the last 60 minutes).
+    `running`, `build`) and `persistence.hf` (loop time, journal and checkpoint writes, the
+    last refresh's universe counts and the rolling `refresh_60s`, the journal `epoch`, the
+    mark feed, price-audit use, orders in the last 60 minutes and `build`).
+  - `refresh` is the last Lab refresh only. The Lab refreshes every 2 s while main rescans
+    every 3 s, so about one refresh in three sees no new observation and shows 0 events and a
+    universe of 0 on a healthy runtime. `refresh_60s` sums the refreshes of the last 60 s
+    (`refreshes`, `events`, `universe`, `refreshes_with_universe`, `last_universe_at`); the
+    rollout check reads it.
   - It writes the HF dashboard view **only** into the compact projection
     (`strategy_lab_compact.json`, key `high_frequency`). The full ledger carries the
     definition and metrics, never HF trades.
@@ -424,13 +464,20 @@ Each book shows:
 An HF failure of the last 10 minutes is shown in red above the books
 (`Грешка в HF: <stage: error> (поредни цикли с грешка: N)`).
 
-The view is at most 16 KB. Without the key the panel shows `Няма HF данни`.
+The view is at most 16 KB. Without the key the panel says why, from the same `/state`
+payload (`strategy_lab.hf_error` and `activity_config.lab_high_frequency`):
+
+- disabled: `HF книгите са изключени (NEO_LAB_HF_ENABLED=0).`;
+- a failed start: `HF не стартира: <error>. Lab опитва отново всяка минута (опити досега: N).`;
+- otherwise `Няма HF данни`.
 
 ## Reporting
 
 - `scripts/paper_edge_report.py --lab-hf DIR` reads a **copy** of `strategy_lab_hf/`.
-  - Journal closes are counted as Lab trades, deduplicated by (book, cfg, seq). Archived
-    resets are skipped.
+  - Journal closes are counted as Lab trades, deduplicated by (book, cfg, epoch, seq). Archived
+    resets inside the folder are skipped; pass an archived session's folder with another
+    `--lab-hf` to include it (its epoch differs, so its closes never collide with the current
+    session's).
   - The report adds a `high_frequency` section: each hypothesis against the same-period
     control, with a pair-bootstrap CI and **always the within-fee-bucket gap**.
   - `--archive-dir` skips HF checkpoints (`strategy_lab_hf/state.json`, also inside reset
@@ -440,8 +487,9 @@ The view is at most 16 KB. Without the key the panel shows `Няма HF данн
     the window.
 - `scripts/evaluate_paper_lab.py --hf-dir DIR` measures each (book, config hash) with
   `paper_lab_metrics.measure_hf_rows`. It reports multi-slot orders per hour, closes per
-  hour, the most slots held at once, cancels by reason, close kinds, cap trips and
-  retirements.
+  hour, the most slots held at once (per journal epoch), cancels by reason, close kinds, cap
+  trips, retirements and the number of journal epochs read. Rows are deduplicated by (book,
+  cfg, epoch, seq).
 - Rescore daily from the journal against `syn_lib`
   (`research/hf_study_2026_10_09/hf_synthesis/`). Evaluate the gap with the pair CI at each
   checkpoint.
@@ -486,7 +534,9 @@ faster.
 
 ## Rollout and verification
 
-1. Deploy all three books together (one release, the lock check passing).
+1. Deploy all three books together (one release, the lock check passing), and only from main:
+   the owner's merge of this change is the acceptance of the POOL_LOSS_MEMORY_V1 replacement
+   (see the defensive layer above); a branch build is never deployed.
 2. On main's `GET /state` (read-only), check:
    - `strategy_lab.activity_config.lab_high_frequency.config_hashes` equals the table above
      and the deployed `strategy-lock.json`;
@@ -495,8 +545,12 @@ faster.
      is 0 (`running` only says the container loaded; it stays true while HF calls fail);
    - `strategy_lab.persistence.hf.refresh.at` is current (a few seconds old, like
      `strategy_lab.updated_at`): a stale value means HF decisions stopped;
-   - `strategy_lab.persistence.hf.refresh.universe` (the HF universe count per refresh) is
-     above 0 once the feed runs.
+   - `strategy_lab.persistence.hf.refresh_60s.universe` (HF universe candidates over the last
+     60 s) is above 0 once the feed runs, and `refresh_60s.last_universe_at` is recent. Do not
+     read `refresh.universe`: it is the last refresh only and is 0 about one read in three on
+     a healthy runtime;
+   - `strategy_lab.persistence.hf.build.failures` is 0 (a failed build is retried every
+     minute and shown as `hf_error`).
 3. After the 15-minute heat warm-up, and while a book's session is open and its cap is not
    tripped, expect 40-50 orders an hour per book (`persistence.hf.orders_last_60m`).
 4. Check that `persistence.hf.journal.last_flush_ms` and `checkpoint.last_ms` stay small,

@@ -53,10 +53,21 @@ export type LabHighFrequencySnapshot = {
   books: LabHighFrequencyBook[];
 };
 
+// strategy_lab.activity_config.lab_high_frequency (published whether or not HF is running).
+export type LabHighFrequencyConfig = {
+  enabled?: boolean; running?: boolean;
+  build?: {
+    attempts?: number | null; failures?: number | null; last_error?: string | null;
+    last_attempt_at?: number | null; next_attempt_at?: number | null; built_at?: number | null; retry_ms?: number | null;
+  } | null;
+};
+
 export const HF_TITLE = 'Висока честота (HF)';
 export const HF_BADGE = 'ЕКСПЕРИМЕНТ · ОЧАКВА СЕ ЗАГУБА';
 export const HF_NOTE = 'Около 50 сделки/час на книга, $25 на сделка, изход след 2 мин. Цени: следващото опресняване на DexScreener + моделирани разходи (CALIB_V1, net50); не е изпълнима котировка. Изследването очаква ≈ −3,6% на сделка (≈ $37–44/час на книга). Измерване, не стратегия; без промоция.';
 export const HF_EMPTY = 'Няма HF данни';
+export const HF_DISABLED = 'HF книгите са изключени (NEO_LAB_HF_ENABLED=0).';
+export const HF_NOT_STARTED_PREFIX = 'HF не стартира';
 export const HF_CAP_TEXT = 'спрян до 00:00 UTC';
 export const HF_ERROR_PREFIX = 'Грешка в HF';
 
@@ -169,6 +180,17 @@ export function hfErrorText(snapshot: Pick<LabHighFrequencySnapshot, 'last_error
   const loops = finite(error.consecutive_loops) && error.consecutive_loops > 0
     ? ` (поредни цикли с грешка: ${error.consecutive_loops})` : '';
   return `${HF_ERROR_PREFIX}: ${error.text}${loops}. Данните по-долу може да не са актуални.`;
+}
+
+// Why there is no HF view: disabled by the operator, a failed start (retried every minute), or no data yet.
+export function hfAbsentText(error?: string | null, config?: LabHighFrequencyConfig | null): string {
+  if (config?.enabled === false) return HF_DISABLED;
+  const text = (typeof error === 'string' && error) || (typeof config?.build?.last_error === 'string' && config.build.last_error) || '';
+  if (text) {
+    const attempts = finite(config?.build?.attempts) && config!.build!.attempts! > 0 ? ` (опити досега: ${config!.build!.attempts})` : '';
+    return `${HF_NOT_STARTED_PREFIX}: ${text}. Lab опитва отново всяка минута${attempts}.`;
+  }
+  return HF_EMPTY;
 }
 
 export function hfSnapshotOrNull(data: unknown): LabHighFrequencySnapshot | null {

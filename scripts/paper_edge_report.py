@@ -353,8 +353,20 @@ def _hf_fee_bucket(fee_bps: Any) -> str:
     return 'fee<=50' if fee <= 50 else 'fee55-95' if fee <= 95 else 'fee100-125'
 
 
+def hf_trade_id(book: str, cfg: str, epoch: Any, seq: int) -> str:
+    """The HF journal identity: book, config hash, epoch (journal lineage) and seq.
+
+    seq restarts at 1 when the HF root is reset, so two sessions' closes share (book, cfg, seq);
+    the epoch (new at every fresh root or reset, on every row) keeps them apart. A row without
+    an epoch keeps the plain book:cfg:seq identity.
+    """
+    if isinstance(epoch, str) and epoch:
+        return f'HF:{book}:{cfg}:{epoch}:{seq}'
+    return f'HF:{book}:{cfg}:{seq}'
+
+
 def _hf_trade(row: dict[str, Any], source: str) -> dict[str, Any] | None:
-    """A LAB_HIGH_FREQUENCY_V1 journal close as a Lab trade; id = book:cfg:seq (journal identity)."""
+    """A LAB_HIGH_FREQUENCY_V1 journal close as a Lab trade; id = book:cfg:epoch:seq (journal identity)."""
     book, cfg, seq = row.get('book'), row.get('cfg'), row.get('seq')
     opened = finite(row.get('decision_at'))
     closed = finite(row.get('closed_at')) or finite(row.get('at'))
@@ -370,8 +382,10 @@ def _hf_trade(row: dict[str, Any], source: str) -> dict[str, Any] | None:
     gross = notional * (exit_mark / entry_mark - 1) if entry_mark and exit_mark and notional else None
     trade_no = row.get('trade_no')
     return {
-        'family': 'LAB', 'account': f'LAB:{HF_GROUP}', 'source': source, 'id': f'HF:{book}:{cfg}:{seq}',
+        'family': 'LAB', 'account': f'LAB:{HF_GROUP}', 'source': source,
+        'id': hf_trade_id(book, cfg, row.get('epoch'), seq),
         'book': book, 'session': 'LAB', 'hf': True, 'config_hash': cfg,
+        'epoch': row.get('epoch') if isinstance(row.get('epoch'), str) else None,
         'trade_no': trade_no if isinstance(trade_no, int) and not isinstance(trade_no, bool) else None,
         'balance_after': finite(row.get('balance_after')),
         'policy': ' | '.join([f'LAB:{HF_GROUP}', 'entry=' + str(row.get('entry_policy_version') or 'legacy_unknown')]),
@@ -1030,7 +1044,8 @@ def build_report(collector: LedgerCollector, *, iterations: int, seed: int) -> d
         # LAB_HIGH_FREQUENCY_V1 journal closes (--lab-hf), also measured as Lab books above.
         'high_frequency': {
             'unique_closed_trades': sum(1 for trade in lab if trade.get('hf')),
-            'dedupe_key': 'book:cfg:seq (journal identity)',
+            'dedupe_key': ('book:cfg:epoch:seq (journal identity; the epoch is new at every fresh HF root or reset, '
+                           'where seq restarts at 1)'),
             **hf_gap_report(lab, iterations=iterations, seed=seed),
         },
         'limitations': [
@@ -1164,7 +1179,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help='full strategy_lab.json copy (repeatable)')
     parser.add_argument('--lab-hf', action='append', default=[], metavar='DIR', type=Path,
                         help='LAB_HIGH_FREQUENCY_V1 strategy_lab_hf directory copy (journal closes as Lab trades, '
-                             'deduplicated by book, config hash and journal seq; repeatable)')
+                             'deduplicated by book, config hash, journal epoch and seq, so archived and '
+                             'current sessions can be read together; repeatable)')
     parser.add_argument('--archive-dir', action='append', default=[], metavar='[LABEL=]DIR',
                         help='directory scanned recursively for state.json / strategy_lab.json copies; an optional '
                              'label applies to engine ledgers that are not under users/<account-uuid>/')

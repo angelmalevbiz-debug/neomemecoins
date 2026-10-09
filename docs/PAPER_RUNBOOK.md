@@ -324,7 +324,8 @@ and the promotion migration, and they take no tape seat.
 
 **Enable and disable.**
 
-- `NEO_LAB_HF_ENABLED` is `1` by default.
+- `NEO_LAB_HF_ENABLED` is `1` by default. Deploy the family only from main: the owner's merge
+  is the acceptance of its POOL_LOSS_MEMORY_V1 replacement (DEFENSIVE_ENTRY_LAYER.md).
 - Set it to `0` and restart the Lab to stop the family. The journal and the checkpoint stay
   on disk, and the next enabled start resumes from them.
 - To retire individual books for good, set `NEO_LAB_HF_RETIRE=HF_QUIET_E95,HF_DIP15_E95`
@@ -416,21 +417,29 @@ every order (`hf_cost_model_mismatch`), as the forward-test books do.
 - `strategy_lab.activity_config.lab_high_frequency`: `config_hashes`, `budget_hash`,
   `cost_model_mismatches` and `running`;
 - `strategy_lab.persistence.hf`: loop milliseconds, `degraded` and `time_budget`
-  (`degraded_since`, `degraded_cleared_at`, `degraded_episodes`), `refresh.at` and
-  `refresh.universe` (the last HF refresh and its universe), `orders_last_60m`, the journal
-  and checkpoint writes (`checkpoint.skipped_in_flight`), `errors` (`count`, `last`,
-  `last_at`, `consecutive_loops`) and `price_audit.checks_last_60s` (at most 2);
+  (`degraded_since`, `degraded_cleared_at`, `degraded_episodes`), `refresh.at` (the last HF
+  refresh), `refresh_60s` (`refreshes`, `events`, `universe`, `refreshes_with_universe` and
+  `last_universe_at` over the last 60 s), `orders_last_60m`, the journal and checkpoint
+  writes (`checkpoint.skipped_in_flight`), `errors` (`count`, `last`, `last_at`,
+  `consecutive_loops`), `price_audit.checks_last_60s` (at most 2), the journal `epoch`,
+  `mark_feed` (HF's own exact-pair feed, at most one request every 2 s) and `build`
+  (`attempts`, `failures`, `last_error`, `next_attempt_at`, `built_at`);
 - `strategy_lab.hf_error`: the failing HF calls of the latest loop (it disappears after the
   first clean loop; `persistence.hf.errors` keeps the count). The Lab keeps running, and the
-  dashboard shows the failure above the HF books for 10 minutes.
+  dashboard shows the failure above the HF books for 10 minutes. A failed HF start shows as
+  `build: <error>` and is retried every minute while HF is enabled; the dashboard then says
+  `HF не стартира: <error>` instead of `Няма HF данни`.
 
 After a deploy, check that `config_hashes` equal the table in LAB_HIGH_FREQUENCY.md and
 `lab_high_frequency.config_hashes` in `strategy-lock.json`, that `strategy_lab.hf_error` is
-absent and `persistence.hf.errors.consecutive_loops` is 0, that `persistence.hf.refresh.at`
-is current (a few seconds old: a stale value means HF decisions stopped, even while
-`running` is true), and that `refresh.universe` is above 0. After the 15-minute heat warm-up,
-and while a book's session is open and its cap is not tripped, expect 40-50 orders an hour
-per book. `hf_degraded` (time budget) lasts at least 5 minutes once tripped.
+absent, `persistence.hf.errors.consecutive_loops` is 0 and `persistence.hf.build.failures`
+is 0, that `persistence.hf.refresh.at` is current (a few seconds old: a stale value means HF
+decisions stopped, even while `running` is true), and that `refresh_60s.universe` is above 0
+with a recent `refresh_60s.last_universe_at`. Do not judge the universe by
+`refresh.universe`: it is the last 2 s refresh only, and main rescans every 3 s, so it is 0
+about one read in three on a healthy runtime. After the 15-minute heat warm-up, and while a
+book's session is open and its cap is not tripped, expect 40-50 orders an hour per book.
+`hf_degraded` (time budget) lasts at least 5 minutes once tripped.
 
 **Rescore** from a **copy** of the folder (never the live one), outside the runtime:
 
@@ -442,15 +451,20 @@ Copy-Item -Recurse -Path RUNTIME\accounts\strategy_lab_hf -Destination (Join-Pat
 ```
 
 - `paper_edge_report.py --lab-hf` counts journal closes as Lab trades, deduplicated by
-  (book, config hash, journal seq). Archived resets are skipped. Its `high_frequency`
-  section reports each hypothesis against the same-period control, with a pair-bootstrap CI
-  and the gap within each fee bucket.
+  (book, config hash, journal epoch, journal seq). Archived resets inside the folder are
+  skipped. Its `high_frequency` section reports each hypothesis against the same-period
+  control, with a pair-bootstrap CI and the gap within each fee bucket.
 - `paper_edge_report.py --archive-dir` skips HF checkpoints (`strategy_lab_hf/state.json`,
   also inside reset archives): they are not engine ledgers. They are listed in the report's
-  `skipped_inputs` and on stderr. Pass an archived `strategy_lab_hf` folder with `--lab-hf`
-  to include its closes.
+  `skipped_inputs` and on stderr. Pass an archived `strategy_lab_hf` folder (or its
+  `archive/reset-<ms>-<id>` folder) with another `--lab-hf` to include its closes. After a
+  reset `seq` restarts at 1, but every row carries its journal `epoch` (new at each reset),
+  so the archived and the current sessions read together never collide.
 - `evaluate_paper_lab.py --hf-dir` reports orders, closes and cancels per hour per (book,
-  config hash), with the most slots held at once.
+  config hash), with the most slots held at once (per epoch) and `journal_epochs`.
+- A journal line torn by a crash (also inside a multi-byte character of a symbol) is counted
+  as one malformed line and skipped; it never stops the Lab's load or these reports, so the
+  journal is never edited by hand.
 - Compare a day's closes with the research simulator
   (`research/hf_study_2026_10_09/hf_synthesis/syn_lib.py`) for the same window when the scan
   log is available.

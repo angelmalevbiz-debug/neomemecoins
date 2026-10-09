@@ -272,6 +272,29 @@ class HighFrequencyJournalTests(unittest.TestCase):
             self.assertIn('High-frequency books', edge.render_markdown(report))
             self.assertEqual(collector.sources[0]['kind'], 'lab_hf')
 
+    def test_an_archived_and_the_current_session_read_together_keep_both_trades(self):
+        # Review finding: seq restarts at 1 after an HF reset, so an archived close and a current
+        # close shared book:cfg:seq; read together, both were excluded as a conflict. The journal
+        # epoch (new at every reset, on every row) is part of the identity.
+        with tempfile.TemporaryDirectory() as tmp:
+            current = Path(tmp) / 'strategy_lab_hf'
+            archived = current / 'archive' / 'reset-1-abcd'
+            write_hf_journal(archived, [dict(hf_close('HF_RND_E95', 7, -3.7, at=START), epoch='a' * 16)])
+            write_hf_journal(current, [dict(hf_close('HF_RND_E95', 7, -3.1, at=START + DAY), epoch='b' * 16)])
+            collector = edge.LedgerCollector()
+            collector.add_hf_journal(current)
+            collector.add_hf_journal(archived)
+            report = edge.build_report(collector, iterations=20, seed=3)
+            self.assertEqual(report['dedupe']['unique_closed_trades'], 2)
+            self.assertEqual(report['dedupe']['conflicting_ids_excluded'], 0)
+            self.assertEqual(report['high_frequency']['unique_closed_trades'], 2)
+            self.assertIn('epoch', report['high_frequency']['dedupe_key'])
+            # A copy of the same session is still one trade per close.
+            collector.add_hf_journal(current)
+            self.assertEqual((collector.duplicates, collector.conflicts), (1, set()))
+        self.assertEqual(edge.hf_trade_id('HF_RND_E95', 'c', 'a' * 16, 7), f"HF:HF_RND_E95:c:{'a' * 16}:7")
+        self.assertEqual(edge.hf_trade_id('HF_RND_E95', 'c', None, 7), 'HF:HF_RND_E95:c:7')
+
     def test_cli_reads_a_lab_hf_copy_and_refuses_a_missing_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / 'copy' / 'strategy_lab_hf'

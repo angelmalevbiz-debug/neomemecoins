@@ -1,6 +1,6 @@
 import {
-  HF_BADGE, HF_EMPTY, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfCloseKind, hfErrorText, hfGapText, hfKillText, hfMoney,
-  hfPct, hfSnapshotOrNull, hfStatusText, hfStatusTone, type LabHighFrequencyBook,
+  HF_BADGE, HF_EMPTY, HF_NOTE, HF_TITLE, hfAbsentText, hfCancelText, hfCapBar, hfCloseKind, hfErrorText, hfGapText, hfKillText,
+  hfMoney, hfPct, hfSnapshotOrNull, hfStatusText, hfStatusTone, type LabHighFrequencyBook, type LabHighFrequencyConfig,
 } from '../lib/labHighFrequencyView';
 
 const toneClass = {
@@ -66,9 +66,14 @@ function BookCard({ book }: { book: LabHighFrequencyBook }) {
   </article>;
 }
 
-export default function LabHighFrequencyPanel({ data }: { data?: unknown }) {
+// data: strategy_lab.high_frequency; error: strategy_lab.hf_error; config: activity_config.lab_high_frequency.
+// Without a view the panel says why: disabled, a failed start (with its error, retried every minute) or no data.
+export default function LabHighFrequencyPanel({ data, error: lastLoopError, config }: {
+  data?: unknown; error?: string | null; config?: LabHighFrequencyConfig | null;
+}) {
   const snapshot = hfSnapshotOrNull(data);
   const error = hfErrorText(snapshot);
+  const absent = snapshot ? null : hfAbsentText(lastLoopError, config);
   return <section data-testid="lab-high-frequency" className="border-b border-white/[0.06]">
     <header className="px-4 pb-2 pt-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -78,7 +83,7 @@ export default function LabHighFrequencyPanel({ data }: { data?: unknown }) {
       <p data-testid="hf-note" className="mt-2 max-w-4xl text-[11px] leading-5 text-amber-100/80">{HF_NOTE}</p>
       {error && <p data-testid="hf-error" className="mt-2 max-w-4xl break-words text-[11px] leading-5 text-red-200">{error}</p>}
     </header>
-    {!snapshot ? <p data-testid="hf-empty" className="px-4 pb-4 text-[11px] text-slate-400">{HF_EMPTY}</p>
+    {!snapshot ? <p data-testid="hf-empty" className={`px-4 pb-4 text-[11px] ${absent !== HF_EMPTY && config?.enabled !== false ? 'break-words text-red-200' : 'text-slate-400'}`}>{absent}</p>
       : snapshot.books.length === 0 ? <p data-testid="hf-empty" className="px-4 pb-4 text-[11px] text-slate-400">{HF_EMPTY}</p>
         : snapshot.books.map(book => <BookCard key={book.id} book={book} />)}
   </section>;

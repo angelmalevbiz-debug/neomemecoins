@@ -32,9 +32,12 @@ Storage (HF_JOURNAL_V1 / HF_CHECKPOINT_V1): every state change is a journal row
 (append-only strategy_lab_hf/journal/<BOOK>/<YYYY-MM-DD>.jsonl, flushed and
 fsynced once per touched file per loop) applied to the in-memory state by one
 function, so a restart that replays the rows after the last checkpoint
-(strategy_lab_hf/state.json) rebuilds exactly the same state. The books live
-outside STATE['books'] and strategy_lab.json: the Lab ledger, the lifecycle, the
-promotion and migration code never see them.
+(strategy_lab_hf/state.json) rebuilds exactly the same state. A row's identity is
+(book, cfg, epoch, seq): the epoch is new at a fresh root or a reset, where seq
+restarts. The books live outside STATE['books'] and strategy_lab.json: the Lab
+ledger, the lifecycle, the promotion and migration code never see them. Held pools
+out of the main feed are marked through HF's own exact-pair feed (HF_MARK_FEED_V1),
+never the Lab books' POSITION_MARK_FEED.
 """
 import bisect
 from collections import OrderedDict, deque
@@ -54,6 +57,7 @@ import entry_defense
 import heat_veto
 import lab_activity as activity
 import lab_forward_tests as lab_forward
+import lab_position_marks
 import paper_market_feasibility as feasibility
 import pool_loss_memory
 import structural_rug_guard as rug
@@ -76,13 +80,15 @@ SESSION_ROTATION_VERSION = 'HF_SESSION_ROTATION_V1'
 KILL_RULE_VERSION = 'HF_KILL_RULE_V1'
 JOURNAL_VERSION = 'HF_JOURNAL_V1'
 CHECKPOINT_VERSION = 'HF_CHECKPOINT_V1'
+# HF's own exact-pair mark path for held pools out of the main feed (never the Lab's POSITION_MARK_FEED).
+MARK_FEED_VERSION = 'HF_MARK_FEED_V1'
 VERSIONS = {
     'family': VERSION, 'universe': UNIVERSE_VERSION, 'refresh_event': REFRESH_EVENT_VERSION,
     'signals': SIGNALS_VERSION, 'book_rules': BOOK_RULES_VERSION, 'rate_governor': RATE_GOVERNOR_VERSION,
     'pool_rule': POOL_RULE_VERSION, 'exit': EXIT_VERSION, 'fill': FILL_VERSION, 'print_guard': PRINT_GUARD_VERSION,
     'accounting': ACCOUNTING_VERSION, 'price_audit': PRICE_AUDIT_VERSION, 'daily_loss_cap': DAILY_LOSS_CAP_VERSION,
     'session_rotation': SESSION_ROTATION_VERSION, 'kill_rule': KILL_RULE_VERSION, 'journal': JOURNAL_VERSION,
-    'checkpoint': CHECKPOINT_VERSION,
+    'checkpoint': CHECKPOINT_VERSION, 'mark_feed': MARK_FEED_VERSION,
 }
 PORTFOLIO_GROUP = 'HF_EXPERIMENT'
 AUTOMATIC_PROMOTION = False
@@ -163,6 +169,8 @@ TIME_BUDGET_CLEAR_LOOPS = 30
 TIME_BUDGET_MIN_DEGRADED_MS = 300_000
 # An HF error published in the dashboard view while it is this recent (strategy_lab hf_error).
 ERROR_VIEW_MS = 600_000
+# The rolling refresh figures of metrics()['refresh_60s'] (the rollout check reads these).
+REFRESH_WINDOW_MS = 60_000
 # Cost functions strategy_lab injects (avoids a circular import; the shared model stays there).
 COST_FUNCTIONS = ('entry_execution', 'exit_execution', 'calibrated_entry_execution', 'calibrated_exit_execution',
                   'pumpswap_fee_bps', 'sol_usd_from_coin', 'pair_liquidity_usd', 'forward_cost_model')
@@ -273,7 +281,11 @@ class FillParameters:
                  'the window end)')
     entry_no_next: str = f'cancel {CANCEL_NO_NEXT} and release the slot'
     exit_no_next: str = f'wait for the next observation and fill there ({FILL_LATE_NEXT})'
-    marks: str = 'the shared feed exact pool, else lab_position_marks.POSITION_MARK_FEED.resolve'
+    marks: str = ("the shared feed exact pool, else HF's own lab_position_marks.PositionMarkFeed (its own worker, "
+                  'pending set and cache; at most one exact-pair request every mark_request_interval_s), never the '
+                  "Lab's POSITION_MARK_FEED, so an HF refresh never queues ahead of an existing Lab position")
+    mark_feed_version: str = MARK_FEED_VERSION
+    mark_request_interval_s: float = 2.0
     vanish_after_ms: int = 600_000
     vanish_confirm_ms: int = 60_000
     vanish_haircut_pct: float = lab_forward.CLOSE_POLICY.vanish_haircut_pct
@@ -491,6 +503,23 @@ def retire_flag_ids(environ=None) -> list:
 def cost_functions(source):
     """The Lab's cost functions as one object (strategy_lab passes itself)."""
     return SimpleNamespace(**{name: getattr(source, name) for name in COST_FUNCTIONS})
+
+
+def new_mark_feed():
+    """HF_MARK_FEED_V1: HF's own exact-pair mark path for held pools out of the main feed.
+
+    A separate lab_position_marks.PositionMarkFeed with its own single worker, pending set and
+    cache, so an HF refresh is never queued in front of an existing Lab position's refresh
+    (the Lab's POSITION_MARK_FEED serves only the Lab's books). It requests at most once every
+    FILL.mark_request_interval_s (30 a minute), and only while an HF pool held is out of the
+    main feed (at most 3 books x 3 slots). Read-only market data; nothing is signed or sent.
+    """
+    return lab_position_marks.PositionMarkFeed(interval_seconds=FILL.mark_request_interval_s)
+
+
+def new_epoch() -> str:
+    """A new HF_JOURNAL_V1 epoch id (64 random bits as 16 hex characters)."""
+    return uuid.uuid4().hex[:16]
 
 
 def session_open_hour(day, budget: BudgetParameters = DEFAULT_BUDGET) -> int:
@@ -777,11 +806,17 @@ class Journal:
         return repaired
 
     def rows(self, book=None, min_day=None, kinds=None):
-        """Every parseable row (file order); malformed lines are counted and skipped."""
+        """Every parseable row (file order); malformed lines are counted and skipped.
+
+        Files are read as bytes, one line at a time: a line torn inside a multi-byte UTF-8
+        character (a symbol in Cyrillic, CJK or an emoji) fails json.loads with a
+        UnicodeDecodeError, a ValueError, so it is skipped as malformed like any torn line
+        instead of stopping the read (and with it load(), the kill checkpoint and the reports).
+        """
         out = []
         for path in self.files(book, min_day):
             try:
-                with path.open('r', encoding='utf-8') as handle:
+                with path.open('rb') as handle:
                     for line in handle:
                         line = line.strip()
                         if not line:
@@ -951,11 +986,32 @@ def pair_bootstrap_gap(groups_a, groups_b, *, notional, reps=1000, seed=20261009
 
 # ------------------------------------------------------------------ the HF container
 
+def new_kill_state(cfg=None) -> dict:
+    """HF_KILL_RULE_V1 checkpoint state of one strategy config (a new config hash is a new sample)."""
+    return {'cfg': cfg, 'next_checkpoint': KILL_RULE.first_checkpoint_closes, 'last': None, 'checkpoints': 0}
+
+
+def kill_state_for(kill, cfg) -> dict:
+    """The kill state that belongs to ``cfg``: the stored one, or a fresh one for a new sample.
+
+    A state not yet tied to a config (a new book) that never evaluated is adopted as is. A
+    state of another config (the strategy hash changed) is replaced by a fresh one: the new
+    sample's first checkpoint comes at first_checkpoint_closes of its own closes, never at the
+    old sample's next threshold; the old one's last evaluation is kept as ``previous``.
+    """
+    kill = kill if isinstance(kill, dict) else {}
+    owner = kill.get('cfg')
+    if owner == cfg or (owner is None and not int(kill.get('checkpoints') or 0) and kill.get('last') is None):
+        return {**new_kill_state(cfg), **{key: value for key, value in kill.items() if key != 'cfg'}, 'cfg': cfg}
+    fresh = new_kill_state(cfg)
+    fresh['previous'] = {'cfg': owner, 'last': kill.get('last'), 'checkpoints': int(kill.get('checkpoints') or 0)}
+    return fresh
+
+
 def new_book(book_id, budget: BudgetParameters) -> dict:
     return {'id': book_id, 'balance': float(budget.start_balance_usd), 'start_balance': float(budget.start_balance_usd),
             'trade_no': 0, 'slots': {}, 'retired': None, 'cap': None, 'session': None, 'governor': [],
-            'recent': [], 'cooldowns': {}, 'kill': {'next_checkpoint': KILL_RULE.first_checkpoint_closes,
-                                                    'last': None, 'checkpoints': 0},
+            'recent': [], 'cooldowns': {}, 'kill': new_kill_state(),
             'aggregates': {}, 'last_closes': []}
 
 
@@ -967,6 +1023,9 @@ class HighFrequencyLab:
         self.root = Path(root)
         self.cost = cost
         self.defense = defense
+        if marks is not None and marks is lab_position_marks.POSITION_MARK_FEED:
+            # HF_MARK_FEED_V1: an HF refresh must never queue in the Lab books' single-worker feed.
+            raise ValueError("HF needs its own mark feed (new_mark_feed()), never the Lab's POSITION_MARK_FEED")
         self.marks = marks
         self.price_audit = price_audit
         self.clock = clock or (lambda: int(time.time() * 1000))
@@ -980,10 +1039,16 @@ class HighFrequencyLab:
         self.books = {book_id: new_book(book_id, self.budget) for book_id in BOOK_IDS}
         self.journal = Journal(self.root / 'journal')
         self.seq = 0
+        # HF_JOURNAL_V1 epoch: one id per journal lineage, new when the HF root starts empty or is
+        # reset, kept in state.json and carried on every row. seq restarts at 1 after a reset, so
+        # reports that read journals of several sessions dedupe by (book, cfg, epoch, seq).
+        self.epoch = None
         # Seqs of rows emitted (journaled) but not yet fully applied: while any exists, no
         # checkpoint is written, so a restart replays them from the journal (exactly once).
         self._in_flight = set()
         self.loaded = False
+        # The archive a reset load made (strategy_lab clears its reset request once it is set).
+        self.reset_archive = None
         self.started_at = None
         # written_at of the checkpoint this process loaded (the previous process's last one).
         self.previous_written_at = None
@@ -1004,6 +1069,11 @@ class HighFrequencyLab:
         self.last_checkpoint_at = 0
         self.refresh_stats = {'at': None, 'observations': 0, 'events': 0, 'universe': 0, 'pools': 0,
                               'universe_rejections': {}, 'defensive_calls': 0, 'pools_in_memory': 0}
+        # (at, events, universe) of the refreshes of the last REFRESH_WINDOW_MS: one refresh often
+        # sees no new observation (the Lab refreshes every 2 s, main rescans every 3 s), so the
+        # rollout check reads these rolling figures, never the last refresh alone.
+        self._refresh_window = deque()
+        self.last_universe_at = None
         self.diagnostics = {book_id: {} for book_id in BOOK_IDS}
         self.audit_stats = {'checks': 0, 'skipped_by_bucket': 0, 'cached_fills': 0, 'errors': 0}
         self._gap_cache = {}
@@ -1026,8 +1096,9 @@ class HighFrequencyLab:
 
     def _emit(self, book_id, kind, fields, at, *, cfg=None) -> dict:
         self.seq += 1
-        row = {'v': 1, 'seq': self.seq, 'kind': kind, 'book': book_id, 'cfg': cfg or self.cfg[book_id],
-               'budget': self.budget_hash, 'at': int(at), 'entry_policy_version': ENTRY_POLICY_VERSION, **fields}
+        row = {'v': 1, 'seq': self.seq, 'epoch': self.epoch, 'kind': kind, 'book': book_id,
+               'cfg': cfg or self.cfg[book_id], 'budget': self.budget_hash, 'at': int(at),
+               'entry_policy_version': ENTRY_POLICY_VERSION, **fields}
         # A stop (KeyboardInterrupt from the local stop marker) or an error between the journal
         # append and the end of _apply leaves this seq in flight: the checkpoint is then skipped
         # (see checkpoint_if_due) and the restart replays the row instead of losing it.
@@ -1151,10 +1222,15 @@ class HighFrequencyLab:
             now = int(self.clock())
             self.root.mkdir(parents=True, exist_ok=True)
             report = {'reset': bool(reset), 'archive': None, 'checkpoint': 'absent', 'replayed_rows': 0,
-                      'restart_cancels': 0, 'resumed_open': 0, 'resumed_exit_ordered': 0, 'torn_tails': 0}
+                      'restart_cancels': 0, 'resumed_open': 0, 'resumed_exit_ordered': 0, 'torn_tails': 0,
+                      'epoch': None, 'epoch_source': None}
             if reset:
                 report['archive'] = self._archive_for_reset(now)
+                # The archive is done: a retried load (the Lab retries a failed build) must not
+                # archive this root's fresh, empty state a second time.
+                self.reset_archive = report['archive']
             min_day = None
+            self.epoch = None
             if self.state_path.exists():
                 try:
                     data = json.loads(self.state_path.read_text(encoding='utf-8'))
@@ -1170,11 +1246,19 @@ class HighFrequencyLab:
                     # The journal is the record: rebuild from every row.
                     self.books = {book_id: new_book(book_id, self.budget) for book_id in BOOK_IDS}
                     self.seq = 0
+                    self.epoch = None
                     self.memory.toggles = {}
                     self.previous_written_at = None
                     report['checkpoint'] = 'unreadable_rebuilt_from_journal'
             report['torn_tails'] = self.journal.repair_torn_tails()
             checkpoint_seq = self.seq
+            report['epoch_source'] = 'checkpoint' if self.epoch else None
+            if self.epoch is None:
+                # No checkpoint epoch: the journal's lineage if it has one, else a new lineage.
+                self.epoch = self._journal_epoch()
+                report['epoch_source'] = 'journal' if self.epoch else 'new'
+                self.epoch = self.epoch or new_epoch()
+            report['epoch'] = self.epoch
             rows = [row for row in self.journal.rows(min_day=min_day) if row['seq'] > checkpoint_seq]
             seen = set()
             for row in sorted(rows, key=lambda item: item['seq']):
@@ -1210,8 +1294,24 @@ class HighFrequencyLab:
             self.checkpoint_if_due(now, force=True)
             return report
 
+    def _journal_epoch(self):
+        """The epoch of the newest journal row that has one (each book's newest day file), or None."""
+        best = None
+        for book_id in BOOK_IDS:
+            files = self.journal.files(book_id)
+            if not files:
+                continue
+            reader = Journal(self.journal.root)
+            for row in reader.rows(book_id, min_day=files[-1].stem):
+                epoch = row.get('epoch')
+                if isinstance(epoch, str) and epoch and (best is None or row['seq'] > best[0]):
+                    best = (row['seq'], epoch)
+        return best[1] if best else None
+
     def _restore(self, data) -> None:
         self.seq = int(data.get('seq') or 0)
+        epoch = data.get('epoch')
+        self.epoch = epoch if isinstance(epoch, str) and epoch else None
         books = data.get('books') or {}
         for book_id in BOOK_IDS:
             stored = books.get(book_id)
@@ -1224,7 +1324,8 @@ class HighFrequencyLab:
         self.memory.toggles = dict(data.get('toggles') or {})
 
     def checkpoint(self, now) -> dict:
-        return {'version': CHECKPOINT_VERSION, 'family': VERSION, 'seq': self.seq, 'written_at': int(now),
+        return {'version': CHECKPOINT_VERSION, 'family': VERSION, 'seq': self.seq, 'epoch': self.epoch,
+                'written_at': int(now),
                 'config_hashes': dict(self.cfg), 'budget_hash': self.budget_hash, 'budget': asdict(self.budget),
                 'books': {book_id: self._checkpoint_book(book, now) for book_id, book in self.books.items()},
                 'toggles': dict(self.memory.toggles)}
@@ -1812,7 +1913,12 @@ class HighFrequencyLab:
         cfg = self.cfg[book_id]
         agg = book['aggregates'].get(cfg)
         closes = int((agg or {}).get('n') or 0)
-        kill = book['kill']
+        # The checkpoint counter belongs to the current config's sample (spec §5: a strategy-hash
+        # change starts a new sample): a state of another config is replaced, never inherited.
+        kill = kill_state_for(book.get('kill'), cfg)
+        if kill != book.get('kill'):
+            self.dirty = True
+        book['kill'] = kill
         days = sum(1 for value in ((agg or {}).get('by_day') or {}).values() if value.get('closes'))
         if not force and (closes < int(kill['next_checkpoint']) or days < KILL_RULE.min_utc_days_with_closes):
             return None
@@ -1958,7 +2064,26 @@ class HighFrequencyLab:
             for book_id in BOOK_IDS:
                 self.diagnostics[book_id] = self._decide(book_id, candidates, defensive, stats, now)
             self.refresh_stats = stats
+            self._refresh_window.append((int(now), len(events), len(candidates)))
+            self._prune_refresh_window(now)
+            if candidates:
+                self.last_universe_at = int(now)
             return stats
+
+    def _prune_refresh_window(self, now) -> None:
+        window = self._refresh_window
+        while window and window[0][0] <= now - REFRESH_WINDOW_MS:
+            window.popleft()
+
+    def refresh_rolling(self, now) -> dict:
+        """HF refreshes of the last 60 s: counts, events and universe candidates (the rollout check)."""
+        with self.lock:
+            self._prune_refresh_window(now)
+            window = list(self._refresh_window)
+            return {'window_ms': REFRESH_WINDOW_MS, 'refreshes': len(window),
+                    'events': sum(item[1] for item in window), 'universe': sum(item[2] for item in window),
+                    'refreshes_with_universe': sum(1 for item in window if item[2]),
+                    'last_universe_at': self.last_universe_at}
 
     def _defensive(self, cache, stats, candidate, now):
         key = candidate['key']
@@ -2061,7 +2186,14 @@ class HighFrequencyLab:
                 'errors': dict(self.errors),
                 'loop_ms_last': self.loop_ms[-1] if self.loop_ms else None,
                 'loop_ms_max_recent': max(self.loop_ms) if self.loop_ms else None,
+                # The last refresh only (often 0 events: main rescans every 3 s, the Lab refreshes
+                # every 2 s); the rollout check reads refresh_60s.
                 'refresh': dict(self.refresh_stats),
+                'refresh_60s': self.refresh_rolling(now),
+                'epoch': self.epoch,
+                'mark_feed': {'version': MARK_FEED_VERSION, 'request_interval_s': FILL.mark_request_interval_s,
+                              'separate_from_lab_position_marks':
+                                  self.marks is not lab_position_marks.POSITION_MARK_FEED},
                 'journal': {'version': JOURNAL_VERSION, 'bytes_written': self.journal.bytes_written,
                             'rows_written': self.journal.rows_written, 'flushes': self.journal.flushes,
                             'last_flush_files': self.journal.last_flush_files,
@@ -2156,7 +2288,8 @@ class HighFrequencyLab:
                     hours = max(0.0, (end - opened) / HOUR_MS)
                 n = agg['n']
                 top = max((value[0] for value in agg['by_pair'].values()), default=0)
-                kill = book['kill']
+                # The current config's sample only (a previous config's evaluation is not shown).
+                kill = kill_state_for(book.get('kill'), self.cfg[book_id])
                 last_kill = kill.get('last') or {}
                 books.append({
                     'id': book_id, 'name': BOOK_NAMES[book_id],
@@ -2209,7 +2342,9 @@ class HighFrequencyLab:
                     'notional_usd': BOOK_RULES.notional_usd, 'hold_seconds': EXIT.hold_ms // 1000,
                     'expected_net50_pct_per_trade': -3.6, 'automatic_promotion': AUTOMATIC_PROMOTION,
                     'profitability_proven': PROFITABILITY_PROVEN,
-                    'universe': {key: self.refresh_stats.get(key) for key in ('events', 'universe', 'pools')},
+                    'universe': {**{key: self.refresh_stats.get(key) for key in ('events', 'universe', 'pools')},
+                                 'universe_60s': self.refresh_rolling(now)['universe'],
+                                 'last_universe_at': self.last_universe_at},
                     'books': books}
 
 
@@ -2285,6 +2420,10 @@ def config_view(hashes=None, budget: BudgetParameters = DEFAULT_BUDGET, *, enabl
         'automatic_promotion': AUTOMATIC_PROMOTION, 'profitability_proven': PROFITABILITY_PROVEN,
         'expected_result': EXPECTED_RESULT, 'is_entry_authorization': False,
         'storage': 'strategy_lab_hf/ (journal/<BOOK>/<YYYY-MM-DD>.jsonl and state.json); never in strategy_lab.json',
+        'journal_identity': ('(book, cfg, epoch, seq): the epoch is one id per journal lineage, new when the HF root '
+                             'starts empty or is reset (seq then restarts at 1), kept in state.json and on every row'),
+        'mark_feed': {'version': MARK_FEED_VERSION, 'request_interval_s': FILL.mark_request_interval_s,
+                      'basis': "HF's own lab_position_marks.PositionMarkFeed, never the Lab's POSITION_MARK_FEED"},
         'time_budget': {'version': TIME_BUDGET_VERSION, 'max_ms_per_loop': TIME_BUDGET_MS,
                         'consecutive_loops': TIME_BUDGET_LOOPS, 'clear_after_loops': TIME_BUDGET_CLEAR_LOOPS,
                         'min_degraded_ms': TIME_BUDGET_MIN_DEGRADED_MS,

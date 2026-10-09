@@ -5,8 +5,9 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import LabHighFrequencyPanel from '../src/components/LabHighFrequencyPanel';
 import {
-  HF_BADGE, HF_CAP_TEXT, HF_EMPTY, HF_ERROR_PREFIX, HF_NOTE, HF_TITLE, hfCancelText, hfCapBar, hfErrorText, hfGapText,
-  hfKillText, hfMoney, hfSnapshotOrNull, hfStatusText, type LabHighFrequencyBook, type LabHighFrequencySnapshot,
+  HF_BADGE, HF_CAP_TEXT, HF_DISABLED, HF_EMPTY, HF_ERROR_PREFIX, HF_NOT_STARTED_PREFIX, HF_NOTE, HF_TITLE, hfAbsentText,
+  hfCancelText, hfCapBar, hfErrorText, hfGapText, hfKillText, hfMoney, hfSnapshotOrNull, hfStatusText,
+  type LabHighFrequencyBook, type LabHighFrequencySnapshot,
 } from '../src/lib/labHighFrequencyView';
 
 const book = (id: string, changes: Partial<LabHighFrequencyBook> = {}): LabHighFrequencyBook => ({
@@ -76,6 +77,36 @@ test('the fallback says there is no HF data when the key is absent or malformed'
   assert.equal(hfSnapshotOrNull('nope'), null);
 });
 
+test('without a view the panel says why: disabled, a failed start with its error, or no data yet', () => {
+  // Review finding: a failed HF build left only 'Няма HF данни' while strategy_lab.hf_error and
+  // activity_config.lab_high_frequency (enabled, running, build) were in the same /state payload.
+  const failed = { enabled: true, running: false, build: { attempts: 3, failures: 3, last_error: 'build: PermissionError: state.json' } };
+  const text = hfAbsentText('build: UnicodeDecodeError: invalid continuation byte', failed);
+  assert.equal(HF_NOT_STARTED_PREFIX, 'HF не стартира');
+  assert.equal(text, 'HF не стартира: build: UnicodeDecodeError: invalid continuation byte. Lab опитва отново всяка минута (опити досега: 3).');
+  // The build status alone (hf_error cleared by a later loop) still names the error.
+  assert.match(hfAbsentText(undefined, failed), /^HF не стартира: build: PermissionError: state\.json\./);
+  assert.equal(hfAbsentText(undefined, { enabled: false, running: false }), HF_DISABLED);
+  assert.equal(HF_DISABLED, 'HF книгите са изключени (NEO_LAB_HF_ENABLED=0).');
+  assert.equal(hfAbsentText(undefined, { enabled: true, running: false, build: { attempts: 0, last_error: null } }), HF_EMPTY);
+  assert.equal(hfAbsentText(), HF_EMPTY);
+  const html = renderToStaticMarkup(createElement(LabHighFrequencyPanel, {
+    data: undefined, error: 'build: UnicodeDecodeError: invalid continuation byte', config: failed,
+  }));
+  assert.match(html, /HF не стартира: build: UnicodeDecodeError/);
+  assert.match(html, /опити досега: 3/);
+  assert.match(html, /text-red-200/);
+  assert.doesNotMatch(html, /Няма HF данни/);
+  const disabled = renderToStaticMarkup(createElement(LabHighFrequencyPanel, { config: { enabled: false } }));
+  assert.ok(disabled.includes(HF_DISABLED));
+  assert.doesNotMatch(disabled, /text-red-200/);
+  // A view, when present, wins over the absent texts.
+  const running = renderToStaticMarkup(createElement(LabHighFrequencyPanel, {
+    data: snapshot([book('HF_RND_E95')]), error: 'build: old', config: { enabled: true, running: true },
+  }));
+  assert.doesNotMatch(running, /HF не стартира/);
+});
+
 test('a recent HF failure is shown above the books and nothing is shown without one', () => {
   const failing: LabHighFrequencySnapshot = {
     ...snapshot([book('HF_RND_E95')]),
@@ -119,7 +150,10 @@ test('cap bar, kill evidence, gap with fee buckets and cancels never overstate',
 test('the dashboard shows the HF panel in the Strategies section outside the advanced details', () => {
   const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
   assert.match(app, /high_frequency\?: LabHighFrequencySnapshot/);
-  const panel = app.indexOf('<LabHighFrequencyPanel data={state?.strategy_lab?.high_frequency} />');
+  assert.match(app, /hf_error\?: string/);
+  assert.match(app, /activity_config\?: \{ lab_high_frequency\?: LabHighFrequencyConfig \}/);
+  const panel = app.indexOf('<LabHighFrequencyPanel data={state?.strategy_lab?.high_frequency} '
+    + 'error={state?.strategy_lab?.hf_error} config={state?.strategy_lab?.activity_config?.lab_high_frequency} />');
   const advancedStart = app.indexOf('{showAdvanced && <div');
   const strategiesTable = app.indexOf('partitionLabStrategies(Object.values(state?.strategy_lab?.books');
   assert.ok(panel > 0 && advancedStart > 0 && strategiesTable > 0);

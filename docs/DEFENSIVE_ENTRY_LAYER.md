@@ -514,10 +514,17 @@ Their defensive modes are part of every HF config hash:
     2-minute move), so 2 losses in a pool are the normal case, not a signal. With the memory
     enforced, the HF books traded 3.5-4.0 times an hour on the holdout
     (`research/hf_study_2026_10_09`).
-  - ACCEPTED 2026-10-09 by the operator under the owner's delegation: on the owner's request
-    of 2026-10-09 ("it has to trade more often like 50 trades per hour for each strategy"),
-    POOL_LOSS_MEMORY_V1 runs as a shadow for the three `LAB_HIGH_FREQUENCY_V1` books only and
-    is replaced there by `HF_POOL_RULE_V1`.
+  - **Acceptance record.** The owner accepts this replacement by merging this change into
+    main; GitHub records who merged it and when, and that merge is the written acceptance of
+    the wording here. No agent can accept it, and an agent never merges to main. The HF books
+    are deployed only from main.
+    - What it accepts: POOL_LOSS_MEMORY_V1 runs as a shadow for the three
+      `LAB_HIGH_FREQUENCY_V1` books only and is replaced there by `HF_POOL_RULE_V1`.
+    - Basis: the owner's request of 2026-10-09, verbatim "it has to trade more often like 50
+      trades per hour for each strategy". The request asks for the rate and does not itself
+      mention POOL_LOSS_MEMORY_V1. The replacement was proposed on 2026-10-09 by the Claude
+      Code workflow that built the family, because the rate cannot be met with the memory
+      enforced (3.5-4.0 trades an hour on the holdout).
   - Every other account, Lab book and the training probe keeps enforcing it unchanged.
 
 ### Tape seats: structural guard and heat for new seats

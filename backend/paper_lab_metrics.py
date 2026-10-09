@@ -174,7 +174,9 @@ def read_hf_journal(directory):
     """Rows of every LAB_HIGH_FREQUENCY_V1 journal file under ``directory`` (read only).
 
     ``directory`` is strategy_lab_hf/ or its journal/ folder; files under an ``archive``
-    folder (earlier reset sessions) are skipped. Unparseable lines are counted, not raised.
+    folder (earlier reset sessions) are skipped. Unparseable lines are counted, not raised:
+    files are read as bytes, so a line torn inside a multi-byte UTF-8 character is one
+    malformed line, never a UnicodeDecodeError for the whole read.
     """
     from pathlib import Path
     import json
@@ -183,7 +185,7 @@ def read_hf_journal(directory):
     for path in sorted(root.rglob('*.jsonl')):
         if 'archive' in path.relative_to(root).parts:
             continue
-        with path.open('r', encoding='utf-8') as handle:
+        with path.open('rb') as handle:
             for line in handle:
                 line = line.strip()
                 if not line:
@@ -201,9 +203,11 @@ def measure_hf_rows(rows, *, as_of=None, started_at=None):
     """Measure LAB_HIGH_FREQUENCY_V1 journal rows per (book, config hash); read only.
 
     A book holds up to three positions at once, so throughput counts every order
-    (``opened_per_hour``) and close, deduplicated by (book, cfg, seq), and the
-    most slots held at the same time is reported. Rates describe the supplied
-    window only; nothing here is a profitability claim.
+    (``opened_per_hour``) and close, deduplicated by (book, cfg, epoch, seq), and the
+    most slots held at the same time is reported. The epoch is the journal lineage
+    (new at a fresh HF root or a reset, where seq and trade_no restart at 1), so the
+    journals of several sessions read together never collide. Rates describe the
+    supplied window only; nothing here is a profitability claim.
     """
     rejected = {'malformed': 0, 'duplicate': 0, 'future': 0}
     seen = set()
@@ -217,7 +221,8 @@ def measure_hf_rows(rows, *, as_of=None, started_at=None):
                 or finite(row.get('at')) is None):
             rejected['malformed'] += 1
             continue
-        key = (row['book'], row['cfg'], row['seq'])
+        epoch = row.get('epoch') if isinstance(row.get('epoch'), str) else None
+        key = (row['book'], row['cfg'], epoch, row['seq'])
         if key in seen:
             rejected['duplicate'] += 1
             continue
@@ -231,26 +236,30 @@ def measure_hf_rows(rows, *, as_of=None, started_at=None):
         group = groups.setdefault((row['book'], row['cfg']), {
             'book': row['book'], 'config_hash': row['cfg'], 'orders': 0, 'fills': 0, 'closes': 0, 'cancels': {},
             'booked_usd': 0.0, 'net50_usd': 0.0, 'net0_usd': 0.0, 'wins_booked': 0, 'wins_net50': 0,
-            'first_at': None, 'last_at': None, 'open': set(), 'max_concurrent': 0, 'close_kinds': {},
-            'cap_trips': 0, 'retired': None})
+            'first_at': None, 'last_at': None, 'open': {}, 'max_concurrent': 0, 'close_kinds': {},
+            'cap_trips': 0, 'retired': None, 'epochs': set()})
         at = finite(row['at'])
         group['first_at'] = at if group['first_at'] is None else group['first_at']
         group['last_at'] = at
         kind = row['kind']
+        # trade_no restarts at 1 in a new epoch: slots are counted per epoch (journal lineage).
+        epoch = row.get('epoch') if isinstance(row.get('epoch'), str) else None
+        group['epochs'].add(epoch)
+        open_slots = group['open'].setdefault(epoch, set())
         trade = row.get('trade_no')
         if kind == 'order' and row.get('side') == 'entry':
             group['orders'] += 1
-            group['open'].add(trade)
-            group['max_concurrent'] = max(group['max_concurrent'], len(group['open']))
+            open_slots.add(trade)
+            group['max_concurrent'] = max(group['max_concurrent'], len(open_slots))
         elif kind == 'fill':
             group['fills'] += 1
         elif kind == 'cancel':
             reason = str(row.get('reason'))
             group['cancels'][reason] = group['cancels'].get(reason, 0) + 1
-            group['open'].discard(trade)
+            open_slots.discard(trade)
         elif kind == 'close':
             group['closes'] += 1
-            group['open'].discard(trade)
+            open_slots.discard(trade)
             booked = finite(row.get('pnl_usd')) or 0.0
             net50 = finite(row.get('net50_usd')) or 0.0
             group['booked_usd'] += booked
@@ -273,7 +282,8 @@ def measure_hf_rows(rows, *, as_of=None, started_at=None):
         books[f'{book}:{cfg[:12]}'] = {
             'book': book, 'config_hash': cfg, 'orders': group['orders'], 'fills': group['fills'],
             'closes': closes, 'cancels': group['cancels'], 'close_kinds': group['close_kinds'],
-            'open_at_end': len(group['open']), 'max_concurrent_slots': group['max_concurrent'],
+            'open_at_end': sum(len(slots) for slots in group['open'].values()),
+            'max_concurrent_slots': group['max_concurrent'], 'journal_epochs': len(group['epochs']),
             'window_hours': round(hours, 6),
             'opened_per_hour': round(group['orders'] / hours, 6) if hours > 0 else None,
             'closed_per_hour': round(closes / hours, 6) if hours > 0 else None,

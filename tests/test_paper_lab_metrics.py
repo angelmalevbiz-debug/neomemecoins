@@ -187,6 +187,40 @@ class HighFrequencyMeasurementTests(unittest.TestCase):
         self.assertEqual(book['win_rate_net50_pct'], 0.0)
         self.assertTrue(report['paper_only'] and report['read_only'])
 
+    def test_two_sessions_with_the_same_seq_are_both_measured(self):
+        # Review finding: seq and trade_no restart at 1 after an HF reset; keyed by (book, cfg, seq)
+        # the second session's rows were dropped as duplicates. The journal epoch keeps them apart.
+        from paper_lab_metrics import measure_hf_rows
+        first = [dict(row, epoch='a' * 16) for row in self.rows()]
+        second = [dict(row, epoch='b' * 16, at=row['at'] + 2 * 3_600_000) for row in self.rows()]
+        report = measure_hf_rows(first + second + [dict(second[0])], as_of=START + 6 * 3_600_000)
+        book = report['books']['HF_RND_E95:' + 'c' * 12]
+        self.assertEqual(report['rejected_rows']['duplicate'], 1)
+        self.assertEqual((book['orders'], book['closes'], book['fills']), (8, 4, 2))
+        self.assertEqual(book['max_concurrent_slots'], 3)       # per session, never 3 + 3
+        self.assertEqual(book['open_at_end'], 2)
+        self.assertEqual(book['journal_epochs'], 2)
+        self.assertAlmostEqual(book['booked_usd'], -1.0)
+
+    def test_a_line_torn_inside_a_multibyte_symbol_is_one_malformed_line(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from paper_lab_metrics import read_hf_journal
+        order = json.dumps({'v': 1, 'seq': 2, 'kind': 'order', 'book': 'HF_RND_E95', 'cfg': 'c', 'at': START,
+                            'symbol': 'ПЕПЕ🐸'}, ensure_ascii=False).encode('utf-8')
+        torn = order[:order.index('🐸'.encode('utf-8')) + 2]
+        good = [json.dumps({'v': 1, 'seq': seq, 'kind': 'order', 'book': 'HF_RND_E95', 'cfg': 'c',
+                            'at': START, 'symbol': 'ПЕПЕ'}, ensure_ascii=False).encode('utf-8') for seq in (1, 3)]
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp) / 'journal' / 'HF_RND_E95'
+            folder.mkdir(parents=True)
+            (folder / '2026-10-10.jsonl').write_bytes(good[0] + b'\n' + torn + b'\n' + good[1] + b'\n')
+            rows, malformed = read_hf_journal(Path(tmp))
+        self.assertEqual(malformed, 1)
+        self.assertEqual([row['seq'] for row in rows], [1, 3])
+        self.assertEqual(rows[1]['symbol'], 'ПЕПЕ')
+
     def test_malformed_and_future_rows_are_counted_not_measured(self):
         from paper_lab_metrics import measure_hf_rows
         rows = self.rows()

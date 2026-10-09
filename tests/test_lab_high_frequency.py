@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import random
 import tempfile
+import threading
 import time
 import unittest
 from types import SimpleNamespace
@@ -63,9 +64,9 @@ def tearDownModule():
 # change these pins, strategy-lock.json (lab_high_frequency) and the table in
 # docs/LAB_HIGH_FREQUENCY.md together; tests check all three.
 PINNED_CONFIG_HASHES = {
-    'HF_RND_E95': 'd4d0a6c29f9dd56d161d86fd12a824546306a43a71463fba1d6d44d74d0872d6',
-    'HF_QUIET_E95': '4195a6e1bf7cc3d31d23dac4cf7ac83fd350da7765a8837d05438a44bab9ef06',
-    'HF_DIP15_E95': 'dc60cdb56c44163e2a38dbaab778edd4a28493e021daf9c64502d8faec8fdb38',
+    'HF_RND_E95': '8b830cca4b0e396a8fb9e7472bdd262f73d0a7a5b3568ede8a59f4719cdad492',
+    'HF_QUIET_E95': 'c4298e9a8174361585f8b64f0d4e05b41ac34e9a9314e5b64b646d74e557907c',
+    'HF_DIP15_E95': '11b3934b3d4cc6ab4b358e9c1fd0e8866c4ee1b63a6efc92f0766845bd34fbf6',
 }
 PINNED_BUDGET_HASH = 'd6bf441229424a474e97d18ab2afdc17bca385868d0454a2cea4676bbfd639fa'
 
@@ -152,6 +153,37 @@ class FakeAudit:
     def check(self, coin):
         self.checks.append(coin['pairAddress'])
         return {'status': self.status, 'reason': 'price_source_disagreement', 'divergence_pct': 12.0}
+
+
+class BlockingHttp:
+    """requests.Session stand-in for a PositionMarkFeed: records each pair asked for, blocks until released.
+
+    No network: the response is an empty pair list (no mark), returned once ``release`` is set.
+    """
+
+    def __init__(self):
+        self.release = threading.Event()
+        self.lock = threading.Lock()
+        self.pairs = []
+
+    def get(self, url, timeout=None):
+        with self.lock:
+            self.pairs.append(url.rsplit('/', 1)[-1])
+        self.release.wait(10)
+        return SimpleNamespace(raise_for_status=lambda: None, json=lambda: {'pairs': []})
+
+    def asked(self):
+        with self.lock:
+            return list(self.pairs)
+
+
+def edge_report_module():
+    """scripts/paper_edge_report.py (loaded as the report tests load it)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('paper_edge_report_hf', ROOT / 'scripts' / 'paper_edge_report.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class Harness:
@@ -1161,6 +1193,71 @@ class KillRuleTests(unittest.TestCase):
         self.assertEqual(view[hf.RND_ID]['status'], 'retired')
         self.assertNotEqual(view[hf.QUIET_ID]['status'], 'retired')
 
+    def test_a_new_config_hash_gets_its_own_first_checkpoint(self):
+        # Review finding: the checkpoint counter was per book, not per config hash. After a
+        # strategy-hash change at 600 closes (next checkpoint 750) the new sample was first
+        # evaluated at 750 closes instead of at its own 500 closes and 3 UTC days, and the
+        # dashboard kept showing the old sample's evaluation.
+        h = Harness(self)
+        rng = random.Random(7)
+
+        def closes(count, start, spacing):
+            at = start
+            for index in range(count):
+                at = start + index * spacing
+                synthetic_close(h, hf.DIP15_ID, index % 12, round(-1.0 + rng.uniform(-0.3, 0.3), 4), at)
+                synthetic_close(h, hf.RND_ID, index % 15, round(-3.6 + rng.uniform(-0.3, 0.3), 4), at)
+            return at
+        h.now = closes(500, NOW0, 8 * MINUTE)
+        h.hf.update({}, h.now, True)
+        h.now = closes(100, h.now + 8 * MINUTE, 8 * MINUTE)
+        h.hf.update({}, h.now, True)
+        old_cfg = h.hf.cfg[hf.DIP15_ID]
+        kill = h.hf.books[hf.DIP15_ID]['kill']
+        self.assertEqual((kill['cfg'], kill['last']['closes'], kill['next_checkpoint']), (old_cfg, 500, 750))
+        self.assertFalse(kill['last']['met'])
+        # A strategy-hash change: a new evidence sample in the same book and ledger.
+        new_cfg = 'e' * 64
+        h.hf.cfg[hf.DIP15_ID] = new_cfg
+        h.now = closes(499, h.now + HOUR, 10 * MINUTE)
+        h.hf.update({}, h.now, True)
+        kill = h.hf.books[hf.DIP15_ID]['kill']
+        self.assertEqual((kill['cfg'], kill['last'], kill['next_checkpoint'], kill['checkpoints']),
+                         (new_cfg, None, 500, 0))
+        self.assertEqual((kill['previous']['cfg'], kill['previous']['checkpoints']), (old_cfg, 1))
+        self.assertIsNone(next(book for book in h.hf.dashboard_view(h.now)['books']
+                               if book['id'] == hf.DIP15_ID)['kill']['last'])
+        h.now += 10 * MINUTE
+        synthetic_close(h, hf.DIP15_ID, 3, -1.0, h.now)
+        h.hf.update({}, h.now, True)
+        kill = h.hf.books[hf.DIP15_ID]['kill']
+        self.assertEqual((kill['cfg'], kill['last']['closes'], kill['next_checkpoint']), (new_cfg, 500, 750))
+        self.assertGreaterEqual(kill['last']['utc_days'], 3)
+        self.assertIsNone(h.hf.books[hf.DIP15_ID]['retired'])
+        view = next(book for book in h.hf.dashboard_view(h.now)['books'] if book['id'] == hf.DIP15_ID)
+        self.assertEqual((view['kill']['closes'], view['kill']['last']['closes'], view['kill']['next_checkpoint']),
+                         (500, 500, 750))
+        # The per-config state is checkpointed with its config hash.
+        h.hf.checkpoint_if_due(h.now, force=True)
+        restarted = h.build()
+        restarted.load()
+        stored = restarted.books[hf.DIP15_ID]['kill']
+        self.assertEqual((stored['cfg'], stored['last']['closes'], stored['previous']['cfg']), (new_cfg, 500, old_cfg))
+
+    def test_kill_state_for_adopts_a_fresh_state_and_replaces_another_configs(self):
+        fresh = hf.new_book(hf.QUIET_ID, hf.DEFAULT_BUDGET)['kill']
+        adopted = hf.kill_state_for(fresh, 'a' * 64)
+        self.assertEqual((adopted['cfg'], adopted['next_checkpoint'], adopted['last']), ('a' * 64, 500, None))
+        evaluated = {**adopted, 'next_checkpoint': 1000, 'last': {'closes': 750}, 'checkpoints': 2}
+        self.assertEqual(hf.kill_state_for(evaluated, 'a' * 64), evaluated)
+        replaced = hf.kill_state_for(evaluated, 'b' * 64)
+        self.assertEqual((replaced['cfg'], replaced['next_checkpoint'], replaced['last'], replaced['checkpoints']),
+                         ('b' * 64, 500, None, 0))
+        self.assertEqual(replaced['previous'], {'cfg': 'a' * 64, 'last': {'closes': 750}, 'checkpoints': 2})
+        # A state of unknown config that already evaluated is never inherited.
+        legacy = {'next_checkpoint': 750, 'last': {'closes': 600}, 'checkpoints': 1}
+        self.assertEqual(hf.kill_state_for(legacy, 'c' * 64)['next_checkpoint'], 500)
+
 
 # ------------------------------------------------------------------ persistence and restart
 
@@ -1248,6 +1345,111 @@ class PersistenceTests(unittest.TestCase):
         self.assertIn(pool_key(2)[1], [row['pairAddress'] for row in rows if row['kind'] == 'order'])
         self.assertTrue(path.read_bytes().startswith(b'{'))
         self.assertIn(b'"seq":99\n', path.read_bytes())
+
+    def test_a_line_torn_inside_a_multibyte_symbol_never_stops_the_load_or_the_reports(self):
+        # Review finding: rows are UTF-8 (ensure_ascii=False) and carry the symbol. A crash that tore
+        # the last line inside a Cyrillic or emoji character made the text-mode read raise
+        # UnicodeDecodeError: load() failed (HF stayed off), on every later restart too, and so did
+        # the kill checkpoint's journal read and evaluate_paper_lab.py --hf-dir.
+        h = Harness(self)
+        symbol = 'ПЕПЕ🐸'
+        with draws(1):
+            h.step((1, 1.0, {'symbol': symbol}))
+            h.step((1, 1.01, {'symbol': symbol}))
+        path = next((h.root / 'journal' / hf.RND_ID).glob('*.jsonl'))
+        order = next(line for line in path.read_bytes().splitlines() if b'"kind":"order"' in line)
+        emoji = '🐸'.encode('utf-8')
+        self.assertIn(emoji, order)                       # stored as UTF-8, not \\u escapes
+        with path.open('ab') as handle:
+            handle.write(order[:order.index(emoji) + 2])  # torn 2 bytes into the 4-byte emoji
+        with self.assertRaises(UnicodeDecodeError):
+            path.read_text(encoding='utf-8')
+        report = h.restart(advance=4 * SECOND)
+        self.assertEqual(report['torn_tails'], 1)
+        self.assertEqual(h.hf.journal.malformed_rows, 1)
+        self.assertEqual(report['restart_cancels'], 1)    # the ORDERED slot, replayed and cancelled
+        with draws(2):
+            h.step((2, 1.0))
+            h.step((2, 1.01))
+        rows = h.rows()
+        orders = [row for row in rows if row['kind'] == 'order' and row['side'] == 'entry']
+        self.assertEqual([(row['pairAddress'], row['symbol']) for row in orders],
+                         [(pool_key(1)[1], symbol), (pool_key(2)[1], 'HF2')])
+        # A second restart over the same bytes loads again (nothing was removed, nothing raises).
+        h.restart(advance=4 * SECOND)
+        self.assertEqual(h.hf.journal.malformed_rows, 1)
+        # The report readers count the torn line as one malformed line and keep every other row.
+        from paper_lab_metrics import measure_hf_rows, read_hf_journal
+        read_rows, malformed = read_hf_journal(h.root)
+        self.assertEqual(malformed, 1)
+        self.assertEqual(sorted(row['seq'] for row in read_rows), sorted(row['seq'] for row in h.rows()))
+        self.assertEqual(measure_hf_rows(read_rows)['rejected_rows']['malformed'], 0)
+        edge = edge_report_module()
+        collector = edge.LedgerCollector()
+        collector.add_hf_journal(h.root)
+        self.assertEqual(collector.rejected['malformed'], 1)
+
+    def test_every_row_carries_the_journal_epoch_and_a_reset_starts_a_new_one(self):
+        h = Harness(self)
+        epoch = h.hf.epoch
+        self.assertRegex(epoch, r'^[0-9a-f]{16}$')
+        self.assertEqual((h.hf.load_report['epoch'], h.hf.load_report['epoch_source']), (epoch, 'new'))
+        with draws(1):
+            open_position(h, 1)
+        rows = h.rows()
+        self.assertTrue(rows)
+        self.assertEqual({row['epoch'] for row in rows}, {epoch})
+        h.hf.checkpoint_if_due(h.now, force=True)
+        self.assertEqual(json.loads((h.root / 'state.json').read_text(encoding='utf-8'))['epoch'], epoch)
+        self.assertEqual((h.restart()['epoch_source'], h.hf.epoch), ('checkpoint', epoch))
+        self.assertEqual(h.hf.metrics()['epoch'], epoch)
+        (h.root / 'state.json').write_text('{broken', encoding='utf-8')
+        self.assertEqual((h.restart()['epoch_source'], h.hf.epoch), ('journal', epoch))
+        # A reset archives the lineage and starts a new one (seq restarts at 1).
+        h.hf = h.build()
+        report = h.hf.load(reset=True)
+        self.assertEqual(report['epoch_source'], 'new')
+        self.assertNotEqual(h.hf.epoch, epoch)
+        archived = {json.loads(line)['epoch'] for path in Path(report['archive']).rglob('*.jsonl')
+                    for line in path.read_text(encoding='utf-8').splitlines() if line.strip()}
+        self.assertEqual(archived, {epoch})
+
+    def test_two_sessions_with_the_same_seq_stay_two_trades_in_the_reports(self):
+        # Review finding: seq restarts at 1 after a reset, so an archived session's close and the
+        # current session's close shared (book, cfg, seq): paper_edge_report excluded both as a
+        # conflict and measure_hf_rows dropped the second as a duplicate.
+        h = Harness(self)
+
+        def one_trade(price):
+            with draws(1):
+                open_position(h, 1)
+                walk_to_trigger(h, 1, 1.02)
+                h.step((1, price))
+            return h.rows('close', hf.RND_ID)[-1]
+        first = one_trade(0.99)
+        h.hf.checkpoint_if_due(h.now, force=True)
+        h.hf = h.build()
+        archive = Path(h.hf.load(reset=True)['archive'])
+        h.now += 10 * MINUTE
+        second = one_trade(0.98)
+        self.assertEqual(first['seq'], second['seq'])
+        self.assertNotEqual(first['epoch'], second['epoch'])
+        self.assertNotEqual(first['pnl_usd'], second['pnl_usd'])
+        edge = edge_report_module()
+        collector = edge.LedgerCollector()
+        collector.add_hf_journal(h.root)          # the current session (archives skipped)
+        collector.add_hf_journal(archive)         # the archived session, as the runbook says
+        report = edge.build_report(collector, iterations=20, seed=3)
+        self.assertEqual(report['dedupe']['unique_closed_trades'], 2)
+        self.assertEqual(report['dedupe']['conflicting_ids_excluded'], 0)
+        self.assertEqual(report['high_frequency']['unique_closed_trades'], 2)
+        from paper_lab_metrics import measure_hf_rows, read_hf_journal
+        rows = read_hf_journal(h.root)[0] + read_hf_journal(archive)[0]
+        measured = measure_hf_rows(rows)
+        book = measured['books'][f"{hf.RND_ID}:{PINNED_CONFIG_HASHES[hf.RND_ID][:12]}"]
+        self.assertEqual(measured['rejected_rows']['duplicate'], 0)
+        self.assertEqual((book['closes'], book['journal_epochs']), (2, 2))
+        self.assertAlmostEqual(book['booked_usd'], first['pnl_usd'] + second['pnl_usd'], places=6)
 
     def test_a_restart_cancels_ordered_slots_and_resumes_open_ones(self):
         h = Harness(self)
@@ -1646,6 +1848,11 @@ class StrategyLabIntegrationTests(unittest.TestCase):
                                                     'books': {s['id']: lab.empty_book(s) for s in lab.STRATEGIES}}),
                         patch.object(lab, 'entry_defense_layer', return_value=defense),
                         patch.object(lab, 'POSITION_MARK_FEED', FakeMarks()),
+                        patch.object(lab, 'HF_MARK_FEED', FakeMarks()),
+                        patch.object(lab, 'HF_BUILD', {'attempts': 0, 'failures': 0, 'last_attempt_at': None,
+                                                       'last_error': None, 'next_attempt_at': None,
+                                                       'built_at': None}),
+                        patch.object(lab, 'RESET_REQUESTED', False),
                         patch.object(lab, 'price_integrity', FakeAudit())]
         for item in self.patches:
             item.start()
@@ -1787,6 +1994,182 @@ class StrategyLabIntegrationTests(unittest.TestCase):
             errors = []
             lab.hf_end_loop(1.0, errors)
         self.assertIn('journal: OSError: disk full', lab.STATE['hf_error'])
+
+    def test_a_failed_build_is_retried_every_minute_and_its_error_is_published(self):
+        # Review finding: main() built HF once; a failed load (a torn journal line, a locked
+        # checkpoint) left HF off until a manual restart, and the dashboard showed only 'Няма HF
+        # данни' although hf_error and activity_config.lab_high_frequency were on /state.
+        original = hf.HighFrequencyLab.load
+        failing = {'on': True}
+
+        def load(container, reset=False):
+            if failing['on']:
+                raise PermissionError('state.json locked')
+            return original(container, reset=reset)
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}), patch.object(hf.HighFrequencyLab, 'load', load):
+            try:                                   # main(): the first build
+                lab.build_high_frequency()
+            except Exception as exc:
+                lab.hf_build_failed(exc)
+            self.assertIsNone(lab.HF)
+            lab.hf_end_loop(1.0, [])
+            lab.persist('online')
+            compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+            self.assertEqual(compact['hf_error'], 'build: PermissionError: state.json locked')
+            self.assertNotIn('high_frequency', compact)
+            config = compact['activity_config']['lab_high_frequency']
+            self.assertEqual((config['enabled'], config['running']), (True, False))
+            self.assertEqual((config['build']['attempts'], config['build']['failures']), (1, 1))
+            self.assertEqual(config['build']['last_error'], 'build: PermissionError: state.json locked')
+            self.assertEqual(compact['persistence']['hf']['build']['next_attempt_at'],
+                             self.clock['now'] + lab.HF_BUILD_RETRY_MS)
+            self.assertFalse(compact['persistence']['hf']['loaded'])
+            # Not before the retry interval; then a failed retry is counted and rescheduled.
+            self.clock['now'] += lab.HF_BUILD_RETRY_MS - SECOND
+            self.assertFalse(lab.hf_retry_build())
+            self.assertEqual(lab.HF_BUILD['attempts'], 1)
+            self.clock['now'] += SECOND
+            self.assertFalse(lab.hf_retry_build())
+            self.assertEqual((lab.HF_BUILD['attempts'], lab.HF_BUILD['failures']), (2, 2))
+            failing['on'] = False
+            self.clock['now'] += lab.HF_BUILD_RETRY_MS
+            self.assertTrue(lab.hf_retry_build())
+            self.assertIsNotNone(lab.HF)
+            self.assertFalse(lab.hf_retry_build())             # built: nothing more to retry
+            lab.hf_end_loop(1.0, [])
+            lab.persist('online')
+        compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+        self.assertNotIn('hf_error', compact)
+        self.assertIn('high_frequency', compact)
+        self.assertTrue(compact['activity_config']['lab_high_frequency']['running'])
+        build = compact['persistence']['hf']['build']
+        self.assertEqual((build['attempts'], build['failures'], build['last_error']), (3, 2, None))
+        self.assertEqual(build['built_at'], self.clock['now'])
+        # Disabled HF is never retried.
+        with patch.object(lab, 'HF', None), patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '0'}):
+            lab.HF_BUILD['next_attempt_at'] = 0
+            self.assertFalse(lab.hf_retry_build())
+
+    def test_a_failed_reset_build_archives_the_hf_root_once(self):
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}):
+            container = lab.build_high_frequency()
+            container.checkpoint_if_due(lab.now_ms(), force=True)
+        archive = self.root / 'strategy_lab_hf' / 'archive'
+        original = hf.HighFrequencyLab.checkpoint_if_due
+        calls = {'n': 0}
+
+        def flaky(container, now, force=False):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                raise PermissionError('state.json locked')
+            return original(container, now, force)
+        lab.HF = None
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}), patch.object(lab, 'RESET_REQUESTED', True), \
+                patch.object(hf.HighFrequencyLab, 'checkpoint_if_due', flaky):
+            try:
+                lab.build_high_frequency()
+            except PermissionError as exc:
+                lab.hf_build_failed(exc)
+            self.assertIsNone(lab.HF)
+            self.assertFalse(lab.RESET_REQUESTED)          # the archive was made: never again
+            self.assertEqual(len(list(archive.iterdir())), 1)
+            self.clock['now'] += lab.HF_BUILD_RETRY_MS
+            self.assertTrue(lab.hf_retry_build())
+            self.assertFalse(lab.HF.load_report['reset'])
+        self.assertEqual(len(list(archive.iterdir())), 1)
+
+    def test_the_lab_gives_hf_its_own_mark_feed_once(self):
+        own = FakeMarks()
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}), patch.object(lab, 'HF_MARK_FEED', None), \
+                patch.object(hf, 'new_mark_feed', return_value=own) as factory:
+            first = lab.build_high_frequency()
+            second = lab.build_high_frequency()
+        self.assertEqual(factory.call_count, 1)
+        self.assertIs(first.marks, own)
+        self.assertIs(second.marks, own)
+        self.assertIsNot(first.marks, lab.POSITION_MARK_FEED)
+        import lab_position_marks
+        feed = hf.new_mark_feed()
+        try:
+            self.assertIsInstance(feed, lab_position_marks.PositionMarkFeed)
+            self.assertIsNot(feed, lab_position_marks.POSITION_MARK_FEED)
+            self.assertEqual(feed._interval, hf.FILL.mark_request_interval_s)
+        finally:
+            feed._executor.shutdown(wait=True)
+        with self.assertRaises(ValueError):
+            hf.HighFrequencyLab(self.root / 'other_hf', cost=hf.cost_functions(lab), defense=FakeDefense(),
+                                marks=lab_position_marks.POSITION_MARK_FEED)
+
+    def test_the_rollout_universe_figure_is_published_as_a_rolling_window(self):
+        with patch.dict(os.environ, {'NEO_LAB_HF_ENABLED': '1'}):
+            lab.build_high_frequency()
+        for price in (1.0, 1.01):
+            self.clock['now'] += 2 * SECOND
+            feed = [make_coin(1, price, self.clock['now'] - 500), make_coin(2, price, self.clock['now'] - 500)]
+            errors = []
+            lab.hf_update(feed, errors)
+            lab.hf_refresh(feed, errors)
+            lab.hf_end_loop(1.0, errors)
+        self.clock['now'] += 2 * SECOND
+        lab.hf_refresh(feed, [])                   # the same scan again: no new observation
+        lab.persist('online')
+        compact = json.loads((self.root / 'strategy_lab_compact.json').read_text(encoding='utf-8'))
+        metrics = compact['persistence']['hf']
+        self.assertEqual(metrics['refresh']['universe'], 0)
+        self.assertEqual((metrics['refresh_60s']['universe'], metrics['refresh_60s']['refreshes_with_universe']), (2, 1))
+        self.assertEqual(metrics['refresh_60s']['last_universe_at'], self.clock['now'] - 2 * SECOND)
+        self.assertEqual(compact['high_frequency']['universe']['universe_60s'], 2)
+
+
+class MarkFeedIsolationTests(unittest.TestCase):
+    """Review finding: HF shared lab_position_marks.POSITION_MARK_FEED (one worker, 1 request/s, 12 s
+    cache) with every Lab book, so up to 9 out-of-feed HF pools queued refreshes ahead of an existing
+    Lab position's, whose resolve then returned None (stale, no stop/TP/hold evaluation)."""
+
+    def feed(self):
+        import lab_position_marks
+        feed = lab_position_marks.PositionMarkFeed(interval_seconds=hf.FILL.mark_request_interval_s)
+        http = BlockingHttp()
+        feed._http = http
+
+        def stop():
+            feed._executor.shutdown(wait=False, cancel_futures=True)   # drop the queued refreshes
+            http.release.set()                                         # then let the running one end
+            feed._executor.shutdown(wait=True)
+        self.addCleanup(stop)
+        return feed, http
+
+    def test_hf_refreshes_never_queue_ahead_of_a_lab_position(self):
+        lab_feed, lab_http = self.feed()
+        hf_feed, hf_http = self.feed()
+        h = Harness(self, marks=hf_feed)
+        with draws(1, 2, 3):
+            h.step((1, 1.0), (2, 1.0), (3, 1.0))
+            h.step((1, 1.01), (2, 1.0), (3, 1.0))       # order pool 1
+            h.step((1, 1.02), (2, 1.01), (3, 1.0))      # fill 1, order 2
+            h.step((1, 1.02), (2, 1.02), (3, 1.01))     # fill 2, order 3
+            h.step((1, 1.02), (2, 1.02), (3, 1.02))     # fill 3
+        self.assertEqual([slot['state'] for slot in h.slots()], [hf.OPEN] * 3)
+        # The three held pools leave the main feed: HF asks for exact-pair marks, on its own feed.
+        h.step((9, 1.0), refresh=False)
+        held = {(slot['address'], slot['pairAddress']) for slot in h.slots()}
+        self.assertEqual(hf_feed._pending, held)
+        self.assertEqual(lab_feed._pending, set())
+        # An existing Lab position out of the feed is refreshed first on the Lab's feed.
+        mint, pair = ident('LabMint', 1), ident('LabPair', 1)
+        self.assertIsNone(lab_feed.resolve({'address': mint, 'pairAddress': pair}, {}, h.now))
+        self.assertEqual(lab_feed._pending, {(mint, pair)})
+        deadline = time.monotonic() + 5
+        while not lab_http.asked() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertEqual(lab_http.asked(), [pair])
+        self.assertTrue(set(hf_http.asked()) <= {key[1] for key in held})
+        self.assertFalse(set(lab_http.asked()) & {key[1] for key in held})
+        # HF keeps resolving every loop without ever touching the Lab's feed.
+        for _ in range(5):
+            h.step((9, 1.0), refresh=False)
+        self.assertEqual(lab_feed._pending, {(mint, pair)})
+        self.assertEqual(lab_http.asked(), [pair])
 
 
 class GateIsolationTests(unittest.TestCase):

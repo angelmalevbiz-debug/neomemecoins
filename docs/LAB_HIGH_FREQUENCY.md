@@ -67,8 +67,13 @@ These hashes include the fill basis's mark path (`HF_MARK_FEED_V1`, review fix2)
 earlier hashes of this branch (`d4d0a6c2...`, `4195a6e1...`, `dc60cdb5...`) were never
 deployed and no HF close exists under them.
 
-Default budget hash ($1,000 start, $100 daily cap, 7-hour session step, 50% floor):
-`d6bf441229424a474e97d18ab2afdc17bca385868d0454a2cea4676bbfd639fa`.
+Default budget hash ($1,000 start, $100 daily cap, 17-hour session step, 50% floor):
+`76af65fea95095a34058a064d2c7488d26efa780317d5e2c746c565534c3fbcf`.
+
+The session step was 7 h at the first deploy (budget hash `d6bf4412...`, no HF close under it): with it the deploy day
+2026-10-09 would have opened at 17:00 UTC. 17 h is also coprime with 24, so the window still visits every UTC hour
+over 24 days, and the deploy day opened at 07:00 UTC, when the family went live. A budget change never starts a new
+evidence sample.
 
 The hashes are pinned in `tests/test_lab_high_frequency.py`, in `strategy-lock.json`
 (`lab_high_frequency`) and in this table. They are published on main's `GET /state` as
@@ -251,9 +256,9 @@ window, 30 s grace).
   open slots still run to their exits. The trip writes a journal `cap` row with its time and
   P&L.
 - On UTC day d (d = floor(ms / 86,400,000)), new orders are allowed only from hour
-  (7 x d) mod 24. Before that hour the reason is `hf_session_not_open`. The cap budget
-  therefore covers different UTC hours each day: Oct 10 opens at 00:00, Oct 11 at 07:00, Oct
-  12 at 14:00, Oct 13 at 21:00, and so on.
+  (17 x d) mod 24. Before that hour the reason is `hf_session_not_open`. The cap budget
+  therefore covers different UTC hours each day: Oct 9 opened at 07:00, Oct 10 opens at 00:00,
+  Oct 11 at 17:00, Oct 12 at 10:00, Oct 13 at 03:00, and so on (every UTC hour within 24 days).
 - Budget knobs, read from the environment (budget hash only):
   - `NEO_LAB_HF_DAILY_CAP_USD` (default 100);
   - `NEO_LAB_HF_START_BALANCE_USD` (default 1000).

@@ -68,7 +68,7 @@ PINNED_CONFIG_HASHES = {
     'HF_QUIET_E95': 'c4298e9a8174361585f8b64f0d4e05b41ac34e9a9314e5b64b646d74e557907c',
     'HF_DIP15_E95': '11b3934b3d4cc6ab4b358e9c1fd0e8866c4ee1b63a6efc92f0766845bd34fbf6',
 }
-PINNED_BUDGET_HASH = 'd6bf441229424a474e97d18ab2afdc17bca385868d0454a2cea4676bbfd639fa'
+PINNED_BUDGET_HASH = '76af65fea95095a34058a064d2c7488d26efa780317d5e2c746c565534c3fbcf'
 
 SOL = feasibility.SOL_QUOTE_MINT
 SOL_USD = 150.0
@@ -1059,33 +1059,35 @@ class CapAndSessionTests(unittest.TestCase):
             h.step((1, 1.0), (2, 1.0))
             self.assertEqual(len(h.rows('close', hf.RND_ID)), 2)
             self.assertEqual(len(h.rows('cap', hf.RND_ID)), 1)
-            # The next UTC day (2026-10-11, session from 07:00) the book trades again.
-            h.now = (hf.utc_day(h.now) + 1) * DAY + 7 * HOUR + 5 * SECOND
+            # The next UTC day (2026-10-11, session from 17:00) the book trades again.
+            h.now = (hf.utc_day(h.now) + 1) * DAY + 17 * HOUR + 5 * SECOND
             h.step((3, 1.02), advance=0)
             h.step((3, 1.03))
         self.assertEqual(h.hf.cap_tripped(h.hf.books[hf.RND_ID], h.now), False)
         self.assertEqual(len(h.rows('order', hf.RND_ID, side='entry')), 3)
 
-    def test_the_session_opens_at_7d_mod_24(self):
+    def test_the_session_opens_at_17d_mod_24(self):
+        self.assertEqual(hf.session_open_hour(20735), 7)     # 2026-10-09, the deploy day (live from 07:00 UTC)
         self.assertEqual(hf.session_open_hour(20736), 0)     # 2026-10-10
-        self.assertEqual(hf.session_open_hour(20737), 7)     # 2026-10-11
-        self.assertEqual(hf.session_open_hour(20738), 14)    # 2026-10-12
-        self.assertEqual(hf.session_open_hour(20739), 21)
+        self.assertEqual(hf.session_open_hour(20737), 17)    # 2026-10-11
+        self.assertEqual(hf.session_open_hour(20738), 10)    # 2026-10-12
+        self.assertEqual(hf.session_open_hour(20739), 3)
         for day in range(20700, 20800):
-            self.assertEqual(hf.session_open_hour(day), (7 * day) % 24)
-        h = Harness(self, now=20737 * DAY + 6 * HOUR)
+            self.assertEqual(hf.session_open_hour(day), (17 * day) % 24)
+        self.assertEqual(len({hf.session_open_hour(day) for day in range(20736, 20760)}), 24)  # every UTC hour in 24 days
+        h = Harness(self, now=20737 * DAY + 16 * HOUR)
         with draws(1):
             h.step((1, 1.0))
             h.step((1, 1.01))
             self.assertEqual(h.hf.diagnostics[hf.RND_ID]['blocked_reason'], 'hf_session_not_open')
             view = h.hf.dashboard_view(h.now)['books'][0]
-            self.assertEqual((view['status'], view['open_hour']), ('session_closed', 7))
-            h.now = 20737 * DAY + 7 * HOUR
+            self.assertEqual((view['status'], view['open_hour']), ('session_closed', 17))
+            h.now = 20737 * DAY + 17 * HOUR
             h.step((1, 1.02))
             h.step((1, 1.03))
         self.assertEqual(len(h.rows('order', hf.RND_ID, side='entry')), 1)
         session = h.rows('session', hf.RND_ID)
-        self.assertEqual((session[0]['day'], session[0]['open_hour']), (20737, 7))
+        self.assertEqual((session[0]['day'], session[0]['open_hour']), (20737, 17))
 
 
 # ------------------------------------------------------------------ kill rule

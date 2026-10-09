@@ -358,8 +358,8 @@ and the promotion migration, and they take no tape seat.
 
 An invalid value keeps the default and is listed in
 `strategy_lab.activity_config.lab_high_frequency.budget_env_errors`. New orders start each
-UTC day d from hour (7 x d) mod 24 (`hf_session_not_open` before): Oct 10 opens at 00:00,
-Oct 11 at 07:00, Oct 12 at 14:00. Never change the strategy rules through the environment:
+UTC day d from hour (17 x d) mod 24 (`hf_session_not_open` before): Oct 9 opened at 07:00,
+Oct 10 opens at 00:00, Oct 11 at 17:00, Oct 12 at 10:00. Never change the strategy rules through the environment:
 the Lab's `NEO_LAB_*` cost knobs change the HF config hashes, and the books then refuse
 every order (`hf_cost_model_mismatch`), as the forward-test books do.
 

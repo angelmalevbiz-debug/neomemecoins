@@ -349,9 +349,11 @@ class BudgetParameters:
     cap_basis: str = "booked P&L of today's (UTC) closes plus the sum of min(0, open booked marks)"
     cap_action: str = 'no new orders until 00:00 UTC; ORDERED entries and open slots run to exit; a cap row'
     session_rotation_version: str = SESSION_ROTATION_VERSION
-    session_step_hours: int = 7
+    session_step_hours: int = 17
     session_rule: str = ('UTC day d = floor(ms / 86,400,000); new orders only from hour (session_step_hours x d) '
                          'mod 24 (hf_session_not_open before)')
+    session_step_note: str = ('17 h is coprime with 24, so the window visits every UTC hour over 24 days (as 7 h did); chosen so'
+                              ' the first deployed day (2026-10-09, d = 20735) opened at 07:00 UTC, the hour the family went live, instead of 17:00')
     capital_floor_fraction: float = 0.5
     env: str = f'{ENV_START_BALANCE} (start_balance_usd), {ENV_DAILY_CAP} (daily_cap_usd)'
 

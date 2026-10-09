@@ -65,7 +65,9 @@ def ensure(container, model, now):
         container['exit_research']=state
     if (not isinstance(state,dict) or state.get('version')!=VERSION
             or state.get('config')!=frozen or state.get('config_hash')!=digest(frozen)
-            or not isinstance(state.get('episodes'),list)):
+            or not isinstance(state.get('episodes'),list)
+            or any(type(state.get(k)) is not int or state[k]<0
+                   for k in ('capacity_refusals','trimmed_completed','observation_errors'))):
         raise ValueError('Exit research state/config mismatch; refusing reset or mixed samples')
     seen=set()
     for e in state['episodes']:

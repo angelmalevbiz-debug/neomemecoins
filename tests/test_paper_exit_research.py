@@ -57,6 +57,12 @@ class ResearchTests(unittest.TestCase):
         self.e['legs'][research.BASELINE]['status']='FAKE_WIN'
         with self.assertRaises(ValueError):research.ensure(self.container,lab.forward_cost_model(),NOW)
 
+    def test_corrupt_observation_counters_fail_closed_without_repair(self):
+        self.state['observation_errors']='unknown'
+        saved=copy.deepcopy(self.container)
+        with self.assertRaises(ValueError):research.ensure(self.container,lab.forward_cost_model(),NOW)
+        self.assertEqual(self.container,saved)
+
     def test_resumed_lots_and_capacity_entries_are_excluded_from_review(self):
         for n,new,p in [(2,False,position(2)),(3,True,{**position(3),'capacity_test':True}),
                        (4,True,{**position(4),'entry_policy_version':active.CAPACITY_TEST_VERSION})]:
@@ -254,6 +260,19 @@ class EngineResearchTests(unittest.TestCase):
         b={**self.books['EARLY'],'portfolio_group':'TEST'}
         lab.record_exit_research_mark(b,position(),coin(position(),NOW),0,NOW)
         self.assertNotIn('exit_research',lab.STATE)
+
+    def test_malformed_shadow_row_does_not_escape_into_financial_loop(self):
+        b=self.open();state=lab.STATE['exit_research'];e=state['episodes'][0]
+        del e['started_at']
+        saved=copy.deepcopy(self.books)
+        lab.advance_exit_research({},self.clock)
+        self.assertEqual(self.books,saved)
+        self.assertEqual(state['observation_errors'],1)
+        self.assertIn('KeyError',state['error'])
+        self.assertNotIn('started_at',e)
+        self.mark(.009)
+        self.assertFalse(active.positions(b))
+        self.assertLess(b['history'][0]['pnl_usd'],-10)
 
     def test_snapshot_projection_carries_summary_not_large_raw_traces(self):
         self.open();self.mark(.0115)

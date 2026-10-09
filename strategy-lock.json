@@ -261,7 +261,7 @@
     "profitability_proven": false
   },
   "support_files_sha256": {
-    "backend/paper_exit_research.py": "edf0e9a2a350d8ce92632c8105a073747d500c7f7aa3831a6cef821fc02aa628",
+    "backend/paper_exit_research.py": "1bae9fe6f3d8686028f917fadeb7c25756d9dc663796abb0debd8801997a7483",
     "src/components/PaperExitResearchPanel.tsx": "316357ce9bcc3ca9fbef0de4065405a25b568d6b10e1cd326cf8768d6a20329a",
     "docs/PAPER_EXIT_RESEARCH.md": "dab19f572b405b066653e0d097412b6f7763d9fdb617b8307278ce4a59910d82",
     "scripts/build_funded_heat_seed.py": "64e98aa7c0d45f6081d95c31b026227cd915920f4cb2b028a6d5771416476bc9",
@@ -291,7 +291,7 @@
     "backend/paper_state_reset.py": "0c48f1f7f0b25b902f19970f9434611c0cdfd181d74f51f263735701025f07b3",
     "backend/paper_training.py": "06d4b67c67bfa6f96bfb47c4ae6a41183378604a73876d1e6cfa3774c15c2598",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "9972e2388fc853ef0e4e5a5c43a37325609a7ae4189840ae9b2052665c723d06",
+    "backend/strategy_lab.py": "88e8b1e832357d41f834458533ff410ec0efc4d9fb8fa133697e96e04d1d9388",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "eeb383cbc011e9de704aed9a1b255c70227588129a98754290d50e9ba9f40592",

@@ -1057,15 +1057,15 @@ def advance_exit_research(prices,now):
     if state is None:
         return
     for episode in state['episodes']:
-        if exit_research.finished(episode):
-            continue
-        exit_research.expire(episode,now)
-        coin=prices.get((episode['address'],episode['pairAddress']))
-        stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
-        if (not coin or not 0<=now-stamp<=POSITION_STALE_AFTER_MS
-                or stamp<=num(episode.get('last_mark_at')) or sol_usd_from_coin(coin)<=0):
-            continue
         try:
+            if exit_research.finished(episode):
+                continue
+            exit_research.expire(episode,now)
+            coin=prices.get((episode['address'],episode['pairAddress']))
+            stamp=num((coin or {}).get('mark_received_at'),num((coin or {}).get('updatedAt')))
+            if (not coin or not 0<=now-stamp<=POSITION_STALE_AFTER_MS
+                    or stamp<=num(episode.get('last_mark_at')) or sol_usd_from_coin(coin)<=0):
+                continue
             quote=exit_execution(coin,episode['quantity'])
             net=episode['partial_realized_pnl']+quote['net_proceeds_usd']-episode['remaining_cost_basis_usd']
             exit_research.observe(episode,coin,net,now)

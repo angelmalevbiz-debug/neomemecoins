@@ -363,7 +363,7 @@
     "docs/funded-zero-trades-repair.md": "1f257cf13407f02c2b0d391df661c66f7227b1012bfc3ccf6dc13f5539bc7935",
     "backend/pump_event_fees.py": "4482e815792e8f9ff08c4a2006d4a784a0e424fe12790dea44fbfc929d2b06a5",
     "docs/paper-fee-observation.md": "621bb16f8e4197cccf69751b64b0d28cc241c1a843e22fe91dd70eabdd5ee2e4",
-    "src/lib/labStrategyView.ts": "b32b22fa5bf6b498873b22a84cddd69dbadecf86b49ece66e80cc7ff73f9dfe5",
+    "src/lib/labStrategyView.ts": "2da64ee23ba2e8c95f31fba9cf300cb1a9b3e1bc0576cf836a4b8979a6019e96",
     "backend/order_flow_adaptive_oct4.py": "8035eb83b352688e36944c6c580978e08c22fa221ca87d29c88c07b27926c857",
     "backend/cost_first_established.py": "1b5369f37b8fd2887a06bf9979ecfff674e2bb16fbeb7bcd78e3cd7657d8a029",
     "docs/tape-decoder-shadow-and-seat-shedding.md": "d04c1a7358733951c4f0c81045e3541266889281dcda8034c88135188d1e5618",

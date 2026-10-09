@@ -189,7 +189,7 @@ const reasons: Record<string, string> = {
   promoted_verified_flow_stale: 'Потвърденият поток е остарял',
   promoted_buy_pressure_unconfirmed: 'Няма потвърден натиск от купувачи',
   promoted_recent_loss_cooldown: 'Пауза след скорошна загуба',
-  quality_buy_flow_too_small: 'Потвърденият купувачески поток е твърде слаб за вход $100',
+  quality_buy_flow_too_small: 'Потвърденият купувачески поток е твърде слаб за пълния размер на входа',
   quality_correlated_position: 'Този токен или pool вече е отворен в друга PAPER сметка',
   quality_pool_loss_pause: 'Пауза 30 минути след загуба в този pool',
   promoted_safety_unknown: 'Чака завършена проверка за безопасност',

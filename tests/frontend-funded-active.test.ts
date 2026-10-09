@@ -15,6 +15,10 @@ test('owner requested 250 policy shows uncapped soft limits, not zero risk or in
   assert.doesNotMatch(text!,/null|undefined|дневен лимит загуба|Следващ UTC ден/);
   assert.match(labEntryStatus({id:'MOMENTUM',balance:200,starting_balance:1000,
     entry_diagnostics:{blocked_reason:'funded_active_cash_unavailable'}}),/свободен PAPER капитал/);
+  const flow=labEntryStatus({id:'MOMENTUM',balance:900,starting_balance:1000,
+    entry_diagnostics:{blocked_reason:'quality_buy_flow_too_small'}});
+  assert.match(flow,/пълния размер на входа/);
+  assert.doesNotMatch(flow,/\$100/);
 });
 
 test('scalp profile displays independent duration and UTC pause without promising an entry', () => {

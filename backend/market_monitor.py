@@ -28,6 +28,7 @@ import market_discovery
 import honest_quote_transport as quote_transport
 import paper_market_feasibility as market_feasibility
 import entry_quote_priority
+import funded_active_paper
 import compat_file_lock as file_lock
 from paper_training import (DEFAULT_CONFIG as TRAINING_DEFAULT_CONFIG, LEARNER_SCORE_VERSION as TRAINING_SCORE_VERSION,
                             training_candidate_signal)
@@ -241,6 +242,18 @@ def strategy_rule_config() -> dict[str, Any]:
     if COST_FIRST_ACTIVE:
         return {cost_first_profile.STRATEGY_ID: cost_first_profile.universe_parameters()}
     return winner_ensemble.rule_config()
+
+
+def shared_feed_candidate(coin: dict[str, Any], now: int, ticker_registry=None) -> bool:
+    """Retain the funded Lab's universe too, not just main's entry candidates.
+
+    Candidate retention never authorizes a fill or bypasses the Lab's own
+    capital, confirmed flow, defense, safety, price and execution cost gates.
+    Main's quote preparation still uses market_candidate(), not this union.
+    """
+    return (market_candidate(coin, now, ticker_registry) or
+            (funded_active_paper.quality_enabled() and
+             any(funded_active_paper.matches(sid, coin) for sid in funded_active_paper.RULES)))
 
 
 activate_strategy(os.getenv('NEO_SIGNAL_STRATEGY', DEFAULT_SIGNAL_STRATEGY))
@@ -3117,7 +3130,7 @@ class Monitor:
             # run later and held pools are independently refreshed below.
             feed = entry_quote_priority.bounded_feed(
                 feed, MAX_FEED, STRICT_MAX_ROUNDTRIP_COST_PCT,
-                is_candidate=lambda coin: market_candidate(coin, scan_at, registry),
+                is_candidate=lambda coin: shared_feed_candidate(coin, scan_at, registry),
             )
             by_address = {c['address']: c for c in feed}
             for position in STATE.positions:

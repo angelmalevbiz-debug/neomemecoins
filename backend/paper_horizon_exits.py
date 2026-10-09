@@ -2,9 +2,11 @@
 import math
 
 VERSION = 'PAPER_HORIZON_EXIT_V1_60_240_720'
+SCALP_VERSION = 'PAPER_MOMENTUM_SCALP_EXIT_V1_15'
+VERSIONS = frozenset({VERSION, SCALP_VERSION})
 PROFILES = {
     'EARLY': ('QUICK', 60, 6.0, 2.0, .75),
-    'MOMENTUM': ('QUICK', 60, 6.0, 2.0, .75),
+    'MOMENTUM': ('SCALP', 15, 6.0, 2.0, .75),
     'PRECISION': ('SWING', 240, 15.0, 4.0, 1.0),
     'ULTRA_PRECISION': ('HOLDER', 720, 30.0, 4.0, 1.0),
 }
@@ -19,7 +21,10 @@ def parameters(strategy_id, notional_usd=100.0):
     if not math.isfinite(notional) or notional <= 0:
         raise ValueError('Positive finite notional required')
     profile, minutes, target, arm, minimum = PROFILES[strategy_id]
-    return dict(version=VERSION, holding_profile=profile, max_hold_minutes=minutes,
+    # Freeze a distinct receipt on NEW Momentum entries only. Existing V1
+    # positions retain their original 60/240/720 policy and observed floors.
+    version = SCALP_VERSION if strategy_id == 'MOMENTUM' else VERSION
+    return dict(version=version, holding_profile=profile, max_hold_minutes=minutes,
         take_profit_net_usd=target, stop_loss_net_usd=5.0,
         take_profit_net_pct=target/notional*100, stop_loss_net_pct=5.0/notional*100,
         profit_protection_arm_net_usd=arm, profit_giveback_fraction=.20,

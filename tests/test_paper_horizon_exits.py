@@ -28,7 +28,7 @@ class HorizonTests(unittest.TestCase):
         return {**self.position(sid),'exit_parameters':horizons.parameters(sid)}
 
     def test_fixed_distinct_profiles_are_not_fitted_to_shadow_outcomes(self):
-        for sid,minutes,target,arm in [('EARLY',60,6,2),('MOMENTUM',60,6,2),
+        for sid,minutes,target,arm in [('EARLY',60,6,2),('MOMENTUM',15,6,2),
                 ('PRECISION',240,15,4),('ULTRA_PRECISION',720,30,4)]:
             p=horizons.parameters(sid)
             self.assertEqual((p['max_hold_minutes'],p['take_profit_net_usd'],
@@ -157,8 +157,50 @@ class HorizonTests(unittest.TestCase):
             self.assertTrue(active.positions(self.books['MOMENTUM']))
         self.mark(.0099)
         t=self.books['MOMENTUM']['history'][0]
-        self.assertEqual(t['exit_reason'],'PAPER_HORIZON_MAX_HOLD_60')
+        self.assertEqual(t['exit_reason'],'PAPER_HORIZON_MAX_HOLD_15')
         self.assertLess(t['pnl_usd'],0)
+
+    def test_new_momentum_scalp_has_distinct_receipt_and_real_engine_fifteen_minute_timeout(self):
+        p=self.open_for('MOMENTUM')
+        self.assertEqual(p['notional_usd'],100)
+        self.assertEqual(p['exit_parameters']['version'],horizons.SCALP_VERSION)
+        self.assertEqual(p['exit_parameters']['holding_profile'],'SCALP')
+        self.clock=NOW+14*60_000;self.mark(.0102)
+        self.assertTrue(active.positions(self.books['MOMENTUM']))
+        self.clock=NOW+15*60_000;self.mark(.0102)
+        self.assertFalse(active.positions(self.books['MOMENTUM']))
+        t=self.books['MOMENTUM']['history'][0]
+        self.assertEqual(t['exit_reason'],'PAPER_HORIZON_MAX_HOLD_15')
+        self.assertLess(t['pnl_usd'],6)  # quote result, never booked at a target
+
+    def test_existing_horizon_momentum_and_holder_are_not_rewritten_or_rearmed(self):
+        for sid,minutes,profile in [('MOMENTUM',60,'QUICK'),('ULTRA_PRECISION',720,'HOLDER')]:
+            p=self.new_position(sid)
+            p['exit_parameters'].update(version=horizons.VERSION,max_hold_minutes=minutes,holding_profile=profile)
+            active.observe_profit_protection(p,5,NOW-1)
+            active.attach(self.books[sid],p)
+        before=copy.deepcopy(self.books)
+        self.assertEqual(active.apply_horizon_exit_policy(self.books,NOW),[])
+        self.assertEqual(self.books,before)
+        p=active.positions(self.books['MOMENTUM'])[0]
+        self.assertIsNone(active.exit_reason(p,4.5,15))
+        self.assertEqual(active.exit_reason(p,4.5,60),'PAPER_HORIZON_MAX_HOLD_60')
+        active.observe_profit_protection(p,6,NOW)
+        self.assertAlmostEqual(p['profit_protection']['floor_net_usd'],4.8)
+
+    def test_daily_pause_retains_all_managed_losses_and_open_marks_across_utc_day(self):
+        b=self.books['MOMENTUM']
+        b['history']=[dict(entry_policy_version=active.CAPACITY_TEST_VERSION,pnl_usd=-60,closed_at=NOW)]
+        cap=active.capacity(b,NOW)
+        self.assertEqual(cap['blocked_reason'],'funded_active_daily_loss_limit')
+        self.assertEqual(cap['daily_window_ends_at'],(NOW//86_400_000+1)*86_400_000)
+        self.assertEqual(cap['daily_window_basis'],'UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS')
+        self.assertFalse(cap['next_day_guarantees_entry'])
+        next_day=cap['daily_window_ends_at']
+        self.assertIsNone(active.capacity(b,next_day)['blocked_reason'])
+        active.attach(b,self.new_position('MOMENTUM'))
+        active.positions(b)[0].update(open_pnl_usd=-55,quote_status='fresh')
+        self.assertEqual(active.capacity(b,next_day)['blocked_reason'],'funded_active_daily_loss_limit')
 
     def test_long_profile_is_not_sold_at_one_hour(self):
         self.open_for('ULTRA_PRECISION');self.clock=NOW+60*60_000

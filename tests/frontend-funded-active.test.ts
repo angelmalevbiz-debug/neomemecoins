@@ -2,6 +2,32 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fundedActiveSummary, profitProtectionSummary, labEntryStatus } from '../src/lib/labStrategyView';
 
+test('scalp profile displays independent duration and UTC pause without promising an entry', () => {
+  const result=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100',quality_mode:true,
+    trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,
+    open_positions:0,max_positions:4,target_orders_per_hour:50,exposure_usd:0,daily_loss_limit_usd:50,
+    blocked_reason:'funded_active_daily_loss_limit',daily_net_usd:-60,
+    daily_window_basis:'UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS',daily_window_ends_at:1791590400000,
+    exit_policy:{version:'PAPER_MOMENTUM_SCALP_EXIT_V1_15',holding_profile:'SCALP',max_hold_minutes:15,
+      take_profit_net_usd:6,stop_loss_net_usd:5,profit_protection_arm_net_usd:2,
+      minimum_profit_giveback_usd:.75,profit_giveback_fraction:.2}});
+  assert.match(result!,/SCALP · максимум 15 мин/);
+  assert.match(result!,/Следващ UTC ден:/);
+  assert.match(result!,/отворените загуби остават в риска/);
+  assert.match(result!,/не гарантира нов вход/);
+});
+
+test('legacy snapshots and invalid risk clocks never fabricate a rollover time', () => {
+  for (const stamp of [undefined,NaN,Infinity,-1,9e15]) {
+    const result=fundedActiveSummary({version:'V5',quality_mode:true,trades:0,wins:0,win_rate:null,
+      net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,open_positions:0,max_positions:4,
+      target_orders_per_hour:50,exposure_usd:0,daily_loss_limit_usd:50,
+      blocked_reason:'funded_active_daily_loss_limit',daily_window_ends_at:stamp,
+      daily_window_basis:'UTC_CALENDAR_DAY_INCLUDING_OPEN_MARKS'});
+    assert.doesNotMatch(result!,/Следващ UTC ден|Invalid Date/);
+  }
+});
+
 test('active PAPER summary separates current policy, entries, exits and no results', () => {
   const result = fundedActiveSummary({ version: 'FUNDED_ACTIVE_PAPER_V1', trades: 0, wins: 0,
     win_rate: null, net_pnl_usd: 0, orders_last_60m: 2, closed_last_60m: 0,

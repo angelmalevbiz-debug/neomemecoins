@@ -1,0 +1,16 @@
+loaded {'rows': 6598553, 'points': 2328685, 'pairs': 3756, 't0': 1791362460712.0, 't1': 1791517300498.0} 1.0
+cut 1791455364583.6 train h 25.806631000027128 holdout h 17.20442066663954
+pumpswap SOL pairs 2851
+guard mismatches 0
+points {'all': 1686713, 'g': 1015302} same-price share 0.888 b5/s5 change without price change share of same-price 0.0324
+guarded price-change interval s: p10 26.3 p50 31.9 p90 66.6 n 119285
+active per minute all        median  66 p10  32 p90  71 | train mean 54.1 holdout mean 66.3 | pairs 2851
+active per minute g          median  39 p10  13 p90  46 | train mean 32.7 holdout mean 38.1 | pairs 122
+active per minute g50        median  35 p10   7 p90  42 | train mean 27.8 holdout mean 34.3 | pairs 87
+active per minute g50_f50    median  14 p10   0 p90  16 | train mean 8.6 holdout mean 14.5 | pairs 41
+active per minute g250_f50   median  12 p10   0 p90  15 | train mean 8.0 holdout mean 13.1 | pairs 41
+active per minute g50_f95    median  28 p10   3 p90  34 | train mean 20.3 holdout mean 28.0 | pairs 71
+rt cost % at $200 fee100+   n  4025 model median 3.34 | net50 leg-stress+calib median 4.65 p10 4.31 p90 5.73
+rt cost % at $200 fee55-95  n  7352 model median 2.09 | net50 leg-stress+calib median 3.40 p10 3.09 p90 4.13
+rt cost % at $200 fee<=50   n  6426 model median 1.20 | net50 leg-stress+calib median 2.75 p10 2.59 p90 3.17
+secs 4.6

@@ -1,0 +1,9 @@
+pool 0 333 points 632 1.2 s
+pool 50 333 points 20141 7.1 s
+pool 100 333 points 29322 10.0 s
+pool 150 333 points 44977 15.8 s
+pool 200 333 points 44992 15.8 s
+pool 250 333 points 47327 16.6 s
+pool 300 333 points 50680 17.7 s
+{'decisions': 95352, 'no_series': 318, 'guard_block': 36507, 'kept': 58527}
+saved 58527 21.3 s

@@ -1,0 +1,98 @@
+PARITY vs hfsim.run_book(occ=fill): n 1814 vs 1814, mismatches 0
+train E95 heat-passing refresh events 12156 pairs 24
+grid rows 192 secs 21.8
+configs inside [47,60]/h with top-pair <= 0.20: 13
+CHOSEN shared rules: h120_s4_none_cd60_nobrake {"tph": 47.718, "hour_p10": 0.0, "hour_median": 56.2, "hours_ge40": 0.72, "pairs": 24.0, "top_pair_share": 0.106, "mean_net50": -3.936, "mean_booked": -2.97, "mean_net0": -1.859, "usd50_per_trade": -0.984, "booked_usd_per_trade": -0.742, "usd50_per_hour": -46.956, "booked_usd_per_hour": -35.428, "win50": 0.826, "fee_le50_share": 0.222, "reentry_le60s_share": 0.0, "reentry_le300s_share": 0.442, "mean_cycle_s": 158.08}
+  h120_s4_none_cd60_nobrake          tph  47.7 p10h  0.0 ge40 0.72 net50 -3.936 booked -2.970 $/tr50 -0.984 bk$/h -35.43 50$/h -46.96 pairs 24.0 top 0.106 le50 0.22 re60 0.00 re300 0.44 cyc 158
+  h120_s5_none_cd120_nobrake         tph  48.8 p10h  0.0 ge40 0.70 net50 -3.925 booked -2.959 $/tr50 -0.981 bk$/h -36.10 50$/h -47.90 pairs 24.0 top 0.099 le50 0.22 re60 0.00 re300 0.40 cyc 159
+  h60_s3_none_cd120_nobrake          tph  49.1 p10h  0.0 ge40 0.72 net50 -3.947 booked -2.980 $/tr50 -0.987 bk$/h -36.60 50$/h -48.47 pairs 23.6 top 0.103 le50 0.22 re60 0.00 re300 0.38 cyc 99
+  h120_s6_none_cd120_nobrake         tph  49.9 p10h  0.0 ge40 0.70 net50 -3.929 booked -2.962 $/tr50 -0.982 bk$/h -36.96 50$/h -49.02 pairs 24.0 top 0.098 le50 0.23 re60 0.00 re300 0.41 cyc 161
+  h120_s5_none_cd60_nobrake          tph  52.2 p10h  0.0 ge40 0.72 net50 -3.936 booked -2.970 $/tr50 -0.984 bk$/h -38.78 50$/h -51.40 pairs 24.0 top 0.103 le50 0.22 re60 0.00 re300 0.48 cyc 158
+  h60_s3_none_cd60_nobrake           tph  52.6 p10h  0.0 ge40 0.72 net50 -3.953 booked -2.987 $/tr50 -0.988 bk$/h -39.26 50$/h -51.96 pairs 23.6 top 0.109 le50 0.22 re60 0.00 re300 0.45 cyc 97
+  h60_s4_none_cd120_nobrake          tph  53.1 p10h  0.0 ge40 0.72 net50 -3.949 booked -2.982 $/tr50 -0.987 bk$/h -39.58 50$/h -52.40 pairs 24.0 top 0.102 le50 0.22 re60 0.00 re300 0.41 cyc 97
+  h120_s6_none_cd60_nobrake          tph  53.9 p10h  0.0 ge40 0.72 net50 -3.932 booked -2.966 $/tr50 -0.983 bk$/h -40.00 50$/h -53.03 pairs 24.0 top 0.102 le50 0.22 re60 0.00 re300 0.49 cyc 157
+  h60_s5_none_cd120_nobrake          tph  54.1 p10h  0.0 ge40 0.72 net50 -3.949 booked -2.982 $/tr50 -0.987 bk$/h -40.31 50$/h -53.37 pairs 24.0 top 0.101 le50 0.22 re60 0.00 re300 0.42 cyc 97
+  h60_s6_none_cd120_nobrake          tph  54.2 p10h  0.0 ge40 0.72 net50 -3.950 booked -2.984 $/tr50 -0.988 bk$/h -40.42 50$/h -53.52 pairs 24.0 top 0.101 le50 0.22 re60 0.00 re300 0.42 cyc 97
+  h60_s4_none_cd60_nobrake           tph  58.1 p10h  0.0 ge40 0.72 net50 -3.950 booked -2.984 $/tr50 -0.988 bk$/h -43.31 50$/h -57.33 pairs 23.8 top 0.108 le50 0.22 re60 0.00 re300 0.49 cyc 96
+  h60_s5_none_cd60_nobrake           tph  59.7 p10h  0.0 ge40 0.72 net50 -3.949 booked -2.982 $/tr50 -0.987 bk$/h -44.48 50$/h -58.89 pairs 24.0 top 0.107 le50 0.22 re60 0.00 re300 0.50 cyc 95
+  h60_s6_none_cd60_nobrake           tph  59.9 p10h  0.0 ge40 0.72 net50 -3.949 booked -2.982 $/tr50 -0.987 bk$/h -44.67 50$/h -59.15 pairs 24.0 top 0.107 le50 0.22 re60 0.00 re300 0.50 cyc 95
+-- rate landscape (control mean tph) by hold/slots/pacing at cd120 nobrake / brake:
+  h60_s3_none_cd120_nobrake          tph  49.1 p10h  0.0 net50 -3.947 bk$/h -36.60 top 0.103
+  h60_s3_none_cd120_brake4x30        tph  18.9 p10h  0.0 net50 -3.896 bk$/h -13.83 top 0.076
+  h60_s3_gap60_cd120_nobrake         tph  30.6 p10h  0.0 net50 -3.962 bk$/h -22.94 top 0.116
+  h60_s3_gap60_cd120_brake4x30       tph  17.5 p10h  0.0 net50 -3.890 bk$/h -12.77 top 0.081
+  h60_s3_gap72_cd120_nobrake         tph  24.1 p10h  0.0 net50 -3.991 bk$/h -18.25 top 0.129
+  h60_s3_gap72_cd120_brake4x30       tph  16.3 p10h  0.0 net50 -3.921 bk$/h -12.06 top 0.078
+  h60_s3_bucket72x3_cd120_nobrake    tph  35.1 p10h  0.0 net50 -3.969 bk$/h -26.36 top 0.118
+  h60_s3_bucket72x3_cd120_brake4x30  tph  18.8 p10h  0.0 net50 -3.892 bk$/h -13.74 top 0.077
+  h60_s4_none_cd120_nobrake          tph  53.1 p10h  0.0 net50 -3.949 bk$/h -39.58 top 0.102
+  h60_s4_none_cd120_brake4x30        tph  19.0 p10h  0.0 net50 -3.897 bk$/h -13.91 top 0.076
+  h60_s4_gap60_cd120_nobrake         tph  30.6 p10h  0.0 net50 -3.962 bk$/h -22.94 top 0.116
+  h60_s4_gap60_cd120_brake4x30       tph  17.5 p10h  0.0 net50 -3.890 bk$/h -12.77 top 0.081
+  h60_s4_gap72_cd120_nobrake         tph  24.1 p10h  0.0 net50 -3.991 bk$/h -18.25 top 0.129
+  h60_s4_gap72_cd120_brake4x30       tph  16.3 p10h  0.0 net50 -3.921 bk$/h -12.06 top 0.078
+  h60_s4_bucket72x3_cd120_nobrake    tph  35.2 p10h  0.0 net50 -3.965 bk$/h -26.37 top 0.118
+  h60_s4_bucket72x3_cd120_brake4x30  tph  18.9 p10h  0.0 net50 -3.890 bk$/h -13.78 top 0.077
+  h60_s5_none_cd120_nobrake          tph  54.1 p10h  0.0 net50 -3.949 bk$/h -40.31 top 0.101
+  h60_s5_none_cd120_brake4x30        tph  19.0 p10h  0.0 net50 -3.895 bk$/h -13.93 top 0.076
+  h60_s5_gap60_cd120_nobrake         tph  30.6 p10h  0.0 net50 -3.962 bk$/h -22.94 top 0.116
+  h60_s5_gap60_cd120_brake4x30       tph  17.5 p10h  0.0 net50 -3.890 bk$/h -12.77 top 0.081
+  h60_s5_gap72_cd120_nobrake         tph  24.1 p10h  0.0 net50 -3.991 bk$/h -18.25 top 0.129
+  h60_s5_gap72_cd120_brake4x30       tph  16.3 p10h  0.0 net50 -3.921 bk$/h -12.06 top 0.078
+  h60_s5_bucket72x3_cd120_nobrake    tph  35.2 p10h  0.0 net50 -3.965 bk$/h -26.37 top 0.118
+  h60_s5_bucket72x3_cd120_brake4x30  tph  18.9 p10h  0.0 net50 -3.891 bk$/h -13.78 top 0.077
+  h60_s6_none_cd120_nobrake          tph  54.2 p10h  0.0 net50 -3.950 bk$/h -40.42 top 0.101
+  h60_s6_none_cd120_brake4x30        tph  19.0 p10h  0.0 net50 -3.893 bk$/h -13.92 top 0.076
+  h60_s6_gap60_cd120_nobrake         tph  30.6 p10h  0.0 net50 -3.962 bk$/h -22.94 top 0.116
+  h60_s6_gap60_cd120_brake4x30       tph  17.5 p10h  0.0 net50 -3.890 bk$/h -12.77 top 0.081
+  h60_s6_gap72_cd120_nobrake         tph  24.1 p10h  0.0 net50 -3.991 bk$/h -18.25 top 0.129
+  h60_s6_gap72_cd120_brake4x30       tph  16.3 p10h  0.0 net50 -3.921 bk$/h -12.06 top 0.078
+  h60_s6_bucket72x3_cd120_nobrake    tph  35.2 p10h  0.0 net50 -3.965 bk$/h -26.37 top 0.118
+  h60_s6_bucket72x3_cd120_brake4x30  tph  18.9 p10h  0.0 net50 -3.891 bk$/h -13.78 top 0.077
+  h120_s3_none_cd120_nobrake         tph  38.5 p10h  0.0 net50 -3.908 bk$/h -28.32 top 0.101
+  h120_s3_none_cd120_brake4x30       tph  18.8 p10h  0.0 net50 -3.918 bk$/h -13.85 top 0.081
+  h120_s3_gap60_cd120_nobrake        tph  29.9 p10h  0.0 net50 -3.954 bk$/h -22.37 top 0.111
+  h120_s3_gap60_cd120_brake4x30      tph  17.3 p10h  0.0 net50 -3.915 bk$/h -12.76 top 0.079
+  h120_s3_gap72_cd120_nobrake        tph  23.8 p10h  0.0 net50 -3.954 bk$/h -17.76 top 0.122
+  h120_s3_gap72_cd120_brake4x30      tph  16.5 p10h  0.0 net50 -3.906 bk$/h -12.09 top 0.089
+  h120_s3_bucket72x3_cd120_nobrake   tph  34.3 p10h  0.0 net50 -3.949 bk$/h -25.56 top 0.112
+  h120_s3_bucket72x3_cd120_brake4x30 tph  18.6 p10h  0.0 net50 -3.921 bk$/h -13.75 top 0.080
+  h120_s4_none_cd120_nobrake         tph  45.6 p10h  0.0 net50 -3.921 bk$/h -33.67 top 0.101
+  h120_s4_none_cd120_brake4x30       tph  19.0 p10h  0.0 net50 -3.922 bk$/h -14.03 top 0.080
+  h120_s4_gap60_cd120_nobrake        tph  30.0 p10h  0.0 net50 -3.956 bk$/h -22.41 top 0.111
+  h120_s4_gap60_cd120_brake4x30      tph  17.4 p10h  0.0 net50 -3.906 bk$/h -12.79 top 0.080
+  h120_s4_gap72_cd120_nobrake        tph  23.8 p10h  0.0 net50 -3.954 bk$/h -17.77 top 0.122
+  h120_s4_gap72_cd120_brake4x30      tph  16.5 p10h  0.0 net50 -3.907 bk$/h -12.11 top 0.089
+  h120_s4_bucket72x3_cd120_nobrake   tph  34.9 p10h  0.0 net50 -3.917 bk$/h -25.72 top 0.112
+  h120_s4_bucket72x3_cd120_brake4x30 tph  18.8 p10h  0.0 net50 -3.914 bk$/h -13.85 top 0.080
+  h120_s5_none_cd120_nobrake         tph  48.8 p10h  0.0 net50 -3.925 bk$/h -36.10 top 0.099
+  h120_s5_none_cd120_brake4x30       tph  19.1 p10h  0.0 net50 -3.927 bk$/h -14.11 top 0.079
+  h120_s5_gap60_cd120_nobrake        tph  30.0 p10h  0.0 net50 -3.956 bk$/h -22.40 top 0.111
+  h120_s5_gap60_cd120_brake4x30      tph  17.4 p10h  0.0 net50 -3.907 bk$/h -12.79 top 0.080
+  h120_s5_gap72_cd120_nobrake        tph  23.8 p10h  0.0 net50 -3.954 bk$/h -17.77 top 0.122
+  h120_s5_gap72_cd120_brake4x30      tph  16.5 p10h  0.0 net50 -3.907 bk$/h -12.11 top 0.089
+  h120_s5_bucket72x3_cd120_nobrake   tph  34.9 p10h  0.0 net50 -3.916 bk$/h -25.72 top 0.112
+  h120_s5_bucket72x3_cd120_brake4x30 tph  18.8 p10h  0.0 net50 -3.912 bk$/h -13.83 top 0.080
+  h120_s6_none_cd120_nobrake         tph  49.9 p10h  0.0 net50 -3.929 bk$/h -36.96 top 0.098
+  h120_s6_none_cd120_brake4x30       tph  19.1 p10h  0.0 net50 -3.925 bk$/h -14.10 top 0.079
+  h120_s6_gap60_cd120_nobrake        tph  30.0 p10h  0.0 net50 -3.956 bk$/h -22.40 top 0.111
+  h120_s6_gap60_cd120_brake4x30      tph  17.4 p10h  0.0 net50 -3.907 bk$/h -12.79 top 0.080
+  h120_s6_gap72_cd120_nobrake        tph  23.8 p10h  0.0 net50 -3.954 bk$/h -17.77 top 0.122
+  h120_s6_gap72_cd120_brake4x30      tph  16.5 p10h  0.0 net50 -3.907 bk$/h -12.11 top 0.089
+  h120_s6_bucket72x3_cd120_nobrake   tph  34.9 p10h  0.0 net50 -3.916 bk$/h -25.72 top 0.112
+  h120_s6_bucket72x3_cd120_brake4x30 tph  18.8 p10h  0.0 net50 -3.912 bk$/h -13.83 top 0.080
+BOOK RND_E95                tph  47.7 p10h   0.0 ge40 0.72 net50 -3.936 booked -2.970 net0 -1.859 gross -0.033 dp50 -3.904 $/tr -0.984 bk$/h -35.43 50$/h -46.96 pairs 24.0 top 0.106 le50 0.22 re60 0.00 win50 0.83 ci [-4.132, -3.72]
+BOOK QUIET_E95              tph  38.9 p10h   0.0 ge40 0.64 net50 -3.724 booked -2.756 net0 -1.568 gross -0.049 dp50 -3.656 $/tr -0.931 bk$/h -26.77 50$/h -36.19 pairs 20.0 top 0.150 le50 0.54 re60 0.00 win50 0.20 ci [-3.894, -3.592]
+BOOK NEAR15LOW_E95          tph  40.1 p10h   0.0 ge40 0.68 net50 -3.788 booked -2.820 net0 -1.685 gross +0.051 dp50 -3.729 $/tr -0.947 bk$/h -28.28 50$/h -37.98 pairs 24.0 top 0.085 le50 0.32 re60 0.00 win50 0.39 ci [-3.994, -3.557]
+BOOK NEAR15LOW_E95_HEATLOG  tph  52.0 p10h   3.0 ge40 0.72 net50 -3.857 booked -2.890 net0 -1.751 gross -0.024 dp50 -3.480 $/tr -0.964 bk$/h -37.55 50$/h -50.11 pairs 28.0 top 0.075 le50 0.34 re60 0.00 win50 0.67 ci [-4.07, -3.644]
+BOOK RND_E95_HEATLOG        tph  63.3 p10h  16.2 ge40 0.72 net50 -3.965 booked -2.998 net0 -1.880 gross -0.051 dp50 -3.958 $/tr -0.991 bk$/h -47.46 50$/h -62.75 pairs 30.6 top 0.085 le50 0.25 re60 0.00 win50 2.28 ci [-4.142, -3.794]
+BOOK RND_L50                tph  15.1 p10h   0.0 ge40 0.00 net50 -3.523 booked -2.552 net0 -1.252 gross -0.041 dp50 -3.435 $/tr -0.881 bk$/h -9.62 50$/h -13.28 pairs  8.0 top 0.303 le50 1.00 re60 0.00 win50 0.10 ci [-3.729, -3.456]
+BOOK RND_E50                tph  15.1 p10h   0.0 ge40 0.00 net50 -3.523 booked -2.552 net0 -1.252 gross -0.041 dp50 -3.435 $/tr -0.881 bk$/h -9.62 50$/h -13.28 pairs  8.0 top 0.303 le50 1.00 re60 0.00 win50 0.10 ci [-3.729, -3.456]
+BOOK QUIET_L50              tph  22.6 p10h   0.0 ge40 0.08 net50 -3.498 booked -2.527 net0 -1.226 gross -0.074 dp50 -3.445 $/tr -0.874 bk$/h -14.29 50$/h -19.79 pairs  8.0 top 0.271 le50 1.00 re60 0.00 win50 0.17 ci [-3.599, -3.38]
+  gap vs RND_E95(hfA) QUIET_E95        net50 [-0.054, 0.444] gross [-0.171, 0.125]
+  gap vs RND_E95(hfA) NEAR15LOW_E95    net50 [-0.179, 0.461] gross [-0.087, 0.242]
+  gap vs RND_E95(hfA) RND_L50          net50 [0.071, 0.57] gross [-0.291, 0.074]
+  gap vs RND_E95(hfA) RND_E50          net50 [0.071, 0.57] gross [-0.291, 0.074]
+  gap vs RND_E95(hfA) QUIET_L50        net50 [0.205, 0.664] gross [-0.199, 0.123]
+  gap NEAR15LOW_HEATLOG vs RND_E95_HEATLOG(hfA) net50 [-0.159, 0.392] gross [-0.163, 0.225]
+secs 23.1

@@ -14,6 +14,7 @@ import entry_defense
 import heat_veto
 import pool_loss_memory
 import lab_forward_tests as lab_forward
+import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
 import momentum_rush_brain as rush_brain
 import engine_rug_guard as rug_guard
@@ -30,6 +31,8 @@ DEX='https://api.dexscreener.com'
 STATE_PATH=Path(os.getenv('NEO_STRATEGY_LAB_PATH','/var/lib/neo-market/strategy_lab.json'))
 COMPACT_PATH=Path(os.getenv('NEO_STRATEGY_LAB_COMPACT_PATH',str(STATE_PATH.parent/'strategy_lab_compact.json')))
 RESET_FLAG_PATH=Path(os.getenv('NEO_STRATEGY_LAB_RESET_FLAG','/var/lib/neo-market/strategy_lab.reset'))
+# LAB_HIGH_FREQUENCY_V1 books keep their own journal and checkpoint here, never in strategy_lab.json.
+HF_ROOT=Path(os.getenv(hf_lab.ENV_ROOT,str(STATE_PATH.parent/'strategy_lab_hf')))
 LIVE_TAPE_PATH=Path(os.getenv('NEO_LIVE_TAPE_PATH','/var/lib/neo-market/live_tape.json'))
 START_BALANCE=float(os.getenv('NEO_LAB_START_BALANCE','500'))
 PROMOTED_STRATEGIES=('EARLY','MOMENTUM','PRECISION','ULTRA_PRECISION')
@@ -695,7 +698,10 @@ def review_strategy_lifecycle(books):
     return lab_forward.apply_kill_rules(books,review,registered_ids=registered,now=now)
 
 def load_state():
+    global RESET_REQUESTED
     reset_requested=RESET_FLAG_PATH.exists()
+    # The HF books (strategy_lab_hf/) follow a requested Lab reset (archived, never deleted).
+    RESET_REQUESTED=RESET_REQUESTED or reset_requested
     if reset_requested:
         raw={}
         try: RESET_FLAG_PATH.unlink()
@@ -746,6 +752,10 @@ STATE={'started_at':now_ms(),'updated_at':now_ms(),'status':'starting',
        'books':{s['id']:empty_book(s) for s in STRATEGIES}}
 # Set once main() has loaded the durable ledger; shutdown persists only after that.
 LOADED=False
+# Whether this process found the Lab reset flag (load_state consumes the flag file).
+RESET_REQUESTED=False
+# LAB_HIGH_FREQUENCY_V1 container (built by main() when NEO_LAB_HF_ENABLED is '1', the default).
+HF=None
 if STATE.get('activity_version')!=activity.POLICY_VERSION:
     STATE['activity_version']=activity.POLICY_VERSION
     STATE['activity_started_at']=now_ms()
@@ -1673,6 +1683,73 @@ def stats(book):
             'zero_capital_trades':len(zero_capital),
             'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}
 
+def build_high_frequency():
+    """LAB_HIGH_FREQUENCY_V1 container of this Lab process, or None when NEO_LAB_HF_ENABLED is not '1'.
+
+    Its books, journal and checkpoint live in HF_ROOT (strategy_lab_hf/), never in STATE['books']
+    or strategy_lab.json. The shared cost model, defensive layer and exact-pair mark feed are
+    injected; a Lab reset (the flag load_state consumed) archives the HF root's state as well.
+    """
+    global HF
+    if not hf_lab.enabled():
+        HF=None
+        return None
+    container=hf_lab.HighFrequencyLab(HF_ROOT,cost=hf_lab.cost_functions(sys.modules[__name__]),
+                                      defense=entry_defense_layer(),marks=POSITION_MARK_FEED,
+                                      price_audit=price_integrity,clock=now_ms)
+    container.load(reset=RESET_REQUESTED)
+    HF=container
+    return container
+
+def hf_feed_prices(feed):
+    """{(mint, pool): coin} of this loop's shared feed (the marks HF.update reads)."""
+    prices={}
+    for coin in feed or []:
+        address=coin.get('address'); pair=coin.get('pairAddress')
+        if address and pair and num(coin.get('priceUsd'))>0:
+            prices[(address,pair)]=coin
+    return prices
+
+def hf_error_text(stage,error):
+    return f'{stage}: {type(error).__name__}: {error}'[:300]
+
+def hf_update(feed,errors):
+    """HF fills, marks and exits of this loop (after update_positions); returns its milliseconds."""
+    if HF is None:
+        return 0.0
+    started=time.perf_counter()
+    try:
+        now=now_ms()
+        HF.update(hf_feed_prices(feed),now,lab_forward.feed_alive(feed,now))
+    except Exception as e:
+        errors.append(hf_error_text('update',e))
+    return (time.perf_counter()-started)*1000
+
+def hf_refresh(feed,errors):
+    """HF decisions of this refresh (after maybe_open); returns its milliseconds."""
+    if HF is None:
+        return 0.0
+    started=time.perf_counter()
+    try:
+        HF.on_refresh(feed,now_ms())
+    except Exception as e:
+        errors.append(hf_error_text('on_refresh',e))
+    return (time.perf_counter()-started)*1000
+
+def hf_end_loop(milliseconds,errors):
+    """Time budget (> 250 ms of HF work in 3 consecutive loops: hf_degraded, exits continue) and
+    STATE['hf_error'] of this loop; an HF error never stops the Lab."""
+    if HF is None:
+        return
+    try:
+        HF.record_loop_time(milliseconds)
+    except Exception as e:
+        errors.append(hf_error_text('time_budget',e))
+    if errors:
+        STATE['hf_error']=' | '.join(errors)[:600]
+    else:
+        STATE.pop('hf_error',None)
+
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
     STATE['registry_compatibility']=registry_compatibility(STATE['books'])
@@ -1706,6 +1783,23 @@ def persist(status='online',error=None):
     STATE['activity_config']['lab_forward_tests']=lab_forward.config()
     STATE['activity_config']['lab_forward_tests_state']={**FORWARD_MEMORY.status(),
                                                          'signal_carry':FORWARD_SIGNAL_CARRY.status()}
+    # LAB_HIGH_FREQUENCY_V1: checkpoint (forced on stop), published definition, metrics and the
+    # dashboard section. The HF view goes only into the compact projection: the full ledger
+    # carries the HF definition and metrics, never HF trades.
+    hf_view=None
+    hf_metrics=None
+    if HF is not None:
+        try:
+            hf_now=now_ms()
+            HF.checkpoint_if_due(hf_now,force=status=='stopped')
+            STATE['activity_config']['lab_high_frequency']={**HF.config(),'running':bool(HF.loaded)}
+            hf_metrics=HF.metrics()
+            hf_view=HF.dashboard_view(hf_now)
+        except Exception as e:
+            STATE['hf_error']=hf_error_text('persist',e)
+    else:
+        STATE['activity_config']['lab_high_frequency']={**hf_lab.config_view(enabled_flag=hf_lab.enabled()),
+                                                        'running':False}
     if DEFENSE is not None:
         STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
         if status=='stopped':
@@ -1742,10 +1836,13 @@ def persist(status='online',error=None):
     if error: STATE['error']=str(error)[:200]
     else: STATE.pop('error',None)
     STATE['persistence']=dict(PERSIST_METRICS)
+    if hf_metrics is not None:
+        STATE['persistence']['hf']=hf_metrics
     published=merge_paired_snapshot(merge_astra_snapshot(STATE))
     started=time.perf_counter()
     ledger_bytes=atomic_write(published)
-    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(published))
+    compact_source={**published,'high_frequency':hf_view} if hf_view is not None else published
+    compact_bytes=atomic_write_path(COMPACT_PATH,compact_strategy_lab(compact_source))
     record_persist_metrics(ledger_bytes,compact_bytes,time.perf_counter()-started,now_ms())
 
 def main():
@@ -1763,6 +1860,11 @@ def main():
     if STATE.get('activity_version')!=activity.POLICY_VERSION:
         STATE['activity_version']=activity.POLICY_VERSION
         STATE['activity_started_at']=now_ms()
+    try:
+        # LAB_HIGH_FREQUENCY_V1 (NEO_LAB_HF_ENABLED, default '1'); a failure leaves the Lab running without it.
+        build_high_frequency()
+    except Exception as e:
+        STATE['hf_error']=hf_error_text('build',e)
     last_entry=0
     feed=[]
     persistence_ready=True
@@ -1783,8 +1885,12 @@ def main():
                 feed=r.json().get('feed') or []
                 last_entry=time.time()
             update_positions(flows,feed)
+            hf_errors=[]
+            hf_ms=hf_update(feed,hf_errors)
             if refresh_due:
                 maybe_open(feed,flows)
+                hf_ms+=hf_refresh(feed,hf_errors)
+            hf_end_loop(hf_ms,hf_errors)
             persist('online')
             failures=0
         except Exception as e:

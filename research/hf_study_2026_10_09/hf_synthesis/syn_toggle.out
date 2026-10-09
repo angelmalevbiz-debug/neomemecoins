@@ -1,0 +1,7 @@
+pairs with toggles 11 {'7mQDGtei': 12, 'HMzvsEEm': 10, 'F2P22Sfc': 8, 'FnzKY6x7': 5, 'FcfEJ9uJ': 3, 'HU22UBaT': 3, 'A2ASUorC': 3, '3RAFMXR7': 2, '7wCarEYc': 1, 'BFrSZake': 1}
+RND   train   base n  856 tph 33.2 net50 -3.876 min -17.9 max +40.6 | guard(a) n  851 tph 33.0 net50 -3.925 min -17.9 max +40.6 | (a)+(b) net50 -3.925 min -17.9 max +40.6
+RND   holdout base n  830 tph 48.2 net50 -3.694 min -13.4 max +30.2 | guard(a) n  819 tph 47.6 net50 -3.736 min -13.4 max +19.9 | (a)+(b) net50 -3.762 min -13.4 max +11.9
+QUIET train   base n  813 tph 31.5 net50 -3.745 min -75.6 max +40.6 | guard(a) n  774 tph 30.0 net50 -3.664 min -8.3 max +40.6 | (a)+(b) net50 -3.720 min -8.3 max +1.7
+QUIET holdout base n  768 tph 44.6 net50 -3.566 min -8.6 max -0.4 | guard(a) n  724 tph 42.1 net50 -3.611 min -13.8 max -0.1 | (a)+(b) net50 -3.611 min -13.8 max -0.1
+DIP15 train   base n  826 tph 32.0 net50 -3.802 min -10.5 max +40.6 | guard(a) n  810 tph 31.4 net50 -3.808 min -10.5 max +40.6 | (a)+(b) net50 -3.862 min -10.5 max +3.1
+DIP15 holdout base n  696 tph 40.5 net50 -3.634 min -13.3 max +30.2 | guard(a) n  666 tph 38.7 net50 -3.633 min -13.3 max +30.2 | (a)+(b) net50 -3.683 min -13.3 max +3.0

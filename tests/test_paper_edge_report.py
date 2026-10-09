@@ -220,6 +220,71 @@ def edge_rows(rows):
     return [edge._engine_trade(row, 'main', 'state.json') for row in rows]
 
 
+def hf_close(book, seq, net50_pct, *, pool='HFPOOL1', fee_bps=30.0, cfg='c' * 64, at=None):
+    """A LAB_HIGH_FREQUENCY_V1 journal close row (book, config hash and journal seq are its identity)."""
+    at = START + seq * MINUTE if at is None else at
+    pnl = round(25 * (net50_pct + 1.0) / 100, 6)
+    return {'v': 1, 'seq': seq, 'kind': 'close', 'book': book, 'cfg': cfg, 'budget': 'b' * 64, 'at': at,
+            'entry_policy_version': 'LAB_HIGH_FREQUENCY_V1', 'trade_no': seq, 'address': 'HFMINT', 'pairAddress': pool,
+            'decision_at': at - 150_000, 'entry_fill_price': 1.0, 'exit_fill_price': 0.98, 'close_kind': 'HF_TIME_120',
+            'pnl_usd': pnl, 'pnl_pct': round(pnl / 25 * 100, 6), 'net50_usd': round(25 * net50_pct / 100, 6),
+            'net50_pct': net50_pct, 'fee_bps': fee_bps, 'balance_after': 1000 + pnl, 'closed_at': at}
+
+
+def write_hf_journal(root, rows):
+    for row in rows:
+        path = root / 'journal' / row['book'] / '2026-10-10.jsonl'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open('a', encoding='utf-8') as handle:
+            handle.write(json.dumps(row) + '\n')
+
+
+class HighFrequencyJournalTests(unittest.TestCase):
+    def test_hf_closes_are_lab_trades_deduped_by_book_config_and_seq_with_fee_bucket_gaps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'strategy_lab_hf'
+            rows = []
+            for seq in range(1, 31):
+                pool = f'HFPOOL{seq % 5}'
+                fee = 30.0 if seq % 2 else 70.0
+                rows.append(hf_close('HF_RND_E95', seq, -3.7, pool=pool, fee_bps=fee))
+                rows.append(hf_close('HF_QUIET_E95', 100 + seq, -3.5 if fee == 30.0 else -3.9, pool=pool,
+                                     fee_bps=fee, at=START + seq * MINUTE))
+            write_hf_journal(root, rows + rows[:4])             # a copied tail: duplicates
+            write_hf_journal(root / 'archive' / 'reset-1', [hf_close('HF_RND_E95', 999, 50.0)])
+            with (root / 'journal' / 'HF_RND_E95' / '2026-10-10.jsonl').open('a', encoding='utf-8') as handle:
+                handle.write('{"v":1,"seq"\n')
+            collector = edge.LedgerCollector()
+            collector.add_hf_journal(root)
+            report = edge.build_report(collector, iterations=50, seed=3)
+            self.assertEqual(report['lab']['unique_closed_trades'], 60)
+            self.assertEqual(collector.duplicates, 4)
+            self.assertEqual(collector.rejected['malformed'], 1)
+            self.assertEqual(report['lab']['by_book']['HF_RND_E95']['closed_trades'], 30)
+            hf = report['high_frequency']
+            self.assertEqual(hf['unique_closed_trades'], 60)
+            gap = hf['gaps']['HF_QUIET_E95']
+            self.assertEqual(gap['control'], 'HF_RND_E95')
+            self.assertAlmostEqual(gap['gap_net50_pct'], 0.0, places=6)
+            self.assertAlmostEqual(gap['within_fee_bucket']['fee<=50']['gap_net50_pct'], 0.2, places=6)
+            self.assertAlmostEqual(gap['within_fee_bucket']['fee55-95']['gap_net50_pct'], -0.2, places=6)
+            self.assertEqual(len(gap['gap_ci95_pair_bootstrap']), 2)
+            self.assertIn('High-frequency books', edge.render_markdown(report))
+            self.assertEqual(collector.sources[0]['kind'], 'lab_hf')
+
+    def test_cli_reads_a_lab_hf_copy_and_refuses_a_missing_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / 'copy' / 'strategy_lab_hf'
+            write_hf_journal(root, [hf_close('HF_RND_E95', seq, -3.7) for seq in range(1, 4)])
+            out = Path(tmp) / 'reports' / 'edge'
+            with patch('sys.stdout', new_callable=io.StringIO), patch('sys.stderr', new_callable=io.StringIO):
+                self.assertEqual(edge.main(['--lab-hf', str(root), '--output', str(out), '--bootstrap', '20']), 0)
+            report = json.loads(out.with_name('edge.json').read_text(encoding='utf-8'))
+            self.assertEqual(report['lab']['by_book']['HF_RND_E95']['closed_trades'], 3)
+            with patch('sys.stderr', new_callable=io.StringIO), self.assertRaises(SystemExit):
+                edge.main(['--lab-hf', str(Path(tmp) / 'absent')])
+
+
 class LabAndCliTests(unittest.TestCase):
     def test_lab_books_are_deduped_and_measured_separately(self):
         with tempfile.TemporaryDirectory() as tmp:

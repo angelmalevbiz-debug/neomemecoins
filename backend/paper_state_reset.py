@@ -77,6 +77,40 @@ def archive_files(root, names, *, move_names=()):
     return destination
 
 
+def archive_directory(root, name):
+    """Move ``root/name`` (a whole directory tree) into a checksummed reset archive and recreate it empty.
+
+    Used for the LAB_HIGH_FREQUENCY_V1 books (strategy_lab_hf/: journal and checkpoint).
+    Nothing is deleted: every file is hashed before the move and its size checked after it.
+    Returns the archive directory, or None when there was no directory to archive.
+    """
+    root = Path(root).resolve()
+    source = root / name
+    if source.exists() and not source.is_dir():
+        raise ValueError(f'{name} is not a directory; reset refused')
+    if not source.is_dir():
+        source.mkdir(parents=True, exist_ok=True, mode=0o700)
+        return None
+    files = {}
+    for path in sorted(source.rglob('*')):
+        if path.is_file():
+            digest, size = _hash_file(path)
+            files[path.relative_to(source).as_posix()] = {'sha256': digest, 'bytes': size}
+    destination = root / 'archive' / f'reset-{time.time_ns()}-{uuid.uuid4().hex[:8]}'
+    destination.mkdir(parents=True, mode=0o700)
+    target = destination / name
+    os.replace(source, target)
+    for relative, metadata in files.items():
+        if (target / relative).stat().st_size != metadata['bytes']:
+            raise OSError('archive size mismatch; reset refused')
+    atomic_json(destination / 'manifest.json', {
+        'schema_version': 1, 'mode': 'PAPER', 'archived_at': int(time.time()*1000),
+        'reason': 'User explicitly requested history and capital reset', 'directory': name, 'files': files,
+    })
+    source.mkdir(parents=True, exist_ok=True, mode=0o700)
+    return destination
+
+
 def reset_offline(root, *, starting_balance=1000.0, training_balance=500.0):
     root = Path(root).resolve()
     if not math.isfinite(starting_balance) or starting_balance <= 0:
@@ -264,6 +298,8 @@ def reset_all_offline(root, *, paired_root=None):
             else:
                 for book in data[field].values() if field == 'books' else [data[field]]:
                     valid_capital(book)
+    if (root / 'strategy_lab_hf').exists() and not (root / 'strategy_lab_hf').is_dir():
+        raise ValueError('strategy_lab_hf is not a directory; reset refused')
     if paired_root is not None and (Path(paired_root)/'paired_state.json').exists():
         paired = json.loads((Path(paired_root)/'paired_state.json').read_text(encoding='utf-8'))
         if not isinstance(paired.get('groups'),dict):
@@ -307,6 +343,10 @@ def reset_all_offline(root, *, paired_root=None):
         atomic_json(lab,data)
         from lab_dashboard_projection import compact_strategy_lab
         atomic_json(root/'strategy_lab_compact.json',compact_strategy_lab(data))
+    # LAB_HIGH_FREQUENCY_V1 books keep their journal and checkpoint next to the Lab ledger.
+    hf_archive = archive_directory(root, 'strategy_lab_hf')
+    if hf_archive is not None:
+        archives.append(str(hf_archive))
     astra = root / 'astra_6_brain.json'
     if astra.exists():
         data = json.loads(astra.read_text(encoding='utf-8'))

@@ -1,0 +1,33 @@
+== HF_A_QUIET_E95_HEAT train: n 1409 tph 54.6 (hours>=40: 0.74) net50 -3.001 [[-3.194, -2.84]] net0 -1.589 gross -0.045 cost 2.956 | $/trade -6.00 $/h -328 (net0 $/h -174) win50 0.3 win0 0.9 pairs 20 top 0.16 bestpair-removed -3.000 mdd 846%
+   random(5 salts): net50 -3.318 [-3.296, -3.331, -3.262, -3.327, -3.375] net0 -1.988 gross -0.013 cost 3.305 tph 76.9 $/h -510 win50 0.5 pairs 24 | GAP net50 +0.317 (gross -0.032, cost +0.349)
+   exits {'HOLD': 1407, 'FEED_GAP/GAP': 2} per day {'20733': {'n': 585, 'usd50': -3604.66, 'mean_net50': -3.081}, '20734': {'n': 824, 'usd50': -4852.6, 'mean_net50': -2.945}}
+== HF_A_QUIET_E95_HEAT holdout: n 1374 tph 79.9 (hours>=40: 0.99) net50 -2.817 [[-3.078, -2.61]] net0 -1.374 gross +0.062 cost 2.879 | $/trade -5.63 $/h -450 (net0 $/h -219) win50 0.1 win0 0.7 pairs 18 top 0.14 bestpair-removed -2.816 mdd 774%
+   random(5 salts): net50 -3.065 [-3.069, -3.044, -3.115, -3.081, -3.016] net0 -1.681 gross +0.010 cost 3.075 tph 94.6 $/h -580 win50 0.8 pairs 21 | GAP net50 +0.248 (gross +0.052, cost +0.196)
+   exits {'HOLD': 1371, 'FEED_GAP/GAP': 1, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 1} per day {'20734': {'n': 991, 'usd50': -5583.93, 'mean_net50': -2.817}, '20735': {'n': 383, 'usd50': -2156.79, 'mean_net50': -2.816}}
+   holdout with daily cap $100: trades 38, per UTC day {'20734': {'n': 19, 'usd50': -107.4, 'active_min': 16.9}, '20735': {'n': 19, 'usd50': -108.84, 'active_min': 12.7}}
+== HF_B_NEAR15LOW_E95_NOHEAT train: n 1817 tph 70.4 (hours>=40: 0.78) net50 -3.416 [[-3.731, -3.13]] net0 -1.815 gross +0.045 cost 3.461 | $/trade -6.83 $/h -481 (net0 $/h -256) win50 1.1 win0 3.8 pairs 29 top 0.07 bestpair-removed -3.416 mdd 1241%
+   random(5 salts): net50 -3.686 [-3.719, -3.688, -3.635, -3.659, -3.727] net0 -2.028 gross -0.021 cost 3.664 tph 95.5 $/h -704 win50 2.0 pairs 31 | GAP net50 +0.270 (gross +0.066, cost +0.203)
+   exits {'TP': 249, 'STOP': 232, 'HOLD': 1329, 'FEED_GAP/GAP': 6, 'OPEN_AT_END/VANISHED': 1} per day {'20733': {'n': 774, 'usd50': -5292.57, 'mean_net50': -3.419}, '20734': {'n': 1043, 'usd50': -7122.19, 'mean_net50': -3.414}}
+== HF_B_NEAR15LOW_E95_NOHEAT holdout: n 1291 tph 75.0 (hours>=40: 1.05) net50 -3.130 [[-3.383, -2.866]] net0 -1.569 gross +0.056 cost 3.185 | $/trade -6.26 $/h -470 (net0 $/h -235) win50 1.2 win0 3.3 pairs 21 top 0.08 bestpair-removed -3.129 mdd 808%
+   random(5 salts): net50 -3.329 [-3.316, -3.341, -3.348, -3.366, -3.275] net0 -1.703 gross -0.007 cost 3.322 tph 113.2 $/h -754 win50 2.1 pairs 23 | GAP net50 +0.199 (gross +0.063, cost +0.137)
+   exits {'HOLD': 1044, 'STOP': 108, 'TP': 133, 'FEED_GAP/GAP': 1, 'OPEN_AT_END/END': 5} per day {'20734': {'n': 1006, 'usd50': -6343.22, 'mean_net50': -3.153}, '20735': {'n': 285, 'usd50': -1737.5, 'mean_net50': -3.048}}
+   holdout with daily cap $100: trades 41, per UTC day {'20734': {'n': 19, 'usd50': -127.63, 'active_min': 10.5}, '20735': {'n': 22, 'usd50': -132.99, 'active_min': 13.8}}
+== HF_C_QUIET_E95_NOHEAT_3SLOT train: n 1194 tph 46.3 (hours>=40: 0.66) net50 -2.983 [[-3.241, -2.813]] net0 -1.569 gross -0.043 cost 2.940 | $/trade -5.97 $/h -276 (net0 $/h -145) win50 0.2 win0 1.2 pairs 20 top 0.17 bestpair-removed -2.983 mdd 1187%
+   random(5 salts): net50 -3.405 [-3.425, -3.408, -3.362, -3.444, -3.385] net0 -2.073 gross -0.036 cost 3.369 tph 61.4 $/h -418 win50 2.5 pairs 30 | GAP net50 +0.422 (gross -0.007, cost +0.429)
+   exits {'HOLD': 1147, 'TP': 43, 'FEED_GAP/GAP': 4} per day {'20733': {'n': 473, 'usd50': -2836.54, 'mean_net50': -2.998}, '20734': {'n': 721, 'usd50': -4286.27, 'mean_net50': -2.972}}
+== HF_C_QUIET_E95_NOHEAT_3SLOT holdout: n 1150 tph 66.8 (hours>=40: 0.99) net50 -2.802 [[-3.102, -2.598]] net0 -1.354 gross +0.052 cost 2.854 | $/trade -5.60 $/h -375 (net0 $/h -181) win50 0.4 win0 1.7 pairs 18 top 0.15 bestpair-removed -2.800 mdd 1074%
+   random(5 salts): net50 -3.052 [-3.018, -3.113, -3.093, -3.044, -2.992] net0 -1.673 gross +0.028 cost 3.080 tph 76.1 $/h -465 win50 2.6 pairs 22 | GAP net50 +0.250 (gross +0.024, cost +0.226)
+   exits {'HOLD': 1103, 'TP': 42, 'FEED_GAP/GAP': 1, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 3} per day {'20734': {'n': 870, 'usd50': -4889.11, 'mean_net50': -2.81}, '20735': {'n': 280, 'usd50': -1555.3, 'mean_net50': -2.777}}
+   holdout with daily cap $60: trades 26, per UTC day {'20734': {'n': 12, 'usd50': -77.13, 'active_min': 8.9}, '20735': {'n': 14, 'usd50': -76.62, 'active_min': 10.4}}
+sizing (train, config A) $25: n 1409 tph 54.6 net50 -3.707 net0 -1.544 $/trade -0.927 $/h -50.6; hours to a $100 cap 1.98
+sizing (train, config A) $50: n 1409 tph 54.6 net50 -3.251 net0 -1.516 $/trade -1.626 $/h -88.8; hours to a $100 cap 1.13
+sizing (train, config A) $100: n 1409 tph 54.6 net50 -3.049 net0 -1.529 $/trade -3.049 $/h -166.5; hours to a $100 cap 0.60
+sizing (train, config A) $200: n 1409 tph 54.6 net50 -3.001 net0 -1.589 $/trade -6.002 $/h -327.7; hours to a $100 cap 0.31
+occupancy=fill (train, config A): n 1299 tph 50.3 net50 -2.987
+tape check HF_A_QUIET_E95_HEAT            book   {'n_checked': 35, 'n_trades': 2783, 'optimism_mean_pct': 0.091, 'optimism_median_pct': 0.045, 'mean_abs_diff_pct': 0.362}
+tape check HF_A_QUIET_E95_HEAT            random {'n_checked': 58, 'n_trades': 3652, 'optimism_mean_pct': 0.124, 'optimism_median_pct': 0.016, 'mean_abs_diff_pct': 0.363}
+tape check HF_B_NEAR15LOW_E95_NOHEAT      book   {'n_checked': 29, 'n_trades': 3108, 'optimism_mean_pct': -0.195, 'optimism_median_pct': -0.077, 'mean_abs_diff_pct': 0.391}
+tape check HF_B_NEAR15LOW_E95_NOHEAT      random {'n_checked': 154, 'n_trades': 4430, 'optimism_mean_pct': 0.052, 'optimism_median_pct': -0.025, 'mean_abs_diff_pct': 0.774}
+tape check HF_C_QUIET_E95_NOHEAT_3SLOT    book   {'n_checked': 10, 'n_trades': 2344, 'optimism_mean_pct': 0.16, 'optimism_median_pct': 0.128, 'mean_abs_diff_pct': 0.321}
+tape check HF_C_QUIET_E95_NOHEAT_3SLOT    random {'n_checked': 118, 'n_trades': 2882, 'optimism_mean_pct': -0.097, 'optimism_median_pct': -0.039, 'mean_abs_diff_pct': 0.767}
+secs 5.9

@@ -101,6 +101,14 @@ def _fetch(mint,pair):
   p=_path(mint,pair);tmp=p.with_suffix('.tmp');tmp.write_text(json.dumps(d));tmp.replace(p)
   return d
 
+def cached(coin):
+ """Read-only lookup for the HF_PRICE_AUDIT_V1 log: the cached exact-pool reference validated
+ against this observation, or None when none is cached. Never schedules a fetch."""
+ mint=str(coin.get('address') or '');pair=str(coin.get('pairAddress') or '')
+ if not ADDRESS.fullmatch(mint) or not ADDRESS.fullmatch(pair):return None
+ ref=_read(mint,pair)
+ return validate(coin,ref) if ref else None
+
 def check(coin):
  mint=str(coin.get('address') or '');pair=str(coin.get('pairAddress') or '')
  if not ADDRESS.fullmatch(mint) or not ADDRESS.fullmatch(pair):return {'status':'blocked','reason':'price_identity_mismatch'}

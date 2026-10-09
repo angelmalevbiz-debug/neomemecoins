@@ -93,6 +93,34 @@ class PaperResetTests(unittest.TestCase):
             self.assertIsNone(lab['position'])
             self.assertFalse(lab['history'])
 
+    def test_reset_all_archives_and_recreates_the_high_frequency_books(self):
+        # LAB_HIGH_FREQUENCY_V1 keeps its journal and checkpoint in strategy_lab_hf/ next to the Lab
+        # ledger: a reset moves the whole tree into a checksummed archive and starts it empty.
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'strategy_lab.json').write_text(json.dumps({'books':{'SCALPER':{'starting_balance':100,'balance':80}}}))
+            hf=root/'strategy_lab_hf';(hf/'journal'/'HF_RND_E95').mkdir(parents=True)
+            journal=hf/'journal'/'HF_RND_E95'/'2026-10-10.jsonl'
+            journal.write_text('{"v":1,"seq":1,"kind":"close","pnl_usd":-0.7}\n',encoding='utf-8')
+            (hf/'state.json').write_text('{"version":"HF_CHECKPOINT_V1","seq":1}',encoding='utf-8')
+            digest=hashlib.sha256(journal.read_bytes()).hexdigest()
+            result=reset_all_offline(root)
+            self.assertTrue(hf.is_dir())
+            self.assertEqual(list(hf.iterdir()),[])
+            archive=Path(next(path for path in result['archives'] if (Path(path)/'strategy_lab_hf').is_dir()))
+            manifest=json.loads((archive/'manifest.json').read_text(encoding='utf-8'))
+            self.assertEqual(manifest['directory'],'strategy_lab_hf')
+            self.assertEqual(manifest['files']['journal/HF_RND_E95/2026-10-10.jsonl']['sha256'],digest)
+            self.assertEqual(hashlib.sha256((archive/'strategy_lab_hf'/'journal'/'HF_RND_E95'/'2026-10-10.jsonl')
+                                            .read_bytes()).hexdigest(),digest)
+            self.assertIn('state.json',manifest['files'])
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);state=root/'state.json';state.write_text('{"demo_balance_usd":800}')
+            (root/'strategy_lab_hf').write_text('not a directory')
+            before=state.read_bytes()
+            with self.assertRaises(ValueError):reset_all_offline(root)
+            self.assertEqual(state.read_bytes(),before)
+
     def test_unknown_legacy_schema_refuses_before_any_mutation(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);state=root/'state.json';state.write_text('{"demo_balance_usd":800}')

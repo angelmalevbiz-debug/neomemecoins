@@ -166,6 +166,135 @@ def measure_book(book, *, started_at, as_of, advertised_count=None, target=80.0)
     }
 
 
+HF_VERSION = 'PAPER_LAB_HF_MEASUREMENTS_V1'
+HF_ROW_KINDS = ('order', 'fill', 'cancel', 'close', 'cap', 'session', 'retire')
+
+
+def read_hf_journal(directory):
+    """Rows of every LAB_HIGH_FREQUENCY_V1 journal file under ``directory`` (read only).
+
+    ``directory`` is strategy_lab_hf/ or its journal/ folder; files under an ``archive``
+    folder (earlier reset sessions) are skipped. Unparseable lines are counted, not raised.
+    """
+    from pathlib import Path
+    import json
+    root = Path(directory)
+    rows, malformed = [], 0
+    for path in sorted(root.rglob('*.jsonl')):
+        if 'archive' in path.relative_to(root).parts:
+            continue
+        with path.open('r', encoding='utf-8') as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    malformed += 1
+                    continue
+                rows.append(row)
+    return rows, malformed
+
+
+def measure_hf_rows(rows, *, as_of=None, started_at=None):
+    """Measure LAB_HIGH_FREQUENCY_V1 journal rows per (book, config hash); read only.
+
+    A book holds up to three positions at once, so throughput counts every order
+    (``opened_per_hour``) and close, deduplicated by (book, cfg, seq), and the
+    most slots held at the same time is reported. Rates describe the supplied
+    window only; nothing here is a profitability claim.
+    """
+    rejected = {'malformed': 0, 'duplicate': 0, 'future': 0}
+    seen = set()
+    groups = {}
+    clean = []
+    limit = finite(as_of)
+    for row in rows or ():
+        if (not isinstance(row, dict) or row.get('kind') not in HF_ROW_KINDS
+                or not isinstance(row.get('seq'), int) or isinstance(row.get('seq'), bool)
+                or not isinstance(row.get('book'), str) or not isinstance(row.get('cfg'), str)
+                or finite(row.get('at')) is None):
+            rejected['malformed'] += 1
+            continue
+        key = (row['book'], row['cfg'], row['seq'])
+        if key in seen:
+            rejected['duplicate'] += 1
+            continue
+        seen.add(key)
+        if limit is not None and finite(row['at']) > limit:
+            rejected['future'] += 1
+            continue
+        clean.append(row)
+    clean.sort(key=lambda item: (finite(item['at']), item['seq']))
+    for row in clean:
+        group = groups.setdefault((row['book'], row['cfg']), {
+            'book': row['book'], 'config_hash': row['cfg'], 'orders': 0, 'fills': 0, 'closes': 0, 'cancels': {},
+            'booked_usd': 0.0, 'net50_usd': 0.0, 'net0_usd': 0.0, 'wins_booked': 0, 'wins_net50': 0,
+            'first_at': None, 'last_at': None, 'open': set(), 'max_concurrent': 0, 'close_kinds': {},
+            'cap_trips': 0, 'retired': None})
+        at = finite(row['at'])
+        group['first_at'] = at if group['first_at'] is None else group['first_at']
+        group['last_at'] = at
+        kind = row['kind']
+        trade = row.get('trade_no')
+        if kind == 'order' and row.get('side') == 'entry':
+            group['orders'] += 1
+            group['open'].add(trade)
+            group['max_concurrent'] = max(group['max_concurrent'], len(group['open']))
+        elif kind == 'fill':
+            group['fills'] += 1
+        elif kind == 'cancel':
+            reason = str(row.get('reason'))
+            group['cancels'][reason] = group['cancels'].get(reason, 0) + 1
+            group['open'].discard(trade)
+        elif kind == 'close':
+            group['closes'] += 1
+            group['open'].discard(trade)
+            booked = finite(row.get('pnl_usd')) or 0.0
+            net50 = finite(row.get('net50_usd')) or 0.0
+            group['booked_usd'] += booked
+            group['net50_usd'] += net50
+            group['net0_usd'] += finite(row.get('net0_usd')) or 0.0
+            group['wins_booked'] += int(booked > 0)
+            group['wins_net50'] += int(net50 > 0)
+            label = str(row.get('close_kind'))
+            group['close_kinds'][label] = group['close_kinds'].get(label, 0) + 1
+        elif kind == 'cap':
+            group['cap_trips'] += 1
+        elif kind == 'retire':
+            group['retired'] = row.get('reason')
+    books = {}
+    for (book, cfg), group in sorted(groups.items()):
+        start = finite(started_at) if finite(started_at) is not None else group['first_at']
+        end = limit if limit is not None else group['last_at']
+        hours = max(0.0, (end - start) / 3_600_000) if start is not None and end is not None else 0.0
+        closes = group['closes']
+        books[f'{book}:{cfg[:12]}'] = {
+            'book': book, 'config_hash': cfg, 'orders': group['orders'], 'fills': group['fills'],
+            'closes': closes, 'cancels': group['cancels'], 'close_kinds': group['close_kinds'],
+            'open_at_end': len(group['open']), 'max_concurrent_slots': group['max_concurrent'],
+            'window_hours': round(hours, 6),
+            'opened_per_hour': round(group['orders'] / hours, 6) if hours > 0 else None,
+            'closed_per_hour': round(closes / hours, 6) if hours > 0 else None,
+            'booked_usd': round(group['booked_usd'], 6), 'net50_usd': round(group['net50_usd'], 6),
+            'net0_usd': round(group['net0_usd'], 6),
+            'booked_usd_per_close': round(group['booked_usd'] / closes, 6) if closes else None,
+            'net50_usd_per_close': round(group['net50_usd'] / closes, 6) if closes else None,
+            'win_rate_booked_pct': round(100 * group['wins_booked'] / closes, 3) if closes else None,
+            'win_rate_net50_pct': round(100 * group['wins_net50'] / closes, 3) if closes else None,
+            'cap_trips': group['cap_trips'], 'retired': group['retired'],
+        }
+    return {
+        'version': HF_VERSION, 'paper_only': True, 'read_only': True, 'books': books, 'rejected_rows': rejected,
+        'limitations': [
+            'PAPER fills at the next DexScreener refresh with modeled costs; not executable quotes.',
+            'Three slots per book: opened_per_hour counts every order, including cancelled ones.',
+            'Rates describe the supplied window only; nothing here is a profitability claim.',
+        ],
+    }
+
+
 def evaluate_lab(state, *, target=80.0):
     if not isinstance(state, dict) or not isinstance(state.get('books'), dict):
         raise ValueError('Expected full Strategy Lab state with books')

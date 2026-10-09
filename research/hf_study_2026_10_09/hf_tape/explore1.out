@@ -1,0 +1,108 @@
+loaded 0.9 s; T0 1791362460712.0 T1 1791517300498.0 CUT 1791455364583.6 hours 43.01
+tape pools 375 in series 333 pumpswap SOL 333
+adjacent buy/sell log gap 100_125 n 26849 q10/25/50/75/90 [0.0101, 0.0116, 0.0209, 0.0246, 0.0339]
+adjacent buy/sell log gap 55_95 n 16127 q10/25/50/75/90 [0.0061, 0.0086, 0.0096, 0.0098, 0.0142]
+adjacent buy/sell log gap fee100 n 4325 q10/25/50/75/90 [0.0099, 0.0101, 0.0107, 0.0203, 0.0224]
+adjacent buy/sell log gap fee105 n 6323 q10/25/50/75/90 [0.0113, 0.0211, 0.0214, 0.0221, 0.0317]
+adjacent buy/sell log gap fee110 n 3264 q10/25/50/75/90 [0.0111, 0.0111, 0.0221, 0.0224, 0.0295]
+adjacent buy/sell log gap fee115 n 1570 q10/25/50/75/90 [0.0115, 0.0116, 0.0122, 0.0221, 0.028]
+adjacent buy/sell log gap fee120 n 8599 q10/25/50/75/90 [0.0061, 0.0123, 0.0195, 0.0276, 0.0386]
+adjacent buy/sell log gap fee125 n 2768 q10/25/50/75/90 [0.006, 0.0062, 0.018, 0.0302, 0.049]
+adjacent buy/sell log gap fee30 n 8387 q10/25/50/75/90 [0.003, 0.003, 0.0033, 0.0043, 0.006]
+adjacent buy/sell log gap fee37 n 6 q10/25/50/75/90 [0.0079, 0.008, 0.0081, 0.0081, 0.0081]
+adjacent buy/sell log gap fee40 n 25 q10/25/50/75/90 [0.004, 0.004, 0.005, 0.0057, 0.0087]
+adjacent buy/sell log gap fee42 n 202 q10/25/50/75/90 [0.0043, 0.0043, 0.0048, 0.0057, 0.0075]
+adjacent buy/sell log gap fee45 n 233 q10/25/50/75/90 [0.0045, 0.0048, 0.0061, 0.0094, 0.0096]
+adjacent buy/sell log gap fee47 n 1363 q10/25/50/75/90 [0.0048, 0.0048, 0.0056, 0.0076, 0.0101]
+adjacent buy/sell log gap fee50 n 822 q10/25/50/75/90 [0.005, 0.0051, 0.0059, 0.0083, 0.0105]
+adjacent buy/sell log gap fee52 n 1562 q10/25/50/75/90 [0.0053, 0.0053, 0.0058, 0.0068, 0.0089]
+adjacent buy/sell log gap fee55 n 678 q10/25/50/75/90 [0.0054, 0.0055, 0.0058, 0.0088, 0.0116]
+adjacent buy/sell log gap fee60 n 574 q10/25/50/75/90 [0.006, 0.0061, 0.0061, 0.0061, 0.0081]
+adjacent buy/sell log gap fee65 n 68 q10/25/50/75/90 [0.0065, 0.0066, 0.0106, 0.0132, 0.0137]
+adjacent buy/sell log gap fee70 n 103 q10/25/50/75/90 [0.007, 0.0071, 0.0079, 0.0142, 0.0172]
+adjacent buy/sell log gap fee75 n 81 q10/25/50/75/90 [0.0075, 0.0076, 0.009, 0.0152, 0.0178]
+adjacent buy/sell log gap fee80 n 548 q10/25/50/75/90 [0.0081, 0.0081, 0.0082, 0.0086, 0.0107]
+adjacent buy/sell log gap fee85 n 2483 q10/25/50/75/90 [0.0086, 0.0086, 0.0087, 0.0088, 0.0121]
+adjacent buy/sell log gap fee90 n 2046 q10/25/50/75/90 [0.0091, 0.0092, 0.0093, 0.0109, 0.0202]
+adjacent buy/sell log gap fee95 n 7984 q10/25/50/75/90 [0.0096, 0.0096, 0.0096, 0.0099, 0.0154]
+adjacent buy/sell log gap le50 n 11038 q10/25/50/75/90 [0.003, 0.003, 0.0037, 0.0055, 0.0066]
+half spread (median/2) {'100_125': 0.010453385449078057, '55_95': 0.004785501220092935, 'le50': 0.0018480045968759678}
+ingest lag (av-et<=120s, in window) n 237844 q10/25/50/75/90 [1.678, 2.204, 3.069, 9.793, 22.88] share<=5s 0.655
+seated(any)                        train mean 4.47  holdout mean 5.11  train dist {0: 188, 1: 15, 2: 32, 3: 96, 4: 287, 5: 427, 6: 312, 7: 140, 8: 51}  holdout dist {0: 3, 2: 18, 3: 108, 4: 197, 5: 305, 6: 255, 7: 100, 8: 45}
+seated pumpswapSOL fresh           train mean 4.43  holdout mean 5.10  train dist {0: 201, 1: 17, 2: 37, 3: 86, 4: 280, 5: 424, 6: 312, 7: 140, 8: 51}  holdout dist {0: 3, 2: 18, 3: 108, 4: 200, 5: 302, 6: 257, 7: 99, 8: 44}
+seated guarded                     train mean 3.00  holdout mean 3.99  train dist {0: 251, 1: 88, 2: 188, 3: 315, 4: 380, 5: 250, 6: 65, 7: 11}  holdout dist {0: 5, 1: 12, 2: 63, 3: 265, 4: 358, 5: 239, 6: 71, 7: 17, 8: 1}
+seated guarded liq>=50k            train mean 2.64  holdout mean 3.98  train dist {0: 259, 1: 152, 2: 256, 3: 351, 4: 321, 5: 171, 6: 35, 7: 3}  holdout dist {0: 5, 1: 12, 2: 64, 3: 265, 4: 359, 5: 237, 6: 71, 7: 17, 8: 1}
+seated guarded liq>=50k fee<=95    train mean 2.18  holdout mean 3.98  train dist {0: 317, 1: 271, 2: 312, 3: 301, 4: 198, 5: 118, 6: 29, 7: 2}  holdout dist {0: 5, 1: 12, 2: 66, 3: 269, 4: 356, 5: 234, 6: 71, 7: 17, 8: 1}
+guarded seated minutes by (fee bucket, liq): {('100_125', 'liq>=50k'): 731, ('55_95', 'liq>=50k'): 2678, ('100_125', 'liq<50k'): 563, ('le50', 'liq>=50k'): 4788}
+top guarded seated pools (minutes):
+   AGZjpu5v VSOF 916
+   FGdGihHZ USWR 645
+   BcRQvcFg TDF 517
+   69fyvgoT swordinu 365
+   A2ASUorC RARINU 323
+   2DVbU5h8 MANIFEST 305
+   867dKvaC MISTAKE 293
+   HMzvsEEm CATE 249
+   7mQDGtei CATCRAFT 245
+   Fm6tVXcH OURA 234
+   HJ72PgqL WOTF 233
+   HU22UBaT SNDWITCH 219
+   F2P22Sfc A1 204
+   12jc1DzJ SI276 199
+   2B8tftZ5 CRAWL 195
+   CyJwKnLi Agency 191
+   7wCarEYc IOF 187
+   EpugLBw1 USDF 175
+   UCWmMumV ECSTASY 171
+   Fe7bpDYC CLAUDIA 158
+   4R8CiMnJ JEANPHIL 154
+   8J42or3k MINER 153
+   FnzKY6x7 ANSEM 146
+   5wNu5Qhd neet 145
+   5iYzSzD8 DOTF 131
+hourly mean seated / guarded / guarded liq>=50k fee<=95:
+   10-07 08 seated 1.26 guarded 0.89 cheap 0.37
+   10-07 09 seated 0.00 guarded 0.00 cheap 0.00
+   10-07 10 seated 0.18 guarded 0.08 cheap 0.00
+   10-07 11 seated 3.80 guarded 3.17 cheap 1.85
+   10-07 12 seated 4.77 guarded 3.98 cheap 2.03
+   10-07 13 seated 5.13 guarded 3.32 cheap 2.22
+   10-07 14 seated 5.98 guarded 3.03 cheap 1.07
+   10-07 15 seated 6.28 guarded 3.92 cheap 1.28
+   10-07 16 seated 6.40 guarded 3.87 cheap 2.03
+   10-07 17 seated 5.28 guarded 3.27 cheap 1.37
+   10-07 18 seated 5.00 guarded 3.68 cheap 1.50
+   10-07 19 seated 5.68 guarded 4.05 cheap 3.07
+   10-07 20 seated 2.63 guarded 0.13 cheap 0.10
+   10-07 21 seated 5.58 guarded 3.45 cheap 2.63
+   10-07 22 seated 3.63 guarded 2.65 cheap 2.12
+   10-07 23 seated 2.05 guarded 1.13 cheap 0.93
+   10-08 00 seated 5.35 guarded 3.47 cheap 3.07
+   10-08 01 seated 4.88 guarded 3.82 cheap 3.37
+   10-08 02 seated 4.83 guarded 3.88 cheap 3.38
+   10-08 03 seated 5.15 guarded 4.42 cheap 3.95
+   10-08 04 seated 4.40 guarded 3.28 cheap 3.08
+   10-08 05 seated 5.00 guarded 3.58 cheap 2.92
+   10-08 06 seated 4.92 guarded 2.98 cheap 2.20
+   10-08 07 seated 4.45 guarded 1.62 cheap 1.47
+   10-08 08 seated 5.17 guarded 3.80 cheap 3.80
+   10-08 09 seated 5.27 guarded 4.25 cheap 4.25
+   10-08 10 seated 5.72 guarded 4.50 cheap 4.50
+   10-08 11 seated 6.00 guarded 4.58 cheap 4.58
+   10-08 12 seated 5.83 guarded 3.82 cheap 3.82
+   10-08 13 seated 5.62 guarded 3.75 cheap 3.73
+   10-08 14 seated 5.80 guarded 4.48 cheap 4.48
+   10-08 15 seated 5.83 guarded 3.95 cheap 3.95
+   10-08 16 seated 5.70 guarded 3.85 cheap 3.85
+   10-08 17 seated 5.47 guarded 3.82 cheap 3.82
+   10-08 18 seated 5.48 guarded 3.57 cheap 3.57
+   10-08 19 seated 5.43 guarded 3.92 cheap 3.92
+   10-08 20 seated 5.65 guarded 3.98 cheap 3.98
+   10-08 21 seated 5.75 guarded 4.35 cheap 4.35
+   10-08 22 seated 4.48 guarded 4.25 cheap 4.25
+   10-08 23 seated 3.88 guarded 3.88 cheap 3.75
+   10-09 00 seated 3.77 guarded 3.77 cheap 3.73
+   10-09 01 seated 4.07 guarded 4.07 cheap 4.07
+   10-09 02 seated 3.85 guarded 3.85 cheap 3.85
+   10-09 03 seated 3.66 guarded 3.66 cheap 3.56
+done 1.5 s

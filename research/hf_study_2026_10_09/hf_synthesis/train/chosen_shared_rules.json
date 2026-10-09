@@ -1,0 +1,49 @@
+{
+ "chosen": {
+  "tag": "h120_s4_none_cd60_nobrake",
+  "cfg": {
+   "hold_s": 120,
+   "slots": 4,
+   "pacing": [
+    "none"
+   ],
+   "cooldown_s": 60,
+   "brake": null
+  },
+  "control_mean": {
+   "tph": 47.718,
+   "hour_p10": 0.0,
+   "hour_median": 56.2,
+   "hours_ge40": 0.72,
+   "pairs": 24.0,
+   "top_pair_share": 0.106,
+   "mean_net50": -3.936,
+   "mean_booked": -2.97,
+   "mean_net0": -1.859,
+   "usd50_per_trade": -0.984,
+   "booked_usd_per_trade": -0.742,
+   "usd50_per_hour": -46.956,
+   "booked_usd_per_hour": -35.428,
+   "win50": 0.826,
+   "fee_le50_share": 0.222,
+   "reentry_le60s_share": 0.0,
+   "reentry_le300s_share": 0.442,
+   "mean_cycle_s": 158.08
+  },
+  "salt_net50": [
+   -3.931,
+   -3.938,
+   -3.851,
+   -4.01,
+   -3.952
+  ],
+  "salt_tph": [
+   48.36,
+   47.74,
+   48.17,
+   46.89,
+   47.43
+  ]
+ },
+ "n_ok": 13
+}

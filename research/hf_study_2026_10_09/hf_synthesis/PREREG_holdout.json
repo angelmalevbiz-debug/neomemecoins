@@ -1,0 +1,10 @@
+{
+ "written_at_utc": "2026-10-09T04:21:13Z",
+ "basis": "chosen on TRAIN only by the frozen v2 rule in syn_train2.py (train/chosen_v2.json: h120_s3_cd120_gov50_nogb)",
+ "syn_holdout_py_sha256": "2f1b39cc316d4e328b0f7ce117803180e00dcdbf4168ffa49b4ba24fb883800a",
+ "syn_lib_py_sha256": "407befddb64e04f3c5727a12d945def498cfd2c3e8d43c76a25b7b5c38b903d5",
+ "configs": ["HF_RND_E95 (random control, p=0.25 per refresh event, salts hfA..hfE)", "HF_QUIET_E95 (v5/liq<=0.002 and |refresh step|<=0.6%)", "HF_DIP15_E95 (price<=1.002 x 15-min low)"],
+ "shared_rules": {"universe": "E95 engine-equivalent structural guard, PumpSwap SOL, liq>=50k, fee<=95", "heat_veto": "enforced", "notional_usd": 25, "exit": "time 120 s from decision, no stop/TP", "slots": 3, "one_position_per_pool": true, "occupancy": "until exit fill", "pool_cooldown_s": 120, "governor": "<=50 orders per trailing 3600 s", "orders_per_refresh": 1, "loss_brake": "none"},
+ "overlays": ["UTC-day booked loss cap 100 USD", "POOL_LOSS_MEMORY_V1 emulation (2 booked losses -> 6 h)"],
+ "run_count": "exactly once"
+}

@@ -226,4 +226,10 @@ def compact_strategy_lab(data):
     if isinstance(paired, dict):
         result['paired'] = paired
 
+    # LAB_HIGH_FREQUENCY_V1: the HF books' own bounded view (HighFrequencyLab.dashboard_view, at most
+    # 16 KB), passed through as built; the Lab's full ledger never carries it.
+    high_frequency = data.get('high_frequency')
+    if isinstance(high_frequency, dict):
+        result['high_frequency'] = high_frequency
+
     return result

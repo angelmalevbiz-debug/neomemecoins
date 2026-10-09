@@ -1,0 +1,21 @@
+rt25 {"n": 21907, "p50": 1.731, "p90": 2.31, "p99": 2.443, "max": 2.469, "share_gt_2.75": 0.0, "by_fee_p50": {"0-50": [7090, 1.167, 1.515], "51-75": [9954, 1.807, 2.023], "76-95": [4863, 2.309, 2.469]}}
+RND n 1686 | |gross|>=5%: 20 (1.186%), >=10%: 6 | entry fill print >=5% from decision: 5 | gross p1 -4.72 p99 4.20 min -14.67 max 45.50 | entry quiet 0.286 exit quiet 0.221 | flags {'HOLD': 1680, 'FEED_GAP/GAP': 4, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 1}
+   HMzvsEEm CATE gross +45.50 net50 +40.65 liq 2853070 fee 30 HOLD
+   AydhgDU2 Buffet gross +34.81 net50 +30.20 liq 276340 fee 35 HOLD
+   2B8tftZ5 CRAWL gross +24.72 net50 +19.95 liq 251825 fee 70 HOLD
+   867dKvaC MISTAKE gross +16.21 net50 +11.92 liq 243477 fee 60 HOLD
+   8ewuF2o8 swordcat gross +15.95 net50 +10.92 liq 179177 fee 90 HOLD
+QUIET n 1581 | |gross|>=5%: 2 (0.127%), >=10%: 2 | entry fill print >=5% from decision: 2 | gross p1 -1.82 p99 1.58 min -74.70 max 45.43 | entry quiet 0.479 exit quiet 0.391 | flags {'HOLD': 1575, 'HOLD/GAP': 1, 'FEED_GAP/GAP': 4, 'OPEN_AT_END/END': 1}
+   HMzvsEEm CATE gross -74.70 net50 -75.62 liq 2848888 fee 30 HOLD
+   HMzvsEEm CATE gross +45.43 net50 +40.57 liq 2853889 fee 30 HOLD
+   DA4pM4xS OTC gross -4.99 net50 -8.62 liq 510797 fee 65 HOLD
+   4R8CiMnJ JEANPHIL gross -4.79 net50 -8.39 liq 345187 fee 60 HOLD
+   7wCarEYc IOF gross -4.78 net50 -8.28 liq 268836 fee 42 HOLD
+DIP15 n 1522 | |gross|>=5%: 10 (0.657%), >=10%: 2 | entry fill print >=5% from decision: 2 | gross p1 -3.79 p99 3.26 min -9.95 max 45.50 | entry quiet 0.332 exit quiet 0.288 | flags {'HOLD': 1520, 'OPEN_AT_END/VANISHED': 1, 'OPEN_AT_END/END': 1}
+   HMzvsEEm CATE gross +45.50 net50 +40.65 liq 2853070 fee 30 HOLD
+   AydhgDU2 Buffet gross +34.81 net50 +30.20 liq 276340 fee 35 HOLD
+   3ETStQ3N SEC gross -9.95 net50 -13.34 liq 205137 fee 60 OPEN_AT_END/VANISHED
+   4R8CiMnJ JEANPHIL gross -9.59 net50 -12.93 liq 357450 fee 55 HOLD
+   BFrSZake HIGGS gross +7.87 net50 +3.13 liq 168226 fee 95 HOLD
+train eligible pools refreshing per minute: mean 5.30 p10 0 p50 6 p90 10, zero minutes 0.288
+holdout eligible pools refreshing per minute: mean 6.48 p10 4 p50 6 p90 9, zero minutes 0.003

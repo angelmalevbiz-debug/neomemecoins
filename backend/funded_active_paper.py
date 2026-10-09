@@ -13,6 +13,7 @@ import structural_rug_guard as rug
 
 VERSION = 'FUNDED_ACTIVE_PAPER_V3_MOMENTUM_PULSE_100'
 CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
+CAPACITY_EXIT_VERSION = 'PAPER_CAPACITY_EXIT_V2_NET30_STOP10'
 CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
 MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
                               CAPACITY_TEST_VERSION})
@@ -259,8 +260,68 @@ def exit_parameters(strategy_id):
                 max_hold_minutes=4.0, profit_trail_arm_net_pct=2.0, profit_trail_drawdown_pct=1.0)
 
 
+def capacity_exit_parameters(notional_usd=MAX_NOTIONAL_USD):
+    """Owner-requested dollar exits for PAPER test lots, not a profit promise."""
+    notional = finite(notional_usd, math.nan)
+    if not math.isfinite(notional) or notional <= 0:
+        raise ValueError('A positive finite notional is required for dollar exits')
+    return dict(version=CAPACITY_EXIT_VERSION, take_profit_net_usd=30.0,
+                stop_loss_net_usd=10.0, take_profit_net_pct=30.0/notional*100,
+                stop_loss_net_pct=10.0/notional*100, max_hold_minutes=None,
+                profit_trail_arm_net_pct=None, profit_trail_drawdown_pct=None,
+                trigger_basis='TOTAL_POSITION_NET_PNL_AFTER_MODELED_COSTS',
+                thresholds_are_not_guaranteed_fills=True)
+
+
+def apply_capacity_exit_policy(books, now):
+    """Audited, idempotent change of OPEN test lots only, before startup persist.
+
+    Entry receipts, quantities, entry time, capital and every old close stay
+    untouched. The explicitly authorized exit change must not look like a new
+    entry or silently rewrite its original admission policy.
+    """
+    changed = []
+    if not capacity_test_enabled():
+        return changed
+    for book in books.values():
+        if not applies(book) or book.get('promotion_pending'):
+            continue
+        synchronize_alias(book)
+        for position in positions(book):
+            old = position.get('exit_parameters') or {}
+            if (position.get('entry_policy_version') != CAPACITY_TEST_VERSION
+                    or position.get('capacity_test') is not True
+                    or position.get('strategy_id') != book['id']
+                    or old.get('version') != CAPACITY_TEST_VERSION):
+                continue
+            exits = capacity_exit_parameters(position.get('notional_usd'))
+            event = dict(id=CAPACITY_EXIT_VERSION, at=int(now),
+                         reason='OWNER_REQUEST_NET_30_USD_PAPER_TEST',
+                         previous_parameters=dict(old), new_parameters=dict(exits))
+            position['exit_policy_changes'] = [*(position.get('exit_policy_changes') or []), event]
+            position['exit_parameters'] = exits
+            position['exit_policy_label'] = CAPACITY_EXIT_VERSION
+            position['stop_loss_net_pct'] = exits['stop_loss_net_pct']
+            position['stop_headroom_pct'] = max(0.0, exits['stop_loss_net_pct'] +
+                                               finite(position.get('entry_roundtrip_pnl_pct')))
+            changed.append(dict(strategy_id=book['id'], trade_no=position.get('trade_no'), **event))
+    return changed
+
+
 def exit_reason(position, net_pct, hold_minutes):
     exits = position['exit_parameters']
+    if exits.get('version') == CAPACITY_EXIT_VERSION:
+        # Dollar target, not a gross price move or a percentage of a changed
+        # account balance. Peak PnL and elapsed time cannot cause an early exit.
+        notional = finite(position.get('notional_usd'), math.nan)
+        net_usd = finite(net_pct, math.nan) * notional / 100
+        if not math.isfinite(net_usd) or notional <= 0:
+            return None
+        if net_usd <= -exits['stop_loss_net_usd']:
+            return 'CAPACITY_TEST_STOP_NET_USD'
+        if net_usd >= exits['take_profit_net_usd']:
+            return 'CAPACITY_TEST_TAKE_PROFIT_NET_USD'
+        return None
     if net_pct <= -exits['stop_loss_net_pct']:
         return 'FUNDED_ACTIVE_STOP_NET'
     if net_pct >= exits['take_profit_net_pct']:
@@ -278,6 +339,7 @@ def performance(book, now):
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
     policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
     return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': MAX_NOTIONAL_USD,
+            **({'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
             'capacity_test':capacity_test_enabled(), 'strategy_validation':False,
             'risk_limits_shadow_only':capacity_test_enabled(),
             'strategy_policy_version':VERSION,
@@ -298,6 +360,7 @@ def candidate_config():
 def config():
     return dict(version=reporting_version(), enabled=enabled(), max_positions_per_strategy=MAX_SLOTS,
                 capacity_test_enabled=capacity_test_enabled(),capacity_test_version=CAPACITY_TEST_VERSION,
+                capacity_test_exits=capacity_exit_parameters(),
                 capacity_test_rules={'target_total_slots':16,'notional_usd':100,'minimum_liquidity_usd':50_000,
                     'strategy_signal_required':False,'fresh_full_safety_required':True,
                     'independent_exact_pool_price_required':True,'max_observation_age_ms':12_000,
@@ -309,5 +372,6 @@ def config():
                 max_exposure_fraction=MAX_EXPOSURE_FRACTION, target_orders_per_hour=ORDERS_PER_HOUR,
                 target_is_not_a_minimum_or_promise=True, daily_loss_fraction=DAILY_LOSS_FRACTION,
                 ticker_min_continuous_coverage_minutes=60, main_ticker_guard_unchanged=True,
-                rules=candidate_config(), exits={sid: exit_parameters(sid) for sid in RULES},
+                rules=candidate_config(), exits={sid: (capacity_exit_parameters() if capacity_test_enabled()
+                                                      else exit_parameters(sid)) for sid in RULES},
                 costs_unchanged=True, profitability_proven=False, real_execution_enabled=False)

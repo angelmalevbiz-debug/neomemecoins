@@ -53,3 +53,15 @@ test('capacity fills are not presented as successful strategic signals or protec
   assert.match(text!,/PAPER капиталът може да се загуби/);
   assert.doesNotMatch(text!,/дневен лимит загуба/);
 });
+
+test('capacity test exit summary shows net dollar target and stop without claiming guaranteed fills', () => {
+  const text=fundedActiveSummary({version:'PAPER_CAPACITY_TEST_V1_FIXED_100',capacity_test:true,
+    risk_limits_shadow_only:true,fixed_notional_usd:100,
+    exit_policy:{version:'PAPER_CAPACITY_EXIT_V2_NET30_STOP10',take_profit_net_usd:30,stop_loss_net_usd:10},
+    trades:2,wins:0,win_rate:0,net_pnl_usd:-3,orders_last_60m:6,closed_last_60m:2,
+    open_positions:4,max_positions:4,target_orders_per_hour:50,exposure_usd:400,daily_loss_limit_usd:50});
+  assert.match(text!,/цел \+\$30\.00 нето \/ стоп −\$10\.00 нето/);
+  assert.match(text!,/без кратък таймер и trailing/);
+  assert.match(text!,/праговете не гарантират цена на изхода/);
+  assert.match(text!,/не доказва печалба/);
+});

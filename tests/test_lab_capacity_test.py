@@ -1,7 +1,9 @@
 """Synthetic load-test regression fixtures are not live trade/profit evidence."""
 import copy
+import json
 import os
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -153,8 +155,11 @@ class CapacityTestTests(unittest.TestCase):
         self.assertTrue(view['books']['EARLY']['positions'][0]['capacity_test'])
         self.assertEqual(view['books']['EARLY']['position']['capacity_test_shadow'],b['position']['capacity_test_shadow'])
 
-    def test_exits_close_test_positions_after_flag_off_and_keep_fees_and_shadow(self):
+    def test_legacy_exits_close_after_flag_off_and_keep_fees_and_shadow(self):
         lab.maybe_open(self.rows,{})
+        for b in self.books.values():
+            for p in active.positions(b):
+                p['exit_parameters']={**active.exit_parameters(b['id']),'version':capacity.VERSION}
         self.clock+=240_001
         marks=[{**c,'updatedAt':self.clock,'mark_received_at':self.clock} for c in self.rows]
         with patch.dict(os.environ,{active.CAPACITY_TEST_ENV:'0',active.ENV:'0'}),\
@@ -169,6 +174,179 @@ class CapacityTestTests(unittest.TestCase):
             self.assertLess(b['balance'],950)
             view=compact_strategy_lab({'books':{'EARLY':b}})['books']['EARLY']
             self.assertTrue(view['history'][0]['capacity_test'])
+
+    def test_new_test_entries_freeze_dollar_target_and_stop_without_timer_or_trailing(self):
+        lab.maybe_open(self.rows,{})
+        for b in self.books.values():
+            for p in active.positions(b):
+                exits=p['exit_parameters']
+                self.assertEqual(exits['version'],active.CAPACITY_EXIT_VERSION)
+                self.assertEqual(exits['take_profit_net_usd'],30)
+                self.assertEqual(exits['stop_loss_net_usd'],10)
+                self.assertEqual(p['stop_loss_net_pct'],10)
+                self.assertIsNone(exits['max_hold_minutes'])
+                self.assertIsNone(exits['profit_trail_arm_net_pct'])
+            self.assertEqual(active.performance(b,NOW)['exit_policy'],active.capacity_exit_parameters())
+
+    def test_dollar_exit_boundaries_ignore_age_peak_and_small_positive_pnl(self):
+        p={'notional_usd':100,'peak_net_pct':80,'exit_parameters':active.capacity_exit_parameters()}
+        for net in (-9.999,0,2,4,6,15,29.999):
+            self.assertIsNone(active.exit_reason(p,net,60*24*7))
+        self.assertEqual(active.exit_reason(p,30,0),'CAPACITY_TEST_TAKE_PROFIT_NET_USD')
+        self.assertEqual(active.exit_reason(p,-10,0),'CAPACITY_TEST_STOP_NET_USD')
+        self.assertEqual(active.exit_reason(p,-70,0),'CAPACITY_TEST_STOP_NET_USD')
+
+    def test_dollar_target_is_not_a_percent_of_the_notional_or_account_balance(self):
+        p={'notional_usd':200,'exit_parameters':active.capacity_exit_parameters(200)}
+        self.assertIsNone(active.exit_reason(p,14.999,1))
+        self.assertEqual(active.exit_reason(p,15,1),'CAPACITY_TEST_TAKE_PROFIT_NET_USD')
+        self.assertEqual(active.exit_reason(p,-5,1),'CAPACITY_TEST_STOP_NET_USD')
+        for invalid in (0,-1,float('nan'),True):
+            with self.assertRaises(ValueError):active.capacity_exit_parameters(invalid)
+        p['notional_usd']=-1
+        self.assertIsNone(active.exit_reason(p,999,1))
+
+    def test_existing_test_exit_change_is_audited_idempotent_and_preserves_entries_and_history(self):
+        lab.maybe_open(self.rows,{})
+        for b in self.books.values():
+            for p in active.positions(b):
+                p['exit_parameters']={**active.exit_parameters(b['id']),'version':capacity.VERSION}
+        before=copy.deepcopy(self.books)
+        changes=active.apply_capacity_exit_policy(self.books,NOW+123)
+        self.assertEqual(len(changes),16)
+        changed_fields={'exit_parameters','exit_policy_label','stop_loss_net_pct',
+                        'stop_headroom_pct','exit_policy_changes'}
+        for sid,b in self.books.items():
+            self.assertEqual(b['history'],before[sid]['history'])
+            self.assertEqual(b['balance'],before[sid]['balance'])
+            self.assertEqual(b['trade_seq'],before[sid]['trade_seq'])
+            for p,old in zip(active.positions(b),active.positions(before[sid])):
+                self.assertEqual({k:v for k,v in p.items() if k not in changed_fields},
+                                 {k:v for k,v in old.items() if k not in changed_fields})
+                event=p['exit_policy_changes'][0]
+                self.assertEqual(event['at'],NOW+123)
+                self.assertEqual(event['previous_parameters'],old['exit_parameters'])
+                self.assertEqual(event['new_parameters'],p['exit_parameters'])
+        after=copy.deepcopy(self.books)
+        self.assertEqual(active.apply_capacity_exit_policy(self.books,NOW+999),[])
+        self.assertEqual(self.books,after)
+        view=compact_strategy_lab({'books':self.books})['books']['EARLY']
+        self.assertEqual(view['position']['exit_policy_changes'],view['positions'][0]['exit_policy_changes'])
+
+    def test_exit_migration_does_not_touch_closed_rows_ordinary_lots_or_disabled_modes(self):
+        lab.maybe_open(self.rows,{})
+        for b in self.books.values():
+            for p in active.positions(b):
+                p['exit_parameters']={**active.exit_parameters(b['id']),'version':capacity.VERSION}
+        before=copy.deepcopy(self.books)
+        for flags in ({active.CAPACITY_TEST_ENV:'0'},{'NEO_ENGINE_MODE':'LIVE'},
+                      {'NEO_EXECUTION_MODE':'LIVE'}):
+            with patch.dict(os.environ,flags):
+                self.assertEqual(active.apply_capacity_exit_policy(self.books,NOW),[])
+            self.assertEqual(self.books,before)
+        self.books['EARLY']['positions'][0]['entry_policy_version']=active.VERSION
+        self.books['EARLY']['positions'][1]['capacity_test']=False
+        self.books['MOMENTUM']['portfolio_group']='TEST'
+        self.books['PRECISION']['promotion_pending']=True
+        saved=copy.deepcopy(self.books)
+        changes=active.apply_capacity_exit_policy(self.books,NOW)
+        self.assertEqual(len(changes),6)
+        self.assertEqual(self.books['MOMENTUM'],saved['MOMENTUM'])
+        self.assertEqual(self.books['PRECISION'],saved['PRECISION'])
+        for b in self.books.values():self.assertEqual(b['history'],saved[b['id']]['history'])
+
+    def test_startup_load_requests_durable_exit_change_and_restart_does_not_repeat_it(self):
+        lab.maybe_open(self.rows,{})
+        for b in self.books.values():
+            for p in active.positions(b):
+                p['exit_parameters']={**active.exit_parameters(b['id']),'version':capacity.VERSION}
+        saved=copy.deepcopy(self.books)
+        raw={'books':self.books,'portfolio_setup':{'version':'PROMOTED_PAPER_COHORT_V1','status':'ACTIVE'}}
+        with tempfile.TemporaryDirectory(prefix='neo-dollar-exit-test-') as tmp:
+            path=Path(tmp)/'state.json'
+            path.write_text(json.dumps(raw),encoding='utf-8')
+            with patch.object(lab,'STATE_PATH',path),patch.object(lab,'RESET_FLAG_PATH',Path(tmp)/'reset'),\
+                 patch.object(lab,'review_strategy_lifecycle',return_value={}):
+                loaded=lab.load_state()
+                self.assertTrue(loaded['_exit_policy_requires_persist'])
+                self.assertFalse(loaded['_funding_requires_persist'])
+                for sid,b in loaded['books'].items():
+                    self.assertEqual(b['history'],saved[sid]['history'])
+                    self.assertEqual(b['balance'],saved[sid]['balance'])
+                    self.assertEqual(len(active.positions(b)),4)
+                    self.assertTrue(all(len(p['exit_policy_changes'])==1 for p in active.positions(b)))
+                path.write_text(json.dumps(loaded),encoding='utf-8')
+                restarted=lab.load_state()
+                self.assertFalse(restarted['_exit_policy_requires_persist'])
+                self.assertEqual(restarted['books'],loaded['books'])
+
+    def test_failed_startup_persist_prevents_decisions_on_an_unrecorded_exit_change(self):
+        loaded={'books':self.books,'portfolio_setup':{'status':'ACTIVE'},
+                '_exit_policy_requires_persist':True,'_funding_requires_persist':False}
+        with patch.object(lab,'LOADED',False),patch.object(lab,'load_state',return_value=loaded),\
+             patch.object(lab,'persist',side_effect=OSError('fixture write failure')),\
+             patch.object(lab,'update_positions') as manage,patch.object(lab,'maybe_open') as enter,\
+             patch.object(lab,'build_high_frequency') as hf:
+            with self.assertRaises(OSError):lab.main()
+        manage.assert_not_called();enter.assert_not_called();hf.assert_not_called()
+
+    def test_fresh_marks_do_not_close_new_policy_at_four_minutes_or_on_a_small_gain(self):
+        lab.maybe_open(self.rows,{})
+        identities=[[p['trade_no'] for p in active.positions(b)] for b in self.books.values()]
+        self.clock+=60*60*1000
+        marks=[{**c,'updatedAt':self.clock,'mark_received_at':self.clock,
+                'priceUsd':.011,'priceNative':.011/150} for c in self.rows]
+        with patch.dict(os.environ,{active.CAPACITY_TEST_ENV:'0',active.ENV:'0'}),\
+             patch.object(lab.POSITION_MARK_FEED,'resolve',side_effect=lambda p,by_pair,now:by_pair[(p['address'],p['pairAddress'])]):
+            lab.update_positions({},marks)
+        self.assertEqual([[p['trade_no'] for p in active.positions(b)] for b in self.books.values()],identities)
+        self.assertTrue(all(len(b['history'])==1 for b in self.books.values()))
+        self.assertTrue(all(0<p['open_pnl_usd']<30 for b in self.books.values() for p in active.positions(b)))
+
+    def test_gross_thirty_percent_is_not_thirty_dollars_net_and_only_actual_target_closes(self):
+        lab.maybe_open(self.rows,{})
+        self.clock+=10_000
+        def marks(price):
+            return [{**c,'priceUsd':price,'priceNative':price/150,
+                     'updatedAt':self.clock,'mark_received_at':self.clock} for c in self.rows]
+        with patch.object(lab.POSITION_MARK_FEED,'resolve',side_effect=lambda p,by_pair,now:by_pair[(p['address'],p['pairAddress'])]):
+            lab.update_positions({},marks(.013))
+            self.assertTrue(all(len(active.positions(b))==4 for b in self.books.values()))
+            self.assertTrue(all(p['open_pnl_usd']<30 for b in self.books.values() for p in active.positions(b)))
+            lab.update_positions({},marks(.014))
+        for b in self.books.values():
+            self.assertEqual(active.positions(b),[])
+            trades=[t for t in b['history'] if t.get('capacity_test')]
+            self.assertEqual(len(trades),4)
+            self.assertTrue(all(t['pnl_usd']>=30 and t['exit_dex_fee_usd']>0 for t in trades))
+            self.assertTrue(all(t['exit_reason']=='CAPACITY_TEST_TAKE_PROFIT_NET_USD' for t in trades))
+
+    def test_new_stop_keeps_working_after_flag_off_and_does_not_clamp_gap_losses(self):
+        lab.maybe_open(self.rows,{})
+        self.clock+=10_000
+        marks=[{**c,'priceUsd':.008,'priceNative':.008/150,
+                'updatedAt':self.clock,'mark_received_at':self.clock} for c in self.rows]
+        with patch.dict(os.environ,{active.CAPACITY_TEST_ENV:'0',active.ENV:'0'}),\
+             patch.object(lab.POSITION_MARK_FEED,'resolve',side_effect=lambda p,by_pair,now:by_pair[(p['address'],p['pairAddress'])]):
+            lab.update_positions({},marks)
+        for b in self.books.values():
+            self.assertEqual(active.positions(b),[])
+            trades=[t for t in b['history'] if t.get('capacity_test')]
+            self.assertEqual(len(trades),4)
+            self.assertTrue(all(t['pnl_usd']<-10 and t['exit_reason']=='CAPACITY_TEST_STOP_NET_USD' for t in trades))
+
+    def test_stale_or_wrong_pool_target_price_cannot_close(self):
+        lab.maybe_open(self.rows,{})
+        self.clock+=60_000
+        with patch.object(lab.POSITION_MARK_FEED,'resolve',side_effect=lambda p,by_pair,now:
+                          {**self.rows[0],'address':p['address'],'pairAddress':p['pairAddress'],
+                           'priceUsd':1,'mark_received_at':NOW}):
+            lab.update_positions({},[])
+        self.assertTrue(all(len(active.positions(b))==4 for b in self.books.values()))
+        with patch.object(lab.POSITION_MARK_FEED,'resolve',side_effect=lambda p,by_pair,now:
+                          {**self.rows[0],'priceUsd':1,'pairAddress':'wrong','mark_received_at':self.clock}):
+            lab.update_positions({},[])
+        self.assertTrue(all(len(active.positions(b))==4 for b in self.books.values()))
 
 
 if __name__=='__main__':unittest.main()

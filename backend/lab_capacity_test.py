@@ -135,7 +135,7 @@ def fill(book,candidates,now,engine):
         if cap['blocked_reason'] or basis>cap['available_exposure_usd']:
             reject(cap['blocked_reason'] or 'funded_active_exposure_limit');continue
         book['trade_seq']=int(book.get('trade_seq',0))+1
-        exits={**active.exit_parameters(sid),'version':VERSION}
+        exits=active.capacity_exit_parameters(100.0)
         position={
             'trade_no':book['trade_seq'],'strategy_id':sid,'symbol':coin.get('symbol'),'name':coin.get('name'),
             'address':coin['address'],'pairAddress':coin['pairAddress'],'dexId':coin['dexId'],
@@ -156,7 +156,7 @@ def fill(book,candidates,now,engine):
             'mark_source':'SHARED_LIVE_FEED_EXACT_POOL','entry_roundtrip_pnl_pct':pct,
             'entry_cost_cap_pct':None,'stop_loss_net_pct':exits['stop_loss_net_pct'],
             'stop_headroom_pct':engine.activity.stop_headroom_pct(exits['stop_loss_net_pct'],pct),
-            'exit_parameters':exits,'exit_policy_label':VERSION,'peak_net_pct':pct,
+            'exit_parameters':exits,'exit_policy_label':active.CAPACITY_EXIT_VERSION,'peak_net_pct':pct,
             'open_pnl_usd':round(pnl,4),'pnl_pct':round(pct,3),
             'estimated_exit_fee_usd':mark['dex_fee_usd']+mark['network_fee_usd'],
             'estimated_exit_impact_pct':mark['impact_pct'],'defensive_entry':engine.entry_defense.compact(original_defense),

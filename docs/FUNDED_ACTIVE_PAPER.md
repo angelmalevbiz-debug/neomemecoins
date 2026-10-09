@@ -9,7 +9,7 @@ This selects **PAPER_CAPACITY_TEST_V1_FIXED_100**, not the strategy admission
 described below. Each named book is visibly suffixed `ТЕСТ ЗАПЪЛВАНЕ`.
 
 The test tries to fill all four slots per book in a bounded event-loop refresh,
-then refills vacancies after ordinary frozen net exits (four-minute max hold).
+then refills vacancies after the position's stored net exits.
 It uses fresh real PumpSwap/SOL market observations, >=$50k observed liquidity,
 full fresh exact-pool safety, independent exact-pool price checks, and the
 unchanged fee/network/impact/slippage model at exactly $100. Four slots, unique
@@ -32,6 +32,30 @@ separate these fills from V3 strategic trades; all-time cash/P&L includes both.
 The same pool can appear across four books: 16 slots are not necessarily 16
 independent market exposures. High utilization does not prove strategic entry
 quality, profitable expectancy, realistic wallet fills or 80% win rate.
+
+### Owner-requested $30 net exits (2026-10-09)
+
+`PAPER_CAPACITY_EXIT_V2_NET30_STOP10` replaces the short exits of the four named
+capacity-test books. Each $100 lot targets **+$30 total net PAPER PnL**, including
+entry and estimated exit fees, network costs, impact and slippage/latency. The
+chosen experimental stop triggers at **-$10 total net PnL**. The 4-minute timer,
+early +$4/+$6 take-profit and early trailing exit are removed for these lots.
+Ordinary strategic lots and main/personal/other TEST exits remain unchanged.
+
+Startup applies this explicit owner request to open V1 capacity-test lots only,
+recording `exit_policy_changes` with the old/new parameters and change time,
+and persists before making exit or entry decisions. It never changes their
+admission version, original entry time/price/quantity, funding or completed
+history. New test lots freeze the new exits. Restart is idempotent and disabling
+capacity admission does not disable stored exits on already-open lots.
+
+The dollar target is not a guaranteed profit; a 30% gross move on a $100 entry
+can still be below $30 net after costs. Stops are trigger thresholds, not
+guaranteed maximum losses: gaps, cost changes or unavailable fresh marks can
+produce a worse result. Missing exact-pool marks do not manufacture an exit.
+Positions can now remain open for hours or longer: the old 50/hour throughput
+assumption based on a four-minute hold no longer applies. Slots/cash and every
+modeled loss remain real constraints of this finite PAPER test.
 
 The owner authorized a prospective PAPER-only repair, retaining fees, all
 historical outcomes and balances. MONEY.zip was inspected, not restored.

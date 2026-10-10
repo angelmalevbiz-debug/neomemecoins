@@ -2863,8 +2863,8 @@ class TapeSeatTests(unittest.TestCase):
         self.assertEqual([coin['pairAddress'] for coin in selected], [full('TrndP')])
         self.assertEqual(report['unpinned_flow_free_lab_positions'], 4)
         self.assertEqual(report['lab_pin_rule'], tape_pool_scheduler.LAB_PIN_RULE)
-        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
-        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V7_FAST_SCALP_COST_FIRST')
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
         # A pool main also holds keeps its pin (main's exit reads flow).
         state = self.lab_state(other=False)
         held = state['strategy_lab']['books'][lf.LAB_A_ID]['position']

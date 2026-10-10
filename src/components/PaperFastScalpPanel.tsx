@@ -13,14 +13,16 @@ export type PaperFastScalpSnapshot = {
   realized_pnl_usd?: number; unrealized_pnl_usd?: number; trades?: number;
   win_rate_pct?: number | null; entries_last_60m?: number;
   config: { notional_usd: number; take_profit_net_usd: number; stop_loss_net_usd: number;
-    profit_arm_net_usd: number; profit_giveback_usd: number; max_hold_seconds: number };
+    profit_arm_net_usd: number; profit_giveback_usd: number; max_hold_seconds: number;
+    market_screen?: string };
   positions?: FastPosition[]; history?: FastTrade[];
-  diagnostics?: { blocked_reason?: string; market_candidates: number; signal_candidates: number;
+  diagnostics?: { at?: number; blocked_reason?: string; market_candidates: number; signal_candidates: number;
     rejections: Record<string, number> };
 };
 
 const reasons: Record<string, string> = {
   fast_no_market_signal: 'Няма подходящ пазарен сигнал',
+  fast_market_outside_universe: 'Пулът вече е извън допустимия пазарен подбор',
   fast_move_does_not_cover_cost: 'Краткото движение не покрива разходите и буфера',
   fast_pending_signal_expired: 'Сигналът е изтекъл преди нова прясна цена',
   fast_waiting_next_observation: 'Потвърден кандидат — чака следваща прясна цена',
@@ -55,11 +57,13 @@ export default function PaperFastScalpPanel({ data, connected }: {
     <p className="mt-1 text-amber-100">Тестов капитал {moneyOrUnavailable(data.starting_balance)}, не печалба. Собствен баланс и история; бавните стратегии са запазени. Няма истински пари, гарантиран профит или принудителни входове.</p>
     <p className="mt-1">Вход {moneyOrUnavailable(config.notional_usd)} · цел +{moneyOrUnavailable(config.take_profit_net_usd)} нето · стоп −{moneyOrUnavailable(config.stop_loss_net_usd)} нето · защита от +{moneyOrUnavailable(config.profit_arm_net_usd)}, отстъпление {moneyOrUnavailable(config.profit_giveback_usd)} · максимум {config.max_hold_seconds / 60} мин от входа.</p>
     <p className="mt-1 text-slate-400">Движение за 60 сек над разходите + 0.25 процентни пункта и потвърдени 3 сделки / 2 портфейла. Такси, impact, slippage и забавяне са включени. Изпълнение на следваща прясна цена след ≥2 сек; не на удобния праг. При липса на цена изходът се бави и стопът може да бъде надхвърлен.</p>
+    {config.market_screen === 'FUNDED_V9_MOMENTUM_OR_COST_FIRST_PHYSICAL_V2' && <p className="mt-1 text-slate-400">Собствен подбор: Momentum или ликвидни пулове с ниски разходи. Новият клон не чака 5-минутния Momentum филтър; потвърденият поток и всички проверки за риск остават задължителни.</p>}
     {stale && <p className="mt-2 text-amber-200">Няма актуална връзка със скалпъра — показаните данни не са актуални.</p>}
     {data.error && <p role="status" className="mt-2 text-red-300">Скалпърът има грешка: {data.error}. Това не разрешава нови входове.</p>}
     {!data.enabled && !data.error && <p className="mt-2 text-amber-200">Новите входове са изключени. Съществуващите позиции продължават да се управляват.</p>}
     <p className="mt-2">Баланс {moneyOrUnavailable(data.balance)} · свободни {moneyOrUnavailable(data.available_cash_usd)} · реализиран нетен PnL {moneyOrUnavailable(data.realized_pnl_usd, true)} · отворен {moneyOrUnavailable(data.unrealized_pnl_usd, true)} (не е прибрано)</p>
-    <p>Последен час: {data.entries_last_60m ?? '—'} входа · {data.trades ?? '—'} затворени · {data.win_rate_pct == null ? 'WR — няма оценка' : `WR ${data.win_rate_pct.toFixed(1)}%`} · позиции {data.positions?.length ?? '—'}</p>
+    <p>Последен час: {data.entries_last_60m ?? '—'} входа · общо {data.trades ?? '—'} затворени · {data.win_rate_pct == null ? 'WR — няма оценка' : `WR ${data.win_rate_pct.toFixed(1)}%`} · позиции {data.positions?.length ?? '—'}</p>
+    {data.diagnostics && <p>Последен подбор: {data.diagnostics.market_candidates} кандидата · {data.diagnostics.signal_candidates} сигнала (не изпълнени сделки){data.diagnostics.at != null && <> · преди {Math.max(0, Math.floor((Date.now()-data.diagnostics.at)/1000))} сек</>}</p>}
     {reason && <p className="mt-1 text-slate-400">Сега: {reasons[reason] ?? reason}</p>}
     {data.positions?.map(position => <div key={position.trade_no} className="mt-2 rounded-lg border border-cyan-200/15 px-3 py-2">
       ${position.symbol} · {moneyOrUnavailable(position.notional_usd)} · нетна оценка {moneyOrUnavailable(position.open_pnl_usd, true)} · {position.quote_status === 'fresh' ? 'прясна цена' : 'стара цена — чака обновяване'}

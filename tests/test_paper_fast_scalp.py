@@ -287,5 +287,146 @@ class FastScalpTests(unittest.TestCase):
         self.assertEqual(lab.STATE['fast_scalp']['status'],'degraded')
         lab.STATE.clear(); lab.STATE.update(before)
 
+    def test_v1_config_hash_is_exactly_the_deployed_ledger_hash(self):
+        self.assertEqual(fast.PREVIOUS_CONFIG_HASH,
+                         '5030707e5d2c0fadef64e1102c65e3bdc796fa134c390c2948bf38177a7bb3fd')
+
+    def test_cost_first_branch_can_admit_short_flow_without_slow_momentum(self):
+        self.coin.update(priceChange={'m5':-.2,'h1':-15}, txns={'m5':{'buys':6,'sells':18}})
+        self.assertFalse(fast.active.matches('MOMENTUM',self.coin))
+        self.assertTrue(fast.market_candidate(self.coin))
+        hint=fast.discovery_estimate(self.coin)
+        self.assertTrue(hint['candidate']); self.assertFalse(hint['is_entry_authorization'])
+        p=self.opened()
+        self.assertEqual(p['entry_policy_version'],fast.VERSION)
+        self.assertEqual(p['notional_usd'],250)
+        self.assertGreater(p['micro_signal']['observed_return_pct'],p['entry_roundtrip_cost_pct'])
+
+    def test_new_branch_still_requires_actual_flow_and_observed_cost_cover(self):
+        self.coin.update(priceChange={'m5':-.2,'h1':-15},txns={'m5':{'buys':6,'sells':18}})
+        self.tick(flow={})
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertEqual(self.engine.state['diagnostics']['blocked_reason'],'promoted_verified_flow_unavailable')
+        self.tick(price=.01005)
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertEqual(self.engine.state['diagnostics']['blocked_reason'],'fast_move_does_not_cover_cost')
+        self.risk.assert_not_called()
+
+    def test_pending_cost_first_candidate_must_still_be_in_universe_at_commit(self):
+        self.coin.update(priceChange={'m5':-.2,'h1':-15},txns={'m5':{'buys':6,'sells':18}})
+        self.tick(); self.assertIsNotNone(self.engine.state['pending_entry'])
+        self.coin['liquidityUsd']=249_999
+        self.tick(2000)
+        self.assertFalse(self.engine.state['positions'])
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertEqual(self.engine.state['diagnostics']['blocked_reason'],'fast_market_outside_universe')
+        self.risk.assert_not_called()
+
+    def test_virtual_contribution_cannot_be_reclassified_as_real_profit(self):
+        for field in ('profit','real_money','transfer_from_funded_books'):
+            state=copy.deepcopy(self.engine.state)
+            state['funding_event'][field]=True
+            lab.atomic_write_path(self.path,state)
+            before=self.path.read_bytes()
+            with self.assertRaises(ValueError): self.new_engine()
+            self.assertEqual(self.path.read_bytes(),before)
+
+    def test_discovery_uses_full_250_cost_and_unknown_or_expensive_is_not_eligible(self):
+        for changed in [dict(priceNative=0),dict(liquidityUsd=10_000),
+                        dict(marketCap=100_000),dict(quoteTokenAddress='wrong')]:
+            hint=fast.discovery_estimate({**self.coin,**changed})
+            self.assertFalse(hint['candidate'],hint)
+            self.assertFalse(hint['is_entry_authorization'])
+        hint=fast.discovery_estimate(self.coin)
+        expected=-fast.feasibility.modeled_roundtrip(self.coin,250)['initial_pnl_pct']
+        self.assertAlmostEqual(hint['roundtrip_cost_pct'],expected)
+        self.assertEqual(hint['planned_notional_usd'],250)
+
+    def test_mark_only_ticks_preserve_last_admission_diagnostics(self):
+        self.tick(flow={})
+        prior=copy.deepcopy(self.engine.state['diagnostics'])
+        self.now+=1000
+        self.engine.step([self.coin],{},refresh=False)
+        self.assertEqual(self.engine.state['diagnostics'],prior)
+        self.assertEqual(self.new_engine().state['diagnostics'],prior)
+        self.assertGreater(self.engine.view()['updated_at'],prior['at'])
+
+    def legacy_ledger(self):
+        state=copy.deepcopy(self.engine.state)
+        state.update(version=fast.PREVIOUS_VERSION,config_hash=fast.PREVIOUS_CONFIG_HASH)
+        for row in state['positions']+state['history']:
+            row.update(entry_policy_version=fast.PREVIOUS_VERSION,config_hash=fast.PREVIOUS_CONFIG_HASH,
+                       exit_parameters=fast.config(fast.PREVIOUS_VERSION))
+        lab.atomic_write_path(self.path,state)
+        return state
+
+    def test_upgrade_preserves_open_lot_cash_funding_clock_and_frozen_exits(self):
+        self.opened()
+        before=self.legacy_ledger()
+        self.engine=self.new_engine()
+        for field in ('positions','history','balance','trade_seq','created_at','funding_event'):
+            self.assertEqual(self.engine.state[field],before[field],field)
+        self.assertEqual(self.engine.state['version'],fast.VERSION)
+        self.assertEqual(len(self.engine.state['policy_changes']),1)
+        self.assertEqual(self.engine.state['policy_changes'][0]['funding_change_usd'],0)
+        self.assertEqual(self.new_engine().state['policy_changes'],self.engine.state['policy_changes'])
+
+    def test_upgrade_preserves_closed_outcomes_and_does_not_credit_losses(self):
+        self.opened(); self.tick(2000,price=.0095); self.tick(2000)
+        before=self.legacy_ledger()
+        self.assertLess(before['balance'],1000)
+        self.engine=self.new_engine()
+        self.assertEqual(self.engine.state['history'],before['history'])
+        self.assertEqual(self.engine.state['balance'],before['balance'])
+        self.assertEqual(self.engine.state['funding_event'],before['funding_event'])
+
+    def test_migrated_v1_position_can_close_with_its_original_exit_receipt(self):
+        self.opened(); before=self.legacy_ledger(); self.engine=self.new_engine()
+        self.tick(2000,price=.0095); self.tick(2000)
+        trade=self.engine.state['history'][0]
+        self.assertEqual(trade['entry_policy_version'],fast.PREVIOUS_VERSION)
+        self.assertEqual(trade['exit_parameters'],before['positions'][0]['exit_parameters'])
+        self.assertEqual(trade['opened_at'],before['positions'][0]['opened_at'])
+        self.assertLess(trade['pnl_usd'],0)
+        self.assertEqual(self.new_engine().state['balance'],1000+trade['pnl_usd'])
+
+    def test_old_pending_intent_is_invalidated_not_counted_as_a_fill_on_upgrade(self):
+        self.tick(); self.assertIsNotNone(self.engine.state['pending_entry'])
+        self.legacy_ledger(); self.engine=self.new_engine()
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertFalse(self.engine.state['positions']); self.assertFalse(self.engine.state['history'])
+        self.assertEqual(self.engine.state['trade_seq'],0)
+
+    def test_fast_candidates_get_bounded_discovery_without_slow_rules(self):
+        coins=[fixture.coin(i,marketCap=20_000_000,priceChange={'m5':-.2,'h1':-15},
+                           txns={'m5':{'buys':6,'sells':18}}) for i in range(5)]
+        scheduler=fixture.TapePoolScheduler()
+        with patch.object(scheduler,'defensive_entry_decision',side_effect=lambda *a,**k:
+                          lab.entry_defense.pass_decision('SYNTHETIC_ISOLATION')):
+            selected,report=scheduler.select({'feed':coins},now=NOW,max_tracked=2)
+            self.assertEqual(report['fast_scalp']['candidate_pools'],5)
+            self.assertEqual(report['fast_scalp']['selected_pools'],2)
+            self.assertFalse(report['fast_scalp']['is_entry_authorization'])
+            first={c['pairAddress'] for c in selected}
+            selected,_=scheduler.select({'feed':coins},now=NOW+20_000,max_tracked=2)
+            self.assertEqual({c['pairAddress'] for c in selected},first)
+            selected,_=scheduler.select({'feed':coins},now=NOW+60_000,max_tracked=2)
+            self.assertFalse(first & {c['pairAddress'] for c in selected})
+        self.risk.assert_not_called()
+
+    def test_discovery_disabled_live_or_structurally_blocked_keeps_old_behavior(self):
+        c={**self.coin,'priceChange':{'m5':-.2,'h1':-15}}
+        for env in [{fast.ENV:'0'},{'NEO_ENGINE_MODE':'LIVE'},{'NEO_EXECUTION_MODE':'LIVE'}]:
+            with patch.dict(os.environ,env),patch.object(fixture.TapePoolScheduler,'defensive_entry_decision',
+                    side_effect=lambda *a,**k:lab.entry_defense.pass_decision('SYNTHETIC_ISOLATION')):
+                _,report=fixture.TapePoolScheduler().select({'feed':[c]},now=NOW,max_tracked=1)
+                self.assertFalse(report['fast_scalp']['enabled'])
+                self.assertEqual(report['fast_scalp']['candidate_pools'],0)
+        with patch.object(fixture.TapePoolScheduler,'defensive_entry_decision',
+                return_value={'allowed':False,'reasons':['rug_lp_pullable']}):
+            selected,report=fixture.TapePoolScheduler().select({'feed':[c]},now=NOW,max_tracked=1)
+            self.assertFalse(selected)
+            self.assertEqual(report['fast_scalp']['candidate_pools'],0)
+
 
 if __name__=='__main__': unittest.main()

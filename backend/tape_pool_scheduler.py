@@ -66,6 +66,7 @@ import cost_first_established as cost_first
 import entry_defense
 import funded_market_candidates
 import funded_active_paper as active_paper
+import paper_fast_scalp as fast_scalp
 import paper_market_feasibility as feasibility
 from shared_snapshot_io import read_shared_text
 import winner_ensemble
@@ -73,8 +74,8 @@ import winner_ensemble
 
 FUNDED_RULES = ('EARLY', 'MOMENTUM', 'PRECISION', 'ULTRA_PRECISION')
 LEASE_MS = 60_000
-POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS'
-PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY'
+POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V7_FAST_SCALP_COST_FIRST'
+PREVIOUS_POLICY_VERSION = 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS'
 LAB_PIN_RULE = 'LAB_POSITIONS_PINNED_UNLESS_THEIR_BOOK_NEVER_READS_FLOW'
 DEFENSIVE_EXAMPLE_LIMIT = 6
 SEAT_RULE = 'NO_SEAT_FOR_A_STRUCTURALLY_BLOCKED_POOL_NO_NEW_SEAT_FOR_A_HOT_POOL'
@@ -637,9 +638,15 @@ class TapePoolScheduler:
                         'minimum_model_roundtrip_cost_pct':cost_pct,
                         'model_cost_feasible':cost_pct <= funded_cap,
                         'reason':'sized_model_within_cap' if cost_pct <= funded_cap else 'sized_model_cost_above_limit'}
-            matched = bool(main_rules or funded_rules)
+            # Independent scalper has an affordable physical branch that must
+            # not wait for the slower funded books' 5m momentum screen. Observe
+            # it within the SAME seat/lease/RPC budget, never authorize an entry.
+            fast_model = fast_scalp.discovery_estimate(coin) if fast_scalp.enabled() else None
+            fast_candidate = bool(fast_model and fast_model['candidate'])
+            matched = bool(main_rules or funded_rules or fast_candidate)
             possible = bool((main_rules and main_cost['model_cost_feasible'] is True)
-                            or (funded_rules and funded_cost['model_cost_feasible'] is True))
+                            or (funded_rules and funded_cost['model_cost_feasible'] is True)
+                            or fast_candidate)
             unknown = bool(matched and (main_cost['model_cost_feasible'] is None
                                        or funded_cost['model_cost_feasible'] is None))
             if matched:
@@ -650,7 +657,7 @@ class TapePoolScheduler:
                     examples.append({'symbol': coin.get('symbol'), 'address': identity[0],
                                      'pairAddress': identity[1], 'main_rules': main_rules,
                                      'funded_rules': funded_rules, 'main_model': main_cost,
-                                     'funded_model': funded_cost})
+                                     'funded_model': funded_cost, 'fast_scalp_model':fast_model})
             # COST_FIRST universe: the Lab book pair's exact physical screen
             # (fee tier, liquidity, modeled fee + impact). Membership requires a
             # known cost estimate within the universe cap; it is a seat priority,
@@ -665,13 +672,14 @@ class TapePoolScheduler:
             tx = (coin.get('txns') or {}).get('m5') or {}
             activity = feasibility.number(tx.get('buys')) + feasibility.number(tx.get('sells'))
             priority = (bool(funded_rules and funded_cost['model_cost_feasible'] is True),
-                        bool(main_rules), activity >= 30,
+                        bool(main_rules), fast_candidate, activity >= 30,
                         -abs(activity - 60) if activity >= 12 else -1000 - activity,
                         len(funded_rules), len(main_rules), feasibility.number(coin.get('score')))
             group = (GROUP_FEASIBLE if possible else GROUP_COST_FIRST if in_cost_first
                      else GROUP_OVER_BUDGET if matched else GROUP_EXPLORATION)
             candidates.append({'identity': identity, 'coin': coin, 'group': group,
-                               'cost_first': in_cost_first, 'priority': priority})
+                               'cost_first': in_cost_first, 'priority': priority,
+                               'fast_scalp':fast_candidate})
 
         by_identity = {row['identity']: row for row in candidates}
         # Exit monitoring can exceed the entry discovery budget. Every held
@@ -769,6 +777,10 @@ class TapePoolScheduler:
                        'estimated_fixed_cost_over_budget': model_excluded,
                        'estimated_cost_unknown': model_unknown,
                        'selected_entry_pools': len(selected),
+                       'fast_scalp': {'enabled':fast_scalp.enabled(), 'version':fast_scalp.VERSION,
+                           'candidate_pools':sum(row['fast_scalp'] for row in candidates),
+                           'selected_pools':sum(row['fast_scalp'] for row in selected),
+                           'same_seat_budget':True, 'is_entry_authorization':False},
                        'selected_exploration_pools': sum(row['group'] != 0 for row in selected),
                        'selected_pairs': [coin['pairAddress'] for coin in pins] +
                                          [row['identity'][1] for row in selected],

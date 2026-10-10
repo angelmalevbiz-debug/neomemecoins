@@ -36,6 +36,22 @@ test('decoupled flow repair displays restored floors separately from the full or
   assert.doesNotMatch(text,/undefined|750/);
 });
 
+test('base flow restoration renders actual 3/2 proof without inventing entries or wins', () => {
+  const text=fundedActiveSummary({version:'V9',quality_mode:true,flow_size_decoupled:true,base_flow_restored:true,
+    quality_flow_requirements:{minimum_confirmed_30s_buy_usd:0,minimum_confirmed_30s_net_buy_usd:0,
+      minimum_confirmed_30s_trades:3,minimum_confirmed_30s_wallets:2,minimum_buy_sell_usd_ratio:1.2},
+    fixed_notional_usd:250,trades:0,wins:0,win_rate:null,net_pnl_usd:0,
+    orders_last_60m:0,closed_last_60m:0,open_positions:0,max_positions:null,
+    target_orders_per_hour:null,exposure_usd:0,daily_loss_limit_usd:null})!;
+  assert.match(text,/възстановено базово потвърждение/);
+  assert.match(text,/3 сделки \/ 2 портфейла/);
+  assert.match(text,/покупки ≥1\.2× продажби/);
+  assert.match(text,/без допълнителен минимум за USD оборот/);
+  assert.match(text,/0 входа \/ 0 изхода/);
+  assert.match(text,/не доказват печалба/);
+  assert.doesNotMatch(text,/6 сделки \/ 4 портфейла|ТЕСТ ЗАПЪЛВАНЕ|undefined|\$300/);
+});
+
 test('ticker warning experiment is explicitly labelled and does not claim profit or dropped safety', () => {
   const stats = {version:'V7',quality_mode:true,ticker_reuse_log_only:true,trades:0,wins:0,
     win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,open_positions:0,

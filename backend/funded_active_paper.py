@@ -22,6 +22,8 @@ TICKER_WARNING_ENV = 'NEO_LAB_TICKER_WARNING_ENABLED'
 TICKER_WARNING_BOOKS = frozenset({'MOMENTUM', 'PRECISION'})
 FLOW_SIZE_VERSION = 'FUNDED_ACTIVE_PAPER_V8_FLOW_SIZE_DECOUPLED_250'
 FLOW_SIZE_ENV = 'NEO_LAB_FLOW_SIZE_DECOUPLED_ENABLED'
+BASE_FLOW_VERSION = 'FUNDED_ACTIVE_PAPER_V9_BASE_FLOW_RESTORED_250'
+BASE_FLOW_ENV = 'NEO_LAB_BASE_FLOW_RESTORED_ENABLED'
 UNCAPPED_BOOKS = frozenset({'MOMENTUM', 'PRECISION'})
 QUALITY_EXIT_VERSION = 'PAPER_QUALITY_EXIT_V1_NET30_STOP5'
 ADAPTIVE_EXIT_VERSION = 'PAPER_ADAPTIVE_EXIT_V1_NET30_STOP5_LOCK80'
@@ -30,7 +32,7 @@ CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
 CAPACITY_EXIT_VERSION = 'PAPER_CAPACITY_EXIT_V2_NET30_STOP10'
 CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
 MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
-                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION, SIZED_VERSION, TICKER_WARNING_VERSION, FLOW_SIZE_VERSION,
+                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION, SIZED_VERSION, TICKER_WARNING_VERSION, FLOW_SIZE_VERSION, BASE_FLOW_VERSION,
                               CAPACITY_TEST_VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
@@ -75,6 +77,8 @@ def quality_enabled():
 
 
 def reporting_version(strategy_id=None):
+    if base_flow_restored():
+        return BASE_FLOW_VERSION
     if flow_size_decoupled():
         return FLOW_SIZE_VERSION
     if ticker_warning_enabled(strategy_id):
@@ -100,7 +104,18 @@ def flow_size_decoupled():
     return sized_enabled() and os.getenv(FLOW_SIZE_ENV) == '1'
 
 
+def base_flow_restored():
+    # Prospective PAPER repair; never reinstates the old capacity-test bypasses.
+    return flow_size_decoupled() and os.getenv(BASE_FLOW_ENV) == '1'
+
+
 def quality_flow_requirements():
+    if base_flow_restored():
+        # Flow is a signal, not executable depth. Full-size cost/impact and
+        # safety/price authorize the order independently at admission/commit.
+        return dict(minimum_confirmed_30s_trades=3, minimum_confirmed_30s_wallets=2,
+                    minimum_confirmed_30s_buy_usd=0, minimum_confirmed_30s_net_buy_usd=0,
+                    minimum_buy_sell_usd_ratio=1.2)
     basis = MAX_NOTIONAL_USD if flow_size_decoupled() else entry_notional()
     return dict(minimum_confirmed_30s_trades=6, minimum_confirmed_30s_wallets=4,
                 minimum_confirmed_30s_buy_usd=3*basis,
@@ -121,7 +136,12 @@ def quality_admission(coin, features, now, books):
     """Additional prospective guards, never a fitted win-probability score.
 
     Existing market, full defense, exact-pool flow/safety/price and cost gates
-    remain mandatory. V8 restores the pre-sizing $300/$100 evidence floors;
+    remain mandatory. V9 restores the baseline 3-swap/2-wallet proof rather
+    than requiring twice as many in the same 30-second window. It uses the
+    baseline 1.2 buy/sell ratio without extra dollar-turnover floors. Full
+    order size is checked independently, not inferred from these swaps.
+    V8 retains 6/4 proof, $300/$100 floors and 1.5 buy/sell ratio.
+    V8 restores the pre-sizing $300/$100 evidence floors;
     the old scaled policy remains available when the repair switch is off.
     Neither floor is a fitted probability or an executable liquidity quote;
     four copies of one pool are one exposure, not four independent signals.
@@ -601,6 +621,7 @@ def performance(book, now):
     return {**capacity(book, now), 'version': version, 'fixed_notional_usd': entry_notional(),
             'ticker_reuse_log_only':ticker_warning_enabled(book['id']),
             'flow_size_decoupled':flow_size_decoupled(),
+            'base_flow_restored':base_flow_restored(),
             'quality_flow_requirements':quality_flow_requirements(),
             **({'exit_policy':exit_parameters(book['id'])} if quality_enabled() else
                {'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
@@ -655,6 +676,15 @@ def config():
                     'cash_and_exposure_enforced':True,'synthetic_ticks_or_fills':False,
                     'profitable_strategy_validation':False},
                 sized_policy_enabled=sized_enabled(), sized_policy_version=SIZED_VERSION,
+                base_flow_repair={'version':BASE_FLOW_VERSION,'enabled':base_flow_restored(),
+                    'books':list(RULES) if base_flow_restored() else [],
+                    'restores_baseline_confirmed_count':True,
+                    'requirements':quality_flow_requirements(),
+                    'extra_dollar_turnover_floor_required':False,
+                    'baseline_positive_buy_pressure_required':True,
+                    'fixed_size_cost_safety_price_cash_rechecks_unchanged':True,
+                    'capacity_test_bypass_restored':False,
+                    'history_reclassified':False,'profitability_proven':False},
                 flow_size_repair={'version':FLOW_SIZE_VERSION,'enabled':flow_size_decoupled(),
                     'books':list(RULES) if flow_size_decoupled() else [],
                     'restores_pre_sizing_evidence_floors':True,'position_size_usd':entry_notional(),

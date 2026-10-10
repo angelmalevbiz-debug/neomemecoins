@@ -21,6 +21,18 @@ test('owner requested 250 policy shows uncapped soft limits, not zero risk or in
   assert.doesNotMatch(flow,/\$100/);
 });
 
+test('ticker warning experiment is explicitly labelled and does not claim profit or dropped safety', () => {
+  const stats = {version:'V7',quality_mode:true,ticker_reuse_log_only:true,trades:0,wins:0,
+    win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,open_positions:0,
+    max_positions:null,target_orders_per_hour:null,exposure_usd:0,daily_loss_limit_usd:null};
+  const text = fundedActiveSummary(stats)!;
+  assert.match(text,/повтарящ се тикер е предупреждение, не забрана/);
+  assert.match(text,/останалите защити и разходи остават/);
+  assert.match(text,/резултатите се отчитат отделно/);
+  assert.match(text,/печалба не е доказана/);
+  assert.doesNotMatch(fundedActiveSummary({...stats,ticker_reuse_log_only:false})!,/PAPER експеримент/);
+});
+
 test('scalp profile displays independent duration and UTC pause without promising an entry', () => {
   const result=fundedActiveSummary({version:'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100',quality_mode:true,
     trades:0,wins:0,win_rate:null,net_pnl_usd:0,orders_last_60m:0,closed_last_60m:0,

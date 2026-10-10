@@ -156,6 +156,8 @@ $settings = @{
     NEO_LAB_QUALITY_ENABLED='1';
     # Owner: $250 new entries in all four; soft capacity caps off only for M/P.
     NEO_LAB_PAPER_250_ENABLED='1';
+    # Owner-authorized M/P PAPER experiment; main/personal and E/U keep the veto.
+    NEO_LAB_TICKER_WARNING_ENABLED='1';
     NEO_TAPE_MAX_PAIRS='4'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
     NEO_TAPE_TX_PER_POLL='48'; NEO_TAPE_HISTORICAL_TX_PER_POLL='1'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');

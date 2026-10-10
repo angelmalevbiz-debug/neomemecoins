@@ -485,23 +485,30 @@ class TapePoolScheduler:
         (a seat serves every ledger; each entry path applies its own).
         """
         decision = self.defense.evaluate(coin, now, blocked_pools={}, heat_log_only=True)
-        if (active_paper.enabled() and not decision.get('allowed')
-                and {'rug_young_pool','rug_ticker_registry_warming'}.intersection(decision.get('reasons', []))):
+        if active_paper.enabled() and not decision.get('allowed'):
             matching=[sid for sid in active_paper.RULES if active_paper.matches(sid,coin)]
-            if matching:
-                sid=min(matching,key=lambda name:active_paper.RULES[name]['age'][0])
+            warning_books=[sid for sid in matching if active_paper.ticker_warning_enabled(sid)]
+            reasons=set(decision.get('reasons') or [])
+            if matching and ({'rug_young_pool','rug_ticker_registry_warming'} & reasons or
+                             (warning_books and 'rug_ticker_reuse' in reasons)):
+                sid=min(warning_books or matching,key=lambda name:active_paper.RULES[name]['age'][0])
                 decision=self.defense.evaluate(coin,now,blocked_pools={},heat_log_only=True,
-                    structural_parameters=active_paper.structural_parameters(sid))
+                    structural_parameters=active_paper.structural_parameters(sid),
+                    ticker_reuse_log_only=active_paper.ticker_warning_enabled(sid))
         if not decision.get('allowed'):
             return decision
-        flags = list(decision.get('log_only_flags') or [])
+        # Only heat warnings have the running-lease exception. A funded ticker
+        # warning must not accidentally be promoted back to a heat veto here.
+        heat = decision.get('heat_veto') or {}
+        flags = list(heat.get('reasons') or []) if heat.get('log_only') else []
         enforced = [reason for reason in flags if reason not in SEAT_HEAT_LOG_ONLY_REASONS]
         if not enforced:
             return decision
         if leased:
             return {**decision, 'seat_heat_lease_kept': True}
         return {**decision, 'allowed': False, 'reasons': list(decision.get('reasons') or []) + enforced,
-                'log_only_flags': [flag for flag in flags if flag not in enforced], 'seat_heat_withheld': True}
+                'log_only_flags': [flag for flag in decision.get('log_only_flags') or []
+                                   if flag not in enforced], 'seat_heat_withheld': True}
 
     def _shed_record(self, identity, coin, now, decode_yield):
         """Return the active shed record for a supported entry candidate, if any."""

@@ -17,6 +17,9 @@ PREVIOUS_QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V4_QUALITY_100'
 QUALITY_VERSION = 'FUNDED_ACTIVE_PAPER_V5_ADAPTIVE_100'
 SIZED_VERSION = 'FUNDED_ACTIVE_PAPER_V6_COST_AWARE_250'
 SIZED_ENV = 'NEO_LAB_PAPER_250_ENABLED'
+TICKER_WARNING_VERSION = 'FUNDED_ACTIVE_PAPER_V7_TICKER_WARNING_250'
+TICKER_WARNING_ENV = 'NEO_LAB_TICKER_WARNING_ENABLED'
+TICKER_WARNING_BOOKS = frozenset({'MOMENTUM', 'PRECISION'})
 UNCAPPED_BOOKS = frozenset({'MOMENTUM', 'PRECISION'})
 QUALITY_EXIT_VERSION = 'PAPER_QUALITY_EXIT_V1_NET30_STOP5'
 ADAPTIVE_EXIT_VERSION = 'PAPER_ADAPTIVE_EXIT_V1_NET30_STOP5_LOCK80'
@@ -25,7 +28,7 @@ CAPACITY_TEST_VERSION = 'PAPER_CAPACITY_TEST_V1_FIXED_100'
 CAPACITY_EXIT_VERSION = 'PAPER_CAPACITY_EXIT_V2_NET30_STOP10'
 CAPACITY_TEST_ENV = 'NEO_LAB_CAPACITY_TEST_ENABLED'
 MANAGED_VERSIONS = frozenset({'FUNDED_ACTIVE_PAPER_V1', 'FUNDED_ACTIVE_PAPER_V2_FIXED_100', VERSION,
-                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION, SIZED_VERSION,
+                              PREVIOUS_QUALITY_VERSION, QUALITY_VERSION, SIZED_VERSION, TICKER_WARNING_VERSION,
                               CAPACITY_TEST_VERSION})
 ENV = 'NEO_LAB_FUNDED_ACTIVE_ENABLED'
 FUNDING_ENV = 'NEO_LAB_AUTHORIZED_CAPITAL_USD'
@@ -69,12 +72,19 @@ def quality_enabled():
             and os.getenv('NEO_EXECUTION_MODE','PAPER')=='PAPER')
 
 
-def reporting_version():
+def reporting_version(strategy_id=None):
+    if ticker_warning_enabled(strategy_id):
+        return TICKER_WARNING_VERSION
     return SIZED_VERSION if sized_enabled() else QUALITY_VERSION if quality_enabled() else CAPACITY_TEST_VERSION if capacity_test_enabled() else VERSION
 
 
 def sized_enabled():
     return quality_enabled() and os.getenv(SIZED_ENV) == '1'
+
+
+def ticker_warning_enabled(strategy_id=None):
+    return (sized_enabled() and os.getenv(TICKER_WARNING_ENV) == '1'
+            and (strategy_id is None or strategy_id in TICKER_WARNING_BOOKS))
 
 
 def entry_notional():
@@ -286,7 +296,7 @@ def remove(book, position):
 
 
 def current_trades(book):
-    return [t for t in book.get('history', []) if t.get('entry_policy_version') == reporting_version()]
+    return [t for t in book.get('history', []) if t.get('entry_policy_version') == reporting_version(book.get('id'))]
 
 
 def is_active_position(position):
@@ -563,15 +573,17 @@ def exit_reason(position, net_pct, hold_minutes):
 def performance(book, now):
     trades = current_trades(book)
     wins = sum(finite(t.get('pnl_usd')) > 0 for t in trades)
-    policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==reporting_version()]
-    return {**capacity(book, now), 'version': reporting_version(), 'fixed_notional_usd': entry_notional(),
+    version = reporting_version(book['id'])
+    policy_opens=trades+[p for p in positions(book) if p.get('entry_policy_version')==version]
+    return {**capacity(book, now), 'version': version, 'fixed_notional_usd': entry_notional(),
+            'ticker_reuse_log_only':ticker_warning_enabled(book['id']),
             **({'exit_policy':exit_parameters(book['id'])} if quality_enabled() else
                {'exit_policy':capacity_exit_parameters()} if capacity_test_enabled() else {}),
             'quality_mode':quality_enabled(), 'entry_cost_limit_pct':entry_cost_limit(book['id']),
-            'legacy_open_positions':sum(p.get('entry_policy_version')!=reporting_version() for p in positions(book)),
-            'legacy_closed_trades':sum(t.get('entry_policy_version')!=reporting_version() for t in book.get('history',[])),
+            'legacy_open_positions':sum(p.get('entry_policy_version')!=version for p in positions(book)),
+            'legacy_closed_trades':sum(t.get('entry_policy_version')!=version for t in book.get('history',[])),
             'legacy_net_pnl_usd':round(sum(finite(t.get('pnl_usd')) for t in book.get('history',[])
-                                         if t.get('entry_policy_version')!=reporting_version()),4),
+                                         if t.get('entry_policy_version')!=version),4),
             'open_net_pnl_usd':round(sum(finite(p.get('open_pnl_usd')) for p in positions(book)),4),
             'adaptive_open_positions':sum((p.get('exit_parameters') or {}).get('version') in {ADAPTIVE_EXIT_VERSION,*horizons.VERSIONS}
                                           for p in positions(book)),
@@ -592,7 +604,7 @@ def candidate_config():
     for sid, rule in RULES.items():
         effective = {**rule, 'cost':entry_cost_limit(sid),
                      'stop':5.0 if quality_enabled() else rule['stop']}
-        result[sid] = {**effective, 'candidate_branches':[{'id':reporting_version()+'_'+sid,
+        result[sid] = {**effective, 'candidate_branches':[{'id':reporting_version(sid)+'_'+sid,
                        'constraints':dict(effective), 'score_is_admission_gate':False}]}
     return result
 
@@ -620,6 +632,11 @@ def config():
                     'cash_and_exposure_enforced':True,'synthetic_ticks_or_fills':False,
                     'profitable_strategy_validation':False},
                 sized_policy_enabled=sized_enabled(), sized_policy_version=SIZED_VERSION,
+                ticker_warning_experiment={'version':TICKER_WARNING_VERSION,
+                    'enabled':ticker_warning_enabled(),
+                    'books':sorted(TICKER_WARNING_BOOKS) if ticker_warning_enabled() else [],
+                    'log_only_reason':'rug_ticker_reuse','other_defense_and_cost_gates_unchanged':True,
+                    'history_reclassified':False,'profitability_proven':False},
                 sized_exits_apply_to_new_lots_only=True,
                 soft_limit_exempt_books=sorted(UNCAPPED_BOOKS) if sized_enabled() else [],
                 removed_soft_limits=['daily_loss','hourly_orders','position_count','fractional_exposure','book_loss_run_pause'] if sized_enabled() else [],

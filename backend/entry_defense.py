@@ -121,32 +121,46 @@ class DefensiveEntryLayer:
         self.last_error = f'{stage}:{type(exc).__name__}'
 
     def evaluate(self, coin, now, *, blocked_pools=None, closed_history=None, heat_log_only=False,
-                 structural_parameters=None) -> dict:
+                 structural_parameters=None, ticker_reuse_log_only=False) -> dict:
         """All three vetoes for one candidate at ``now`` (ms); ``allowed`` only when none blocks.
 
         ``blocked_pools`` is a pool_loss_memory.index of the deciding ledger
         (computed once per scan); ``closed_history`` is used when it is absent.
+        ``ticker_reuse_log_only=True`` is an explicit caller-scoped PAPER
+        experiment; all other vetoes stay enforced and the raw finding stays
+        in the receipt. Default callers retain the ticker veto.
         Never raises: an unexpected error blocks this candidate with
         ``defensive_entry_error`` (fail closed) and is counted in ``status()``.
         """
         try:
             return self._evaluate(coin, now, blocked_pools=blocked_pools, closed_history=closed_history,
-                                   heat_log_only=heat_log_only, structural_parameters=structural_parameters)
+                                   heat_log_only=heat_log_only, structural_parameters=structural_parameters,
+                                   ticker_reuse_log_only=ticker_reuse_log_only)
         except Exception as exc:
             self._note_error('evaluate', exc)
             return error_decision(exc)
 
     def _evaluate(self, coin, now, *, blocked_pools, closed_history, heat_log_only,
-                  structural_parameters=None) -> dict:
+                  structural_parameters=None, ticker_reuse_log_only=False) -> dict:
         structural = (rug.check(coin, now, self.registry) if structural_parameters is None else
                       rug.check(coin, now, self.registry, params=structural_parameters))
         loss = pool_loss_memory.check(coin, now, history=closed_history, blocked=blocked_pools)
         heat = heat_veto.evaluate(coin, now, self.history, log_only=heat_log_only)
-        reasons = (list(structural['reasons']) if structural['blocked'] else []) + list(loss['reasons'])
+        structural_reasons = list(structural['reasons']) if structural['blocked'] else []
+        # Explicit caller-scoped PAPER experiment: keep the original structural
+        # finding/identities, but only this one finding may become a warning.
+        # No other structural failure, heat, loss memory or error is downgraded.
+        ticker_warning = ticker_reuse_log_only is True and 'rug_ticker_reuse' in structural_reasons
+        if ticker_warning:
+            structural_reasons.remove('rug_ticker_reuse')
+        reasons = structural_reasons + list(loss['reasons'])
         if heat['vetoed']:
             reasons += heat['reasons']
-        return {'version': VERSION, 'allowed': not (structural['blocked'] or loss['blocked'] or heat['vetoed']),
-                'reasons': reasons, 'log_only_flags': list(heat['reasons']) if heat['log_only'] else [],
+        structural_blocked = structural['blocked'] and (not ticker_warning or bool(structural_reasons))
+        return {'version': VERSION, 'allowed': not (structural_blocked or loss['blocked'] or heat['vetoed']),
+                'reasons': reasons, 'ticker_reuse_log_only': ticker_reuse_log_only is True,
+                'log_only_flags': (list(heat['reasons']) if heat['log_only'] else []) +
+                                  (['rug_ticker_reuse'] if ticker_warning else []),
                 'structural_rug_guard': rug.compact(structural), 'pool_loss_memory': loss, 'heat_veto': heat}
 
     def status(self) -> dict:
@@ -172,6 +186,7 @@ def compact(decision: dict) -> dict:
     return {'version': decision.get('version', VERSION), 'allowed': bool(decision.get('allowed')),
             'reasons': list(decision.get('reasons') or []),
             'log_only_flags': list(decision.get('log_only_flags') or []),
+            'ticker_reuse_log_only': decision.get('ticker_reuse_log_only') is True,
             **({'mode': decision['mode']} if decision.get('mode') else {}),
             **({'error': decision['error']} if decision.get('error') else {}),
             'versions': dict(VERSIONS),

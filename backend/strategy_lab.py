@@ -98,7 +98,8 @@ def funded_defensive_decision(book,coin,now,*,blocked_pools,heat_log_only=False)
     if active_paper.applies(book):
         return entry_defense_layer().evaluate(
             coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only,
-            structural_parameters=active_paper.structural_parameters(book['id']))
+            structural_parameters=active_paper.structural_parameters(book['id']),
+            ticker_reuse_log_only=active_paper.ticker_warning_enabled(book['id']))
     return defensive_entry_decision(coin,now,blocked_pools=blocked_pools,heat_log_only=heat_log_only)
 
 def heat_log_only_book(book_id):
@@ -1562,7 +1563,7 @@ def maybe_open(feed,flows):
                     'reentry_cooldown' if blocked_cooldown else 'cost_first_size_below_minimum')
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             book['entry_diagnostics'].update({
-                'promoted_policy_version':active_paper.reporting_version() if is_active else promoted_guard.FUNDED_POLICY_VERSION,
+                'promoted_policy_version':active_paper.reporting_version(book['id']) if is_active else promoted_guard.FUNDED_POLICY_VERSION,
                 'promoted_evidence_guard_version':promoted_guard.VERSION,
                 'promoted_candidate_policy_source':'FUNDED_MARKET_BRANCHES',
                 'promoted_candidate_policy_version':funded_candidates.VERSION,
@@ -1579,7 +1580,7 @@ def maybe_open(feed,flows):
             })
             if is_active:
                 book['entry_diagnostics'].update({'funded_active':active_paper.performance(book,now),
-                    'entry_policy_version':active_paper.reporting_version(),'stop_loss_net_pct':book_stop,
+                    'entry_policy_version':active_paper.reporting_version(book['id']),'stop_loss_net_pct':book_stop,
                     'max_entry_roundtrip_cost_pct':admission_cap})
             if signal_candidates==0:
                 book['entry_diagnostics']['blocked_reason']='no_market_signal'
@@ -1699,7 +1700,7 @@ def maybe_open(feed,flows):
             'price_crosscheck':validation,
             'entry_policy_version':(cost_first.ENTRY_POLICY_VERSION if is_cost_first
                                     else lab_forward.ENTRY_POLICY_VERSION if is_forward
-                                     else active_paper.reporting_version() if is_active
+                                     else active_paper.reporting_version(book['id']) if is_active
                                     else promoted_guard.FUNDED_POLICY_VERSION if is_promoted
                                     else activity.POLICY_VERSION),
             'entry_roundtrip_pnl_pct':round(proposed['initial_pnl_pct'],6),
@@ -1821,8 +1822,8 @@ def stats(book):
             'partial_exits':partial_count,'partial_locked_pnl':round(locked_partial,2),
             'active_policy_trades':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS for t in h),
             'active_policy_wins':sum(t.get('entry_policy_version') in ACTIVE_POLICY_VERSIONS and num(t.get('pnl_usd'))>0 for t in h),
-            'promoted_policy_trades':sum(t.get('entry_policy_version')==(active_paper.reporting_version() if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) for t in h),
-            'promoted_policy_wins':sum(t.get('entry_policy_version')==(active_paper.reporting_version() if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) and num(t.get('pnl_usd'))>0 for t in h),
+            'promoted_policy_trades':sum(t.get('entry_policy_version')==(active_paper.reporting_version(book['id']) if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) for t in h),
+            'promoted_policy_wins':sum(t.get('entry_policy_version')==(active_paper.reporting_version(book['id']) if active_paper.applies(book) else promoted_guard.FUNDED_POLICY_VERSION) and num(t.get('pnl_usd'))>0 for t in h),
             # Closes counted in trades/wins but not in the balance (control measurement past its funding).
             'zero_capital_trades':len(zero_capital),
             'zero_capital_pnl_usd':round(sum(num(t.get('pnl_usd')) for t in zero_capital),2)}

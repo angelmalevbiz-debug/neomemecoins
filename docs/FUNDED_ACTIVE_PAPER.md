@@ -312,3 +312,26 @@ the first-position alias for older clients. Restarts deduplicate that alias.
 
 No 80% win rate, 50 valid fills/hour or profit is promised. Acceptance requires
 measured forward outcomes after costs, not passing unit tests or a green CI.
+
+## V7: owner-authorized ticker-warning PAPER experiment
+
+`NEO_LAB_TICKER_WARNING_ENABLED=1` requires the active, quality, $250 policy
+and both execution modes PAPER. Only the funded Momentum and Precision books
+use `FUNDED_ACTIVE_PAPER_V7_TICKER_WARNING_250`. Early and Ultra remain V6;
+main, personal engines and other Lab books retain their default ticker veto.
+
+Only `rug_ticker_reuse` becomes a recorded warning. The original structural
+finding, duplicate count and normalized ticker remain in the entry receipt;
+no history is removed or relabeled. Current-policy V7 outcomes are separate
+from V6 and earlier outcomes. This is an unvalidated experiment, not evidence
+that a repeated ticker identifies a safe token or that increased activity earns
+profit. All other structural checks, coverage warm-up, heat veto, per-pool
+loss memory, confirmed exact-pool flow, full safety, independent prices, cash
+and the 1.5% modeled round-trip cost ceiling remain mandatory, including at
+commit. $250 entries, stops and horizons are unchanged.
+
+The shared tape may observe an otherwise eligible Momentum/Precision pool
+with that warning; observation is never admission for main or another book.
+Ticker warnings do not use the scheduler's heat-lease exception. Disabling
+the experiment flag restores the veto for future entries, without changing
+existing lots, exits or completed trades. No force-fill mode is enabled.

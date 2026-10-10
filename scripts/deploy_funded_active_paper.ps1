@@ -6,11 +6,11 @@ $ErrorActionPreference='Stop'
 $sourceRoot=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $targetRoot=[IO.Path]::GetFullPath($RuntimeRepository)
 if ($sourceRoot -eq $targetRoot) { throw 'Source and runtime must be different checkouts.' }
-$files=@('backend/market_monitor.py','backend/funded_active_paper.py','backend/paper_horizon_exits.py','backend/paper_exit_research.py','backend/lab_capacity_test.py','backend/strategy_lab.py','backend/live_tape.py','backend/funded_market_candidates.py',
+$files=@('backend/market_monitor.py','backend/funded_active_paper.py','backend/paper_horizon_exits.py','backend/paper_exit_research.py','backend/paper_fast_scalp.py','backend/lab_capacity_test.py','backend/strategy_lab.py','backend/live_tape.py','backend/funded_market_candidates.py',
     'backend/entry_defense.py','backend/tape_pool_scheduler.py','backend/lab_dashboard_projection.py',
     'scripts/start_local_paper.ps1','scripts/build_funded_heat_seed.py','scripts/audit_lab_outcomes.py',
-    'src/lib/labStrategyView.ts','src/components/PaperExitResearchPanel.tsx',
-    'docs/FUNDED_ACTIVE_PAPER.md','docs/PAPER_HORIZON_EXITS.md','docs/PAPER_EXIT_RESEARCH.md','docs/PAPER_OUTCOME_AUDIT_20261009.md','strategy-lock.json')
+    'src/lib/labStrategyView.ts','src/components/PaperExitResearchPanel.tsx','src/components/PaperFastScalpPanel.tsx',
+    'docs/FUNDED_ACTIVE_PAPER.md','docs/PAPER_HORIZON_EXITS.md','docs/PAPER_EXIT_RESEARCH.md','docs/PAPER_FAST_SCALP.md','docs/PAPER_OUTCOME_AUDIT_20261009.md','strategy-lock.json')
 $liveLock=Get-Content -LiteralPath (Join-Path $targetRoot 'strategy-lock.json') -Raw | ConvertFrom-Json
 $incomingLock=Get-Content -LiteralPath (Join-Path $sourceRoot 'strategy-lock.json') -Raw | ConvertFrom-Json
 $digest=[Security.Cryptography.SHA256]::Create()

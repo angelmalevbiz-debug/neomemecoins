@@ -127,7 +127,7 @@ def matched_branches(strategy_id: str, coin: dict, features: dict,
     if strategy_id not in FUNDED_STRATEGIES:
         return []
     if active_paper.enabled():
-        return [active_paper.reporting_version() + '_' + strategy_id] if active_paper.matches(strategy_id, coin) else []
+        return [active_paper.reporting_version(strategy_id) + '_' + strategy_id] if active_paper.matches(strategy_id, coin) else []
     matches = []
     if activity.RULES[strategy_id].matches(features, require_flow=require_flow):
         matches.append(strategy_id)

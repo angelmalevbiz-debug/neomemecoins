@@ -392,6 +392,7 @@ export type FundedActiveStats = {
   orders_last_60m: number; closed_last_60m: number; open_positions: number; max_positions: number | null;
   target_orders_per_hour: number | null; exposure_usd: number; daily_loss_limit_usd: number | null; fixed_notional_usd?: number;
   soft_limits_removed?: boolean;
+  ticker_reuse_log_only?: boolean;
   funded_capital_usd?: number; effective_position_capacity?: number;
   capacity_test?: boolean; risk_limits_shadow_only?: boolean;
   quality_mode?: boolean; entry_cost_limit_pct?: number;
@@ -438,5 +439,6 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
     ? ` · Следващ UTC ден: ${new Date(stats.daily_window_ends_at).toLocaleString('bg-BG')} местно време; отворените загуби остават в риска; това не гарантира нов вход` : '';
   const limits = stats.soft_limits_removed ? 'без дневен, часов и позиционен таван; до наличния PAPER капитал, без заем · стопът, сигналите, проверките и паузата за повторен губещ токен остават; капиталът може да се загуби'
     : stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd ?? 0)}`;
-  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions ?? 'без таван'}${capacity} · ${limits}${quality}${pause}${reset}`;
+  const ticker = stats.ticker_reuse_log_only ? ' · PAPER експеримент: повтарящ се тикер е предупреждение, не забрана; останалите защити и разходи остават; резултатите се отчитат отделно' : '';
+  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions ?? 'без таван'}${capacity} · ${limits}${quality}${ticker}${pause}${reset}`;
 }

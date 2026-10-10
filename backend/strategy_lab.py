@@ -1726,6 +1726,8 @@ def maybe_open(feed,flows):
             position['peak_net_pct']=proposed['initial_pnl_pct']
         if book.get('portfolio_group')=='PROMOTED_PAPER':
             position['verified_entry_flow']=features.get('verified_flow')
+            if is_active and active_paper.quality_enabled():
+                position['entry_quality_flow_requirements']=active_paper.quality_flow_requirements()
             position['risk_guard']=risk
             position['entry_evidence_guard_version']=promoted_guard.VERSION
             position['entry_candidate_rule']=promoted_candidate_config()[strategy['id']]

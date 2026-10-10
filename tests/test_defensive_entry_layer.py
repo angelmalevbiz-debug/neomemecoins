@@ -2845,8 +2845,8 @@ class TapeSchedulerPathTests(unittest.TestCase):
         self.assertEqual(sorted(row['symbol'] for row in selected), ['Lost', 'Safe'])
         self.assertEqual(report['defensive_entry']['blocked_pools_in_feed'], 2)
         # V6 (LAB_FORWARD_TESTS_V1: no pins for flow-free Lab books) keeps every V5 defensive seat rule.
-        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
-        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        self.assertEqual(report['policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V7_FAST_SCALP_COST_FIRST')
+        self.assertEqual(report['previous_policy_version'], 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
         self.assertTrue(defensive['pinned_exit_pools_exempt'])
         # The fake-cap pool sits in the 30 bps tier but never reaches the cost-first seat group.
         self.assertEqual(cost_first.fee_tier_bps(fake), 30.0)
@@ -2998,10 +2998,10 @@ class VersionAndReplayTests(unittest.TestCase):
         self.assertEqual(cost_first.ENTRY_POLICY_VERSION, 'COST_FIRST_ESTABLISHED_V2')
         self.assertEqual(lab.activity.POLICY_VERSION, 'LAB_ACTIVE_V7_DEFENSIVE_ENTRY')
         self.assertEqual(promoted_guard.FUNDED_POLICY_VERSION, 'PROMOTED_MARKET_BRANCHES_EVIDENCE_COST_V5')
-        # The defensive seat screen arrived in V5; V6 (LAB_FORWARD_TESTS_V1) keeps it unchanged.
-        self.assertEqual(tape_scheduler.PREVIOUS_POLICY_VERSION, 'STABLE_COST_AWARE_TAPE_DISCOVERY_V5_DEFENSIVE_ENTRY')
+        # The defensive seat screen and flow-free exit pins survive V7 unchanged.
+        self.assertEqual(tape_scheduler.PREVIOUS_POLICY_VERSION, 'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
         self.assertEqual(tape_scheduler.POLICY_VERSION,
-                         'STABLE_COST_AWARE_TAPE_DISCOVERY_V6_NO_PINS_FOR_FLOW_FREE_LAB_BOOKS')
+                         'STABLE_COST_AWARE_TAPE_DISCOVERY_V7_FAST_SCALP_COST_FIRST')
         self.assertEqual(m.SCORE_VERSION, 'NEO_MARKET_SCORE_V2_LIQ_MC_BAND')
 
     def test_v4_learning_evidence_still_holds_a_throttled_rule(self):

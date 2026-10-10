@@ -1,10 +1,10 @@
-# Independent Fast PAPER Scalper V1
+# Independent Fast PAPER Scalper V2
 
 Owner request 2026-10-11: preserve the existing slower books and add a separate
 fast strategy. This is a prospective unvalidated hypothesis, not a promise of
 profitable trades, a fitted win probability or a LIVE executor.
 
-`PAPER_FAST_SCALP_V1_250_5M` owns `fast_scalp.json` beside the Lab ledger,
+`PAPER_FAST_SCALP_V2_COST_FIRST_250_5M` owns `fast_scalp.json` beside the Lab ledger,
 an independent exact-pool mark feed and $1,000 of initial virtual experiment
 capital. The initial contribution is durable, recorded as not profit and not
 a transfer from the four funded books. It never tops up losses, borrows,
@@ -18,7 +18,22 @@ Enable entries only
 with literal `NEO_LAB_FAST_SCALP_ENABLED=1` and both execution/engine modes
 literal `PAPER`. Disabling entries continues held-lot exits while in PAPER.
 
-The V9 Momentum physical universe is reused without changing its thresholds.
+V1 reused the slower V9 Momentum physical universe alone. V2 preserves that
+branch unchanged and adds the independent COST_FIRST V2 physical branch at the
+full $250 size: SOL-quoted PumpSwap, known denomination and market cap, liquidity
+>= $250,000, fee tier <=50bps, and fee-plus-impact round trip <=1.2%. Its genuine
+30s flow no longer has to also pass the slower books' 5m buy/sell, turnover and
+hour-return filters. This is broader eligibility, NOT a demonstrated new edge.
+All structural, ticker, heat, loss-memory, cash, full-cost, risk and independent
+price gates remain enforced. The physical universe is rechecked at commit too.
+
+The tape scheduler observes these full-size, full-cost-feasible candidates in
+its feasible cohort within the SAME existing RPC/seat budget. Existing main and
+funded candidate priorities, held-pool pins and stable 60s observation leases
+remain. Fast-only candidates rotate fairly rather than waiting behind pools
+that already cannot meet this book's cost cap. A scheduling estimate never
+stands in for actual confirmed flow or an executable fill.
+
 An exact-pool, genuinely observed 60-second return must exceed the full
 $250 modeled round-trip friction by 0.25 percentage points, while remaining
 below +3%. This past movement is NOT a forecast that the next movement pays
@@ -54,3 +69,19 @@ losses and rejected signals remain visible. The UI includes only the last
 20 closes; the dedicated durable ledger keeps full history and receipts.
 Synthetic regressions validate mechanics, not profitability. No automatic
 promotion or automatic optimization is allowed by this release.
+
+## V1 ledger upgrade and diagnostics
+
+Recognize only the exact pinned V1 config hash or the current V2 hash. Upgrade
+the ledger's future-entry version/hash with a durable policy-change event and
+prior canonical ledger hash; preserve its original contribution, cash, full
+history and open lots byte-for-value. Old lots retain their V1 entry/config and
+frozen exits. No reset, top-up, reclassification or mark-to-trigger repricing.
+Cancel an old unfilled pending intent instead of counting it as a fill; it must
+qualify anew. A failed write cannot duplicate a contribution or policy event.
+
+Exit-only loop ticks preserve the LAST actual admission diagnostics instead
+of overwriting them with misleading zero candidate counts. The panel labels
+last-scan candidates/signals separately from actual fills and reports all-time
+closes separately from the last-hour entry count. Neither zero fills nor a
+successful synthetic test claims real money, profit or a known win rate.

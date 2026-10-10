@@ -11,13 +11,16 @@ import os
 from dataclasses import replace
 
 import entry_defense
+import cost_first_established as cost_first
 import funded_active_paper as active
+import paper_market_feasibility as feasibility
 import pool_loss_memory
 import promoted_entry_guard as guard
 import structural_rug_guard as rug
 from lab_position_marks import fresh_exact_coin, mark_observed_at
 
-VERSION = 'PAPER_FAST_SCALP_V1_250_5M'
+PREVIOUS_VERSION = 'PAPER_FAST_SCALP_V1_250_5M'
+VERSION = 'PAPER_FAST_SCALP_V2_COST_FIRST_250_5M'
 ENV = 'NEO_LAB_FAST_SCALP_ENABLED'
 CAPITAL = 1000.0
 NOTIONAL = 250.0
@@ -42,8 +45,8 @@ def enabled():
     return paper_mode() and os.getenv(ENV) == '1'
 
 
-def config():
-    return dict(version=VERSION, starting_capital_usd=CAPITAL, notional_usd=NOTIONAL,
+def config(version=VERSION):
+    result = dict(version=version, starting_capital_usd=CAPITAL, notional_usd=NOTIONAL,
         max_roundtrip_cost_pct=COST_CAP_PCT, take_profit_net_usd=TARGET_USD,
         stop_loss_net_usd=STOP_USD, profit_arm_net_usd=ARM_USD,
         profit_giveback_usd=GIVEBACK_USD, max_hold_seconds=HOLD_MS//1000,
@@ -56,9 +59,42 @@ def config():
         cost_model=dict(EXPECTED_COST_MODEL),
         execution_basis='DEX_SPOT_MODELED_COSTS_V3_VERIFIED_SOL_DENOMINATION',
         independent_capital=True, automatic_topup=False, forced_fill=False)
+    if version == VERSION:
+        result.update(market_screen='FUNDED_V9_MOMENTUM_OR_COST_FIRST_PHYSICAL_V2',
+            cost_first_universe=cost_first.UNIVERSE_VERSION,
+            cost_first_full_size_usd=NOTIONAL, shared_tape_discovery=True,
+            historical_move_is_not_expected_profit=True)
+    return result
 
 
 CONFIG_HASH = hashlib.sha256(json.dumps(config(), sort_keys=True).encode()).hexdigest()
+PREVIOUS_CONFIG_HASH = hashlib.sha256(json.dumps(config(PREVIOUS_VERSION), sort_keys=True).encode()).hexdigest()
+SUPPORTED_CONFIGS = {VERSION:CONFIG_HASH, PREVIOUS_VERSION:PREVIOUS_CONFIG_HASH}
+
+
+def market_candidate(coin):
+    """Own physical universe; a lagging 5m buy ratio cannot veto the new branch.
+
+    This never admits a position. Full-size costs, genuine short-window signal,
+    flow, defense, risk and price are still checked at decision AND commit.
+    """
+    return active.matches('MOMENTUM', coin) or not cost_first.physical_rejections(
+        coin, cap_usd=NOTIONAL, minimum_notional_usd=NOTIONAL)
+
+
+def discovery_estimate(coin):
+    """Pure planning hint shared with tape seats; never a flow or fill receipt."""
+    result = dict(version=VERSION, is_entry_authorization=False,
+                  profitability_proven=False, planned_notional_usd=NOTIONAL,
+                  maximum_roundtrip_cost_pct=COST_CAP_PCT, candidate=False)
+    if not market_candidate(coin):
+        return {**result, 'reason':'fast_market_outside_universe'}
+    estimate = feasibility.modeled_roundtrip(coin, NOTIONAL,
+        **{key:value for key,value in EXPECTED_COST_MODEL.items() if key != 'execution_model'})
+    cost = -number(estimate.get('initial_pnl_pct'))
+    valid = estimate.get('status') == 'estimate' and math.isfinite(cost) and 0 <= cost <= COST_CAP_PCT
+    return {**result, 'candidate':valid, 'roundtrip_cost_pct':cost if math.isfinite(cost) else None,
+            'reason':'fast_observation_candidate' if valid else 'fast_roundtrip_cost'}
 
 
 def number(value, default=math.nan):
@@ -101,12 +137,16 @@ class FastScalpLab:
     def load(self):
         if self.path.exists():
             state = json.loads(self.path.read_text(encoding='utf-8'))
-            if (state.get('version') != VERSION or state.get('config_hash') != CONFIG_HASH
+            if (state.get('version') not in SUPPORTED_CONFIGS
+                    or state.get('config_hash') != SUPPORTED_CONFIGS.get(state.get('version'))
                     or state.get('starting_balance') != CAPITAL
                     or not isinstance(state.get('positions'), list)
                     or not isinstance(state.get('history'), list)
                     or not isinstance(state.get('funding_event'), dict)
                     or state['funding_event'].get('amount_usd') != CAPITAL
+                    or state['funding_event'].get('real_money') is not False
+                    or state['funding_event'].get('profit') is not False
+                    or state['funding_event'].get('transfer_from_funded_books') is not False
                     or not math.isfinite(number(state.get('balance')))
                     or state['balance'] < 0):
                 raise ValueError('Unrecognized fast-scalp ledger; refusing reset or credit')
@@ -114,9 +154,22 @@ class FastScalpLab:
             expected = CAPITAL+sum(number(t.get('pnl_usd')) for t in state['history'])
             if not math.isfinite(expected) or abs(state['balance']-expected) > .00001:
                 raise ValueError('Fast-scalp cash does not reconcile')
-            if any(p.get('entry_policy_version') != VERSION for p in state['positions']):
+            if any(p.get('entry_policy_version') not in SUPPORTED_CONFIGS
+                    or p.get('config_hash') != SUPPORTED_CONFIGS.get(p.get('entry_policy_version'))
+                    for p in state['positions']+state['history']):
                 raise ValueError('Unknown fast-scalp open lot')
             self.state = state
+            if state['version'] == PREVIOUS_VERSION:
+                # No credit, reset, rewritten entry or repricing. Existing lots
+                # retain V1 receipts/frozen exits; only FUTURE admissions change.
+                previous = hashlib.sha256(json.dumps(state, sort_keys=True).encode()).hexdigest()
+                state.setdefault('policy_changes', []).append(dict(at=self.clock(),
+                    from_version=PREVIOUS_VERSION, from_config_hash=PREVIOUS_CONFIG_HASH,
+                    to_version=VERSION, to_config_hash=CONFIG_HASH,
+                    previous_ledger_sha256=previous, balance_unchanged=state['balance'],
+                    funding_change_usd=0, historical_outcomes_unchanged=True))
+                state.update(version=VERSION, config_hash=CONFIG_HASH, pending_entry=None)
+                self.write(self.path, state)
         else:
             if not enabled():
                 raise ValueError('No authorization to create a PAPER experiment')
@@ -156,6 +209,8 @@ class FastScalpLab:
     def plan(self, coin, features, now):
         if not fresh_exact_coin(coin, coin.get('address'), coin.get('pairAddress'), now):
             return None, 'fast_market_stale'
+        if not market_candidate(coin):
+            return None, 'fast_market_outside_universe'
         flow = guard.flow_admission(coin, features, now)
         if not flow['allow']:
             return None, flow['reason']
@@ -278,8 +333,9 @@ class FastScalpLab:
         if self.error:
             self.load()  # Re-read durable state after any uncertain write; no duplicate entries.
         now = self.clock()
-        self.state['diagnostics'] = dict(at=now, market_candidates=0, signal_candidates=0,
-                                         rejections={}, blocked_reason=None)
+        if refresh or not self.state.get('diagnostics'):
+            self.state['diagnostics'] = dict(at=now, market_candidates=0, signal_candidates=0,
+                                             rejections={}, blocked_reason=None)
         coins = {(c.get('address'), c.get('pairAddress')):c for c in feed if isinstance(c, dict)}
         try:
             self.update(coins, now)  # Exits keep running even with entries switched off.
@@ -290,7 +346,7 @@ class FastScalpLab:
                     # Cheap gates across the feed, at most one provider candidate next refresh.
                     candidates = []
                     for coin in coins.values():
-                        if not active.matches('MOMENTUM', coin):
+                        if not market_candidate(coin):
                             continue
                         self.state['diagnostics']['market_candidates'] += 1
                         plan, reason = self.plan(coin, flows.get((coin['address'], coin['pairAddress'])) or {}, now)

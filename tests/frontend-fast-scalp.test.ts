@@ -45,3 +45,12 @@ test('realized losses and expired timeboxes stay visible; missing ledger stats a
     data:{version:snapshot.version,status:'degraded',config:snapshot.config,error:'unreadable'}}));
   assert.match(error,/Баланс —/); assert.match(error,/— затворени/);
 });
+
+test('new independent discovery and last scan counts cannot be mistaken for actual fills',()=>{
+  const html=renderToStaticMarkup(createElement(PaperFastScalpPanel,{connected:true,
+    data:{...snapshot,version:'PAPER_FAST_SCALP_V2_COST_FIRST_250_5M',
+      config:{...snapshot.config,market_screen:'FUNDED_V9_MOMENTUM_OR_COST_FIRST_PHYSICAL_V2'},
+      diagnostics:{...snapshot.diagnostics!,at:Date.now()-5000,market_candidates:8,signal_candidates:2}}}));
+  for(const text of ['Собствен подбор','не чака 5-минутния Momentum','8 кандидата','2 сигнала',
+    'не изпълнени сделки','0 входа','общо 0 затворени']) assert.ok(html.includes(text),text);
+});

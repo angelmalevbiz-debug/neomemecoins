@@ -394,7 +394,10 @@ export type FundedActiveStats = {
   soft_limits_removed?: boolean;
   ticker_reuse_log_only?: boolean;
   flow_size_decoupled?: boolean;
-  quality_flow_requirements?: { minimum_confirmed_30s_buy_usd: number; minimum_confirmed_30s_net_buy_usd: number };
+  base_flow_restored?: boolean;
+  quality_flow_requirements?: { minimum_confirmed_30s_buy_usd: number; minimum_confirmed_30s_net_buy_usd: number;
+    minimum_confirmed_30s_trades?: number; minimum_confirmed_30s_wallets?: number;
+    minimum_buy_sell_usd_ratio?: number };
   funded_capital_usd?: number; effective_position_capacity?: number;
   capacity_test?: boolean; risk_limits_shadow_only?: boolean;
   quality_mode?: boolean; entry_cost_limit_pct?: number;
@@ -442,7 +445,9 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const limits = stats.soft_limits_removed ? 'без дневен, часов и позиционен таван; до наличния PAPER капитал, без заем · стопът, сигналите, проверките и паузата за повторен губещ токен остават; капиталът може да се загуби'
     : stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd ?? 0)}`;
   const ticker = stats.ticker_reuse_log_only ? ' · PAPER експеримент: повтарящ се тикер е предупреждение, не забрана; останалите защити и разходи остават; резултатите се отчитат отделно' : '';
-  const flow = stats.flow_size_decoupled && stats.quality_flow_requirements
-    ? ` · PAPER поправка: размерът не затяга сигнала; за 30 сек покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_buy_usd)}, нетни покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_net_buy_usd)}; 6 сделки / 4 портфейла; входът и разходите се проверяват при $250; резултатите са отделни, не доказват печалба` : '';
+  const flow = stats.base_flow_restored && stats.quality_flow_requirements
+    ? ` · PAPER поправка: възстановено базово потвърждение за 30 сек — ${stats.quality_flow_requirements.minimum_confirmed_30s_trades} сделки / ${stats.quality_flow_requirements.minimum_confirmed_30s_wallets} портфейла, покупки ≥${stats.quality_flow_requirements.minimum_buy_sell_usd_ratio}× продажби; без допълнителен минимум за USD оборот; входът и разходите се проверяват при $250; резултатите са отделни, не доказват печалба`
+    : stats.flow_size_decoupled && stats.quality_flow_requirements
+      ? ` · PAPER поправка: размерът не затяга сигнала; за 30 сек покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_buy_usd)}, нетни покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_net_buy_usd)}; ${stats.quality_flow_requirements.minimum_confirmed_30s_trades ?? 6} сделки / ${stats.quality_flow_requirements.minimum_confirmed_30s_wallets ?? 4} портфейла; входът и разходите се проверяват при $250; резултатите са отделни, не доказват печалба` : '';
   return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions ?? 'без таван'}${capacity} · ${limits}${quality}${ticker}${flow}${pause}${reset}`;
 }

@@ -169,6 +169,34 @@ Tests verify mechanics only. Prospective closed net results across multiple
 pools/days are required before claiming improved win rate or profitability.
 MAIN, personal, other Lab/HF books, fees and wallet execution are unchanged.
 
+## V9: restore baseline confirmed-count admission at $250
+
+`NEO_LAB_BASE_FLOW_RESTORED_ENABLED=1` requires the V8 flow-size repair,
+sized quality policy and both modes PAPER. The four funded books report
+`FUNDED_ACTIVE_PAPER_V9_BASE_FLOW_RESTORED_250` separately from V8 and earlier.
+
+Runtime evidence showed zero quality-policy entries while the recent repeated
+entries were capacity-test rows: 127 historical fills with the signal/flow
+and defensive decisions recorded only as shadow evidence. V8 fixed a sizing
+coupling, but after the warm-up the additional 6-swap/4-wallet minimum in just
+30 seconds continued to reject candidates passing baseline confirmed flow.
+
+V9 restores the baseline **3 confirmed swaps / 2 signing wallets**, positive
+buy USD and buy/sell USD >=1.2 in the same complete 30-second exact-pool window.
+It removes the extra dollar-turnover floors and does not restore capacity-test
+bypasses. Flow is a signal, not a quote for executable $250 depth.
+It preserves 12-second freshness, full defense/heat, exact-pool completed
+safety, independent price, $250 full size with <=1.5% modeled total round-trip
+cost, cohort mutex, pool-loss pauses and actual available PAPER cash.
+Admission is rechecked at commit. Old entry/exits/quantities, contributions
+and completed history are never amended or relabeled. Disabling the new
+flag restores V8's 6/4, $300/$100 and 1.5 ratio for future entries; existing V9 lots retain
+their exits and management.
+
+This is an owner-requested prospective activity repair, not a fitted signal,
+not evidence of a high win rate and not a guarantee of any number of entries.
+Actual forward receipts and net closed outcomes remain the acceptance proof.
+
 ## Owner-requested capacity test (previous Windows mode)
 
 The owner explicitly requested 15–16 of the 16 slots filled at all times for

@@ -254,6 +254,8 @@ def compact_strategy_lab(data):
     high_frequency = data.get('high_frequency')
     if isinstance(high_frequency, dict):
         result['high_frequency'] = high_frequency
+    if isinstance(data.get('fast_scalp'), dict):
+        result['fast_scalp'] = data['fast_scalp']
     if isinstance(data.get('exit_research_summary'),dict):
         result['exit_research']=data['exit_research_summary']
     if data.get('exit_research_error'):

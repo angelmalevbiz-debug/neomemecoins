@@ -17,6 +17,8 @@ import lab_forward_tests as lab_forward
 import lab_high_frequency as hf_lab
 import funded_market_candidates as funded_candidates
 import funded_active_paper as active_paper
+import paper_fast_scalp as fast_scalp
+from lab_position_marks import PositionMarkFeed
 import paper_exit_research as exit_research
 import lab_capacity_test
 import momentum_rush_brain as rush_brain
@@ -1959,6 +1961,32 @@ def hf_persist_error(stage,error,now):
     except Exception:
         pass
 
+FAST_SCALP = None
+
+
+def fast_scalp_cycle(feed, flows, *, refresh):
+    """Independent PAPER ledger/marks. Its failure never stops funded-book exits."""
+    global FAST_SCALP
+    path = STATE_PATH.parent/'fast_scalp.json'
+    if not fast_scalp.paper_mode() or not (fast_scalp.enabled() or path.exists()):
+        return
+    try:
+        if FAST_SCALP is None:
+            FAST_SCALP = fast_scalp.FastScalpLab(path,
+                write=atomic_write_path, entry=entry_execution, exit=exit_execution,
+                defense=entry_defense_layer(), marks=PositionMarkFeed(),
+                risk=rug_guard.check, price=price_integrity.check, clock=now_ms,
+                cost_model=forward_cost_model())
+        FAST_SCALP.step(feed, flows, refresh=refresh)
+        STATE['fast_scalp'] = FAST_SCALP.view()
+    except Exception as error:
+        STATE['fast_scalp'] = {
+            **(FAST_SCALP.view() if FAST_SCALP is not None else
+               {'version':fast_scalp.VERSION,'config':fast_scalp.config()}),
+            'status':'degraded','error':f'{type(error).__name__}: {error}'[:220],
+            'profitability_proven':False,'real_execution_enabled':False}
+
+
 def persist(status='online',error=None):
     STATE['status']=status; STATE['updated_at']=now_ms()
     STATE['registry_compatibility']=registry_compatibility(STATE['books'])
@@ -2137,6 +2165,7 @@ def main():
             if refresh_due:
                 maybe_open(feed,flows)
                 hf_ms+=hf_refresh(feed,hf_errors)
+            fast_scalp_cycle(feed,flows,refresh=refresh_due)
             hf_end_loop(hf_ms,hf_errors)
             persist('online')
             failures=0

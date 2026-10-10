@@ -189,7 +189,7 @@ const reasons: Record<string, string> = {
   promoted_verified_flow_stale: 'Потвърденият поток е остарял',
   promoted_buy_pressure_unconfirmed: 'Няма потвърден натиск от купувачи',
   promoted_recent_loss_cooldown: 'Пауза след скорошна загуба',
-  quality_buy_flow_too_small: 'Потвърденият купувачески поток е твърде слаб за пълния размер на входа',
+  quality_buy_flow_too_small: 'Потвърденият купувачески поток е под допълнителните прагове на PAPER сигнала',
   quality_correlated_position: 'Този токен или pool вече е отворен в друга PAPER сметка',
   quality_pool_loss_pause: 'Пауза 30 минути след загуба в този pool',
   promoted_safety_unknown: 'Чака завършена проверка за безопасност',
@@ -393,6 +393,8 @@ export type FundedActiveStats = {
   target_orders_per_hour: number | null; exposure_usd: number; daily_loss_limit_usd: number | null; fixed_notional_usd?: number;
   soft_limits_removed?: boolean;
   ticker_reuse_log_only?: boolean;
+  flow_size_decoupled?: boolean;
+  quality_flow_requirements?: { minimum_confirmed_30s_buy_usd: number; minimum_confirmed_30s_net_buy_usd: number };
   funded_capital_usd?: number; effective_position_capacity?: number;
   capacity_test?: boolean; risk_limits_shadow_only?: boolean;
   quality_mode?: boolean; entry_cost_limit_pct?: number;
@@ -440,5 +442,7 @@ export function fundedActiveSummary(stats?: FundedActiveStats) {
   const limits = stats.soft_limits_removed ? 'без дневен, часов и позиционен таван; до наличния PAPER капитал, без заем · стопът, сигналите, проверките и паузата за повторен губещ токен остават; капиталът може да се загуби'
     : stats.risk_limits_shadow_only ? `цел запълване на свободните места; сигналните филтри, паузите и лимитите за загуба/честота са само записани, не спират теста. PAPER капиталът може да се загуби; цена, safety и капиталовата експозиция остават задължителни` : `цел до ${stats.target_orders_per_hour} входа/ч, без гаранция · дневен лимит загуба ${usd(stats.daily_loss_limit_usd ?? 0)}`;
   const ticker = stats.ticker_reuse_log_only ? ' · PAPER експеримент: повтарящ се тикер е предупреждение, не забрана; останалите защити и разходи остават; резултатите се отчитат отделно' : '';
-  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions ?? 'без таван'}${capacity} · ${limits}${quality}${ticker}${pause}${reset}`;
+  const flow = stats.flow_size_decoupled && stats.quality_flow_requirements
+    ? ` · PAPER поправка: размерът не затяга сигнала; за 30 сек покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_buy_usd)}, нетни покупки ≥${usd(stats.quality_flow_requirements.minimum_confirmed_30s_net_buy_usd)}; 6 сделки / 4 портфейла; входът и разходите се проверяват при $250; резултатите са отделни, не доказват печалба` : '';
+  return `${mode}${size}${capital}${exits} · ${stats.trades} затворени · ${win} · нетен PnL ${usd(stats.net_pnl_usd)} след разходи · последен час: ${stats.orders_last_60m} входа / ${stats.closed_last_60m} изхода · позиции ${stats.open_positions}/${stats.max_positions ?? 'без таван'}${capacity} · ${limits}${quality}${ticker}${flow}${pause}${reset}`;
 }

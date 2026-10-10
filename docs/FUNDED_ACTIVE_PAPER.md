@@ -1,5 +1,21 @@
 # Named strategy PAPER repair — 2026-10-09
 
+## Current: decouple order sizing from signal strength — 2026-10-10
+
+`NEO_LAB_FLOW_SIZE_DECOUPLED_ENABLED=1` opts the four funded PAPER books into
+`FUNDED_ACTIVE_PAPER_V8_FLOW_SIZE_DECOUPLED_250`, only with sized quality PAPER.
+V6 had increased the additional 30-second buy-flow floors from $300/$100 to
+$750/$250 along with order size. V8 restores those **pre-sizing evidence
+floors**, keeping six swaps, four wallets and buy/sell USD >=1.5. It is a
+prospective policy repair, **not proof of profitable entries or 50 trades/hour**.
+The fixed order remains $250; cash, $250 impact/cost planning and admission,
+fresh exact-pool flow, defense/heat, full safety, independent price, cohort
+mutex/loss pauses and frozen exits remain mandatory. The ticker-warning scope
+stays Momentum/Precision only. No force fill, LIVE orders, funding or resets.
+Old entry receipts/outcomes remain in their original cohorts; new lots record
+the effective flow thresholds. With the switch off V6/V7 retain $750/$250.
+Current diagnostics must be inspected forward; low activity can still persist.
+
 ## Current: $250 entries and selected soft-cap removal — 2026-10-10
 
 The owner explicitly selected **all four PAPER strategies** for $250 new

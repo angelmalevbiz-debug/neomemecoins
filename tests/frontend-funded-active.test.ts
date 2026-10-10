@@ -17,8 +17,23 @@ test('owner requested 250 policy shows uncapped soft limits, not zero risk or in
     entry_diagnostics:{blocked_reason:'funded_active_cash_unavailable'}}),/свободен PAPER капитал/);
   const flow=labEntryStatus({id:'MOMENTUM',balance:900,starting_balance:1000,
     entry_diagnostics:{blocked_reason:'quality_buy_flow_too_small'}});
-  assert.match(flow,/пълния размер на входа/);
+  assert.match(flow,/допълнителните прагове/);
   assert.doesNotMatch(flow,/\$100/);
+});
+
+test('decoupled flow repair displays restored floors separately from the full order size', () => {
+  const text=fundedActiveSummary({version:'V8',quality_mode:true,flow_size_decoupled:true,
+    quality_flow_requirements:{minimum_confirmed_30s_buy_usd:300,minimum_confirmed_30s_net_buy_usd:100},
+    fixed_notional_usd:250,trades:0,wins:0,win_rate:null,net_pnl_usd:0,
+    orders_last_60m:0,closed_last_60m:0,open_positions:0,max_positions:null,
+    target_orders_per_hour:null,exposure_usd:0,daily_loss_limit_usd:null})!;
+  assert.match(text,/размерът не затяга сигнала/);
+  assert.match(text,/покупки ≥\$300\.00, нетни покупки ≥\$100\.00/);
+  assert.match(text,/6 сделки \/ 4 портфейла/);
+  assert.match(text,/разходите се проверяват при \$250/);
+  assert.match(text,/0 входа \/ 0 изхода/);
+  assert.match(text,/не доказват печалба/);
+  assert.doesNotMatch(text,/undefined|750/);
 });
 
 test('ticker warning experiment is explicitly labelled and does not claim profit or dropped safety', () => {
@@ -141,7 +156,7 @@ test('quality separates old losses and open marks from unproven current-policy o
 });
 
 test('quality admission rejects small flow, correlated lots and repeated losing pools with readable reasons', () => {
-  for (const [reason,text] of [['quality_buy_flow_too_small','твърде слаб'],
+  for (const [reason,text] of [['quality_buy_flow_too_small','прагове'],
     ['quality_correlated_position','друга PAPER сметка'],['quality_pool_loss_pause','30 минути']]) {
     assert.ok(labEntryStatus({id:'EARLY',starting_balance:1000,balance:950,
       entry_diagnostics:{blocked_reason:reason}}).includes(text));

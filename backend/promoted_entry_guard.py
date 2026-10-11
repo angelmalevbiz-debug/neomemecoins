@@ -57,13 +57,17 @@ def flow_admission(coin, features, now):
 def risk_admission(coin, risk, now, ttl_ms):
     checked = finite((risk or {}).get('checked_at'))
     age_limit = min(SAFETY_MAX_AGE_MS, max(0, finite(ttl_ms) or 0))
-    valid = bool(risk and risk.get('status') == 'pass'
-                 and not risk.get('provisional_early')
+    identified_fresh = bool(risk and not risk.get('provisional_early')
                  and risk.get('mint') == coin.get('address')
                  and risk.get('pair') == coin.get('pairAddress')
                  and checked is not None and checked > 0
                  and 0 <= now - checked <= age_limit)
-    return {'allow': valid, 'reason': None if valid else 'promoted_safety_unavailable'}
+    valid = identified_fresh and risk.get('status') == 'pass'
+    # A completed rejection is not a pending/unavailable provider check.
+    # Only the diagnostic changes: the exact same reports remain inadmissible.
+    blocked = identified_fresh and risk.get('status') == 'blocked'
+    return {'allow': valid, 'reason': None if valid else
+            'promoted_safety_blocked' if blocked else 'promoted_safety_unavailable'}
 
 
 def max_entry_cost_pct(stop_loss_pct):

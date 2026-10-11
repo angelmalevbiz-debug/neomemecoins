@@ -65,6 +65,17 @@ class PromotedAdmissionTests(unittest.TestCase):
         for stop in (0, -3, None, float('inf')):
             self.assertFalse(guard.cost_admission(-1, stop)['allow'])
 
+    def test_completed_risk_refusal_is_not_misreported_as_waiting_for_provider(self):
+        risk={'status':'blocked','mint':'mint','pair':'pool','checked_at':NOW,
+              'reasons':['reported_linked_insiders']}
+        result=guard.risk_admission(COIN,risk,NOW,60_000)
+        self.assertEqual(result,{'allow':False,'reason':'promoted_safety_blocked'})
+        for changes in ({'pair':'other'},{'checked_at':NOW-60_001},
+                        {'checked_at':NOW+1},{'provisional_early':True},
+                        {'status':'review'},{'status':'unavailable'}):
+            self.assertEqual(guard.risk_admission(COIN,{**risk,**changes},NOW,60_000),
+                             {'allow':False,'reason':'promoted_safety_unavailable'})
+
     def test_policy_does_not_claim_edge_or_rewrite_ledger(self):
         config = guard.policy_config(3)
         self.assertEqual(config['maximum_roundtrip_cost_pct'], 1.5)

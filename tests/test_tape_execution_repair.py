@@ -708,6 +708,86 @@ class RpcAndDurability(unittest.TestCase):
         self.assertEqual(snapshot['pair_coverage'][PAIR]['reason'],'UNCLASSIFIED_TRANSACTIONS')
         self.assertEqual(snapshot['pair_coverage'][PAIR]['unclassified'],1)
 
+    def test_recent_event_time_mismatch_is_rechecked_and_can_restore_complete_coverage(self):
+        self.rec.poll([META],lambda calls:[{'result':[]} for _ in calls])
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state,attempts,reason) VALUES('transient-time',?,?, ?,?,?, 'unclassified',1,
+                'FUTURE_OR_INCONSISTENT_EVENT_TIME')''',
+                (PAIR,42,NOW,NOW,json.dumps(META)))
+        requested=[]
+        def rpc(calls):
+            requested.extend(params[0] for method,params in calls if method=='getTransaction')
+            return [{'result':transaction()} for _ in calls]
+        self.rec.process(rpc,pairs=[PAIR],current_metadata=[META])
+        row=self.rec.db.execute("SELECT state,reason,next_retry FROM signatures WHERE signature='transient-time'").fetchone()
+        self.assertEqual(requested,['transient-time'])
+        self.assertEqual(row['state'],'processed');self.assertIsNone(row['reason']);self.assertEqual(row['next_retry'],0)
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertEqual(snapshot['events_total'],1)
+
+    def test_unknown_sol_value_retries_with_fresh_route_and_audits_event_correction(self):
+        self.rec.poll([META],lambda calls:[{'result':[]} for _ in calls])
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state) VALUES('transient-fx',?,?, ?,?,?, 'pending')''',
+                (PAIR,42,NOW,NOW,json.dumps(META)))
+        tx=transaction(quote_mint=tape.WSOL)
+        def rpc(calls):
+            return [{'result':tx} for _ in calls]
+        self.rec.process(rpc,pairs=[PAIR],current_metadata=[META])
+        row=self.rec.db.execute("SELECT state,reason,next_retry FROM signatures WHERE signature='transient-fx'").fetchone()
+        self.assertEqual(row['state'],'unclassified')
+        self.assertEqual(row['reason'],'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE')
+        self.assertGreater(row['next_retry'],self.clock[0])
+        original=json.loads(self.rec.db.execute("SELECT payload FROM events WHERE signature='transient-fx'").fetchone()['payload'])
+        self.assertIn('QUOTE_USD_UNKNOWN',original['quality_flags'])
+
+        # The backoff prevents the same body from consuming a request every poll.
+        no_calls=[]
+        self.rec.process(lambda calls:no_calls.extend(calls),pairs=[PAIR],current_metadata=[META])
+        self.assertEqual(no_calls,[])
+
+        self.clock[0]=row['next_retry']
+        fresh=dict(META,quote_usd_reference=200,quote_reference_at=self.clock[0],
+                   quote_reference_source='JUPITER_CONVERSION_QUOTE_REFERENCE')
+        self.rec.process(rpc,pairs=[PAIR],current_metadata=[fresh])
+        repaired=self.rec.db.execute("SELECT state,reason,next_retry FROM signatures WHERE signature='transient-fx'").fetchone()
+        self.assertEqual(repaired['state'],'processed');self.assertIsNone(repaired['reason']);self.assertEqual(repaired['next_retry'],0)
+        payload=json.loads(self.rec.db.execute("SELECT payload FROM events WHERE signature='transient-fx'").fetchone()['payload'])
+        self.assertEqual(payload['quality_flags'],[])
+        self.assertAlmostEqual(payload['usd_amount'],30.2)
+        self.assertEqual(payload['usd_valuation_source'],'JUPITER_CONVERSION_QUOTE_REFERENCE')
+        audit=self.rec.db.execute('SELECT previous_payload,replacement_payload FROM event_reclassifications WHERE signature=?',
+                                  ('transient-fx',)).fetchone()
+        self.assertIsNotNone(audit)
+        self.assertIn('QUOTE_USD_UNKNOWN',json.loads(audit['previous_payload'])['quality_flags'])
+        self.assertEqual(json.loads(audit['replacement_payload'])['quality_flags'],[])
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'COMPLETE')
+        self.assertEqual(snapshot['events_total'],1)
+
+    def test_estimated_fx_reference_does_not_clear_unclassified_coverage(self):
+        self.rec.poll([META],lambda calls:[{'result':[]} for _ in calls])
+        with self.rec.db:
+            self.rec.db.execute('''INSERT INTO signatures(signature,pair,slot,event_time,observed,
+                metadata,state) VALUES('still-unknown-fx',?,?, ?,?,?, 'pending')''',
+                (PAIR,42,NOW,NOW,json.dumps(META)))
+        tx=transaction(quote_mint=tape.WSOL)
+        self.rec.process(lambda calls:[{'result':tx} for _ in calls],pairs=[PAIR],current_metadata=[META])
+        due=self.rec.db.execute("SELECT next_retry FROM signatures WHERE signature='still-unknown-fx'").fetchone()['next_retry']
+        self.clock[0]=due
+        estimated=dict(META,quote_usd_reference=200,quote_reference_at=self.clock[0],
+                       quote_reference_source='UNVERIFIED_PRICE_RATIO')
+        self.rec.process(lambda calls:[{'result':tx} for _ in calls],pairs=[PAIR],current_metadata=[estimated])
+        row=self.rec.db.execute("SELECT state,reason FROM signatures WHERE signature='still-unknown-fx'").fetchone()
+        self.assertEqual(row['state'],'unclassified')
+        self.assertEqual(row['reason'],'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE')
+        self.assertEqual(self.rec.db.execute('SELECT count(*) FROM event_reclassifications').fetchone()[0],0)
+        snapshot=self.rec.snapshot([META])
+        self.assertEqual(snapshot['pair_coverage'][PAIR]['status'],'DEGRADED')
+
     def test_transaction_null_is_pending_then_success_after_restart(self):
         available=[False]
         def rpc(calls):

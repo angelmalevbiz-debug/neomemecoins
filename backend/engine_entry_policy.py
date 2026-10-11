@@ -24,6 +24,7 @@ LABELS = {
     'promoted_verified_flow_stale': 'потвърденият поток или пазарната снимка са остарели',
     'promoted_buy_pressure_unconfirmed': 'недостатъчен независим buy-flow от различни портфейли',
     'promoted_safety_unavailable': 'липсва свежа проверка за риск на точния token и pool',
+    'promoted_safety_blocked': 'завършената проверка е отказала точния token и pool заради установен риск',
     'promoted_cost_headroom_insufficient': 'разходът за вход и изход е твърде висок спрямо стопа',
     'flow_quality': 'непълен или забавен проверен order flow',
     'audit_pending': 'непотвърден траен audit запис; изчаква повторен запис',

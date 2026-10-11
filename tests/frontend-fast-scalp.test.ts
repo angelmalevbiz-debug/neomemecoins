@@ -54,3 +54,17 @@ test('new independent discovery and last scan counts cannot be mistaken for actu
   for(const text of ['Собствен подбор','не чака 5-минутния Momentum','8 кандидата','2 сигнала',
     'не изпълнени сделки','0 входа','общо 0 затворени']) assert.ok(html.includes(text),text);
 });
+
+test('waiting preserves deadline and completed risk blocks are not shown as pending checks',()=>{
+  const waiting=renderToStaticMarkup(createElement(PaperFastScalpPanel,{connected:true,
+    data:{...snapshot,diagnostics:{...snapshot.diagnostics!,blocked_reason:'fast_waiting_next_observation'}}}));
+  assert.match(waiting,/запазва първоначалния си срок/);
+  assert.match(waiting,/Няма вход по стара цена/);
+  const blocked=renderToStaticMarkup(createElement(PaperFastScalpPanel,{connected:true,
+    data:{...snapshot,diagnostics:{...snapshot.diagnostics!,blocked_reason:'promoted_safety_blocked',
+      rejections:{promoted_safety_blocked:2,promoted_verified_flow_unavailable:7}}}}));
+  assert.match(blocked,/Проверката е завършена: отказ заради установен риск/);
+  assert.match(blocked,/Всички откази при последния подбор/);
+  assert.match(blocked,/точния pool: 7/);
+  assert.doesNotMatch(blocked,/Чака завършена проверка за риск/);
+});

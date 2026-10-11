@@ -195,6 +195,7 @@ const reasons: Record<string, string> = {
   promoted_safety_unknown: 'Чака завършена проверка за безопасност',
   promoted_safety_not_fresh_pass: 'Чака прясна проверка за безопасност',
   promoted_safety_unavailable: 'Чака прясна пълна проверка за безопасност',
+  promoted_safety_blocked: 'Проверката е завършена: отказ заради установен риск',
   promoted_price_identity_unconfirmed: 'Цената за точния пазар не е потвърдена',
   promoted_price_identity_unverified: 'Цената за точния пазар не е потвърдена',
   network_price_unknown: 'Чака проверима оценка на мрежовите такси',

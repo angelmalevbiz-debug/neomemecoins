@@ -103,10 +103,82 @@ class FastScalpTests(unittest.TestCase):
 
     def test_pending_does_not_fill_at_first_or_stale_observation(self):
         self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
         self.now += 2000
         self.engine.step([self.coin],self.flow())  # same old price observation
         self.assertFalse(self.engine.state['positions'])
         self.risk.assert_not_called()
+        self.assertEqual(self.engine.state['pending_entry'],original)
+        self.assertEqual(self.engine.state['diagnostics']['blocked_reason'],
+                         'fast_waiting_next_observation')
+
+    def test_pending_waits_across_early_polls_and_fills_on_next_actual_observation(self):
+        self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
+        for _ in range(3):
+            self.now += 2000
+            self.engine.step([self.coin],self.flow())
+            self.assertEqual(self.engine.state['pending_entry'],original)
+            self.assertFalse(self.engine.state['positions'])
+        self.risk.assert_not_called()
+        self.tick(2000)
+        p=self.engine.state['positions'][0]
+        self.assertEqual(p['entry_signal_at'],original['signal_at'])
+        self.assertEqual(p['opened_at']-p['entry_signal_at'],8000)
+        self.assertEqual(p['entry_readiness_version'],fast.READINESS_VERSION)
+
+    def test_waiting_for_price_never_extends_signal_deadline_or_books_stale_fill(self):
+        self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
+        for age in (2000,6000,12000):
+            self.now=original['signal_at']+age
+            self.engine.step([self.coin],self.flow())
+            self.assertEqual(self.engine.state['pending_entry'],original)
+        self.now=original['signal_at']+12001
+        self.engine.step([self.coin],self.flow())
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertFalse(self.engine.state['positions'])
+        self.risk.assert_not_called()
+        self.assertIn('fast_pending_signal_expired',
+                      self.engine.state['diagnostics']['rejections'])
+
+    def test_temporarily_absent_pool_keeps_deadline_without_provider_work(self):
+        self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
+        self.now += 2000
+        self.engine.step([],self.flow())
+        self.assertEqual(self.engine.state['pending_entry'],original)
+        self.risk.assert_not_called()
+        self.tick(2000)
+        self.assertEqual(self.engine.state['positions'][0]['entry_signal_at'],original['signal_at'])
+
+    def test_restart_preserves_pending_anchor_and_original_expiry(self):
+        self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
+        self.now += 6000
+        self.engine.step([self.coin],self.flow())
+        self.engine=self.new_engine()
+        self.assertEqual(self.engine.state['pending_entry'],original)
+        self.now=original['signal_at']+12001
+        self.engine.step([],self.flow())
+        self.assertIsNone(self.engine.state['pending_entry'])
+        self.assertFalse(self.engine.state['positions'])
+        self.risk.assert_not_called()
+
+    def test_provider_work_cannot_extend_original_deadline_even_with_fresh_flow(self):
+        self.tick()
+        original=copy.deepcopy(self.engine.state['pending_entry'])
+        def slow_price(c):
+            self.now += 5000
+            return dict(status='pass',mint=c['address'],pair=c['pairAddress'],
+                        reference_received_at=self.now)
+        self.price.side_effect=slow_price
+        self.tick(8000)
+        self.assertEqual(self.now-original['signal_at'],13000)
+        self.assertFalse(self.engine.state['positions'])
+        self.assertEqual(self.engine.state['trade_seq'],0)
+        self.assertEqual(self.engine.state['balance'],1000)
+        self.assertIn('fast_pending_signal_expired',self.engine.state['diagnostics']['rejections'])
 
     def test_cost_signal_and_cash_are_hard_before_provider_work(self):
         self.tick(price=.01005)

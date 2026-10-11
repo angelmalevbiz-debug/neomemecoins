@@ -32,6 +32,7 @@ GIVEBACK_USD = .75
 HOLD_MS = 300_000
 DELAY_MS = 2000
 PRICE_TTL_MS = 30_000
+READINESS_VERSION = 'PAPER_FAST_PENDING_OBSERVATION_V1'
 EXPECTED_COST_MODEL = dict(execution_model='DEX_SPOT_MODELED_COSTS_V3_VERIFIED_SOL_DENOMINATION',
     generic_dex_fee_bps=30.0, base_slippage_bps=10.0, latency_buffer_bps=10.0,
     network_fee_sol=.0001, max_price_impact_pct=20.0)
@@ -236,13 +237,26 @@ class FastScalpLab:
 
     def open_pending(self, coins, flows, now):
         pending = self.state.get('pending_entry')
-        if not pending or now < pending['signal_at']+DELAY_MS:
+        if not pending:
             return
-        self.state['pending_entry'] = None
-        coin = coins.get((pending['address'], pending['pairAddress']))
-        if not coin or now-pending['signal_at'] > 12_000 or mark_observed_at(coin) < pending['signal_at']+DELAY_MS:
+        age = now-number(pending.get('signal_at'))
+        if not math.isfinite(age) or not 0 <= age <= guard.FLOW_MAX_AGE_MS:
+            self.state['pending_entry'] = None
             self.reject('fast_pending_signal_expired')
             return
+        coin = coins.get((pending['address'], pending['pairAddress']))
+        if (age < DELAY_MS or not coin
+                or mark_observed_at(coin) < pending['signal_at']+DELAY_MS):
+            # The Lab and market feed poll independently. An early poll is not
+            # a failed signal: keep its ORIGINAL deadline until a subsequent
+            # actual observation arrives. Never restamp it, use the old price,
+            # or spend provider work while the execution observation is absent.
+            self.state['diagnostics'].update(
+                blocked_reason='fast_waiting_next_observation',
+                pending_signal_age_ms=age,
+                pending_signal_expires_at=pending['signal_at']+guard.FLOW_MAX_AGE_MS)
+            return
+        self.state['pending_entry'] = None
         features = flows.get((coin['address'], coin['pairAddress'])) or {}
         plan, reason = self.plan(coin, features, now)
         if reason:
@@ -265,11 +279,15 @@ class FastScalpLab:
         if reason or not guard.risk_admission(coin, risk, commit, guard.SAFETY_MAX_AGE_MS)['allow']:
             self.reject(reason or 'promoted_safety_unavailable')
             return
+        if not 0 <= commit-pending['signal_at'] <= guard.FLOW_MAX_AGE_MS:
+            self.reject('fast_pending_signal_expired')
+            return
         opening, marked = plan['opening'], plan['marked']
         self.state['trade_seq'] += 1
         self.state['positions'].append(dict(trade_no=self.state['trade_seq'],
             strategy_id='FAST_SCALP', symbol=coin.get('symbol'), address=coin['address'],
             pairAddress=coin['pairAddress'], opened_at=commit, entry_signal_at=pending['signal_at'],
+            entry_readiness_version=READINESS_VERSION,
             entry_policy_version=VERSION, config_hash=CONFIG_HASH, execution_mode='PAPER',
             notional_usd=NOTIONAL, quantity=opening['quantity'],
             capital_committed_usd=opening['capital_committed_usd'],
@@ -384,6 +402,7 @@ class FastScalpLab:
                 'closed_at','pnl_usd','reason','entry_policy_version','mark_received_at')
             return {key:copy.deepcopy(row[key]) for key in fields if key in row}
         return dict(version=VERSION, config_hash=CONFIG_HASH, config=config(),
+            entry_readiness_version=READINESS_VERSION,
             status='degraded' if self.error else 'online', error=self.error,
             enabled=enabled(), updated_at=state['updated_at'], starting_balance=CAPITAL,
             balance=state['balance'], available_cash_usd=self.free_cash(),

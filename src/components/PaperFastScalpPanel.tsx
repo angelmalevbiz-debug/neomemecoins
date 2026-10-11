@@ -37,6 +37,7 @@ const reasons: Record<string, string> = {
   promoted_verified_flow_stale: 'Потвърденият поток е изтекъл',
   promoted_buy_pressure_unconfirmed: 'Покупателният натиск не е потвърден',
   promoted_safety_unavailable: 'Чака завършена проверка за риск',
+  promoted_safety_blocked: 'Проверката е завършена: отказ заради установен риск',
   heat_history_warming: 'Събира реална ценова история за защитите',
   heat_return_5m_surge: 'Отказан прекалено нагорещен pool',
   heat_buy_share_5m: 'Отказана прекалено едностранна активност',
@@ -65,6 +66,12 @@ export default function PaperFastScalpPanel({ data, connected }: {
     <p>Последен час: {data.entries_last_60m ?? '—'} входа · общо {data.trades ?? '—'} затворени · {data.win_rate_pct == null ? 'WR — няма оценка' : `WR ${data.win_rate_pct.toFixed(1)}%`} · позиции {data.positions?.length ?? '—'}</p>
     {data.diagnostics && <p>Последен подбор: {data.diagnostics.market_candidates} кандидата · {data.diagnostics.signal_candidates} сигнала (не изпълнени сделки){data.diagnostics.at != null && <> · преди {Math.max(0, Math.floor((Date.now()-data.diagnostics.at)/1000))} сек</>}</p>}
     {reason && <p className="mt-1 text-slate-400">Сега: {reasons[reason] ?? reason}</p>}
+    {reason === 'fast_waiting_next_observation' && <p className="text-slate-400">Чакащият сигнал запазва първоначалния си срок. Няма вход по стара цена или удължаване на валидността.</p>}
+    {!!Object.keys(data.diagnostics?.rejections ?? {}).length && <details className="mt-1 text-slate-400">
+      <summary>Всички откази при последния подбор</summary>
+      {Object.entries(data.diagnostics!.rejections).sort((a,b) => b[1]-a[1]).map(([code,count]) =>
+        <p key={code}>{reasons[code] ?? code}: {count}</p>)}
+    </details>}
     {data.positions?.map(position => <div key={position.trade_no} className="mt-2 rounded-lg border border-cyan-200/15 px-3 py-2">
       ${position.symbol} · {moneyOrUnavailable(position.notional_usd)} · нетна оценка {moneyOrUnavailable(position.open_pnl_usd, true)} · {position.quote_status === 'fresh' ? 'прясна цена' : 'стара цена — чака обновяване'}
       {position.profit_floor_usd != null && <> · защитен праг {moneyOrUnavailable(position.profit_floor_usd, true)} (не гарантира изпълнение)</>}

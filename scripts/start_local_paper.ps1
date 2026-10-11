@@ -147,7 +147,7 @@ $settings = @{
     NEO_MARKET_UPSTREAM="http://127.0.0.1:$MainPort"; NEO_LOCAL_API="http://127.0.0.1:$MainPort/state";
     NEO_MARKET_STATE_PATH=(Join-Path $runtime 'state.json'); NEO_MARKET_AUDIT_PATH=(Join-Path $runtime 'audit.jsonl');
     NEO_LIVE_TAPE_PATH=(Join-Path $runtime 'live_tape.json'); NEO_TAPE_DB_PATH=(Join-Path $runtime 'live_tape.sqlite3');
-    # Spread the existing 48-transaction body budget over twelve market candidates.
+    # Spread the existing 48-transaction body budget over thirty market candidates.
     # Candidate-first ranking avoids spending coverage on busy pools the entry policy would reject.
     # Pools outside this bounded set have unavailable flow until monitored.
     NEO_LAB_AUTHORIZED_CAPITAL_USD='1000';
@@ -163,7 +163,7 @@ $settings = @{
     NEO_LAB_BASE_FLOW_RESTORED_ENABLED='1';
     # Separate owner-requested PAPER micro-scalper; never funded from old books.
     NEO_LAB_FAST_SCALP_ENABLED='1';
-    NEO_TAPE_MAX_PAIRS='12'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
+    NEO_TAPE_MAX_PAIRS='30'; NEO_TAPE_PAGE_SIZE='1000'; NEO_TAPE_PAGES_PER_POLL='1';
     NEO_TAPE_TX_PER_POLL='48'; NEO_TAPE_HISTORICAL_TX_PER_POLL='1'; NEO_TAPE_RPC_BATCH_SIZE='20'; NEO_TAPE_RPC_TX_CONCURRENCY='4'; NEO_TAPE_POLL_SECONDS='2.0';
     NEO_USER_STATE_PATH=(Join-Path $runtime 'user_accounts.json'); NEO_USER_ENGINE_ROOT=(Join-Path $runtime 'users');
     NEO_STRATEGY_LAB_PATH=(Join-Path $runtime 'strategy_lab.json');

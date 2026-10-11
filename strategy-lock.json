@@ -409,7 +409,7 @@
     "docs/PAPER_OUTCOME_AUDIT_20261009.md": "ba0784ee87f51583f9b54b9eea91e3dbf231315412ae35e6e8718213ce641919",
     "backend/astra6_brain.py": "00e189ede49cded7b523c276006d2aa7fd9399b30505284cfdf6d7aa2929c05a",
     "backend/compat_file_lock.py": "8ba79d6e53250fba0a3f0dc2f997ed89094210d170d84c4b66c200f5ab9d64df",
-    "backend/engine_entry_policy.py": "0890dbbe3f04f0fa783d87bd5bc930ff4a4678da145cd9d7085186087452c3ec",
+    "backend/engine_entry_policy.py": "f9200b45bd5b016f54d6fe5e6691afa9f2e3f9c230e60b7f9653cbc6c7133b43",
     "backend/engine_execution.py": "f48dd7a6c7c78aeffe57cfb8531045dc1e03517aa384ca0e143ee3432620171c",
     "backend/engine_exit_policy.py": "822dcd7db129897e215a49a4fa2aee48dd1fa36ecb358f5789fd4eb7b9da5a4a",
     "backend/engine_rug_guard.py": "5c732df903fdfcb692a8b2d64afd1276f1350658471d17c4c8363cefd58ae7e3",

@@ -2,6 +2,7 @@ import copy
 import unittest
 
 import promoted_entry_guard as guard
+import engine_entry_policy
 
 
 NOW = 1_800_000_000_000
@@ -70,6 +71,7 @@ class PromotedAdmissionTests(unittest.TestCase):
               'reasons':['reported_linked_insiders']}
         result=guard.risk_admission(COIN,risk,NOW,60_000)
         self.assertEqual(result,{'allow':False,'reason':'promoted_safety_blocked'})
+        self.assertIn(result['reason'],engine_entry_policy.LABELS)
         for changes in ({'pair':'other'},{'checked_at':NOW-60_001},
                         {'checked_at':NOW+1},{'provisional_early':True},
                         {'status':'review'},{'status':'unavailable'}):

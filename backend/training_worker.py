@@ -6,6 +6,7 @@ import os
 import time
 from pathlib import Path
 import compat_file_lock as fcntl
+import observation_journal
 from engine_runtime import atomic_json as _atomic_json
 from paper_training import PaperTrainingEngine
 from paper_state_reset import archive_files
@@ -44,8 +45,10 @@ def consume_batch(engine, source, offset, minimum_time):
     The gap counter participates in the learner's existing promotion veto.
     """
     changed = False
-    with source.open('rb') as handle:
+    with observation_journal.Reader(source) as handle:
         if handle.seek(0, 2) < offset:
+            if observation_journal.manifest_path(source).exists():
+                raise ValueError('Segmented observation checkpoint exceeds retained journal')
             offset = 0
         handle.seek(offset)
         for _ in range(MAX_BATCH_ROWS):
@@ -93,7 +96,7 @@ def follow(root, config):
                 # The marker was written in producer queue order. Preserve
                 # post-reset rows even if they arrived during archive creation,
                 # and exclude the old prefix on every subsequent restart.
-                offset = int(info.get('journal_offset', source.stat().st_size if source.exists() else 0))
+                offset = int(info.get('journal_offset', observation_journal.total_size(source)))
                 engine.state['recording_start_offset'] = offset
                 engine.state['recording_drops_baseline'] = int(info.get('recording_drops_total', 0))
                 engine.save()

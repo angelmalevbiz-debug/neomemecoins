@@ -16,6 +16,7 @@ import time
 from collections import OrderedDict
 from pathlib import Path
 from engine_runtime import atomic_json
+import observation_journal
 from paper_training import USDC, digest, number, raw_int
 
 _BRIDGE = None
@@ -166,10 +167,12 @@ class TrainingBridge:
         """Append adjacent observations with one durable sync, preserving order."""
         encoded = ''.join(json.dumps(item, ensure_ascii=False, allow_nan=False,
                                      separators=(',', ':')) + '\n' for item in batch)
-        with (self.root / 'observations.jsonl').open('a', encoding='utf-8') as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
+        observation_journal.append(self.root / 'observations.jsonl', encoded.encode('utf-8'))
+        rows = observation_journal.layout(self.root / 'observations.jsonl')
+        self.journal_status = {'version': observation_journal.VERSION,
+                              'parts': len(rows), 'logical_bytes': sum(n for _, _, n in rows),
+                              'legacy_prefix_preserved': len(rows) > 1,
+                              'part_limit_bytes': observation_journal.PART_BYTES}
 
     def _write_reset_boundary(self):
         if not self._persist_drop_count():
@@ -179,7 +182,7 @@ class TrainingBridge:
             'at': int(time.time()*1000),
             # Queue order gives an exact durable boundary; timestamps alone
             # cannot exclude future-dated imports.
-            'journal_offset': journal.stat().st_size if journal.exists() else 0,
+            'journal_offset': observation_journal.total_size(journal),
             'recording_drops_total': self.dropped})
         with self.lock:
             self.cache.clear()
@@ -765,6 +768,7 @@ def snapshot():
                               'dropped': max(0, dropped_total - dropped_baseline),
                               'dropped_total': dropped_total, 'dropped_baseline': dropped_baseline,
                               'coalesced': _BRIDGE.coalesced,
+                              'journal': getattr(_BRIDGE, 'journal_status', None),
                               'error': _BRIDGE.error}
         if _BRIDGE.error:
             result['status'] = 'degraded'

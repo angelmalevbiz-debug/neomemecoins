@@ -130,6 +130,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
 
 import structural_rug_guard as guard  # noqa: E402
+import observation_journal  # noqa: E402
 
 VERSION = guard.REGISTRY_SEED_VERSION
 SOURCE_KIND = 'TRAINING_OBSERVATIONS_JOURNAL'
@@ -235,13 +236,13 @@ def replay_window(journal: Path, window_days, *, max_bytes=None) -> dict:
     ``max_bytes`` (the replay budget) moves the start later when the window
     holds more journal than that (``limited_by_replay_budget``).
     """
-    size = journal.stat().st_size
+    size = observation_journal.total_size(journal)
     result = {'version': REPLAY_WINDOW_VERSION, 'journal_bytes': size, 'start_offset': 0,
               'skipped_bytes': 0, 'window_days': window_days, 'full_journal': window_days is None,
               'target_start_at': None, 'newest_row_at': None, 'max_replay_bytes': max_bytes,
               'limited_by_replay_budget': False, 'effective_start_at': None, 'effective_window_days': None,
               'estimated_replay_minutes': None}
-    with journal.open('rb') as handle:
+    with observation_journal.Reader(journal) as handle:
         newest = _newest_observed_at(handle, size)
         result['newest_row_at'] = newest
         lo = 0
@@ -286,7 +287,7 @@ def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS, start_offset: 
                                     prune_interval_ms=guard.HOUR_MS)
     rows = invalid = registered = market_rows = held_rows = 0
     first = last = None
-    with journal.open('rb') as handle:
+    with observation_journal.Reader(journal) as handle:
         handle.seek(max(0, int(start_offset)))
         for raw in handle:
             line = raw.decode('utf-8', errors='replace')
@@ -319,7 +320,7 @@ def build(journal: Path, *, max_gap_ms=guard.REGISTRY_MAX_GAP_MS, start_offset: 
     coverage = registry.coverage_status(last)
     summary = {'version': VERSION, 'registry_version': guard.REGISTRY_VERSION, 'source_kind': SOURCE_KIND,
                'coverage_basis': guard.REGISTRY_COVERAGE_BASIS,
-               'journal': journal.name, 'journal_bytes': journal.stat().st_size, 'rows': rows,
+               'journal': journal.name, 'journal_bytes': observation_journal.total_size(journal), 'rows': rows,
                'invalid_rows': invalid, 'market_rows': market_rows, 'held_position_rows': held_rows,
                'new_pools_registered': registered, 'entries': len(registry),
                'first_observed_at': first, 'last_observed_at': last, 'coverage': coverage,

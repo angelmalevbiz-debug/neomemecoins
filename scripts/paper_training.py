@@ -19,11 +19,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 from paper_training import PaperTrainingEngine, atomic_json
+import observation_journal
+
+
+def source_hash(path):
+    digest = hashlib.sha256()
+    with observation_journal.Reader(path) as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def load_rows(path):
     rows = []
-    with Path(path).open(encoding="utf-8") as handle:
+    with observation_journal.Reader(path) as handle:
         for line_no, line in enumerate(handle, 1):
             if not line.strip():
                 continue
@@ -56,7 +65,7 @@ def import_dataset(args):
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
-    result = {"source": str(args.input.resolve()), "source_sha256": hashlib.sha256(args.input.read_bytes()).hexdigest(),
+    result = {"source": str(args.input.resolve()), "source_sha256": source_hash(args.input),
               "dataset": str(args.output.resolve()), "observations": len(rows),
               "first_available_at": rows[0]["available_at"] if rows else None,
               "last_available_at": rows[-1]["available_at"] if rows else None,
@@ -86,14 +95,13 @@ def main():
     elif args.command == "record":
         args.output.parent.mkdir(parents=True, exist_ok=True)
         recorded = 0
-        with args.output.open("a", encoding="utf-8") as handle:
-            for line in sys.stdin:
-                value = json.loads(line)
-                if not isinstance(value, dict) or "available_at" not in value or "coin" not in value:
-                    raise ValueError("canonical observation required")
-                handle.write(json.dumps(value, allow_nan=False, ensure_ascii=False) + "\n")
-                handle.flush()
-                recorded += 1
+        for line in sys.stdin:
+            value = json.loads(line)
+            if not isinstance(value, dict) or "available_at" not in value or "coin" not in value:
+                raise ValueError("canonical observation required")
+            observation_journal.append(args.output, (json.dumps(
+                value, allow_nan=False, ensure_ascii=False) + "\n").encode('utf-8'))
+            recorded += 1
         result = {"recorded": recorded, "path": str(args.output.resolve()), "provider_requests": 0}
     else:
         config = json.loads(args.config.read_text(encoding="utf-8")) if args.command == "replay" and args.config else None
@@ -103,7 +111,7 @@ def main():
         result = engine.replay(load_rows(args.input)) if args.command == "replay" else engine.snapshot()
         if args.command == "replay":
             result["dataset"] = {"path": str(args.input.resolve()),
-                                 "sha256": hashlib.sha256(args.input.read_bytes()).hexdigest(),
+                                 "sha256": source_hash(args.input),
                                  "provenance": "saved observations only; correctness fixtures do not establish financial performance"}
             if args.snapshot:
                 atomic_json(args.snapshot, result)

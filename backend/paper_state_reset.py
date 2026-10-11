@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from engine_runtime import atomic_json
+import observation_journal
 
 
 ARCHIVE_CHUNK_BYTES = 1024 * 1024
@@ -48,10 +49,32 @@ def _copy_file_checked(source, target):
 
 def archive_files(root, names, *, move_names=()):
     root = Path(root).resolve()
+    names = list(names)
+    move_names = set(move_names)
+    journal_manifest = None
+    journal_manifest_bytes = None
+    if 'observations.jsonl' in names:
+        journal = root / 'observations.jsonl'
+        rows = observation_journal.layout(journal)
+        journal_names = [p.name for p, _, _ in rows]
+        if len(rows) > 1:
+            journal_manifest = observation_journal.manifest_path(journal).name
+            journal_names.append(journal_manifest)
+            # Online learner reset archives may outlast a rotation. Freeze the
+            # validated part list; copying the LATER source manifest could
+            # otherwise reference parts absent from this archive. The captured
+            # tail stays growable, so any complete bytes copied from it remain
+            # part of this retained evidence snapshot.
+            journal_manifest_bytes = json.dumps({
+                'version': observation_journal.VERSION, 'source': journal.name,
+                'parts': [{'name': p.name, 'bytes': n if i < len(rows)-1 else None}
+                          for i, (p, _, n) in enumerate(rows)]}, indent=2).encode('utf-8')
+        names = list(dict.fromkeys(names + journal_names))
+        if 'observations.jsonl' in move_names:
+            move_names.update(journal_names)
     destination = root / 'archive' / f'reset-{time.time_ns()}-{uuid.uuid4().hex[:8]}'
     destination.mkdir(parents=True, mode=0o700)
     files = {}
-    move_names = set(move_names)
     for name in names:
         source = root / name
         if source.resolve().parent != root or not source.is_file():
@@ -62,6 +85,13 @@ def archive_files(root, names, *, move_names=()):
             os.replace(source, target)
             if target.stat().st_size != size:
                 raise OSError('archive size mismatch; reset refused')
+        elif name == journal_manifest and journal_manifest_bytes is not None:
+            with target.open('xb') as handle:
+                handle.write(journal_manifest_bytes)
+                handle.flush()
+                os.fsync(handle.fileno())
+            digest, size = _hash_file(target)
+            os.chmod(target, 0o600)
         else:
             digest, size = _copy_file_checked(source, target)
             os.chmod(target, 0o600)

@@ -20,7 +20,7 @@ import { costCapRule, forwardCapitalNote, forwardCloseNote, isArchivedStrategy, 
 import LabEntryStatus from './components/LabEntryStatus';
 import {
   backendErrorMessage, dashboardConnectionStatus, initialDashboardConnection,
-  moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, quotePreparationSummary, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
+  moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, personalEngineEntryView, quotePreparationSummary, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
 } from './lib/paperDashboardState';
 
 const apiConfiguration = paperApiConfiguration((import.meta as any).env.VITE_NEO_API_URL, (import.meta as any).env.DEV);
@@ -339,7 +339,7 @@ export default function App() {
   const portfolioUnrealizedPnl = promotedPortfolio?.unrealizedPnl ?? state?.stats.unrealized_pnl_usd;
   const portfolioOpenPositions = promotedPortfolio?.openPositions ?? state?.stats.open_positions;
   const portfolioMaxPositions = promotedPortfolio?.books.some(({id}) => state?.strategy_lab?.stats[id]?.funded_active?.soft_limits_removed)
-    ? 'без таван' : promotedPortfolio?.books.reduce((count, {id}) => count + (state?.strategy_lab?.stats[id]?.funded_active?.max_positions ?? 1), 0) ?? state?.config.max_positions;
+    ? 'по стратегия' : promotedPortfolio?.books.reduce((count, {id}) => count + (state?.strategy_lab?.stats[id]?.funded_active?.max_positions ?? 1), 0) ?? state?.config.max_positions;
   const portfolioClosedTrades = promotedPortfolio?.trades ?? state?.stats.closed_trades;
   const portfolioWinRate = promotedPortfolio?.winRate ?? state?.stats.win_rate;
   const portfolioRunning = promotedPortfolio ? state?.strategy_lab?.status === 'online' : state?.running;
@@ -347,6 +347,7 @@ export default function App() {
   const entryRejections = Object.entries(state?.entry_diagnostics?.rejections || {}).sort((a, b) => b[1] - a[1]).slice(0, 4);
   const quotePreparationText = quotePreparationSummary(state?.entry_diagnostics);
   const strategyLearningRows = Object.entries(state?.strategy_learning?.strategies || {});
+  const personalEntry = personalEngineEntryView(connected, state?.running, state?.entry_diagnostics);
 
 
   return <div className="min-h-screen bg-[#07090b] text-slate-200">
@@ -374,14 +375,15 @@ export default function App() {
         <Metric label="PnL" value={moneyOrUnavailable(portfolioRealizedPnl, true)} hint={state ? `open ${moneyOrUnavailable(portfolioUnrealizedPnl, true)}` : 'Очакват се данни'} />
         <Metric label="Equity" value={`${promotedPortfolio?.valuationStale ? '~' : ''}${moneyOrUnavailable(portfolioEquity)}`} hint={promotedPortfolio?.valuationStale ? 'Последна оценка · стара котировка' : state ? percentageOrUnavailable(portfolioReturnPct) : 'Очакват се данни'} />
         <Metric label="Open" value={state ? `${portfolioOpenPositions ?? 0}/${portfolioMaxPositions ?? 0}` : '—'} hint={state ? `${moneyOrUnavailable(portfolioReserved, false, 0)} в позиции` : 'Очакват се данни'} />
-        <Metric label="Win rate" value={portfolioClosedTrades ? `${(portfolioWinRate ?? 0).toFixed(1)}%` : '—'} hint={state ? `${portfolioClosedTrades ?? 0} затворени · цел 80%` : 'Очакват се данни'} />
+        <Metric label="Win rate" value={portfolioClosedTrades ? `${(portfolioWinRate ?? 0).toFixed(1)}%` : '—'} hint={state ? `${portfolioClosedTrades ?? 0} затворени · всички версии` : 'Очакват се данни'} />
         <Metric label="Market" value={state ? String(state.stats.feed_count) : '—'} hint={state ? `${setupCount} SETUP · ${watchCount} WATCH` : 'Очакват се данни'} />
       </section>
+      {promotedPortfolio && <p data-testid="portfolio-scope" className="mt-2 text-[10px] leading-5 text-slate-500">Балансите, позициите и историята тук са сборът от Early, Momentum, Precision и Ultra — виртуален PAPER капитал, не истински пари. FAST SCALP и TEST/HF са отделни. Momentum/Precision нямат мек позиционен таван; Early/Ultra имат собствен таван и лимит за експозиция. Свободният капитал и всички проверки за вход продължават да важат. Общият win rate смесва стари и текущи правила; текущата версия е отчетена по стратегия по-долу.</p>}
       <section data-testid="main-entry-learning" className="mt-4 grid gap-4 rounded-3xl border border-white/10 bg-[#0b0e11] p-4 lg:grid-cols-2">
         <div>
-          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">Отделна PAPER сметка</div><h2 className="mt-1 text-sm font-black text-white">Кандидати и причини за отказ</h2></div><span className="rounded-lg border border-white/10 px-2 py-1 text-[9px] font-black text-slate-400">{state?.entry_diagnostics?.status?.toUpperCase() ?? 'ЧАКА ДАННИ'}</span></div>
+          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-300">Отделна PAPER сметка</div><h2 className="mt-1 text-sm font-black text-white">Кандидати и причини за отказ</h2></div><span className="rounded-lg border border-white/10 px-2 py-1 text-[9px] font-black text-slate-400">{personalEntry.status}</span></div>
           {promotedPortfolio && <p className="mt-2 text-[10px] text-slate-500">Тези проверки са за отделната PAPER сметка. Четирите финансирани стратегии в портфейла имат собствени правила и резултати в таблицата по-долу.</p>}
-          <p className="mt-2 text-[10px] leading-5 text-slate-400">{state?.entry_diagnostics?.message ?? 'Изчаква се актуална диагностика от PAPER backend.'}</p>
+          <p className="mt-2 text-[10px] leading-5 text-slate-400">{personalEntry.message}</p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <div className="rounded-xl border border-white/[0.06] bg-black/20 p-2"><div className="text-[8px] uppercase text-slate-600">Проверени кандидати</div><div className="mt-1 text-sm font-black text-white">{state?.entry_diagnostics?.evaluated ?? '—'}</div></div>
             <div className="rounded-xl border border-white/[0.06] bg-black/20 p-2"><div className="text-[8px] uppercase text-slate-600">Сигнали с потвърден поток</div><div className="mt-1 text-sm font-black text-cyan-200">{state?.entry_diagnostics?.signal_passed ?? '—'}</div></div>
@@ -393,7 +395,8 @@ export default function App() {
           {quotePreparationText && <p className="mt-2 text-[10px] leading-5 text-slate-400" data-testid="quote-preparation-codes">{quotePreparationText}</p>}
         </div>
         <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">Главна PAPER сметка · обратна връзка</div><h2 className="mt-1 text-sm font-black text-white">Резултат по правила и изходи на загуба</h2></div><span className="text-[9px] text-slate-500">{state?.strategy_learning?.policy_version ?? '—'}</span></div>
+          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">Споделен основен engine · отделен отчет</div><h2 className="mt-1 text-sm font-black text-white">Резултат по правила и изходи на загуба</h2></div><span className="text-[9px] text-slate-500">{state?.strategy_learning?.policy_version ?? '—'}</span></div>
+          <p className="mt-2 text-[10px] text-slate-500">Това не е отчетът на четирите финансирани стратегии. Съвпадащите имена на правила тук не означават същите сделки или баланси.</p>
           <div className="mt-2 text-[10px] text-slate-400">{state?.strategy_learning ? `${state.strategy_learning.closed_trades} валидни затворени сделки · ${state.strategy_learning.closed_trades ? `${state.strategy_learning.win_rate_pct.toFixed(1)}% печеливши` : 'успеваемост —'} · ${moneyOrUnavailable(state.strategy_learning.net_pnl_usd, true)} нето` : 'Няма отчет от текущата политика.'}</div>
           {state?.strategy_learning?.window_max_closed_trades && <div className="mt-1 text-[9px] text-slate-500">Извадка: последните до {state.strategy_learning.window_max_closed_trades} валидни затваряния за всяко правило от текущата политика.</div>}
           {Object.entries(state?.strategy_learning?.ignored_data || {}).some(([reason, count]) => reason !== 'other_policy' && count > 0) && <div className="mt-1 text-[9px] text-amber-200">Изключени невалидни или повторени данни. Отчетът използва само проверени затваряния.</div>}
@@ -409,6 +412,7 @@ export default function App() {
               <div><div className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">Live Market Feed</div><h2 className="mt-1 text-lg font-black text-white">Ботът избира сам</h2></div>
               <Flame className="h-5 w-5 text-emerald-300" />
             </div>
+            <p className="mt-2 text-[9px] leading-4 text-slate-500">SETUP и score са пазарен подбор, не одобрен вход и не вероятност за печалба. Потокът, рискът, цената, разходите и капиталът се проверяват отделно.</p>
             <div className="relative mt-3"><Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-600" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Coin, symbol или address…" className="h-10 w-full rounded-xl border border-white/10 bg-black/20 pl-9 pr-3 text-xs text-white outline-none placeholder:text-slate-700 focus:border-emerald-400/30" /></div>
             <div className="mt-3 flex gap-1.5 overflow-x-auto pb-1">
               {(['ALL','SETUP','WATCH','NEW','BOOSTED'] as Filter[]).map(item => <button key={item} onClick={() => setFilter(item)} className={`shrink-0 rounded-lg border px-2.5 py-1.5 text-[9px] font-black ${filter === item ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-300' : 'border-white/[0.07] bg-white/[0.02] text-slate-500 hover:text-white'}`}>{item}</button>)}

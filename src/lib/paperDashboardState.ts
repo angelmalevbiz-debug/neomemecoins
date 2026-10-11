@@ -98,6 +98,14 @@ export function tokenDetailForAddress<T extends { coin: { address: string } }>(d
   return detail?.coin.address === address ? detail : null;
 }
 
+export function personalEngineEntryView(connected: boolean, running?: boolean, diagnostics?: { status?: string; message?: string }) {
+  if (!connected) return { status: 'НЕПОТВЪРДЕНО', message: 'Няма прясна връзка, която да потвърди работата на отделната PAPER сметка.' };
+  if (running === false) return { status: 'СПРЯНА', message: 'Отделната PAPER сметка е спряна и не търси нови входове. Това не спира четирите финансирани стратегии. Броячите отдолу са от последното ѝ сканиране, ако има такова.' };
+  if (running !== true) return { status: 'ЧАКА ДАННИ', message: 'Работата на отделната PAPER сметка още не е потвърдена.' };
+  return { status: diagnostics?.status?.toUpperCase() ?? 'ЧАКА ДИАГНОСТИКА',
+    message: diagnostics?.message ?? 'Сметката работи; изчаква се диагностика от нейното сканиране.' };
+}
+
 export type QuotePreparationDiagnostics = {
   quote_attempts?: number; quote_defers?: number;
   quote_preparation_codes?: Record<string, number>; quote_preparation_codes_rolling?: Record<string, number>;

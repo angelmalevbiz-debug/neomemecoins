@@ -130,9 +130,10 @@ def compact_strategy_lab(data):
             'entry_diagnostics': {
                 field: raw['entry_diagnostics'][field]
                 for field in (
-                    'at', 'signal_candidates', 'market_rejected_candidates', 'matched_candidates', 'cost_rejected',
+                    'at', 'signal_candidates', 'market_rejected_candidates', 'market_screen', 'matched_candidates', 'cost_rejected',
                     'capacity_test','strategy_validation','opened_this_refresh','hard_rejections','shadow_examples',
-                    'cooldown_rejected', 'affordable_candidates', 'price_verification_rejected',
+                    'cooldown_rejected', 'network_cost_rejected', 'affordable_candidates', 'price_verification_rejected',
+                    'commit_recheck_rejected',
                     'price_crosscheck_pending', 'flow_missing_candidates',
                     'flow_tape_status', 'flow_tape_coverage_pct',
                     'verified_flow_events_60s', 'flow_tape_backlog', 'blocked_reason',

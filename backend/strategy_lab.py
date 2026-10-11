@@ -1095,8 +1095,10 @@ def maybe_open(feed,flows):
     cost_cap=lab_cost_cap_pct()
     STATE['strategy_lifecycle']=review_strategy_lifecycle(STATE['books'])
     by_pair={}
+    usable_feed_rows=0
     for c in feed:
         if activity.usable_feed_coin(c,now):
+            usable_feed_rows+=1
             key=(c['address'],c['pairAddress'])
             if key not in by_pair or num(c.get('updatedAt'))>num(by_pair[key].get('updatedAt')):
                 by_pair[key]=c
@@ -1232,6 +1234,11 @@ def maybe_open(feed,flows):
         checked=0
         signal_candidates=0
         market_rejected=0
+        market_screen=active_paper.new_market_screen() if is_active else None
+        if is_active:
+            market_screen.update(feed_rows=len(feed),usable_feed_rows=usable_feed_rows,
+                unusable_feed_rows=len(feed)-usable_feed_rows,
+                unique_usable_pairs=len(candidates),duplicate_usable_rows=usable_feed_rows-len(candidates))
         blocked_cost=0
         blocked_network=0
         blocked_price=0
@@ -1271,7 +1278,11 @@ def maybe_open(feed,flows):
         forward_coins={}
         for coin,features in candidates:
             if is_active and any(p.get('address')==coin['address'] for p in active_paper.positions(book)):
+                market_screen['already_open']+=1
                 continue
+            if is_active:
+                active_paper.record_market_screen(market_screen,coin,
+                    active_paper.market_rejections(strategy['id'],coin))
             branches=(funded_candidates.matched_branches(strategy['id'],coin,features)
                       if is_promoted else [])
             if is_forward:
@@ -1581,7 +1592,10 @@ def maybe_open(feed,flows):
                 'profitability_proven':False,
             })
             if is_active:
-                book['entry_diagnostics'].update({'funded_active':active_paper.performance(book,now),
+                book['entry_diagnostics'].update({'market_screen':market_screen,
+                    'opened_this_refresh':0,
+                    'commit_recheck_rejected':0,
+                    'funded_active':active_paper.performance(book,now),
                     'entry_policy_version':active_paper.reporting_version(book['id']),'stop_loss_net_pct':book_stop,
                     'max_entry_roundtrip_cost_pct':admission_cap})
             if signal_candidates==0:
@@ -1780,6 +1794,7 @@ def maybe_open(feed,flows):
             active_paper.attach(book,position)
             record_exit_research_mark(book,position,coin,proposed['initial_pnl_usd'],stamp,new_entry=True)
             book['entry_diagnostics']['funded_active']=active_paper.performance(book,stamp)
+            book['entry_diagnostics']['opened_this_refresh']=1
         else:
             book['position']=position
         book.setdefault('last_entry_by_address',{})[address]=stamp

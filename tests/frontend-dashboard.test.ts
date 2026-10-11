@@ -7,8 +7,17 @@ import { promotedPaperPortfolio } from '../src/lib/paperPortfolioState';
 import {
   backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus,
   initialDashboardConnection, moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable,
-  quotePreparationSummary, readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
+  personalEngineEntryView, quotePreparationSummary, readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
 } from '../src/lib/paperDashboardState';
+
+test('paused private engine is not starting or evidence of all funded books stopping', () => {
+  const view=personalEngineEntryView(true,false,{status:'starting',message:'Waiting'});
+  assert.equal(view.status,'СПРЯНА');assert.match(view.message,/не спира четирите/);
+  assert.doesNotMatch(view.message,/Waiting/);
+  assert.equal(personalEngineEntryView(false,false).status,'НЕПОТВЪРДЕНО');
+  assert.equal(personalEngineEntryView(true,undefined).status,'ЧАКА ДАННИ');
+  assert.equal(personalEngineEntryView(true,true,{status:'scanning'}).status,'SCANNING');
+});
 
 class MemoryStorage implements Storage {
   private items = new Map<string, string>();

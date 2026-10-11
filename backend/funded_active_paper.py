@@ -237,33 +237,78 @@ def finite(value, default=0.0):
         return default
 
 
-def matches(strategy_id, coin):
+def market_rejections(strategy_id, coin):
+    """Explain the existing physical screen; this is NOT entry authorization.
+
+    Stable order makes the first reason mutually exclusive; the full list
+    counts overlapping failed constraints. Evidence/defense/cost follow later.
+    Missing or malformed fields fail closed, never become zero-valued signals.
+    """
     rule = RULES.get(strategy_id)
-    if not rule or str(coin.get('dexId') or '').lower() != 'pumpswap':
-        return False
+    if not rule or not isinstance(coin, dict):
+        return ['market_input_invalid']
+    reasons = []
+    if str(coin.get('dexId') or '').lower() != 'pumpswap':
+        reasons.append('market_dex')
     raw_quote = coin.get('quoteToken')
     if (coin.get('quoteTokenAddress') != SOL or
             (raw_quote is not None and (not isinstance(raw_quote, dict) or
              raw_quote.get('address', SOL) != SOL))):
-        return False
-    tx = ((coin.get('txns') or {}).get('m5') or {})
+        reasons.append('market_quote')
+    transactions = coin.get('txns') or {}
     changes, volume = coin.get('priceChange') or {}, coin.get('volume') or {}
+    if not all(isinstance(v, dict) for v in (transactions, changes, volume)):
+        return reasons + ['market_input_invalid']
+    tx = transactions.get('m5') or {}
+    if not isinstance(tx, dict):
+        return reasons + ['market_input_invalid']
     cap = coin.get('marketCap')
     if cap is None:
         cap = coin.get('fdv')
     values = [finite(v, math.nan) for v in (coin.get('ageMinutes'), coin.get('liquidityUsd'),
                cap, changes.get('m5'), changes.get('h1'), tx.get('buys'), tx.get('sells'), volume.get('h1'))]
     if not all(math.isfinite(v) for v in values):
-        return False
+        return reasons + ['market_input_invalid']
     age, liq, cap, move, hour, buys, sells, turnover = values
     if cap <= 0 or liq <= 0 or min(buys, sells, turnover) < 0 or buys != int(buys) or sells != int(sells):
-        return False
-    return (rule['age'][0] <= age <= rule['age'][1] and liq >= rule['liquidity']
-            and rule['move'][0] <= move <= rule['move'][1]
-            and rule['hour'][0] <= hour <= rule['hour'][1]
-            and buys / max(sells, 1) >= rule['buy_sell']
-            and rule['liquidity_cap'] <= liq / cap < 1
-            and rule['turnover'][0] <= turnover / liq <= rule['turnover'][1])
+        return reasons + ['market_input_invalid']
+    tests = (
+        ('market_age', rule['age'][0] <= age <= rule['age'][1]),
+        ('market_liquidity', liq >= rule['liquidity']),
+        ('market_move_5m', rule['move'][0] <= move <= rule['move'][1]),
+        ('market_move_1h', rule['hour'][0] <= hour <= rule['hour'][1]),
+        ('market_buy_sell', buys / max(sells, 1) >= rule['buy_sell']),
+        ('market_liquidity_cap', rule['liquidity_cap'] <= liq / cap < 1),
+        ('market_turnover', rule['turnover'][0] <= turnover / liq <= rule['turnover'][1]),
+    )
+    return reasons + [reason for reason, passed in tests if not passed]
+
+
+def matches(strategy_id, coin):
+    return not market_rejections(strategy_id, coin)
+
+
+def new_market_screen():
+    return dict(version='FUNDED_MARKET_SCREEN_DIAGNOSTICS_V1', evaluated=0,
+        passed=0, rejected=0, already_open=0, primary_rejections={},
+        failed_constraints={}, examples=[], example_limit=4,
+        counts_scope='LAST_SCAN_BEFORE_DEFENSE_AND_EVIDENCE_NOT_ORDERS',
+        is_entry_authorization=False)
+
+
+def record_market_screen(summary, coin, reasons):
+    summary['evaluated'] += 1
+    summary['passed' if not reasons else 'rejected'] += 1
+    if not reasons:
+        return
+    primary = summary['primary_rejections']
+    primary[reasons[0]] = primary.get(reasons[0], 0) + 1
+    for reason in reasons:
+        counts = summary['failed_constraints']
+        counts[reason] = counts.get(reason, 0) + 1
+    if len(summary['examples']) < summary['example_limit']:
+        summary['examples'].append(dict(symbol=coin.get('symbol'),
+            address=coin.get('address'), pairAddress=coin.get('pairAddress'), reasons=reasons))
 
 
 def structural_parameters(strategy_id):

@@ -144,7 +144,7 @@ def flush_scheduler_registry():
     runner calls this on a clean stop so a restart loses no ticker sighting.
     """
     try:
-        return bool(_POOL_SCHEDULER.defense.registry.flush())
+        return bool(_POOL_SCHEDULER.defense.flush())
     except Exception:
         return False
 

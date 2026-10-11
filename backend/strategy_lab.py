@@ -2067,7 +2067,7 @@ def persist(status='online',error=None):
         STATE['activity_config']['defensive_entry_state']=DEFENSE.status()
         if status=='stopped':
             # Keep the Lab's ticker memory across a restart (atomic; never raises).
-            DEFENSE.registry.flush()
+            DEFENSE.flush()
     STATE['activity_config'].update({
         'rush_stop_loss_net_pct':STOP_LOSS,'rush_take_profit_net_pct':RUSH_TAKE_PROFIT,
         'rush_max_hold_minutes':RUSH_MAX_HOLD_MIN,'rush_trail_arm_net_pct':RUSH_TRAIL_ARM,

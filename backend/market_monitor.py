@@ -3197,7 +3197,7 @@ class Monitor:
         self.discovery.stop()
         # Keep the ticker memory across a restart (atomic sidecar; never raises).
         if self._entry_defense is not None:
-            self._entry_defense.registry.flush()
+            self._entry_defense.flush()
 
 
 MONITOR = Monitor()

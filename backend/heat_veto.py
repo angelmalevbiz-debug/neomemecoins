@@ -46,7 +46,12 @@ A missing m5 txn count, a zero h1 volume or unknown liquidity leave (b), (c)
 or (g) unevaluated, exactly as in the research; unknown liquidity is already
 a fail-closed structural rug input.
 
-The history lives in memory only. The research windows read a continuous
+The default history lives in memory only. PAPER services with a state path
+use paper_heat_history.PersistentPairHistory to checkpoint actual bounded
+samples, observation clocks and gaps. A validated checkpoint less than 120 s
+old carries the existing windows across a short restart; missing, stale,
+future or invalid evidence still starts cold. Thresholds below are unchanged.
+The research windows read a continuous
 scan log, so after a restart the 15-min high and the 60-min paid-profile
 lookback would otherwise see only the samples since the restart; each window
 therefore has its own coverage requirement above (fail closed), and an engine
@@ -437,7 +442,7 @@ def config(params: HeatParameters = PARAMS, history: HistoryParameters = HISTORY
                 'paid_profile_60m': ('at a fee tier >= 100 bps and no known paid profile: this process '
                                      'observing the feed for >= 3600 s; otherwise heat_history_warming'),
                 'clock': 'coverage counts on the process clock (now), never on an older updatedAt',
-                'persistence': 'none: a restart starts every window again'},
+                'persistence': 'memory by default; PAPER services restore validated actual local observations via PAPER_OBSERVED_HEAT_CONTINUITY_V1'},
             'malformed_inputs': 'leave the affected rule unevaluated; never raise',
             'warming_is_a_veto': True, 'exits_changed': False,
             'is_entry_authorization': False, 'profitability_proven': False}

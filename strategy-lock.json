@@ -3,7 +3,7 @@
   "locked_at_utc": "2026-10-07",
   "source_commit": "USER_AUTHORIZED_FUNDED_PAPER_REPAIR_20261007",
   "strategy_file": "backend/market_monitor.py",
-  "sha256": "43cf3b38b5a8db2e363ed4c340ff9a034f48f2d867b6735f68a7ecab3b21b16d",
+  "sha256": "f1288b30c1b88ae0dd55454d69e438a646acf52eb66332d8ee18fbc8bb367d55",
   "production_strategy_id": "WINNER_ENSEMBLE_PAPER_V1",
   "rules": {
     "entry_score": 76,
@@ -411,9 +411,9 @@
     "backend/lab_dashboard_projection.py": "209d1eacd5a8f60e0bdd898e3bc3339bda2d551c11c7dae06595a8e994b0f877",
     "backend/lab_paired_runner.py": "2556bd9dd34dbf9561bab59423fb6013e6a60c915b97bfda4d334cb74c1f6e66",
     "backend/lab_position_marks.py": "7dc9ed982810769c1efd3788c5a919ef88701d95e5fc6d1b17fd64a45e6062f9",
-    "backend/live_tape.py": "eaf2550ec7ae98db1d1379f946745252cce9b455f01db62970ab3fa1434c32b4",
+    "backend/live_tape.py": "93186d8c8ac412d91d41a9d687ce1564f9efa05555dc1602537015f897e5ff10",
     "backend/main_replay.py": "a0e1334a0477d834ab49a620d0c90b59e011ff3553fd4e7858416ccb00ee8df7",
-    "backend/market_monitor.py": "43cf3b38b5a8db2e363ed4c340ff9a034f48f2d867b6735f68a7ecab3b21b16d",
+    "backend/market_monitor.py": "f1288b30c1b88ae0dd55454d69e438a646acf52eb66332d8ee18fbc8bb367d55",
     "backend/momentum_rush_brain.py": "24785592c5dc854236a57dd470169919b0ee013c14ee44124e9c00cdda6c5832",
     "backend/pair_price_integrity.py": "2de9526a1aa743e6f5b02ac4d28f349153e6e5089dd7c3a9ed19b5af249e4f4f",
     "backend/paper_execution_quotes.py": "fc5b0582c627800a80edc3fd48f24f8c2a9b4460bbf28cb8571493e1568fe2ac",
@@ -421,7 +421,7 @@
     "backend/paper_state_reset.py": "0c48f1f7f0b25b902f19970f9434611c0cdfd181d74f51f263735701025f07b3",
     "backend/paper_training.py": "06d4b67c67bfa6f96bfb47c4ae6a41183378604a73876d1e6cfa3774c15c2598",
     "backend/pumpswap_stop_quote.py": "518f607710ea738edd94d5e6040fcd0ec8bc5521f6f20814ad20967c8be4be61",
-    "backend/strategy_lab.py": "e304fbfc5db16192f6b29afecd7e0a2445aecce13c27d489bd957f13e1846b39",
+    "backend/strategy_lab.py": "fc62893bf806cb8218d16a09a448cf2007cfdcec8bc53571e8e01eea8eef3087",
     "backend/training_bridge.py": "e96503d70774bda0fe28b04cb2c857227d657fea24dfc1669f422c0f4c18fb56",
     "backend/training_quote_probe.py": "8c71ac78c8b0e1775d18d17efb39785aac6d2393ac0f0dad0596447c15161a32",
     "backend/training_worker.py": "eeb383cbc011e9de704aed9a1b255c70227588129a98754290d50e9ba9f40592",
@@ -453,10 +453,12 @@
     "docs/tape-decoder-shadow-and-seat-shedding.md": "d04c1a7358733951c4f0c81045e3541266889281dcda8034c88135188d1e5618",
     "backend/cost_first_engine_profile.py": "3bbbb86a4c7a8165765a29bf16af52645802f6ce7c0930568896ac37eb8d177f",
     "backend/structural_rug_guard.py": "f035d946408a3f65bc5f992db84446ddd419b5c47acb989c6070cb3fa19b4f84",
-    "backend/heat_veto.py": "16813afec8842e37d25f2200bc90e6735e6aca0a3041c4eb21449658aa26d69c",
+    "backend/heat_veto.py": "ee5307e49a83683f61fabfb63fb7a6530d5e6673e249a194e0449c119f469f88",
     "backend/pool_loss_memory.py": "ba771aea0dc8b8daf39f4afd6d74d9fdd8099a194f065d4ecbde1b42620d518f",
-    "backend/entry_defense.py": "7387cd3216233bc594a851bba1db90c5c4720a0287d14ad9417084fb4b3d576c",
-    "docs/DEFENSIVE_ENTRY_LAYER.md": "8b9262ab14c7cb66b254b1ffbc10745f15503f8f2605b7c7ac2758a33baf9977",
+    "backend/entry_defense.py": "a7aec6cd8c1f4c7c1f8f73ef949d670b02f7a44f8f747cfcd6de85aa0ca49e97",
+    "backend/paper_heat_history.py": "a340301852c60ec9a81a50a9dac2d4f73bc82f311eb3eb44c9f817be4f33c655",
+    "docs/PAPER_HEAT_CONTINUITY.md": "ae0147e56bf5ec871417b172ef27dac5fc64b728530883c3e7907f79982a9a55",
+    "docs/DEFENSIVE_ENTRY_LAYER.md": "6ab455f694c49adbca6ea3c5ec2d6826a8470c2d6152d5d59c538a34c39790ae",
     "scripts/build_ticker_registry_seed.py": "40436da840c23baf3b51efa9cb29631d938e240cbfc0db4ff073e8a9e1f3c590",
     "backend/lab_forward_tests.py": "50111a74b16267b12b54f7819e544a28f7d733bb368ff0e6afd8a63588e983a0",
     "docs/LAB_FORWARD_TESTS.md": "2b182d5a9a413120d4a16532c4ceb404f04c74fa301e1d3290fc16c553c5be82",
@@ -941,6 +943,17 @@
     "lab_pin_rule_source": "lab_forward_tests.tape_pin_required (LAB_FORWARD_TESTS_V1 positions)",
     "published_unpinned_count": "live_tape_status.entry_scheduling.unpinned_flow_free_lab_positions"
   },
+  "paper_observed_heat_continuity": {
+    "version": "PAPER_OBSERVED_HEAT_CONTINUITY_V1",
+    "change_reason": "Persist actual bounded observation windows instead of erasing them on every short PAPER restart; no price, flow, safety, exit, capital or profit fabrication.",
+    "save_interval_ms": 30000,
+    "maximum_restart_gap_ms": 120000,
+    "maximum_sidecar_bytes": 33554432,
+    "missing_or_invalid_history": "NORMAL_FAIL_CLOSED_WARMUP",
+    "thresholds_changed": false,
+    "exits_changed": false,
+    "profitability_proven": false
+  },
   "defensive_entry": {
     "version": "DEFENSIVE_ENTRY_LAYER_V1",
     "modules": {
@@ -1216,9 +1229,9 @@
     "prewarm_version": "PREWARM_V2_DEFENSIVE_POPULATION",
     "effective_config_hashes": {
       "basis": "code defaults, no NEO_* overrides; pinned exactly in tests/test_cost_first_engine_profile.py",
-      "WINNER_ENSEMBLE_PAPER_V1": "580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7",
-      "ORDER_FLOW_ADAPTIVE": "fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba",
-      "COST_FIRST_ESTABLISHED_PAPER_V1": "4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10"
+      "WINNER_ENSEMBLE_PAPER_V1": "5ec76dc4501be80b378d9af07634a26a41d41b05ee7aef74c8ca369e49c23817",
+      "ORDER_FLOW_ADAPTIVE": "aceeccf7612ba712d824face4d0aa8b16a6d0bfd1bc08e8f9a877ad428b4b01c",
+      "COST_FIRST_ESTABLISHED_PAPER_V1": "4c64318c5596ea128fbcf16272facf9320b6cb32201933e18dd6438edc5b1105"
     },
     "research_reproduction": "the archived research forensics call cost_first_engine_profile.physical_universe_rejections (COST_FIRST_UNIVERSE_V1, physical screens only); the live V2 universe fails closed without a ticker registry",
     "training_score_basis": {

@@ -88,10 +88,12 @@ ORDER_FLOW_ADAPTIVE_HASH_AT_69BE225 = '405669df3b585e9c69d2cf02706d530590c168c20
 # record this hash as their audit identity, so an engine
 # default, a profile field or a layer threshold may only change together with these pins
 # (and docs/DEFENSIVE_ENTRY_LAYER.md).
-DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '580e3d25ebb845ff2ddd3e1e83928584bf75ca2208669f1be29adeb466b7b0b7'
+# PAPER_OBSERVED_HEAT_CONTINUITY_V1: restart availability is now explicit in
+# the audited config; prior lot hashes and every trade receipt remain intact.
+DEFAULT_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '5ec76dc4501be80b378d9af07634a26a41d41b05ee7aef74c8ca369e49c23817'
 ORDER_FLOW_ADAPTIVE_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = (
-    'fcf5bd55bf7e5e8b99c1cc9f863236eb679536c31f42bca04db83e473f55d7ba')
-COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '4ff33f9d0111846ff0d25e18f70574566a059a0832f7232bcbd1c7e887c97e10'
+    'aceeccf7612ba712d824face4d0aa8b16a6d0bfd1bc08e8f9a877ad428b4b01c')
+COST_FIRST_HASH_WITH_DEFENSIVE_ENTRY_LAYER_V1 = '4c64318c5596ea128fbcf16272facf9320b6cb32201933e18dd6438edc5b1105'
 
 
 def universe_coin(now, **overrides):

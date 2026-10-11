@@ -16,7 +16,8 @@ heat veto at decision and commit):
   acceleration, extended move, paid profile on high fees, crash, turnover,
   and a conservative veto while a rule's window is not covered by this
   process's history (5-min return; 15-min high; 60-min paid-profile lookback
-  at >= 100 bps), so a restart waits instead of judging on partial windows.
+  at >= 100 bps). PAPER_OBSERVED_HEAT_CONTINUITY_V1 restores actual windows
+  after short restarts, never grants missing coverage or bypasses a veto.
 
 The layer only removes candidates. It never admits, sizes, prices or exits
 anything, and no research result shows positive expectancy after costs:
@@ -33,6 +34,7 @@ Neither ``observe`` nor ``evaluate`` raises: an unexpected error blocks the
 candidate with ``defensive_entry_error`` (fail closed) and is counted.
 """
 import heat_veto
+import paper_heat_history
 import pool_loss_memory
 import structural_rug_guard as rug
 
@@ -91,7 +93,10 @@ class DefensiveEntryLayer:
     def __init__(self, *, registry_path=None, registry=None, history=None, clock=None, seed_paths=()):
         self.registry = (registry if registry is not None
                          else rug.TickerRegistry(registry_path, clock=clock, seed_paths=seed_paths))
-        self.history = history if history is not None else heat_veto.PairHistory()
+        self.history = (history if history is not None else
+                        paper_heat_history.PersistentPairHistory(
+                            paper_heat_history.path_for_registry(registry_path), clock=clock)
+                        if registry_path else heat_veto.PairHistory())
         self.observe_errors = 0
         self.evaluate_errors = 0
         self.last_error = None
@@ -167,6 +172,19 @@ class DefensiveEntryLayer:
         return {'version': VERSION, 'ticker_registry': self.registry.status(), 'pair_history': self.history.status(),
                 'observe_errors': self.observe_errors, 'evaluate_errors': self.evaluate_errors,
                 'last_error': self.last_error}
+
+    def flush(self):
+        """Clean-stop checkpoints of ticker AND actual heat observations; never raises."""
+        success = True
+        for target in (self.registry, self.history):
+            flush = getattr(target, 'flush', None)
+            if callable(flush):
+                try:
+                    success = flush() is not False and success
+                except Exception as exc:
+                    success = False
+                    self._note_error('observe', exc)
+        return success
 
 
 def error_decision(exc) -> dict:
@@ -260,6 +278,7 @@ def config() -> dict:
             'applies_before': ['quotes', 'flow promotion (promoted_entry_guard.flow_admission)',
                                'RugCheck (engine_rug_guard.check)', 'Jupiter price probes'],
             'structural_rug_guard': rug.config(), 'heat_veto': heat_veto.config(),
+            'pair_history_persistence': paper_heat_history.config(),
             'pool_loss_memory': pool_loss_memory.config(),
             'exits_changed': False, 'is_entry_authorization': False, 'profitability_proven': False,
             'evidence_status': 'LOSS_REDUCTION_MEASURED_NO_POSITIVE_EXPECTANCY'}

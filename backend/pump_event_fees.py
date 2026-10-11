@@ -16,7 +16,11 @@ BUY_EVENT = bytes([103, 244, 82, 31, 44, 245, 119, 119])
 SELL_EVENT = bytes([62, 47, 55, 10, 165, 3, 220, 42])
 PUBLIC_IDL_URL = 'https://raw.githubusercontent.com/pump-fun/pump-public-docs/main/idl/pump_amm.json'
 SDK_SCHEMA_URL = 'https://registry.npmjs.org/@pump-fun/pump-swap-sdk/-/pump-swap-sdk-2.0.0.tgz'
-_BUY_NAMES = ('buy', 'buy_exact_quote_in')
+_BUY_NAMES = ('buy', 'buy_exact_quote_in', 'buy_v2', 'buy_exact_quote_in_v2')
+_INSTRUCTION_SIDES = {
+    'BUY': 'BUY', 'SELL': 'SELL', 'buy': 'BUY', 'buy_exact_quote_in': 'BUY',
+    'buy_v2': 'BUY', 'buy_exact_quote_in_v2': 'BUY', 'sell': 'SELL', 'sell_v2': 'SELL',
+}
 _BPS_DENOMINATOR = 10_000
 
 
@@ -48,7 +52,7 @@ class _Reader:
 
     def instruction_name(self):
         length = self.integer(4)
-        if not 1 <= length <= len('buy_exact_quote_in'):
+        if not 1 <= length <= max(map(len, _BUY_NAMES)):
             raise _InvalidEvidence('unsupported instruction name')
         value = self.take(length).decode('utf-8', errors='strict')
         if value not in _BUY_NAMES:
@@ -89,8 +93,7 @@ def decode_fee_evidence(payload, instruction_side):
         return None
     if not isinstance(instruction_side, str):
         return None
-    expected = {'BUY': 'BUY', 'SELL': 'SELL', 'buy': 'BUY',
-                'buy_exact_quote_in': 'BUY', 'sell': 'SELL'}.get(instruction_side)
+    expected = _INSTRUCTION_SIDES.get(instruction_side)
     if expected is None:
         return None
     try:

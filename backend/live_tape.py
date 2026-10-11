@@ -61,7 +61,18 @@ WSOL = 'So11111111111111111111111111111111111111112'
 # Official pump-fun/pump-public-docs/idl/pump_amm.json checked 2026-10-05.
 SWAP_DISCRIMINATORS = {bytes([102,6,61,18,1,218,235,234]):'BUY',
                        bytes([198,46,21,82,180,217,232,112]):'BUY',
-                       bytes([51,230,133,164,1,127,131,173]):'SELL'}
+                       bytes([184,23,238,97,103,197,211,61]):'BUY',
+                       bytes([194,171,28,70,104,77,91,47]):'BUY',
+                       bytes([51,230,133,164,1,127,131,173]):'SELL',
+                       bytes([93,246,130,60,231,233,64,178]):'SELL'}
+SWAP_INSTRUCTION_NAMES = {
+    bytes([102,6,61,18,1,218,235,234]):'buy',
+    bytes([198,46,21,82,180,217,232,112]):'buy_exact_quote_in',
+    bytes([184,23,238,97,103,197,211,61]):'buy_v2',
+    bytes([194,171,28,70,104,77,91,47]):'buy_exact_quote_in_v2',
+    bytes([51,230,133,164,1,127,131,173]):'sell',
+    bytes([93,246,130,60,231,233,64,178]):'sell_v2',
+}
 EVENT_DISCRIMINATORS = {bytes([103,244,82,31,44,245,119,119]):'BUY',
                         bytes([62,47,55,10,165,3,220,42]):'SELL'}
 ANCHOR_EVENT_CPI = bytes([228,69,165,46,81,203,154,29])
@@ -87,7 +98,8 @@ YIELD_WINDOW_MS = max(60_000,int(os.getenv('NEO_TAPE_YIELD_WINDOW_MS','7200000')
 _B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 NON_SWAP_DISCRIMINATORS = {hashlib.sha256(('global:'+name).encode()).digest()[:8]
                           for name in ('create_pool','deposit','withdraw','collect_coin_creator_fee','extend_account',
-                                       'claim_token_incentives','sync_user_volume_accumulator','close_user_volume_accumulator')}
+                                       'claim_token_incentives','sync_user_volume_accumulator','close_user_volume_accumulator',
+                                       'init_user_volume_accumulator')}
 INFRA_PROGRAMS = {'11111111111111111111111111111111','TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
                   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb','ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL'}
 SESSION = requests.Session()
@@ -402,8 +414,7 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
                              and accounts[3] in (USDC,WSOL))
             if (accounts[0]==metadata['pair'] and accounts[3]!=accounts[4]
                     and (tracked_base or tracked_quote)):
-                instruction_name=('buy_exact_quote_in' if data[:8]==bytes([198,46,21,82,180,217,232,112])
-                                  else 'buy' if SWAP_DISCRIMINATORS[data[:8]]=='BUY' else 'sell')
+                instruction_name=SWAP_INSTRUCTION_NAMES[data[:8]]
                 swaps.append((index,SWAP_DISCRIMINATORS[data[:8]],accounts,instruction_name))
             else:
                 unknown = True
@@ -413,14 +424,19 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         if unknown and proves_no_pool_swap(tx,metadata,available_at=available):
             return 'non_swap',[],'VERIFIED_FOREIGN_POOL_REFERENCE_NO_SWAP'
         return ('unclassified',[],'UNSUPPORTED_POOL_INSTRUCTION') if unknown else ('non_swap',[],'NO_SUPPORTED_SWAP')
-    decimals = {}
+    decimals,mint_decimals = {},{}
     for balance in (meta.get('preTokenBalances') or [])+(meta.get('postTokenBalances') or []):
         try:
             account = keys[int(balance['accountIndex'])]
-            entry = (balance['mint'],int(balance['uiTokenAmount']['decimals']))
+            mint = balance['mint']
+            precision = int(balance['uiTokenAmount']['decimals'])
+            entry = (mint,precision)
             if account in decimals and decimals[account]!=entry:
                 return 'unclassified',[],'TOKEN_METADATA_INCONSISTENT'
+            if mint in mint_decimals and mint_decimals[mint]!=precision:
+                return 'unclassified',[],'TOKEN_METADATA_INCONSISTENT'
             decimals[account] = entry
+            mint_decimals[mint] = precision
         except (IndexError,KeyError,ValueError,TypeError):
             return 'unclassified',[],'TOKEN_METADATA_MISSING'
     stack,decoded,event_payloads = [],[],[]
@@ -466,9 +482,20 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         reversed_pool = quote_mint==metadata['address']
         token_mint,token_info = (quote_mint,quote_info) if reversed_pool else (base_mint,base_info)
         cash_mint,cash_info = (base_mint,base_info) if reversed_pool else (quote_mint,quote_info)
+        token_decimals_source = 'EVENT_ACCOUNT_BALANCE'
         if not token_info or token_info[0]!=token_mint:
-            reason = 'TRACKED_QUOTE_DECIMALS_OR_MINT_MISSING' if reversed_pool else 'BASE_DECIMALS_OR_MINT_MISSING'
-            return 'unclassified',[],reason
+            # A successful exact PumpSwap instruction binds its user token
+            # account to the instruction mint. Providers may omit that account
+            # from token balances (for example, when it is created/closed in
+            # the same transaction). Mint decimals are immutable, so use only
+            # another balance entry for this same on-chain mint; never use a
+            # scanner-supplied decimal or a different mint's balance.
+            precision = mint_decimals.get(token_mint)
+            if precision is None:
+                reason = 'TRACKED_QUOTE_DECIMALS_OR_MINT_MISSING' if reversed_pool else 'BASE_DECIMALS_OR_MINT_MISSING'
+                return 'unclassified',[],reason
+            token_info = (token_mint,precision)
+            token_decimals_source = 'SAME_MINT_TRANSACTION_BALANCE'
         if cash_mint not in (USDC,WSOL):
             return 'unclassified',[],'UNSUPPORTED_QUOTE_ASSET'
         quote_decimals = 6 if cash_mint==USDC else 9
@@ -522,6 +549,7 @@ def classify_transaction(tx,metadata,*,observed_at=None,ingested_at=None):
         decoded.append({'ts':event_time,'event_time':event_time,'observed_at':observed,'ingested_at':available,'available_at':available,
                         'event_index':log_index,'direction':token_direction,'wallet':wallet,'address':token_mint,'pairAddress':pool,
                         'symbol':metadata.get('symbol','?'),'token_raw_amount':str(token_raw),'token_decimals':token_info[1],
+                        'token_decimals_source':token_decimals_source,
                         'token_amount':token_raw/10**token_info[1],'quote_asset':cash_mint,'quote_raw_amount':str(cash_raw),
                         'quote_decimals':quote_decimals,'quote_amount':quote_amount,'usd_amount':round(usd,8) if usd is not None else None,
                         'usd_valuation_source':valuation,'quality_flags':flags,'program_id':PUMP_AMM,'slot':tx.get('slot'),

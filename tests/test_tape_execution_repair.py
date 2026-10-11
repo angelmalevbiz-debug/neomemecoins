@@ -183,6 +183,46 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(events[0]['token_raw_amount'],'1234000000')
         self.assertEqual(events[0]['available_at'],NOW+1500)
 
+    def test_official_pumpswap_v2_buy_and_sell_instructions_restore_exact_flow(self):
+        variants = (
+            (bytes.fromhex('b817ee6167c5d33d'), 'BUY'),
+            (bytes.fromhex('c2ab1c46684d5b2f'), 'BUY'),
+            (bytes.fromhex('5df6823ce7e940b2'), 'SELL'),
+        )
+        for discriminator,direction in variants:
+            with self.subTest(discriminator=discriminator.hex()):
+                tx=transaction(direction)
+                tx['transaction']['message']['instructions'][0]['data']=tape._b58encode(discriminator)
+                state,events,reason=tape.classify_transaction(tx,META,ingested_at=NOW)
+                self.assertEqual((state,reason),('processed',None))
+                self.assertEqual(len(events),1)
+                self.assertEqual(events[0]['direction'],direction)
+
+    def test_missing_user_token_balance_uses_only_same_mint_transaction_decimals(self):
+        tx=transaction()
+        tx['meta']['preTokenBalances']=[b for b in tx['meta']['preTokenBalances'] if b['accountIndex']!=5]
+        tx['transaction']['message']['accountKeys'].append({'pubkey':pubkey(9)})
+        tx['meta']['postTokenBalances']=[{'accountIndex':9,'mint':MINT,
+            'uiTokenAmount':{'amount':'100','decimals':6}}]
+        state,events,reason=tape.classify_transaction(tx,META,ingested_at=NOW)
+        self.assertEqual((state,reason),('processed',None))
+        self.assertEqual(events[0]['token_decimals'],6)
+        self.assertEqual(events[0]['token_decimals_source'],'SAME_MINT_TRANSACTION_BALANCE')
+
+    def test_missing_user_token_balance_without_same_mint_proof_stays_unclassified(self):
+        tx=transaction()
+        tx['meta']['preTokenBalances']=[b for b in tx['meta']['preTokenBalances'] if b['accountIndex']!=5]
+        state,events,reason=tape.classify_transaction(tx,META,ingested_at=NOW)
+        self.assertEqual((state,events,reason),('unclassified',[],'BASE_DECIMALS_OR_MINT_MISSING'))
+
+    def test_pumpswap_user_volume_init_is_known_non_swap_not_unknown_flow(self):
+        tx=non_swap()
+        instruction=tx['transaction']['message']['instructions'][0]
+        instruction['programId']=tape.PUMP_AMM
+        instruction['data']=tape._b58encode(bytes.fromhex('5e06ca73ff60e8b7'))
+        state,events,reason=tape.classify_transaction(tx,META,ingested_at=NOW)
+        self.assertEqual((state,events,reason),('non_swap',[],'NO_SUPPORTED_SWAP'))
+
     def test_multiple_swaps_kept_separate(self):
         state,events,_=tape.classify_transaction(transaction(swaps=2),META,ingested_at=NOW)
         self.assertEqual(state,'processed');self.assertEqual(len(events),2)

@@ -73,7 +73,7 @@ class CompletePumpEventFeesTests(unittest.TestCase):
         self.assertEqual(result['version'], 'OBSERVED_PUMP_EVENT_FEES_V1')
 
     def test_buy_and_exact_quote_in_use_full_variable_name_tail(self):
-        for name in ('buy', 'buy_exact_quote_in'):
+        for name in ('buy', 'buy_exact_quote_in', 'buy_v2', 'buy_exact_quote_in_v2'):
             with self.subTest(name=name):
                 payload = event_fixture('BUY', instruction_name=name)
                 result = fees.decode_fee_evidence(payload, name)
@@ -159,8 +159,16 @@ class CompletePumpEventFeesTests(unittest.TestCase):
         self.assertIsNone(fees.decode_fee_evidence(event_fixture('BUY'), 'SELL'))
         self.assertIsNone(fees.decode_fee_evidence(event_fixture('BUY'), 'buy_exact_quote_in'))
         self.assertIsNone(fees.decode_fee_evidence(event_fixture('BUY', instruction_name='buy_exact_quote_in'), 'buy'))
+        self.assertIsNone(fees.decode_fee_evidence(event_fixture('BUY', instruction_name='buy_v2'), 'buy'))
+        self.assertIsNone(fees.decode_fee_evidence(
+            event_fixture('BUY', instruction_name='buy_exact_quote_in_v2'), 'buy_v2'))
         for side in ('buy_v2', '', 'buy ', None, 1, {}):
             self.assertIsNone(fees.decode_fee_evidence(event_fixture('BUY'), side))
+
+    def test_sell_v2_uses_the_same_sell_event_and_fee_schema(self):
+        result = fees.decode_fee_evidence(event_fixture('SELL'), 'sell_v2')
+        self.assertEqual(result['instruction_side'], 'SELL')
+        self.assertEqual(result['fee_bps'], 30)
 
     def test_partial_legacy_or_unknown_full_tails_remain_unsupported(self):
         for payload, side in ((event_fixture(), 'SELL'), (event_fixture('BUY'), 'BUY')):

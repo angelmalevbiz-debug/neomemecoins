@@ -47,6 +47,13 @@ WINDOW_MS = 300_000
 DECISION_FLOW_WINDOW_MS = 30_000
 MAX_DISCOVERY_LAG_MS = DECISION_FLOW_WINDOW_MS
 POLL_SECONDS = float(os.getenv('NEO_TAPE_POLL_SECONDS','2.0'))
+RECLASSIFICATION_WINDOW_MS = 60_000
+RECLASSIFICATION_REASONS = frozenset({
+    'FUTURE_OR_INCONSISTENT_EVENT_TIME',
+    'QUOTE_USD_UNKNOWN_OR_ESTIMATED_WITHOUT_ROUTE',
+})
+RECLASSIFICATION_RETRY_BASE_MS = 2_000
+RECLASSIFICATION_RETRY_MAX_MS = 30_000
 ATOMIC_REPLACE_ATTEMPTS = 8
 PUMP_AMM = 'pAMMBay6oceH9fJKBRHGP5D4bD4sWpmSwMn52FMfXEA'
 USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -573,6 +580,20 @@ def _is_shadow_event(event):
     return UNVALIDATED_DECODER_FLAG in (event.get('quality_flags') or ())
 
 
+def _is_verified_fx_revaluation(previous,current):
+    """Allow only an exact-leg event's FX-only defect to be repaired by a fresh Jupiter route."""
+    previous_flags=set(previous.get('quality_flags') or ())
+    if not previous_flags or not previous_flags<=FX_REFERENCE_FLAGS:
+        return False
+    if current.get('quality_flags') or current.get('usd_valuation_source')!='JUPITER_CONVERSION_QUOTE_REFERENCE':
+        return False
+    identity_fields=('event_time','event_index','direction','address','pairAddress','token_raw_amount',
+                     'token_decimals','quote_asset','quote_raw_amount','quote_decimals','pool_orientation',
+                     'onchain_direction','onchain_base_mint','onchain_quote_mint','onchain_base_raw_amount',
+                     'onchain_quote_raw_amount')
+    return all(previous.get(field)==current.get(field) for field in identity_fields)
+
+
 def _pair_filter(pairs):
     """SQL fragment restricting the pending queue to the current selection."""
     if pairs is None:
@@ -585,10 +606,12 @@ def _pair_filter(pairs):
 
 class TapeRecorder:
     def __init__(self,path,*,clock=now_ms,page_size=PAGE_SIZE,page_budget=PAGE_BUDGET,tx_budget=TX_BUDGET,
-                 historical_tx_budget=HISTORICAL_TX_BUDGET,yield_window_ms=YIELD_WINDOW_MS):
+                 historical_tx_budget=HISTORICAL_TX_BUDGET,yield_window_ms=YIELD_WINDOW_MS,
+                 reclassification_tx_budget=8):
         self.path,self.clock = Path(path),clock
         self.page_size,self.page_budget,self.tx_budget = page_size,page_budget,tx_budget
         self.historical_tx_budget = max(0,int(historical_tx_budget))
+        self.reclassification_tx_budget = max(0,int(reclassification_tx_budget))
         # Per pool, one in-memory row per poll: (classified_at, bodies, decoded
         # swaps, engine-usable swaps, shadow-path swaps). Restart starts from zero,
         # so shedding is conservative and never touches the durable journal.
@@ -619,6 +642,9 @@ class TapeRecorder:
                 event_time INTEGER NOT NULL,available INTEGER NOT NULL,payload TEXT NOT NULL);
             CREATE INDEX IF NOT EXISTS shadow_event_time_idx ON shadow_events(event_time);
             CREATE INDEX IF NOT EXISTS shadow_event_pair_time_idx ON shadow_events(pair,event_time);
+            CREATE TABLE IF NOT EXISTS event_reclassifications(event_id TEXT NOT NULL,signature TEXT NOT NULL,
+                pair TEXT NOT NULL,reclassified_at INTEGER NOT NULL,previous_payload TEXT NOT NULL,
+                replacement_payload TEXT NOT NULL,PRIMARY KEY(event_id,reclassified_at));
         ''')
         self.db.commit()
 
@@ -770,7 +796,7 @@ class TapeRecorder:
                     next_active.append(metadata)
             active = next_active
 
-    def process(self,rpc,pairs=None):
+    def process(self,rpc,pairs=None,current_metadata=None):
         # Prioritize on-chain time: an old pagination row discovered just now
         # must not displace an already observed live transaction. Large legacy
         # retry queues remain durable, but get only a small maintenance budget
@@ -794,6 +820,27 @@ class TapeRecorder:
         groups = {}
         for row in pending:
             groups.setdefault(row['signature'],[]).append(row)
+        reclassification_budget=min(self.reclassification_tx_budget,max(0,self.tx_budget-len(groups)))
+        if reclassification_budget:
+            # Only retry recent, plausibly transient classifications, and only
+            # when the live body queue leaves room. These rows retain their
+            # conservative unclassified state until a complete re-read passes.
+            reason_placeholders=','.join('?' for _ in RECLASSIFICATION_REASONS)
+            retry_params=tuple(sorted(RECLASSIFICATION_REASONS))
+            recent_cutoff=current-RECLASSIFICATION_WINDOW_MS
+            retry_filter, retry_filter_params = _pair_filter(pairs)
+            eligible_recent=f'''SELECT * FROM signatures INDEXED BY signature_pair_window_idx
+                WHERE state='unclassified' AND reason IN ({reason_placeholders}) AND next_retry<=?
+                AND event_time>=? {retry_filter}
+                UNION ALL SELECT * FROM signatures INDEXED BY signature_pair_window_idx
+                WHERE state='unclassified' AND reason IN ({reason_placeholders}) AND next_retry<=?
+                AND event_time IS NULL AND observed>=? {retry_filter}'''
+            rechecks=self.db.execute(
+                f'SELECT * FROM ({eligible_recent}) '+order,
+                (*retry_params,current,recent_cutoff,*retry_filter_params,
+                 *retry_params,current,recent_cutoff,*retry_filter_params,reclassification_budget)).fetchall()
+            for row in rechecks:
+                groups.setdefault(row['signature'],[]).append(row)
         calls = [('getTransaction',[sig,{'encoding':'jsonParsed','commitment':'confirmed','maxSupportedTransactionVersion':1}]) for sig in groups]
         if not calls:
             return
@@ -807,12 +854,18 @@ class TapeRecorder:
         # A current owner observation can help only complete successful foreign
         # references with no Pump execution. Keep it ephemeral: no saved metadata
         # claim is trusted and no terminal historical classification is rewritten.
+        fresh_metadata_by_pair={row['pair']:dict(row) for row in (current_metadata or [])
+                                if isinstance(row,dict) and isinstance(row.get('pair'),str)}
         classification_metadata, owner_candidates, owner_candidate_keys = {},[],set()
         for signature,answer in zip(groups,answers):
             tx = answer.get('result') if not answer.get('error') else None
             for row in groups[signature]:
                 try:
                     metadata = json.loads(row['metadata'])
+                    fresh_metadata=fresh_metadata_by_pair.get(row['pair'])
+                    if (fresh_metadata and fresh_metadata.get('address')==metadata.get('address')
+                            and fresh_metadata.get('pair')==metadata.get('pair')):
+                        metadata={**metadata,**fresh_metadata}
                     metadata.pop('pool_owner_proof',None)
                     classification_metadata[(signature,row['pair'])] = metadata
                     event_time = row['event_time'] if row['event_time'] is not None else row['observed']
@@ -840,26 +893,75 @@ class TapeRecorder:
                         classification,events,reason = classify_transaction(tx,metadata,observed_at=row['observed'],ingested_at=self.clock())
                     except (ValueError,TypeError,KeyError,IndexError,AttributeError,OverflowError):
                         classification,events,reason = 'unclassified',[],'TRANSACTION_SCHEMA_MISMATCH'
-                if classification!='retry':
-                    bodies,decoded,usable,shadow = yield_counts.get(row['pair'],(0,0,0,0))
-                    yield_counts[row['pair']] = (
-                        bodies+1,
-                        decoded+sum(1 for event in events if set(event.get('quality_flags') or ())<=FX_REFERENCE_FLAGS),
-                        usable+sum(1 for event in events if not event.get('quality_flags')),
-                        shadow+sum(1 for event in events if _is_shadow_event(event)))
+                final_classification,final_reason=classification,reason
                 with self.db:
+                    event_rows=[]
                     for event in events:
                         event.update(signature=signature,slot=event.get('slot') or row['slot'])
                         event_id = f"{signature}:{row['pair']}:{event['event_index']}"
                         event['event_id'] = event_id
                         # Shadow-path events never enter the projection table.
                         table = SHADOW_EVENTS_TABLE if _is_shadow_event(event) else 'events'
-                        self.db.execute(f'INSERT OR IGNORE INTO {table} VALUES(?,?,?,?,?,?)',
-                            (event_id,signature,row['pair'],event['event_time'],event['available_at'],json.dumps(event,allow_nan=False)))
+                        payload=json.dumps(event,allow_nan=False)
+                        event_rows.append((table,event_id,event,payload))
+                    if row['state']=='unclassified' and final_classification=='processed':
+                        prior_rows={}
+                        for table in {item[0] for item in event_rows}:
+                            prior_rows.update({saved['event_id']:(table,saved['payload']) for saved in self.db.execute(
+                                f'SELECT event_id,payload FROM {table} WHERE signature=? AND pair=?',
+                                (signature,row['pair']))})
+                        new_ids={item[1] for item in event_rows}
+                        if prior_rows and set(prior_rows)!=new_ids:
+                            final_classification,final_reason='unclassified','RECLASSIFICATION_EVENT_MISMATCH'
+                        else:
+                            for table,event_id,event,payload in event_rows:
+                                if event_id not in prior_rows:
+                                    continue
+                                prior_table,prior_payload=prior_rows[event_id]
+                                previous=json.loads(prior_payload)
+                                if previous==event:
+                                    continue
+                                if (prior_table!=table or not _is_verified_fx_revaluation(previous,event)):
+                                    final_classification,final_reason='unclassified','RECLASSIFICATION_EVENT_MISMATCH'
+                                    break
+                    if final_classification=='processed' and row['state']=='unclassified':
+                        for table,event_id,event,payload in event_rows:
+                            previous=self.db.execute(f'SELECT payload FROM {table} WHERE event_id=?',(event_id,)).fetchone()
+                            if previous and previous['payload']!=payload:
+                                self.db.execute('''INSERT INTO event_reclassifications(event_id,signature,pair,
+                                    reclassified_at,previous_payload,replacement_payload) VALUES(?,?,?,?,?,?)''',
+                                    (event_id,signature,row['pair'],self.clock(),previous['payload'],payload))
+                                self.db.execute(f'UPDATE {table} SET available=?,payload=? WHERE event_id=?',
+                                    (event['available_at'],payload,event_id))
+                            else:
+                                self.db.execute(f'INSERT OR IGNORE INTO {table} VALUES(?,?,?,?,?,?)',
+                                    (event_id,signature,row['pair'],event['event_time'],event['available_at'],payload))
+                    else:
+                        for table,event_id,event,payload in event_rows:
+                            self.db.execute(f'INSERT OR IGNORE INTO {table} VALUES(?,?,?,?,?,?)',
+                                (event_id,signature,row['pair'],event['event_time'],event['available_at'],payload))
                     attempts = row['attempts']+1
                     delay = min(60_000,1000*2**min(attempts-1,6))
+                    retry_at=0
+                    if (final_classification=='retry'
+                            or (final_classification=='unclassified'
+                                and final_reason in RECLASSIFICATION_REASONS
+                                and max(int(row['event_time'] or 0),int(row['observed']))
+                                    >=self.clock()-RECLASSIFICATION_WINDOW_MS)):
+                        retry_delay=min(RECLASSIFICATION_RETRY_MAX_MS,
+                                        RECLASSIFICATION_RETRY_BASE_MS*2**min(max(0,attempts-1),4))
+                        retry_at=self.clock()+retry_delay
                     self.db.execute('UPDATE signatures SET state=?,attempts=?,next_retry=?,reason=? WHERE signature=? AND pair=?',
-                        ('pending' if classification=='retry' else classification,attempts,self.clock()+delay if classification=='retry' else 0,reason,signature,row['pair']))
+                        ('pending' if final_classification=='retry' else final_classification,attempts,
+                         self.clock()+delay if final_classification=='retry' else retry_at,
+                         final_reason,signature,row['pair']))
+                if final_classification!='retry':
+                    bodies,decoded,usable,shadow = yield_counts.get(row['pair'],(0,0,0,0))
+                    yield_counts[row['pair']] = (
+                        bodies+1,
+                        decoded+sum(1 for event in events if set(event.get('quality_flags') or ())<=FX_REFERENCE_FLAGS),
+                        usable+sum(1 for event in events if not event.get('quality_flags')),
+                        shadow+sum(1 for event in events if _is_shadow_event(event)))
         self._record_yield(self.clock(),yield_counts)
 
     def snapshot(self,feed):
@@ -926,7 +1028,7 @@ class TapeRecorder:
 
     def poll(self,feed,rpc=rpc_batch):
         self.discover(feed,rpc)
-        self.process(rpc,pairs=[metadata['pair'] for metadata in feed])
+        self.process(rpc,pairs=[metadata['pair'] for metadata in feed],current_metadata=feed)
         return self.snapshot(feed)
 
 

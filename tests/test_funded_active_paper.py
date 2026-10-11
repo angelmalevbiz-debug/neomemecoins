@@ -171,6 +171,23 @@ class ActivePolicyTests(unittest.TestCase):
         self.assertLess(p['entry_roundtrip_pnl_pct'], 0)
         for key in ('history', 'starting_balance', 'balance'):
             self.assertEqual(self.book[key], before[key])
+        diagnostics=self.book['entry_diagnostics']
+        self.assertEqual(diagnostics['market_screen']['evaluated'],1)
+        self.assertEqual(diagnostics['market_screen']['passed'],1)
+        self.assertEqual(diagnostics['opened_this_refresh'],1)
+        self.assertEqual(diagnostics['commit_recheck_rejected'],0)
+
+    def test_entry_funnel_excludes_unusable_feed_and_deduplicates_exact_pool(self):
+        c=coin()
+        stale={**coin(1),'updatedAt':NOW-1_000_000}
+        lab.maybe_open([c,{**c,'updatedAt':NOW-100},stale],{})
+        diagnostics=self.book['entry_diagnostics']
+        screen=diagnostics['market_screen']
+        self.assertEqual((screen['feed_rows'],screen['unusable_feed_rows'],screen['duplicate_usable_rows']),(3,1,1))
+        self.assertEqual(screen['evaluated'],1)
+        self.assertEqual(screen['passed'],diagnostics['signal_candidates'])
+        self.assertEqual(diagnostics['opened_this_refresh'],0)
+        self.assertIsNone(self.book['position'])
 
     def test_all_four_books_use_the_same_admission_not_just_early(self):
         for sid in active.RULES:

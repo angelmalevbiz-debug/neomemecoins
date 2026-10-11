@@ -1,5 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import LabEntryStatus from '../src/components/LabEntryStatus';
+import { entryRejectionRows } from '../src/lib/labStrategyView';
+
+test('entry funnel names market, defense and evidence without claiming orders or fabricated zeroes', () => {
+  const book={id:'EARLY',starting_balance:1000,balance:950,entry_diagnostics:{
+    signal_candidates:1,market_screen:{evaluated:90,passed:1,rejected:89,already_open:0,
+      primary_rejections:{market_age:58,market_liquidity:31}},
+    defensive_entry:{primary_rejections:{heat_buy_share_5m:1}},
+    promoted_block_reasons:{promoted_verified_flow_unavailable:2}}};
+  const html=renderToStaticMarkup(createElement(LabEntryStatus,{book,backendAvailable:true}));
+  for(const text of ['1/90','Възраст извън диапазона: 58','не са брой сделки','Дял на покупките',
+    'Чака пресен потвърден поток: 2','Допустими за избор след всички проверки: —']) assert.ok(html.includes(text),text);
+  assert.doesNotMatch(renderToStaticMarkup(createElement(LabEntryStatus,{book,backendAvailable:false})),/funded-entry-funnel/);
+  assert.deepEqual(entryRejectionRows({market_age:2,unknown_code:1,invalid:-1}),[
+    {code:'market_age',count:2,label:'Възраст извън диапазона'},
+    {code:'unknown_code',count:1,label:'unknown_code'}]);
+});
 import { fundedActiveSummary, profitProtectionSummary, labEntryStatus } from '../src/lib/labStrategyView';
 
 test('owner requested 250 policy shows uncapped soft limits, not zero risk or infinite cash', () => {

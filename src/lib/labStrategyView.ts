@@ -259,6 +259,24 @@ export function planningCostStatus(data?: CostFeasibility) {
 }
 
 export type LabEntryViewDiagnostics = {
+  at?: number;
+  market_screen?: {
+    evaluated?: number; passed?: number; rejected?: number; already_open?: number;
+    feed_rows?: number; unusable_feed_rows?: number; duplicate_usable_rows?: number;
+    primary_rejections?: Record<string, number>;
+    failed_constraints?: Record<string, number>;
+  };
+  defensive_rejected?: number;
+  network_cost_rejected?: number;
+  price_verification_rejected?: number;
+  price_crosscheck_pending?: number;
+  cooldown_rejected?: number;
+  commit_recheck_rejected?: number;
+  opened_this_refresh?: number;
+  promoted_flow_rejected?: number;
+  promoted_safety_rejected?: number;
+  promoted_block_reasons?: Record<string, number>;
+  defensive_entry?: { primary_rejections?: Record<string, number> };
   blocked_reason?: string;
   signal_candidates?: number;
   matched_candidates?: number;
@@ -276,6 +294,21 @@ export type LabEntryViewDiagnostics = {
   cost_feasibility?: CostFeasibility;
   promoted_cost_feasibility?: CostFeasibility;
 };
+
+const marketReasons: Record<string, string> = {
+  market_input_invalid: 'Липсващи/невалидни пазарни данни', market_dex: 'Не е PumpSwap',
+  market_quote: 'Котировката не е SOL', market_age: 'Възраст извън диапазона',
+  market_liquidity: 'Недостатъчна ликвидност', market_move_5m: 'Движение за 5 мин. извън диапазона',
+  market_move_1h: 'Движение за 1 ч. извън диапазона', market_buy_sell: 'Слабо съотношение покупки/продажби за 5 мин.',
+  market_liquidity_cap: 'Ликвидност/капитализация извън диапазона',
+  market_turnover: 'Часов обем/ликвидност извън диапазона',
+};
+
+export function entryRejectionRows(counts: Record<string, number> = {}) {
+  return Object.entries(counts).filter(([, count]) => Number.isInteger(count) && count > 0)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([code, count]) => ({ code, count, label: marketReasons[code] ?? reasons[code] ?? code }));
+}
 
 type EntryViewBook = ViewBook & { entry_diagnostics?: LabEntryViewDiagnostics };
 type EntryView = { status: string; detail: string | null; costLimited: boolean };

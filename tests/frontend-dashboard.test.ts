@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import PaperPortfolioHistory, { exitImpactEmergencySummary } from '../src/components/PaperPortfolioHistory';
 import { promotedPaperPortfolio } from '../src/lib/paperPortfolioState';
 import {
-  backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus,
+  backendErrorMessage, CACHE_MAX_AGE_MS, clearAccountStateCache, dashboardConnectionStatus, engineLearningScope,
   initialDashboardConnection, moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable,
   personalEngineEntryView, quotePreparationSummary, readAccountStateCache, RESPONSE_MAX_AGE_MS, tokenDetailForAddress, writeAccountStateCache,
 } from '../src/lib/paperDashboardState';
@@ -17,6 +17,13 @@ test('paused private engine is not starting or evidence of all funded books stop
   assert.equal(personalEngineEntryView(false,false).status,'НЕПОТВЪРДЕНО');
   assert.equal(personalEngineEntryView(true,undefined).status,'ЧАКА ДАННИ');
   assert.equal(personalEngineEntryView(true,true,{status:'scanning'}).status,'SCANNING');
+});
+
+test('learning report is scoped to the engine serving the current account, not shared funded history', () => {
+  assert.match(engineLearningScope.label,/текущата сметка/);
+  assert.match(engineLearningScope.detail,/личният PAPER engine/);
+  assert.match(engineLearningScope.detail,/не споделеният основен engine/);
+  assert.match(engineLearningScope.detail,/не четирите финансирани/);
 });
 
 class MemoryStorage implements Storage {

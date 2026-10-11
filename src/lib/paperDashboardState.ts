@@ -106,6 +106,13 @@ export function personalEngineEntryView(connected: boolean, running?: boolean, d
     message: diagnostics?.message ?? 'Сметката работи; изчаква се диагностика от нейното сканиране.' };
 }
 
+// /user/state proxies the current user's engine. Its learning snapshot derives
+// from that engine's own history; only strategy_lab is read from a shared file.
+export const engineLearningScope = {
+  label: 'Engine на текущата сметка · отделен отчет',
+  detail: 'Отчетът използва историята на engine-а за текущата сметка. През gateway това е личният PAPER engine, не споделеният основен engine и не четирите финансирани стратегии. Съвпадащите имена на правила не означават същите сделки или баланси.',
+};
+
 export type QuotePreparationDiagnostics = {
   quote_attempts?: number; quote_defers?: number;
   quote_preparation_codes?: Record<string, number>; quote_preparation_codes_rolling?: Record<string, number>;

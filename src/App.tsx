@@ -19,7 +19,7 @@ import { promotedPaperPortfolio } from './lib/paperPortfolioState';
 import { costCapRule, forwardCapitalNote, forwardCloseNote, isArchivedStrategy, isForwardCashExhausted, isForwardTestBook, isForwardZeroCapital, labForwardNote, labForwardSummary, fundedActiveSummary, profitProtectionSummary, partitionLabStrategies, planningCostStatus, quoteFailureStatus, type ProfitProtection, type FundedActiveStats, type StrategyLifecycle, type CostFeasibility } from './lib/labStrategyView';
 import LabEntryStatus from './components/LabEntryStatus';
 import {
-  backendErrorMessage, dashboardConnectionStatus, initialDashboardConnection,
+  backendErrorMessage, dashboardConnectionStatus, engineLearningScope, initialDashboardConnection,
   moneyOrUnavailable, paperApiConfiguration, percentageOrUnavailable, personalEngineEntryView, quotePreparationSummary, readAccountStateCache, tokenDetailForAddress, writeAccountStateCache,
 } from './lib/paperDashboardState';
 
@@ -395,8 +395,8 @@ export default function App() {
           {quotePreparationText && <p className="mt-2 text-[10px] leading-5 text-slate-400" data-testid="quote-preparation-codes">{quotePreparationText}</p>}
         </div>
         <div className="border-t border-white/[0.06] pt-4 lg:border-l lg:border-t-0 lg:pl-4 lg:pt-0">
-          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">Споделен основен engine · отделен отчет</div><h2 className="mt-1 text-sm font-black text-white">Резултат по правила и изходи на загуба</h2></div><span className="text-[9px] text-slate-500">{state?.strategy_learning?.policy_version ?? '—'}</span></div>
-          <p className="mt-2 text-[10px] text-slate-500">Това не е отчетът на четирите финансирани стратегии. Съвпадащите имена на правила тук не означават същите сделки или баланси.</p>
+          <div className="flex items-center justify-between gap-3"><div><div className="text-[9px] font-black uppercase tracking-[0.16em] text-cyan-200">{engineLearningScope.label}</div><h2 className="mt-1 text-sm font-black text-white">Резултат по правила и изходи на загуба</h2></div><span className="text-[9px] text-slate-500">{state?.strategy_learning?.policy_version ?? '—'}</span></div>
+          <p className="mt-2 text-[10px] text-slate-500">{engineLearningScope.detail}</p>
           <div className="mt-2 text-[10px] text-slate-400">{state?.strategy_learning ? `${state.strategy_learning.closed_trades} валидни затворени сделки · ${state.strategy_learning.closed_trades ? `${state.strategy_learning.win_rate_pct.toFixed(1)}% печеливши` : 'успеваемост —'} · ${moneyOrUnavailable(state.strategy_learning.net_pnl_usd, true)} нето` : 'Няма отчет от текущата политика.'}</div>
           {state?.strategy_learning?.window_max_closed_trades && <div className="mt-1 text-[9px] text-slate-500">Извадка: последните до {state.strategy_learning.window_max_closed_trades} валидни затваряния за всяко правило от текущата политика.</div>}
           {Object.entries(state?.strategy_learning?.ignored_data || {}).some(([reason, count]) => reason !== 'other_policy' && count > 0) && <div className="mt-1 text-[9px] text-amber-200">Изключени невалидни или повторени данни. Отчетът използва само проверени затваряния.</div>}
